@@ -1,0 +1,11 @@
+[package]
+name = "simulacao"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Motor puro e determinístico de simulação geopolítica, econômica e política da Guerra Fria (1945+)"
+
+[dependencies]
+ron.workspace = true
+serde.workspace = true
+thiserror.workspace = true
