@@ -1,0 +1,32 @@
+# Rust / Cargo
+/target/
+**/target/
+**/*.rs.bk
+
+# Python / Ferramentas Auxiliares
+venv/
+.venv/
+ENV/
+tools/venv/
+tools/pydeps/
+**/pydeps/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Dados Geográficos Brutos Baixados (Natural Earth, shapefiles, zips)
+/data/raw/
+*.zip
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+
+# Sistema Operacional / Editores
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
