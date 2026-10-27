@@ -2,7 +2,7 @@
 //! e rotas comerciais de importação/exportação entre mercados.
 
 use crate::catalogo::CatalogoEconomia;
-use crate::entidades::{ConfigSimulacao, Mercado, Pais, RotaComercial};
+use crate::entidades::{BlocoComercial, ConfigSimulacao, Mercado, Pais, RotaComercial};
 use crate::tipos::FormulaPreco;
 
 /// Calcula o preço instantâneo de equilíbrio de um bem a partir de `preco_base`, `oferta` e `demanda`.
@@ -57,6 +57,7 @@ pub(crate) fn processar_rotas_comerciais(
     mercados: &[Mercado],
     paises: &mut [Pais],
     rotas: &mut [RotaComercial],
+    blocos: &[BlocoComercial],
     proxima_oferta: &mut [f64],
     proxima_demanda: &mut [f64],
     importacoes_liquidas: &mut [f64],
@@ -79,17 +80,54 @@ pub(crate) fn processar_rotas_comerciais(
         let p_orig = mercados[m_orig].precos_idx[g];
         let p_dest = mercados[m_dest].precos_idx[g];
         let preco_base = catalogo.bens[g].preco_base;
+        let bem_id = &catalogo.bens[g].id;
 
         let pais_lider_orig = mercados[m_orig].pais_lider_idx;
         let pais_lider_dest = mercados[m_dest].pais_lider_idx;
-        let tarifa_exp = paises[pais_lider_orig]
+        let id_orig = &paises[pais_lider_orig].id;
+        let id_dest = &paises[pais_lider_dest].id;
+
+        // Acordo comercial bilateral entre os líderes ou operador da rota
+        let tem_acordo = paises[pais_lider_orig].acordos_comerciais.iter().any(|id| id == id_dest)
+            || paises[pais_lider_dest].acordos_comerciais.iter().any(|id| id == id_orig)
+            || paises[rota.pais_operador_idx].acordos_comerciais.iter().any(|id| id == id_orig || id == id_dest);
+
+        // Blocos comerciais (ex.: Bloco Soviético fechado até COMECON)
+        let bloco_orig = blocos.iter().find(|b| b.membros.iter().any(|m| m == id_orig));
+        let bloco_dest = blocos.iter().find(|b| b.membros.iter().any(|m| m == id_dest));
+
+        let mesmo_bloco_comecon = match (bloco_orig, bloco_dest) {
+            (Some(bo), Some(bd)) => bo.id == bd.id && bo.comecon_ativo,
+            _ => false,
+        };
+
+        let orig_fechada = bloco_orig.map_or(false, |b| b.fechado && bloco_dest.map_or(true, |bd| bd.id != b.id));
+        let dest_fechada = bloco_dest.map_or(false, |b| b.fechado && bloco_orig.map_or(true, |bo| bo.id != b.id));
+
+        // Mercados fechados de um bloco recusam rotas externas se não houver acordo bilateral
+        if (orig_fechada || dest_fechada) && !tem_acordo {
+            rota.volume_atual = 0.0;
+            rota.lucro_ultimo_tick = 0.0;
+            continue;
+        }
+
+        let mut tarifa_exp = paises[pais_lider_orig]
             .politica_fiscal
-            .tarifa_exportacao
-            .max(0.0);
-        let tarifa_imp = paises[pais_lider_dest]
+            .tarifa_exportacao_bem(bem_id);
+        let mut tarifa_imp = paises[pais_lider_dest]
             .politica_fiscal
-            .tarifa_importacao
-            .max(0.0);
+            .tarifa_importacao_bem(bem_id);
+
+        if mesmo_bloco_comecon {
+            // COMECON ativo: isenção total de tarifas intra-bloco
+            tarifa_exp = 0.0;
+            tarifa_imp = 0.0;
+        } else if tem_acordo {
+            // Acordo bilateral reduz tarifas em 85%
+            tarifa_exp *= 0.15;
+            tarifa_imp *= 0.15;
+        }
+
         let mult_lei_operador = paises[rota.pais_operador_idx].mult_volume_comercio_lei;
 
         // Custo logístico base de 4% do preço-base por unidade comercializada
@@ -97,8 +135,9 @@ pub(crate) fn processar_rotas_comerciais(
         let receita_liquida_unit = p_dest / (1.0 + tarifa_imp);
         let margem_unitaria = receita_liquida_unit - custo_unitario;
 
+        let bonus_bloco = if mesmo_bloco_comecon { 1.25 } else { 1.0 };
         let oferta_origem_disponivel = proxima_oferta[m_orig * num_bens + g];
-        let teto_operacional = (rota.volume_maximo * mult_lei_operador)
+        let teto_operacional = (rota.volume_maximo * mult_lei_operador * bonus_bloco)
             .min((oferta_origem_disponivel * 0.45).max(1.0));
 
         if rota.automatica {

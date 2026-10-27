@@ -9,6 +9,7 @@ use plugins::{
     audio::AudioPlugin,
     economia_sim::EconomiaSimPlugin,
     economy::{EconomyPlugin, RecursoMundo},
+    comercio_ui::ComercioUiPlugin,
     mercado_ui::MercadoUiPlugin,
     jogador::JogadorPlugin,
     map::MapPlugin,
@@ -61,6 +62,6 @@ fn main() {
         .insert_resource(RecursoMundo(mundo))
         .insert_resource(plugins::map::RaizProjeto(raiz))
         .insert_resource(plugins::map::RecursoCatalogo(catalogo))
-        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin))
+        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin))
         .run();
 }
