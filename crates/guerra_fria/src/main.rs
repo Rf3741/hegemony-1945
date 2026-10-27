@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use bevy::window::WindowResolution;
 use bevy_egui::EguiPlugin;
 use plugins::{
+    audio::AudioPlugin,
     economy::{EconomyPlugin, RecursoMundo},
     map::MapPlugin,
     politics::PoliticsPlugin,
@@ -44,7 +45,7 @@ fn main() {
     .expect("provinces.ron inválido");
 
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
+        .add_plugins(DefaultPlugins.set(AssetPlugin { file_path: raiz.join("assets").to_string_lossy().into_owned(), ..default() }).set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Guerra Fria - 1945".into(),
                 resolution: WindowResolution::new(1600, 900),
@@ -56,6 +57,6 @@ fn main() {
         .insert_resource(RecursoMundo(mundo))
         .insert_resource(plugins::map::RaizProjeto(raiz))
         .insert_resource(plugins::map::RecursoCatalogo(catalogo))
-        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, PoliticsPlugin, MapPlugin, UiPlugin))
+        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, PoliticsPlugin, MapPlugin, UiPlugin, AudioPlugin))
         .run();
 }
