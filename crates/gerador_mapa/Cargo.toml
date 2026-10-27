@@ -10,5 +10,5 @@ image.workspace = true
 ron.workspace = true
 serde.workspace = true
 shapefile.workspace = true
-simulacao.workspace = true
+gf_mapa.workspace = true
 thiserror.workspace = true

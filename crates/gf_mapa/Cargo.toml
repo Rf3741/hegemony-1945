@@ -1,0 +1,11 @@
+[package]
+name = "gf_mapa"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Mapa (projecao de Miller, cor RGB de provincias, catalogo) e tempo (calendario, relogio) do jogo Guerra Fria"
+
+[dependencies]
+ron.workspace = true
+serde.workspace = true
+thiserror.workspace = true

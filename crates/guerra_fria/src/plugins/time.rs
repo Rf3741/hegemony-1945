@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use simulacao::tempo::{DataSimulacao, RelogioSimulacao, VelocidadeJogo};
+use gf_mapa::tempo::{DataSimulacao, RelogioSimulacao, VelocidadeJogo};
 
 /// Evento disparado quando um dia se passa na simulação.
 #[allow(dead_code)]

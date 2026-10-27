@@ -1,6 +1,6 @@
 use image::{ImageBuffer, Rgb};
 use shapefile::dbase::FieldValue;
-use simulacao::mapa::{
+use gf_mapa::mapa::{
     AlinhamentoGeopolitico, CatalogoProvincias, DefinicaoPais1945, DonosProvincias1945,
     ProvinciaMapa, RegrasCenario1945, cor_unica_provincia, projetar_miller,
 };

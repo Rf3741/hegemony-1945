@@ -2685,6 +2685,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui_plot"
+version = "0.37.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90f3711a5032bb65a41011b23fcdc6c4bb599757b82cc0181d41e7d1de16986a"
+dependencies = [
+ "ahash",
+ "egui",
+ "emath",
+]
+
+[[package]]
 name = "either"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3038,11 +3049,11 @@ dependencies = [
 name = "gerador_mapa"
 version = "0.1.0"
 dependencies = [
+ "gf_mapa",
  "image",
  "ron",
  "serde",
  "shapefile",
- "simulacao",
  "thiserror 2.0.21",
 ]
 
@@ -3079,6 +3090,15 @@ dependencies = [
  "libc",
  "r-efi 6.0.0",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "gf_mapa"
+version = "0.1.0"
+dependencies = [
+ "ron",
+ "serde",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -3239,6 +3259,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_egui",
+ "gf_mapa",
  "image",
  "ron",
  "serde",
@@ -5871,6 +5892,18 @@ name = "typewit"
 version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "214ca0b2191785cbc06209b9ca1861e048e39b5ba33574b3cedd58363d5bb5f6"
+
+[[package]]
+name = "ui_refinada"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "egui",
+ "egui_plot",
+ "ron",
+ "serde",
+]
 
 [[package]]
 name = "unicode-general-category"

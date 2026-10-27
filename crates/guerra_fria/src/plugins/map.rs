@@ -8,7 +8,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::window::PrimaryWindow;
 use bevy_egui::input::EguiWantsInput;
-use simulacao::mapa::{CatalogoProvincias, id_de_cor_provincia};
+use gf_mapa::mapa::{CatalogoProvincias, id_de_cor_provincia};
 use std::path::PathBuf;
 
 #[derive(Resource)]

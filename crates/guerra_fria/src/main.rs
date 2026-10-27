@@ -30,12 +30,17 @@ fn raiz_projeto() -> PathBuf {
 
 fn main() {
     let raiz = raiz_projeto();
-    let (catalogo, mundo) = MundoJogo::carregar_de_arquivos(
+    let (_catalogo_legado, mundo) = MundoJogo::carregar_de_arquivos(
         raiz.join("assets/map/provinces.ron"),
         raiz.join("data/scenario_1945/countries_1945.ron"),
         raiz.join("data/scenario_1945/province_owners_1945.ron"),
     )
     .expect("falha ao carregar o cenário de 1945");
+    // Catálogo do mapa vem de gf_mapa (o de `simulacao` sai na T23).
+    let catalogo: gf_mapa::CatalogoProvincias = ron::from_str(
+        &std::fs::read_to_string(raiz.join("assets/map/provinces.ron")).expect("provinces.ron"),
+    )
+    .expect("provinces.ron inválido");
 
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {

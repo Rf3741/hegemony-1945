@@ -14,7 +14,7 @@ fn ui_raiz(ctx: &egui::Context) -> egui::Ui {
             .max_rect(ctx.viewport_rect()),
     )
 }
-use simulacao::tempo::VelocidadeJogo;
+use gf_mapa::tempo::VelocidadeJogo;
 
 pub struct UiPlugin;
 
