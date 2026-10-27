@@ -307,6 +307,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  - {:?}", countries_path);
     println!("  Total de entidades de 1945: {}", paises_1945.len());
 
+    // Verificação de cobertura: toda província deve pertencer a uma entidade definida em 1945
+    let tags_definidas: HashSet<&str> = paises_1945.iter().map(|p| p.tag.as_str()).collect();
+    let mut sem_definicao: BTreeMap<String, u32> = BTreeMap::new();
+    for tag in donos.por_id.values() {
+        if !tags_definidas.contains(tag.as_str()) {
+            *sem_definicao.entry(tag.clone()).or_insert(0) += 1;
+        }
+    }
+    if sem_definicao.is_empty() {
+        println!("  Cobertura: 100% das províncias pertencem a entidades definidas de 1945.");
+    } else {
+        eprintln!("  AVISO: tags sem definição em 1945: {sem_definicao:?}");
+    }
+    let usadas: HashSet<&str> = donos.por_id.values().map(String::as_str).collect();
+    let paises_com_terra = paises_1945.iter().filter(|p| usadas.contains(p.tag.as_str())).count();
+    println!("  Entidades com ao menos uma província: {paises_com_terra}");
+
     Ok(())
 }
 
@@ -439,6 +456,58 @@ fn gerar_regras_e_paises() -> (RegrasCenario1945, Vec<DefinicaoPais1945>) {
     adm0_map.insert("ESP".to_string(), "ESP".to_string());
     adm0_map.insert("SAH".to_string(), "SPO".to_string());
     adm0_map.insert("GNQ".to_string(), "GNQ".to_string());
+
+    // 15. Correções de códigos ADM0 do Natural Earth e microestados europeus/árabes
+    for (adm0, tag) in [
+        ("LBN", "LEB"),
+        ("MAR", "MOR"),
+        ("OMN", "OMA"),
+        ("LIE", "LIE"),
+        ("SMR", "SMR"),
+        ("MCO", "MCO"),
+        ("AND", "AND"),
+        ("VAT", "VAT"),
+        ("ALD", "FIN"),
+        ("FRO", "DEN"),
+        ("USG", "CUB"),
+        ("ESB", "CYP"),
+        ("WSB", "CYP"),
+    ] {
+        adm0_map.insert(adm0.to_string(), tag.to_string());
+    }
+
+    // 16. Territórios ultramarinos britânicos (Caribe, Atlântico, Índico, Pacífico)
+    for adm0 in [
+        "GIB", "BMU", "SHN", "JEY", "GGY", "IMN", "SGS", "FLK", "IOT", "PCN", "SYC", "MUS", "MDV",
+        "KIR", "FJI", "TON", "SLB", "TUV", "VUT",
+    ] {
+        adm0_map.insert(adm0.to_string(), "GBR".to_string());
+    }
+    for adm0 in ["TCA", "MSR", "AIA", "VGB", "CYM"] {
+        adm0_map.insert(adm0.to_string(), "BWI".to_string());
+    }
+
+    // 17. Territórios ultramarinos franceses, neerlandeses e portugueses
+    for adm0 in ["MAF", "BLM", "SPM", "WLF", "NCL", "PYF", "ATF", "CLP"] {
+        adm0_map.insert(adm0.to_string(), "FRA".to_string());
+    }
+    adm0_map.insert("COM".to_string(), "MDG".to_string());
+    for adm0 in ["SXM", "CUW", "ABW"] {
+        adm0_map.insert(adm0.to_string(), "NLD".to_string());
+    }
+
+    // 18. Territórios dos EUA, Austrália, Nova Zelândia e Pacífico ocupado
+    for adm0 in ["UMI", "VIR", "PRI", "ASM", "GUM", "MNP", "MHL", "FSM", "PLW"] {
+        let tag = if matches!(adm0, "MHL" | "FSM" | "PLW" | "MNP") { "PAC" } else { "USA" };
+        adm0_map.insert(adm0.to_string(), tag.to_string());
+    }
+    for adm0 in ["HMD", "NFK", "IOA", "CSI", "ATC", "NRU"] {
+        adm0_map.insert(adm0.to_string(), "AST".to_string());
+    }
+    for adm0 in ["WSM", "COK", "NIU"] {
+        adm0_map.insert(adm0.to_string(), "NZL".to_string());
+    }
+    adm0_map.insert("PGA".to_string(), "CHI".to_string());
 
     let mut overrides_adm1: BTreeMap<String, String> = BTreeMap::new();
     overrides_adm1.insert("CAN-683".to_string(), "NEW".to_string()); // Terra Nova britânica até 1949
@@ -583,6 +652,13 @@ fn gerar_regras_e_paises() -> (RegrasCenario1945, Vec<DefinicaoPais1945>) {
         ("CRI", "Costa Rica", (185, 45, 55), "San José", None, AlinhamentoGeopolitico::BlocoOcidental, "democracia_republicana", 750_000, 1_500),
         ("PAN", "Panamá", (55, 105, 175), "Cidade do Panamá", None, AlinhamentoGeopolitico::BlocoOcidental, "republica_constitucional", 750_000, 1_600),
         ("SUR", "Suriname", (215, 105, 30), "Paramaribo", Some("NLD"), AlinhamentoGeopolitico::BlocoOcidental, "colonia", 200_000, 300),
+        ("OMA", "Sultanato de Mascate e Omã", (125, 150, 90), "Mascate", None, AlinhamentoGeopolitico::BlocoOcidental, "sultanato_tradicional", 450_000, 400),
+        ("LIE", "Liechtenstein", (170, 60, 60), "Vaduz", None, AlinhamentoGeopolitico::NaoAlinhado, "principado", 12_000, 30),
+        ("SMR", "San Marino", (130, 190, 230), "San Marino", None, AlinhamentoGeopolitico::NaoAlinhado, "republica", 13_000, 20),
+        ("MCO", "Mônaco", (225, 90, 90), "Mônaco", None, AlinhamentoGeopolitico::BlocoOcidental, "principado", 20_000, 40),
+        ("AND", "Andorra", (200, 150, 200), "Andorra la Vella", None, AlinhamentoGeopolitico::NaoAlinhado, "co_principado", 6_000, 10),
+        ("VAT", "Vaticano", (240, 230, 130), "Vaticano", None, AlinhamentoGeopolitico::NaoAlinhado, "teocracia", 1_000, 10),
+        ("PAC", "Territórios do Pacífico (Ocupação dos EUA)", (95, 130, 205), "Saipan", Some("USA"), AlinhamentoGeopolitico::OcupacaoAliada, "ocupacao_militar", 150_000, 100),
         ("ATA", "Antártica (Território Neutro)", (230, 235, 240), "Estações de Pesquisa", None, AlinhamentoGeopolitico::NaoAlinhado, "terra_nullius", 0, 0),
     ];
 
