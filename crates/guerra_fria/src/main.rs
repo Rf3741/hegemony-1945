@@ -1,0 +1,55 @@
+//! Cliente gráfico do jogo Guerra Fria (1945): Bevy + bevy_egui.
+mod plugins;
+
+use bevy::prelude::*;
+use bevy::window::WindowResolution;
+use bevy_egui::EguiPlugin;
+use plugins::{
+    economy::{EconomyPlugin, RecursoMundo},
+    map::MapPlugin,
+    politics::PoliticsPlugin,
+    time::TimePlugin,
+    ui::UiPlugin,
+};
+use simulacao::mundo::MundoJogo;
+use std::path::PathBuf;
+
+/// Localiza a raiz do projeto (onde ficam `assets/` e `data/`).
+fn raiz_projeto() -> PathBuf {
+    let candidatos = [
+        PathBuf::from("."),
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+    ];
+    for c in candidatos {
+        if c.join("assets/map/provinces.png").exists() {
+            return c;
+        }
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+fn main() {
+    let raiz = raiz_projeto();
+    let (catalogo, mundo) = MundoJogo::carregar_de_arquivos(
+        raiz.join("assets/map/provinces.ron"),
+        raiz.join("data/scenario_1945/countries_1945.ron"),
+        raiz.join("data/scenario_1945/province_owners_1945.ron"),
+    )
+    .expect("falha ao carregar o cenário de 1945");
+
+    App::new()
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Guerra Fria - 1945".into(),
+                resolution: WindowResolution::new(1600, 900),
+                ..default()
+            }),
+            ..default()
+        }))
+        .add_plugins(EguiPlugin::default())
+        .insert_resource(RecursoMundo(mundo))
+        .insert_resource(plugins::map::RaizProjeto(raiz))
+        .insert_resource(plugins::map::RecursoCatalogo(catalogo))
+        .add_plugins((TimePlugin, EconomyPlugin, PoliticsPlugin, MapPlugin, UiPlugin))
+        .run();
+}
