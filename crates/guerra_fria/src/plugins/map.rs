@@ -58,7 +58,7 @@ impl Plugin for MapPlugin {
                 Update,
                 (mover_camera, selecionar_provincia)
                     .chain()
-                    .run_if(crate::estado::em_partida),
+                    .run_if(crate::estado::em_partida_ou_menu),
             );
     }
 }

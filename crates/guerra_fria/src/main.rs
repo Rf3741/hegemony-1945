@@ -8,6 +8,7 @@ use bevy_egui::EguiPlugin;
 use plugins::{
     audio::AudioPlugin,
     economy::{EconomyPlugin, RecursoMundo},
+    jogador::JogadorPlugin,
     map::MapPlugin,
     politics::PoliticsPlugin,
     time::TimePlugin,
@@ -57,6 +58,6 @@ fn main() {
         .insert_resource(RecursoMundo(mundo))
         .insert_resource(plugins::map::RaizProjeto(raiz))
         .insert_resource(plugins::map::RecursoCatalogo(catalogo))
-        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, PoliticsPlugin, MapPlugin, UiPlugin, AudioPlugin))
+        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin))
         .run();
 }

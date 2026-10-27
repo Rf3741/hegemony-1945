@@ -1,5 +1,6 @@
 //! Interface egui: barra superior (data e controles de tempo) e painel de província.
 use super::economy::RecursoMundo;
+use super::jogador::{PainelPais, PaisJogador, hud_pais, resumo_pais};
 use super::map::{ProvinciaSelecionada, RecursoCatalogo};
 use super::time::RecursoRelogio;
 use bevy::prelude::*;
@@ -22,7 +23,8 @@ impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             EguiPrimaryContextPass,
-            (barra_superior, painel_provincia)
+            (barra_superior, barra_hud, painel_provincia)
+                .chain()
                 .run_if(crate::estado::em_partida),
         );
     }
@@ -57,6 +59,18 @@ fn barra_superior(
     Ok(())
 }
 
+fn barra_hud(
+    mut contextos: EguiContexts,
+    jogador: Option<Res<PaisJogador>>,
+    mundo: Res<RecursoMundo>,
+    mut painel: ResMut<PainelPais>,
+) -> Result {
+    let Some(p) = jogador.and_then(|j| mundo.paises.get(&j.0)) else { return Ok(()) };
+    let mut raiz = ui_raiz(contextos.ctx_mut()?);
+    egui::Panel::top("barra_hud").show(&mut raiz, |ui| hud_pais(ui, p, &mut painel.aberto));
+    Ok(())
+}
+
 fn painel_provincia(
     mut contextos: EguiContexts,
     selecionada: Res<ProvinciaSelecionada>,
@@ -77,7 +91,9 @@ fn painel_provincia(
             let nome = mundo.paises.get(tag).map(|p| p.nome.as_str()).unwrap_or("?");
             ui.label(format!("Dono em 1945: {nome} ({tag})"));
             if let Some(pais) = mundo.paises.get(tag) {
-                ui.label(format!("População do país: {}", pais.populacao_total()));
+                ui.separator();
+                resumo_pais(ui, pais);
+                ui.separator();
             }
         }
         if let Some(pop) = mundo.populacao_por_provincia.get(&prov.id) {

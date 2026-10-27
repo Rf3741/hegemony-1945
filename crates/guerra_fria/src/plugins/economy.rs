@@ -22,6 +22,9 @@ fn processar_tick_economia(
         return;
     };
     for _ in leitor_eventos.read() {
+        // O motor não avança o calendário sozinho nesta chamada: sem isso o crescimento mensal rodaria todo dia.
+        mundo.data.avancar_dia();
+        mundo.ticks_executados += 1;
         mundo.executar_tick_economia();
     }
 }
