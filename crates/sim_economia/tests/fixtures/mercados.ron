@@ -1,0 +1,22 @@
+[
+    (
+        id: "mercado_belga",
+        nome: "União Econômica Belgo-Luxemburguesa",
+        pais_lider_id: "belgica",
+    ),
+    (
+        id: "mercado_americano",
+        nome: "Mercado Comum Norte-Americano",
+        pais_lider_id: "estados_unidos",
+    ),
+    (
+        id: "mercado_sovietico",
+        nome: "Bloco Econômico Soviético",
+        pais_lider_id: "uniao_sovietica",
+    ),
+    (
+        id: "mercado_brasileiro",
+        nome: "Mercado Nacional Brasileiro",
+        pais_lider_id: "brasil",
+    ),
+]

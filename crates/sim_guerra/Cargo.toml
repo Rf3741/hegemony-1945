@@ -1,0 +1,15 @@
+[package]
+name = "sim_guerra"
+version.workspace = true
+edition.workspace = true
+description = "Motor puro de guerra, logística e frentes operacionais para o cenário Guerra Fria (1945+)"
+license.workspace = true
+
+[dependencies]
+ron.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[[bench]]
+name = "benchmark_guerra"
+harness = false

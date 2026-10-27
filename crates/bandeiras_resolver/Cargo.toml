@@ -1,0 +1,10 @@
+[package]
+name = "bandeiras_resolver"
+version.workspace = true
+edition.workspace = true
+description = "Resolvedor puro (sem Bevy) de bandeira, nome e cor de mapa dinamicos por estado do pais"
+license.workspace = true
+
+[dependencies]
+ron.workspace = true
+serde.workspace = true

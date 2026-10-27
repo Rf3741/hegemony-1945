@@ -1,0 +1,28 @@
+[
+    (
+        id: "general_eisenhower",
+        nome_pt: "Gen. Dwight D. Eisenhower",
+        pais_tag: "USA",
+        habilidade_ataque: 5,
+        habilidade_defesa: 6,
+        habilidade_logistica: 7,
+        habilidade_planejamento: 7,
+        experiencia: 75.0,
+        tracos: [
+            "estrategista_militar",
+        ],
+    ),
+    (
+        id: "marechal_zhukov",
+        nome_pt: "Mar. Georgy Zhukov",
+        pais_tag: "SOV",
+        habilidade_ataque: 7,
+        habilidade_defesa: 6,
+        habilidade_logistica: 5,
+        habilidade_planejamento: 6,
+        experiencia: 85.0,
+        tracos: [
+            "mestre_blindados",
+        ],
+    ),
+]

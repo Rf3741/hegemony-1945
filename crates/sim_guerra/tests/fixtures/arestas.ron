@@ -1,0 +1,37 @@
+[
+    (
+        de: "USA-0001",
+        para: "USA-0002",
+        distancia_km: 120.0,
+        travessia_rio: false,
+        estreito_maritimo: false,
+    ),
+    (
+        de: "USA-0002",
+        para: "USA-0003",
+        distancia_km: 150.0,
+        travessia_rio: false,
+        estreito_maritimo: false,
+    ),
+    (
+        de: "USA-0003",
+        para: "SOV-0003",
+        distancia_km: 90.0,
+        travessia_rio: true,
+        estreito_maritimo: false,
+    ),
+    (
+        de: "SOV-0003",
+        para: "SOV-0002",
+        distancia_km: 160.0,
+        travessia_rio: false,
+        estreito_maritimo: false,
+    ),
+    (
+        de: "SOV-0002",
+        para: "SOV-0001",
+        distancia_km: 130.0,
+        travessia_rio: false,
+        estreito_maritimo: false,
+    ),
+]

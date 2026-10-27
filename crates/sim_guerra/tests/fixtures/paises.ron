@@ -1,0 +1,31 @@
+[
+    (
+        tag: "USA",
+        nome_pt: "Estados Unidos da América",
+        capital_adm1: "USA-0001",
+        doutrina_id: "armas_combinadas",
+        tecnologias_ativas: [
+            "armas_combinadas_1945",
+            "logistica_motorizada",
+        ],
+        cansaco_guerra: 0.0,
+        baixas_totais: 0,
+        populacao_mobilizavel: 12000000,
+        estoque_suprimento: 1.0,
+        eficiencia_naval: 1.0,
+    ),
+    (
+        tag: "SOV",
+        nome_pt: "União Soviética",
+        capital_adm1: "SOV-0001",
+        doutrina_id: "operacoes_profundas",
+        tecnologias_ativas: [
+            "armas_combinadas_1945",
+        ],
+        cansaco_guerra: 0.0,
+        baixas_totais: 0,
+        populacao_mobilizavel: 15000000,
+        estoque_suprimento: 1.0,
+        eficiencia_naval: 0.85,
+    ),
+]

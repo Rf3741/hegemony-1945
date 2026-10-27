@@ -1,0 +1,90 @@
+// ==============================================================================
+// CULTURAS - FIXTURE DE TESTE PARA SIM_TERRITORIO (Compatível com nacoes/culturas.ron)
+// ==============================================================================
+
+[
+    (
+        id: "anglo_americano",
+        nome: "Anglo-Americana",
+        grupo_linguistico: "germanico",
+        heranca_cultural: "europeia",
+    ),
+    (
+        id: "afro_americano",
+        nome: "Afro-Americana",
+        grupo_linguistico: "germanico",
+        heranca_cultural: "africana",
+    ),
+    (
+        id: "brasileira",
+        nome: "Brasileira",
+        grupo_linguistico: "romanico",
+        heranca_cultural: "latino_americana",
+    ),
+    (
+        id: "russa",
+        nome: "Russa",
+        grupo_linguistico: "eslavo",
+        heranca_cultural: "europeia_oriental",
+    ),
+    (
+        id: "ucraniana",
+        nome: "Ucraniana",
+        grupo_linguistico: "eslavo",
+        heranca_cultural: "europeia_oriental",
+    ),
+    (
+        id: "polonesa",
+        nome: "Polonesa",
+        grupo_linguistico: "eslavo",
+        heranca_cultural: "europeia_oriental",
+    ),
+    (
+        id: "alema",
+        nome: "Alemã",
+        grupo_linguistico: "germanico",
+        heranca_cultural: "europeia",
+    ),
+    (
+        id: "francesa",
+        nome: "Francesa",
+        grupo_linguistico: "romanico",
+        heranca_cultural: "europeia",
+    ),
+    (
+        id: "britanica",
+        nome: "Britânica",
+        grupo_linguistico: "germanico",
+        heranca_cultural: "europeia",
+    ),
+    (
+        id: "hindustani",
+        nome: "Hindustâni",
+        grupo_linguistico: "indo_ariano",
+        heranca_cultural: "sul_asiatica",
+    ),
+    (
+        id: "punjabi",
+        nome: "Punjabi",
+        grupo_linguistico: "indo_ariano",
+        heranca_cultural: "sul_asiatica",
+    ),
+    (
+        id: "bengali",
+        nome: "Bengali",
+        grupo_linguistico: "indo_ariano",
+        heranca_cultural: "sul_asiatica",
+    ),
+    (
+        id: "arabe_magrebina",
+        nome: "Árabe Magrebina",
+        grupo_linguistico: "semitico",
+        heranca_cultural: "arabe_islamica",
+    ),
+    (
+        id: "berbere",
+        nome: "Berbere",
+        grupo_linguistico: "berbere",
+        heranca_cultural: "norte_africana",
+    ),
+]

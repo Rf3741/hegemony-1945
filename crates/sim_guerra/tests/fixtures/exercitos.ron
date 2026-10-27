@@ -1,0 +1,28 @@
+[
+    (
+        id: "exercito_eua_europa",
+        nome_pt: "1º Grupo de Exércitos dos EUA",
+        pais_tag: "USA",
+        comandante_id: Some("general_eisenhower"),
+        divisoes_ids: [
+            "div_usa_1",
+            "div_usa_2",
+        ],
+        postura: ofensiva_equilibrada,
+        frente_id: None,
+        regiao_objetivo_adm1: Some("SOV-0003"),
+    ),
+    (
+        id: "exercito_sov_oeste",
+        nome_pt: "1ª Frente Bielorrussa",
+        pais_tag: "SOV",
+        comandante_id: Some("marechal_zhukov"),
+        divisoes_ids: [
+            "div_sov_1",
+            "div_sov_2",
+        ],
+        postura: ofensiva_equilibrada,
+        frente_id: None,
+        regiao_objetivo_adm1: Some("USA-0003"),
+    ),
+]

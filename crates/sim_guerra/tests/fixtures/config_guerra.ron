@@ -1,0 +1,9 @@
+(
+    resolver_paz_automatica: true,
+    limiar_capitulacao_vitoria: 0.80,
+    limiar_cansaco_armisticio: 95.0,
+    variacao_tatica_aleatoria: true,
+    taxa_recuperacao_org_base: 4.0,
+    taxa_acumulo_entrincheiramento: 1.5,
+    fator_dano_combate: 1.0,
+)

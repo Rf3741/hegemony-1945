@@ -1,0 +1,11 @@
+[package]
+name = "sim_territorio"
+version.workspace = true
+edition.workspace = true
+description = "Motor puro de hierarquia territorial, urbanização, eras tecnológicas visuais, infraestrutura e descolonização para o cenário Guerra Fria (1945+)"
+license.workspace = true
+
+[dependencies]
+ron.workspace = true
+serde.workspace = true
+thiserror.workspace = true

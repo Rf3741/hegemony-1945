@@ -1,0 +1,58 @@
+[
+    (
+        id: "flandria",
+        nome: "Flandres",
+        pais_id: "belgica",
+        incorporado: true,
+        infraestrutura_bonus: 25.0,
+    ),
+    (
+        id: "valonia",
+        nome: "Valônia",
+        pais_id: "belgica",
+        incorporado: true,
+        infraestrutura_bonus: 25.0,
+    ),
+    (
+        id: "nova_iorque_estado",
+        nome: "Nova Iorque",
+        pais_id: "estados_unidos",
+        incorporado: true,
+        infraestrutura_bonus: 45.0,
+    ),
+    (
+        id: "pensilvania_ohio",
+        nome: "Pensilvânia e Cinturão Industrial",
+        pais_id: "estados_unidos",
+        incorporado: true,
+        infraestrutura_bonus: 40.0,
+    ),
+    (
+        id: "oblast_moscou",
+        nome: "Região Central de Moscou",
+        pais_id: "uniao_sovietica",
+        incorporado: true,
+        infraestrutura_bonus: 35.0,
+    ),
+    (
+        id: "regiao_ural",
+        nome: "Complexo Industrial dos Urais",
+        pais_id: "uniao_sovietica",
+        incorporado: true,
+        infraestrutura_bonus: 30.0,
+    ),
+    (
+        id: "estado_sao_paulo",
+        nome: "São Paulo",
+        pais_id: "brasil",
+        incorporado: true,
+        infraestrutura_bonus: 20.0,
+    ),
+    (
+        id: "minas_rio",
+        nome: "Minas Gerais e Vale do Paraíba",
+        pais_id: "brasil",
+        incorporado: true,
+        infraestrutura_bonus: 18.0,
+    ),
+]

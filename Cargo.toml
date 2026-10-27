@@ -4,6 +4,11 @@ members = [
     "crates/simulacao",
     "crates/gerador_mapa",
     "crates/guerra_fria",
+    "crates/sim_economia",
+    "crates/sim_politica",
+    "crates/sim_territorio",
+    "crates/sim_guerra",
+    "crates/bandeiras_resolver",
 ]
 
 [workspace.package]
@@ -21,6 +26,11 @@ shapefile = { version = "0.9", features = ["encoding_rs"] }
 bevy = "0.20.0"
 bevy_egui = "0.43.1"
 simulacao = { path = "crates/simulacao" }
+sim_economia = { path = "crates/sim_economia" }
+sim_politica = { path = "crates/sim_politica" }
+sim_territorio = { path = "crates/sim_territorio" }
+sim_guerra = { path = "crates/sim_guerra" }
+bandeiras_resolver = { path = "crates/bandeiras_resolver" }
 
 # Otimiza dependências no modo debug para manter 60 FPS no Bevy sem atrasar recompilações incrementais
 [profile.dev]
@@ -28,3 +38,20 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+
+# Release: otimizacao maxima para distribuicao
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# CI: testes rapidos com limite de tempo
+[profile.ci]
+inherits = "dev"
+opt-level = 0
+debug = false
+
+[profile.ci.package."*"]
+opt-level = 0

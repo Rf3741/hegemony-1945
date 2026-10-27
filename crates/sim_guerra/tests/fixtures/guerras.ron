@@ -1,0 +1,25 @@
+[
+    (
+        id: "terceira_guerra_mundial_1945",
+        nome_pt: "Conflito Global Bipolar",
+        atacantes: [
+            "USA",
+        ],
+        defensores: [
+            "SOV",
+        ],
+        data_inicio: (
+            ano: 1945,
+            mes: 1,
+            dia: 1,
+        ),
+        pontuacao_guerra: 0.0,
+        baixas_atacantes: 0,
+        baixas_defensores: 0,
+        batalhas_vencidas_atacantes: 0,
+        batalhas_vencidas_defensores: 0,
+        capitulou_atacantes: false,
+        capitulou_defensores: false,
+        ativa: true,
+    ),
+]

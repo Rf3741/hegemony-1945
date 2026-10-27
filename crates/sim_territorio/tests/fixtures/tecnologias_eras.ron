@@ -1,0 +1,11 @@
+// TECNOLOGIAS POR ERA VISUAL - fixture de teste
+[
+    (id: "reconstrucao_e_vapor", nome: "Reconstrução do Pós-Guerra e Máquinas a Vapor", era: era1945, pilar: producao_computacao, peso_visual: 1.0, descricao: "Restabelecimento fabril com alvenaria tradicional e caldeiras."),
+    (id: "linha_montagem_fordista", nome: "Linha de Montagem Fordista e Eletrodomésticos", era: era1955, pilar: producao_computacao, peso_visual: 1.5, descricao: "Produção em série, galpões amplos e expansão suburbana."),
+    (id: "arquitetura_modernista_concreto", nome: "Modernismo em Concreto Armado e Rodovias", era: era1955, pilar: sociedade_urbanismo, peso_visual: 1.5, descricao: "Blocos residenciais modernistas e avenidas arteriais."),
+    (id: "aviacao_comercial_jato", nome: "Aviação Comercial a Jato e Aeroportos Internacionais", era: era1965, pilar: aeroespacial_nuclear, peso_visual: 2.0, descricao: "Conexão aérea rápida entre metrópoles e pistas asfaltadas."),
+    (id: "conteinerizacao_maritima", nome: "Conteinerização Marítima Intermodal", era: era1965, pilar: infraestrutura_energia, peso_visual: 2.0, descricao: "Guindastes portuários modernos e pátios de contêineres."),
+    (id: "energia_nuclear_civil", nome: "Centrais Termonucleares Civis", era: era1975, pilar: infraestrutura_energia, peso_visual: 2.5, descricao: "Torres de resfriamento hiperbólicas e eletrificação limpa."),
+    (id: "automacao_maquinas_ferramenta", nome: "Controle Numérico e Automação Industrial", era: era1975, pilar: producao_computacao, peso_visual: 2.5, descricao: "Usinagem de alta precisão e centros de comando eletrônicos."),
+    (id: "microeletronica_e_fibra_optica", nome: "Microeletrônica, Robótica e Fibra Óptica", era: era1985, pilar: producao_computacao, peso_visual: 3.0, descricao: "Robótica fabril CNC e parques tecnológicos integrados."),
+]

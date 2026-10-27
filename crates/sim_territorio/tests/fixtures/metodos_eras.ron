@@ -1,0 +1,11 @@
+// METODOS DE PRODUCAO POR ERA - fixture de teste
+[
+    (metodo_id: "agricultura_tradicional", nome: "Agricultura com Tração Animal", era_minima: era1945, peso_adocao: 1.0),
+    (metodo_id: "siderurgia_forno_aberto", nome: "Forno Siemens-Martin", era_minima: era1945, peso_adocao: 1.0),
+    (metodo_id: "agricultura_mecanizada", nome: "Agricultura Mecanizada com Tratores", era_minima: era1955, peso_adocao: 1.5),
+    (metodo_id: "linha_montagem_eletrodomesticos", nome: "Linha de Montagem Eletrodomésticos", era_minima: era1955, peso_adocao: 1.5),
+    (metodo_id: "siderurgia_arco_eletrico", nome: "Aciaria Elétrica de Alta Eficiência", era_minima: era1965, peso_adocao: 2.0),
+    (metodo_id: "automacao_esteiras_ferrovia", nome: "Esteiras e Ramal Ferroviário Automatizado", era_minima: era1965, peso_adocao: 2.0),
+    (metodo_id: "geracao_termonuclear_civil", nome: "Geração Termonuclear PWR/BWR", era_minima: era1975, peso_adocao: 2.5),
+    (metodo_id: "automacao_robotica_cnc", nome: "Robótica Industrial e Células CNC", era_minima: era1985, peso_adocao: 3.0),
+]

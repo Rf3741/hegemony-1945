@@ -1,0 +1,13 @@
+[package]
+name = "sim_politica"
+version.workspace = true
+edition.workspace = true
+description = "Motor puro de simulação política estilo Victoria 3 para cenário Guerra Fria (1945+)"
+license.workspace = true
+
+[dependencies]
+ron.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
