@@ -11,6 +11,7 @@ members = [
     "crates/sim_guerra",
     "crates/bandeiras_resolver",
     "crates/ui_refinada",
+    "crates/visual_mapa",
 ]
 
 [workspace.package]
@@ -37,13 +38,17 @@ sim_territorio = { path = "crates/sim_territorio" }
 sim_guerra = { path = "crates/sim_guerra" }
 bandeiras_resolver = { path = "crates/bandeiras_resolver" }
 ui_refinada = { path = "crates/ui_refinada" }
+visual_mapa = { path = "crates/visual_mapa" }
 
 # Otimiza dependências no modo debug para manter 60 FPS no Bevy sem atrasar recompilações incrementais
 [profile.dev]
 opt-level = 1
+# Só números de linha: linkar com debuginfo completo levava ~10 min e ~2 GB por binário.
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 3
+debug = false
 
 # Release: otimizacao maxima para distribuicao
 [profile.release]
