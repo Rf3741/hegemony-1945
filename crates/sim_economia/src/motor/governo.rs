@@ -3,7 +3,7 @@
 
 use crate::catalogo::CatalogoEconomia;
 use crate::entidades::{
-    ConfigSimulacao, ItemConstrucao, MAX_FLUXOS_PREDIO, MAX_VAGAS_PREDIO, Mercado, Pais, Predio,
+    ConfigSimulacao, Estado, ItemConstrucao, MAX_FLUXOS_PREDIO, MAX_VAGAS_PREDIO, Mercado, Pais, Predio,
     PredioCompilado, Provincia, SlotEmpregoPredio,
 };
 use crate::tipos::{CategoriaPredio, RegimePropriedade};
@@ -168,6 +168,158 @@ pub fn provincia_comporta_novo_nivel(
     true
 }
 
+/// Verifica se dois identificadores de recursos naturais são compatíveis/equivalentes
+/// (ex.: "ferro" e "minerio_ferro", "ouro" e "ouro_prata", "pesca" e "peixe").
+#[inline]
+pub fn recursos_compativeis(a: &str, b: &str) -> bool {
+    a == b
+        || (a == "minerio_ferro" && b == "ferro")
+        || (a == "ferro" && b == "minerio_ferro")
+        || (a == "ouro" && b == "ouro_prata")
+        || (a == "ouro_prata" && b == "ouro")
+        || (a == "peixe" && b == "pesca")
+        || (a == "pesca" && b == "peixe")
+        || (a == "borracha" && b == "borracha_natural")
+        || (a == "borracha_natural" && b == "borracha")
+        || (a == "gas" && b == "gas_natural")
+        || (a == "gas_natural" && b == "gas")
+}
+
+/// Obtém o limite de um recurso na província considerando sinônimos.
+#[inline]
+pub fn limite_recurso_provincia(prov: &Provincia, recurso: &str) -> Option<u32> {
+    if let Some(&l) = prov.limites_recursos.get(recurso) {
+        return Some(l);
+    }
+    match recurso {
+        "ferro" => prov.limites_recursos.get("minerio_ferro").copied(),
+        "minerio_ferro" => prov.limites_recursos.get("ferro").copied(),
+        "ouro" => prov.limites_recursos.get("ouro_prata").copied(),
+        "ouro_prata" => prov.limites_recursos.get("ouro").copied(),
+        "pesca" => prov.limites_recursos.get("peixe").copied(),
+        "peixe" => prov.limites_recursos.get("pesca").copied(),
+        "borracha" => prov.limites_recursos.get("borracha_natural").copied(),
+        "borracha_natural" => prov.limites_recursos.get("borracha").copied(),
+        "gas" => prov.limites_recursos.get("gas_natural").copied(),
+        "gas_natural" => prov.limites_recursos.get("gas").copied(),
+        _ => None,
+    }
+}
+
+/// Conta quantos níveis de um determinado recurso estão ocupados em todas as províncias do estado.
+pub fn estado_niveis_recurso(
+    catalogo: &CatalogoEconomia,
+    estado: &Estado,
+    provincias: &[Provincia],
+    recurso: &str,
+) -> u32 {
+    let mut total = 0u32;
+    for &p_idx in &estado.provincias_indices {
+        if let Some(prov) = provincias.get(p_idx) {
+            for b in &prov.predios {
+                let Some(t_def) = catalogo.tipos_predio.get(b.cache.tipo_idx) else { continue };
+                if let Some(rec) = &t_def.recurso_natural_requerido {
+                    if recursos_compativeis(rec, recurso) {
+                        total = total.saturating_add(b.nivel);
+                    }
+                }
+            }
+        }
+    }
+    total
+}
+
+/// Verifica se um `Estado` e uma `Provincia` possuem aptidão e capacidade física (recursos naturais,
+/// terra arável e culturas permitidas) para receber `+1` nível de `tipo_predio_idx`.
+pub fn estado_comporta_novo_nivel(
+    catalogo: &CatalogoEconomia,
+    estado: &Estado,
+    prov: &Provincia,
+    tipo_predio_idx: usize,
+) -> bool {
+    let def = &catalogo.tipos_predio[tipo_predio_idx];
+
+    // 1. Agricultura (usa terra arável)
+    if def.usa_terra_aravel {
+        // Cultura deve ser permitida no clima/solo do estado
+        if !estado.cultura_permitida(&def.id) {
+            return false;
+        }
+        if prov.terra_aravel_livre() == 0 {
+            return false;
+        }
+        if estado.terra_aravel > 0 && estado.terra_aravel_livre() == 0 {
+            return false;
+        }
+        return true;
+    }
+
+    // 2. Extração / Recursos Naturais
+    if let Some(recurso) = &def.recurso_natural_requerido {
+        // Se o estado definir limites de recursos (cenário real 1945)
+        if !estado.limites_recursos.is_empty() {
+            let lim_est = estado.limite_recurso(recurso);
+            if lim_est == 0 {
+                return false;
+            }
+            let ocupado_prov: u32 = prov
+                .predios
+                .iter()
+                .filter(|b| {
+                    catalogo.tipos_predio[b.cache.tipo_idx]
+                        .recurso_natural_requerido
+                        .as_deref()
+                        .map_or(false, |r| recursos_compativeis(r, recurso))
+                })
+                .map(|b| b.nivel)
+                .sum();
+            if ocupado_prov >= lim_est {
+                return false;
+            }
+        } else {
+            // Se o estado não define limites (ex.: fixtures de teste legadas), exige jazida na província
+            let Some(lim_prov) = limite_recurso_provincia(prov, recurso) else {
+                return false;
+            };
+            let ocupado_prov: u32 = prov
+                .predios
+                .iter()
+                .filter(|b| {
+                    catalogo.tipos_predio[b.cache.tipo_idx]
+                        .recurso_natural_requerido
+                        .as_deref()
+                        .map_or(false, |r| recursos_compativeis(r, recurso))
+                })
+                .map(|b| b.nivel)
+                .sum();
+            if ocupado_prov >= lim_prov {
+                return false;
+            }
+        }
+
+        // Se a província também tiver limite explícito menor
+        if let Some(lim_prov) = limite_recurso_provincia(prov, recurso) {
+            let ocupado_prov: u32 = prov
+                .predios
+                .iter()
+                .filter(|b| {
+                    catalogo.tipos_predio[b.cache.tipo_idx]
+                        .recurso_natural_requerido
+                        .as_deref()
+                        .map_or(false, |r| recursos_compativeis(r, recurso))
+                })
+                .map(|b| b.nivel)
+                .sum();
+            if ocupado_prov >= lim_prov {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    true
+}
+
 /// Recalcula `terra_aravel_ocupada` de uma província a partir dos prédios agrícolas presentes.
 pub(crate) fn atualizar_terra_aravel_ocupada(catalogo: &CatalogoEconomia, prov: &mut Provincia) {
     let ocupada: u32 = prov
@@ -177,6 +329,19 @@ pub(crate) fn atualizar_terra_aravel_ocupada(catalogo: &CatalogoEconomia, prov: 
         .map(|b| b.nivel)
         .sum();
     prov.terra_aravel_ocupada = ocupada;
+}
+
+/// Recalcula `terra_aravel_ocupada` dos estados a partir das províncias vinculadas.
+pub(crate) fn atualizar_terra_aravel_estados(estados: &mut [Estado], provincias: &[Provincia]) {
+    for est in estados.iter_mut() {
+        let mut soma = 0u32;
+        for &p_idx in &est.provincias_indices {
+            if let Some(p) = provincias.get(p_idx) {
+                soma = soma.saturating_add(p.terra_aravel_ocupada);
+            }
+        }
+        est.terra_aravel_ocupada = soma;
+    }
 }
 
 /// Executa o fechamento fiscal diário (juros, dívida, limite de crédito e calote)

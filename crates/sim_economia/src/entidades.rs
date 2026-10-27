@@ -1,7 +1,7 @@
 //! Entidades dinâmicas do mundo econômico serializáveis em RON:
 //! `Pop`, `Predio`, `Provincia`, `Estado`, `Pais`, `Mercado`, `RotaComercial` e `ConfigSimulacao`.
 
-use crate::catalogo::CatalogoEconomia;
+use crate::catalogo::{CatalogoEconomia, TipoPredio};
 use crate::tipos::{FormulaPreco, ModoCadencia, RegimePropriedade};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -380,10 +380,149 @@ pub struct Estado {
     #[serde(default = "padrao_um")]
     pub acesso_mercado: f64,
 
+    /// Limite agregado de terra arável do estado (capacidade total para fazendas e plantações).
+    #[serde(default)]
+    pub terra_aravel: u32,
+    /// Culturas agrícolas permitidas no estado ("graos", "cafe", "cacau", "acucar", "algodao", "frutas", "tabaco", "gado", etc.).
+    #[serde(default)]
+    pub culturas_permitidas: Vec<String>,
+    /// Níveis máximos para recursos extrativos/minerais ("carvao", "ferro", "ouro_prata", "cobre", "bauxita", "petroleo", "gas_natural", "uranio", "madeira", "pesca", "borracha", etc.).
+    #[serde(default)]
+    pub limites_recursos: BTreeMap<String, u32>,
+    /// Fatores de qualidade/produtividade do recurso (ex.: "cafe": 1.25 para terra muito apta).
+    #[serde(default)]
+    pub qualidade_recursos: BTreeMap<String, f64>,
+
     #[serde(skip)]
     pub(crate) pais_idx: usize,
     #[serde(skip)]
     pub(crate) provincias_indices: Vec<usize>,
+    #[serde(skip)]
+    pub(crate) terra_aravel_ocupada: u32,
+}
+
+impl Estado {
+    /// Índices das províncias pertencentes a este estado no `MundoEconomico`.
+    #[inline]
+    pub fn provincias_indices(&self) -> &[usize] {
+        &self.provincias_indices
+    }
+
+    /// Quantidade de terra arável livre para novas fazendas no estado.
+    #[inline]
+    pub fn terra_aravel_livre(&self) -> u32 {
+        self.terra_aravel.saturating_sub(self.terra_aravel_ocupada)
+    }
+
+    /// Quantidade de terra arável atualmente ocupada por prédios agrícolas no estado.
+    #[inline]
+    pub fn terra_aravel_ocupada(&self) -> u32 {
+        self.terra_aravel_ocupada
+    }
+
+    /// Verifica se uma cultura ou tipo de prédio agrícola é permitido neste estado.
+    pub fn cultura_permitida(&self, tipo_predio_id: &str) -> bool {
+        if self.culturas_permitidas.is_empty() {
+            return true;
+        }
+        let cultura_alvo = match tipo_predio_id {
+            "fazenda_graos" | "graos" => "graos",
+            "rancho_pecuario" | "pecuaria_pesca" | "gado" | "pecuaria" => "gado",
+            "fazenda_hortifruti" | "frutas" | "hortifruti" => "frutas",
+            "plantacao_algodao" | "algodao" => "algodao",
+            "plantacao_acucar" | "acucar" => "acucar",
+            "plantacao_cafe_cha" | "cafe" | "cafe_cha" | "cha" => "cafe",
+            "plantacao_tabaco" | "tabaco" => "tabaco",
+            "plantacao_borracha" | "borracha" => "borracha",
+            outro => outro,
+        };
+        self.culturas_permitidas
+            .iter()
+            .any(|c| c == cultura_alvo || c == tipo_predio_id)
+    }
+
+    /// Retorna o limite de níveis para um determinado recurso mineral/extrativo.
+    #[inline]
+    pub fn limite_recurso(&self, recurso: &str) -> u32 {
+        if let Some(&lim) = self.limites_recursos.get(recurso) {
+            return lim;
+        }
+        match recurso {
+            "ferro" => self.limites_recursos.get("minerio_ferro").copied().unwrap_or(0),
+            "minerio_ferro" => self.limites_recursos.get("ferro").copied().unwrap_or(0),
+            "ouro" => self.limites_recursos.get("ouro_prata").copied().unwrap_or(0),
+            "ouro_prata" => self.limites_recursos.get("ouro").copied().unwrap_or(0),
+            "pesca" => self.limites_recursos.get("peixe").copied().unwrap_or(0),
+            "peixe" => self.limites_recursos.get("pesca").copied().unwrap_or(0),
+            "borracha" => self.limites_recursos.get("borracha_natural").copied().unwrap_or(0),
+            "borracha_natural" => self.limites_recursos.get("borracha").copied().unwrap_or(0),
+            "gas" => self.limites_recursos.get("gas_natural").copied().unwrap_or(0),
+            "gas_natural" => self.limites_recursos.get("gas").copied().unwrap_or(0),
+            _ => 0,
+        }
+    }
+
+    /// Fator multiplicador de qualidade/produtividade para um prédio (padrão 1.0).
+    pub fn fator_qualidade_predio(&self, def: &TipoPredio) -> f64 {
+        if self.qualidade_recursos.is_empty() {
+            return 1.0;
+        }
+        if let Some(rec) = &def.recurso_natural_requerido {
+            if let Some(&f) = self.qualidade_recursos.get(rec.as_str()) {
+                return f;
+            }
+            let alt = match rec.as_str() {
+                "minerio_ferro" => "ferro",
+                "ferro" => "minerio_ferro",
+                "ouro_prata" => "ouro",
+                "ouro" => "ouro_prata",
+                "peixe" => "pesca",
+                "pesca" => "peixe",
+                "borracha_natural" => "borracha",
+                "borracha" => "borracha_natural",
+                "gas_natural" => "gas",
+                "gas" => "gas_natural",
+                _ => "",
+            };
+            if !alt.is_empty() {
+                if let Some(&f) = self.qualidade_recursos.get(alt) {
+                    return f;
+                }
+            }
+        }
+        let cult = match def.id.as_str() {
+            "fazenda_graos" => "graos",
+            "rancho_pecuario" | "pecuaria_pesca" => "gado",
+            "fazenda_hortifruti" => "frutas",
+            "plantacao_algodao" => "algodao",
+            "plantacao_acucar" => "acucar",
+            "plantacao_cafe_cha" => "cafe",
+            "plantacao_tabaco" => "tabaco",
+            "plantacao_borracha" => "borracha",
+            _ => &def.id,
+        };
+        if let Some(&f) = self.qualidade_recursos.get(cult) {
+            return f;
+        }
+        if let Some(&f) = self.qualidade_recursos.get(&def.id) {
+            return f;
+        }
+        1.0
+    }
+}
+
+/// Potencial regional de um estado (limites físicos de expansão, culturas permitidas e qualidade).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PotencialRegional {
+    pub estado_id: String,
+    #[serde(default)]
+    pub terra_aravel: u32,
+    #[serde(default)]
+    pub culturas_permitidas: Vec<String>,
+    #[serde(default)]
+    pub recursos: BTreeMap<String, u32>,
+    #[serde(default)]
+    pub qualidade_recursos: BTreeMap<String, f64>,
 }
 
 /// Parâmetros tributários, tarifários e de gastos institucionais de um `Pais`.
@@ -418,6 +557,15 @@ pub struct PoliticaFiscal {
     /// Tarifa cobrada sobre o valor base das exportações para outros mercados.
     #[serde(default)]
     pub tarifa_exportacao: f64,
+    /// Alíquotas seletivas adicionais de tarifa de importação sobre bens específicos (`bem_id -> tarifa`).
+    #[serde(default)]
+    pub tarifas_importacao_bens: BTreeMap<String, f64>,
+    /// Alíquotas seletivas adicionais de tarifa de exportação sobre bens específicos (`bem_id -> tarifa`).
+    #[serde(default)]
+    pub tarifas_exportacao_bens: BTreeMap<String, f64>,
+    /// Nível geral configurado de abertura de mercado (0.0 a 1.0), se definido.
+    #[serde(default)]
+    pub nivel_abertura_mercado: Option<f64>,
     /// Nível da instituição pública de educação (0 a 5).
     #[serde(default)]
     pub nivel_investimento_educacao: u8,
@@ -427,6 +575,46 @@ pub struct PoliticaFiscal {
     /// Multiplicador de salários pagos a prédios militares (0.5 a 1.5).
     #[serde(default = "padrao_um")]
     pub multiplicador_salario_militar: f64,
+}
+
+impl PoliticaFiscal {
+    /// Tarifa efetiva de importação para um determinado bem (usando sobreposição específica ou a tarifa geral).
+    #[inline]
+    pub fn tarifa_importacao_bem(&self, bem_id: &str) -> f64 {
+        self.tarifas_importacao_bens
+            .get(bem_id)
+            .copied()
+            .unwrap_or(self.tarifa_importacao)
+            .max(0.0)
+    }
+
+    /// Tarifa efetiva de exportação para um determinado bem (usando sobreposição específica ou a tarifa geral).
+    #[inline]
+    pub fn tarifa_exportacao_bem(&self, bem_id: &str) -> f64 {
+        self.tarifas_exportacao_bens
+            .get(bem_id)
+            .copied()
+            .unwrap_or(self.tarifa_exportacao)
+            .max(0.0)
+    }
+
+    /// Nível de abertura comercial (0.0 = totalmente fechado/autárquico, 1.0 = livre-câmbio total).
+    #[inline]
+    pub fn nivel_abertura(&self) -> f64 {
+        if let Some(n) = self.nivel_abertura_mercado {
+            n.clamp(0.0, 1.0)
+        } else {
+            (1.0 - (self.tarifa_importacao * 1.5 + self.tarifa_exportacao * 0.5)).clamp(0.0, 1.0)
+        }
+    }
+
+    /// Define o nível de abertura geral ajustando as tarifas proporcionais (estilo Victoria 3).
+    pub fn definir_nivel_abertura(&mut self, nivel: f64) {
+        let n = nivel.clamp(0.0, 1.0);
+        self.nivel_abertura_mercado = Some(n);
+        self.tarifa_importacao = (0.60 * (1.0 - n)).clamp(0.0, 0.60);
+        self.tarifa_exportacao = (0.30 * (1.0 - n)).clamp(0.0, 0.30);
+    }
 }
 
 /// Estado contábil do tesouro, dívida soberana e fluxo diário de receitas e despesas do `Pais`.
@@ -524,6 +712,9 @@ pub struct Pais {
     pub tag: Option<String>,
     pub nome: String,
     pub mercado_id: String,
+    /// Países com os quais esta nação possui acordo comercial bilateral (redução drástica ou isenção de tarifas).
+    #[serde(default)]
+    pub acordos_comerciais: Vec<String>,
     #[serde(default)]
     pub culturas_primarias: Vec<String>,
     #[serde(default)]
@@ -571,6 +762,20 @@ pub struct Pais {
     /// Pontos de construção efetivamente aplicados à fila no último tick.
     #[serde(skip)]
     pub pontos_aplicados_ultimo_tick: f64,
+}
+
+impl Pais {
+    /// Índices das províncias pertencentes a este país no `MundoEconomico`.
+    #[inline]
+    pub fn provincias_indices(&self) -> &[usize] {
+        &self.provincias_indices
+    }
+
+    /// Índices dos estados pertencentes a este país no `MundoEconomico`.
+    #[inline]
+    pub fn estados_indices(&self) -> &[usize] {
+        &self.estados_indices
+    }
 }
 
 /// Mercado comum ou nacional onde bens são precificados por oferta e demanda agregadas.
@@ -630,6 +835,73 @@ pub struct RotaComercial {
     pub(crate) pais_operador_idx: usize,
     #[serde(skip)]
     pub(crate) bem_idx: usize,
+}
+
+/// Bloco econômico ou comercial multilateral (ex.: Bloco Soviético, Bloco Ocidental/GATT, COMECON).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BlocoComercial {
+    pub id: String,
+    pub nome: String,
+    pub lider_pais_id: String,
+    #[serde(default)]
+    pub membros: Vec<String>,
+    /// Se `true`, países do bloco não participam do livre comércio global e restringem rotas externas a acordos.
+    #[serde(default)]
+    pub fechado: bool,
+    /// Se `true` (especialmente para o bloco soviético), ativa integração comercial socialista COMECON com livre comércio interno.
+    #[serde(default)]
+    pub comecon_ativo: bool,
+}
+
+/// Resumo geral do comércio internacional de um país para a interface econômica (F3).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ResumoComercioPais {
+    pub total_exportacoes_valor: f64,
+    pub total_importacoes_valor: f64,
+    pub saldo_comercial: f64,
+    pub receita_tarifas_total: f64,
+    pub nivel_abertura: f64,
+    pub tarifa_geral_importacao: f64,
+    pub tarifa_geral_exportacao: f64,
+    pub acordos_comerciais: Vec<String>,
+    pub bloco_id: Option<String>,
+    pub bloco_nome: Option<String>,
+    pub bloco_fechado: bool,
+    pub comecon_ativo: bool,
+    pub eh_lider_bloco: bool,
+    pub membros_bloco: Vec<String>,
+}
+
+/// Detalhe de uma rota comercial com métricas de parceiro e preços para a tela de Comércio (F3).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DetalheRotaComercial {
+    pub id: String,
+    pub bem_id: String,
+    pub bem_nome: String,
+    pub eh_exportacao: bool,
+    pub parceiro_pais_id: String,
+    pub parceiro_pais_nome: String,
+    pub volume_atual: f64,
+    pub volume_maximo: f64,
+    pub automatica: bool,
+    pub preco_origem: f64,
+    pub preco_destino: f64,
+    pub lucro_ultimo_tick: f64,
+    pub tarifa_origem: f64,
+    pub tarifa_destino: f64,
+    pub tem_acordo: bool,
+}
+
+/// Opção de parceiro comercial para estabelecimento de novas rotas comerciais.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpcaoParceiroComercial {
+    pub pais_id: String,
+    pub nome: String,
+    pub mercado_id: String,
+    pub tem_acordo: bool,
+    pub mesmo_bloco: bool,
+    pub permitido_comercio: bool,
+    pub razao_bloqueio: Option<String>,
 }
 
 /// Parâmetros globais de calibração e estabilidade da simulação econômica.

@@ -123,6 +123,7 @@ pub fn gerar_cenario_escala_mundial(
             tag: Some(format!("P{:02}", (c + 1).min(99))),
             nome: format!("Nação {}", c + 1),
             mercado_id: mercados[m_idx].id.clone(),
+            acordos_comerciais: Vec::new(),
             culturas_primarias: vec![culturas[c % culturas.len()].to_string()],
             religiao_oficial: religioes[c % religioes.len()].to_string(),
             politica_fiscal: PoliticaFiscal {
@@ -139,6 +140,9 @@ pub fn gerar_cenario_escala_mundial(
                 bens_tributados_consumo: BTreeMap::new(),
                 tarifa_importacao: 0.08,
                 tarifa_exportacao: 0.03,
+                tarifas_importacao_bens: BTreeMap::new(),
+                tarifas_exportacao_bens: BTreeMap::new(),
+                nivel_abertura_mercado: None,
                 nivel_investimento_educacao: ((c % 4) + 1) as u8,
                 multiplicador_salario_governo: 1.0,
                 multiplicador_salario_militar: 1.0,
@@ -184,8 +188,13 @@ pub fn gerar_cenario_escala_mundial(
                 incorporado: true,
                 infraestrutura_bonus: 15.0,
                 acesso_mercado: 1.0,
+                terra_aravel: 100,
+                culturas_permitidas: Vec::new(),
+                limites_recursos: BTreeMap::new(),
+                qualidade_recursos: BTreeMap::new(),
                 pais_idx: 0,
                 provincias_indices: Vec::new(),
+                terra_aravel_ocupada: 0,
             });
         }
     }
@@ -487,5 +496,6 @@ pub fn gerar_cenario_escala_mundial(
         estados,
         provincias,
         rotas_comerciais,
+        blocos_comerciais: Vec::new(),
     }
 }

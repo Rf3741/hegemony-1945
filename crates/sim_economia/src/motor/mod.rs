@@ -13,13 +13,14 @@ pub mod trabalho;
 use crate::catalogo::CatalogoEconomia;
 use crate::cenario::CenarioEconomia;
 use crate::entidades::{
-    ConfigSimulacao, Estado, ItemConstrucao, Mercado, Pais, Provincia, RotaComercial,
+    BlocoComercial, ConfigSimulacao, DetalheRotaComercial, Estado, ItemConstrucao, Mercado,
+    OpcaoParceiroComercial, Pais, Provincia, ResumoComercioPais, RotaComercial,
 };
 use crate::erro::{ErroEconomia, ResultadoEconomia, validar_id_snake_case};
 use crate::motor::consumo::CestaNecessidadeCompilada;
 use crate::motor::demografia::LoteMigrante;
 use crate::motor::governo::{
-    atualizar_terra_aravel_ocupada, compilar_cache_predio, provincia_comporta_novo_nivel,
+    atualizar_terra_aravel_ocupada, compilar_cache_predio,
 };
 use crate::motor::producao::listar_bens_alimento_basico;
 use crate::motor::trabalho::{LotePromocao, reconciliar_empregados_provincia};
@@ -87,6 +88,7 @@ pub struct MundoEconomico {
     estados: Vec<Estado>,
     provincias: Vec<Provincia>,
     rotas_comerciais: Vec<RotaComercial>,
+    pub blocos_comerciais: Vec<BlocoComercial>,
 
     indice_mercados: BTreeMap<String, usize>,
     indice_paises: BTreeMap<String, usize>,
@@ -368,6 +370,7 @@ impl MundoEconomico {
             atualizar_terra_aravel_ocupada(&catalogo, prov);
             reconciliar_empregados_provincia(prov, &mut scratch_emp, &mut scratch_pop);
         }
+        governo::atualizar_terra_aravel_estados(&mut cenario.estados, &cenario.provincias);
 
         // 5. Validar filas de construção iniciais dos países
         for pais in &mut cenario.paises {
@@ -492,6 +495,63 @@ impl MundoEconomico {
             lotes_promocao: Vec::with_capacity(8),
         };
 
+        let mut blocos_comerciais = cenario.blocos_comerciais;
+        if blocos_comerciais.is_empty() {
+            // Bloco Soviético: URSS e satélites do Leste Europeu fechados até COMECON
+            let sov_candidatos = [
+                "sov", "pol", "cze", "hun", "rom", "bul", "alb", "ddr", "uniao_sovietica",
+            ];
+            let sov_membros: Vec<String> = sov_candidatos
+                .iter()
+                .filter(|&id| indice_paises.contains_key(*id))
+                .map(|&s| s.to_string())
+                .collect();
+            if !sov_membros.is_empty() {
+                let lider = if indice_paises.contains_key("sov") {
+                    "sov"
+                } else if indice_paises.contains_key("uniao_sovietica") {
+                    "uniao_sovietica"
+                } else {
+                    &sov_membros[0]
+                };
+                blocos_comerciais.push(BlocoComercial {
+                    id: "bloco_sovietico".to_string(),
+                    nome: "Bloco Soviético (Leste Europeu)".to_string(),
+                    lider_pais_id: lider.to_string(),
+                    membros: sov_membros,
+                    fechado: true,
+                    comecon_ativo: false,
+                });
+            }
+
+            // Bloco Ocidental: Acordo de Bretton Woods / GATT
+            let oci_candidatos = [
+                "usa", "gbr", "fra", "can", "bel", "nld", "lux", "ita", "ger", "estados_unidos", "belgica",
+            ];
+            let oci_membros: Vec<String> = oci_candidatos
+                .iter()
+                .filter(|&id| indice_paises.contains_key(*id))
+                .map(|&s| s.to_string())
+                .collect();
+            if !oci_membros.is_empty() {
+                let lider = if indice_paises.contains_key("usa") {
+                    "usa"
+                } else if indice_paises.contains_key("estados_unidos") {
+                    "estados_unidos"
+                } else {
+                    &oci_membros[0]
+                };
+                blocos_comerciais.push(BlocoComercial {
+                    id: "bloco_ocidental".to_string(),
+                    nome: "Bloco Ocidental (Bretton Woods / GATT)".to_string(),
+                    lider_pais_id: lider.to_string(),
+                    membros: oci_membros,
+                    fechado: false,
+                    comecon_ativo: false,
+                });
+            }
+        }
+
         Ok(Self {
             data_atual: cenario.data_inicial,
             dias_decorridos: 0,
@@ -502,6 +562,7 @@ impl MundoEconomico {
             estados: cenario.estados,
             provincias: cenario.provincias,
             rotas_comerciais: cenario.rotas_comerciais,
+            blocos_comerciais,
             indice_mercados,
             indice_paises,
             indice_estados,
@@ -579,6 +640,7 @@ impl MundoEconomico {
             &self.mercados,
             &mut self.paises,
             &mut self.rotas_comerciais,
+            &self.blocos_comerciais,
             &mut self.buffers.proxima_oferta,
             &mut self.buffers.proxima_demanda,
             &mut self.buffers.importacoes_liquidas,
@@ -592,6 +654,15 @@ impl MundoEconomico {
                 &self.mercados,
                 &mut self.paises,
                 &abertura,
+                &mut self.buffers.proxima_oferta,
+                &mut self.buffers.proxima_demanda,
+                &mut self.buffers.importacoes_liquidas,
+            );
+            global::processar_comercio_intra_bloco_comecon(
+                &self.catalogo,
+                &self.mercados,
+                &self.paises,
+                &self.blocos_comerciais,
                 &mut self.buffers.proxima_oferta,
                 &mut self.buffers.proxima_demanda,
                 &mut self.buffers.importacoes_liquidas,
@@ -746,6 +817,7 @@ impl MundoEconomico {
             &self.mercados,
             &mut self.paises,
             &mut self.rotas_comerciais,
+            &self.blocos_comerciais,
             &mut self.buffers.proxima_oferta,
             &mut self.buffers.proxima_demanda,
             &mut self.buffers.importacoes_liquidas,
@@ -759,6 +831,15 @@ impl MundoEconomico {
                 &self.mercados,
                 &mut self.paises,
                 &abertura,
+                &mut self.buffers.proxima_oferta,
+                &mut self.buffers.proxima_demanda,
+                &mut self.buffers.importacoes_liquidas,
+            );
+            global::processar_comercio_intra_bloco_comecon(
+                &self.catalogo,
+                &self.mercados,
+                &self.paises,
+                &self.blocos_comerciais,
                 &mut self.buffers.proxima_oferta,
                 &mut self.buffers.proxima_demanda,
                 &mut self.buffers.importacoes_liquidas,
@@ -918,7 +999,9 @@ impl MundoEconomico {
         }
 
         let def = &self.catalogo.tipos_predio[tp_idx];
-        if !provincia_comporta_novo_nivel(&self.catalogo, &self.provincias[p_idx], tp_idx) {
+        let prov = &self.provincias[p_idx];
+        let estado = &self.estados[prov.estado_idx];
+        if !governo::estado_comporta_novo_nivel(&self.catalogo, estado, prov, tp_idx) {
             return Err(ErroEconomia::CapacidadeExcedida {
                 provincia_id: provincia_id.to_string(),
                 recurso: def
@@ -1148,6 +1231,12 @@ impl MundoEconomico {
         self.indice_paises.get(id).map(|&i| &self.paises[i])
     }
 
+    /// Localiza o bloco comercial ao qual um determinado país pertence, se houver.
+    #[inline]
+    pub fn bloco_do_pais(&self, pais_id: &str) -> Option<&BlocoComercial> {
+        self.blocos_comerciais.iter().find(|b| b.membros.iter().any(|m| m == pais_id))
+    }
+
     #[inline]
     pub fn obter_pais_mut(&mut self, id: &str) -> Option<&mut Pais> {
         self.indice_paises.get(id).map(|&i| &mut self.paises[i])
@@ -1161,6 +1250,15 @@ impl MundoEconomico {
     #[inline]
     pub fn obter_estado(&self, id: &str) -> Option<&Estado> {
         self.indice_estados.get(id).map(|&i| &self.estados[i])
+    }
+
+    /// Níveis ocupados de um determinado recurso natural/mineral em todas as províncias do estado.
+    pub fn estado_recursos_ocupados(&self, estado_id: &str, recurso: &str) -> u32 {
+        if let Some(estado) = self.obter_estado(estado_id) {
+            governo::estado_niveis_recurso(&self.catalogo, estado, &self.provincias, recurso)
+        } else {
+            0
+        }
     }
 
     #[inline]
@@ -1207,6 +1305,24 @@ impl MundoEconomico {
         })
     }
 
+    /// Taxa média nacional de desemprego (0.0..=1.0).
+    pub fn taxa_desemprego_media_pais(&self, pais_id: &str) -> Option<f64> {
+        let pais = self.obter_pais(pais_id)?;
+        let mut pop_total = 0.0;
+        let mut desemp_total = 0.0;
+        for &p_idx in &pais.provincias_indices {
+            for pop in &self.provincias[p_idx].pops {
+                pop_total += pop.populacao;
+                desemp_total += pop.desempregados();
+            }
+        }
+        Some(if pop_total > 0.0 {
+            (desemp_total / pop_total).clamp(0.0, 1.0)
+        } else {
+            0.0
+        })
+    }
+
     /// Taxa média nacional de alfabetização (0.0..=1.0).
     pub fn alfabetizacao_media_pais(&self, pais_id: &str) -> Option<f64> {
         let pais = self.obter_pais(pais_id)?;
@@ -1223,6 +1339,445 @@ impl MundoEconomico {
         } else {
             0.0
         })
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // COMÉRCIO INTERNACIONAL, TARIFAS, ACORDOS E BLOCOS ECONÔMICOS
+    // -----------------------------------------------------------------------------------------
+
+    #[inline]
+    pub fn blocos_comerciais(&self) -> &[BlocoComercial] {
+        &self.blocos_comerciais
+    }
+
+    #[inline]
+    pub fn blocos_comerciais_mut(&mut self) -> &mut [BlocoComercial] {
+        &mut self.blocos_comerciais
+    }
+
+    /// Localiza mutavelmente o bloco comercial ao qual um determinado país pertence.
+    #[inline]
+    pub fn bloco_do_pais_mut(&mut self, pais_id: &str) -> Option<&mut BlocoComercial> {
+        self.blocos_comerciais.iter_mut().find(|b| b.membros.iter().any(|m| m == pais_id))
+    }
+
+    /// Verifica se dois países possuem acordo comercial bilateral ativo.
+    pub fn tem_acordo_comercial(&self, pais_a: &str, pais_b: &str) -> bool {
+        let a = self.obter_pais(pais_a);
+        let b = self.obter_pais(pais_b);
+        match (a, b) {
+            (Some(pa), Some(pb)) => {
+                pa.acordos_comerciais.iter().any(|id| id == pais_b)
+                    || pb.acordos_comerciais.iter().any(|id| id == pais_a)
+            }
+            _ => false,
+        }
+    }
+
+    /// Firma um acordo bilateral de livre comércio / redução tarifária mútua entre dois países.
+    pub fn assinar_acordo_comercial(&mut self, pais_a: &str, pais_b: &str) -> ResultadoEconomia<()> {
+        if pais_a == pais_b {
+            return Err(ErroEconomia::ValorInvalido {
+                entidade: "AcordoComercial",
+                id: pais_a.into(),
+                detalhe: "um país não pode firmar acordo comercial consigo mesmo".into(),
+            });
+        }
+        let idx_a = *self.indice_paises.get(pais_a).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+            origem_entidade: "AcordoComercial",
+            origem_id: pais_a.into(),
+            alvo_entidade: "Pais",
+            alvo_id: pais_a.into(),
+        })?;
+        let idx_b = *self.indice_paises.get(pais_b).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+            origem_entidade: "AcordoComercial",
+            origem_id: pais_b.into(),
+            alvo_entidade: "Pais",
+            alvo_id: pais_b.into(),
+        })?;
+
+        if !self.paises[idx_a].acordos_comerciais.contains(&pais_b.to_string()) {
+            self.paises[idx_a].acordos_comerciais.push(pais_b.to_string());
+        }
+        if !self.paises[idx_b].acordos_comerciais.contains(&pais_a.to_string()) {
+            self.paises[idx_b].acordos_comerciais.push(pais_a.to_string());
+        }
+        Ok(())
+    }
+
+    /// Revoga um acordo comercial bilateral entre dois países.
+    pub fn cancelar_acordo_comercial(&mut self, pais_a: &str, pais_b: &str) -> ResultadoEconomia<()> {
+        if let Some(&idx_a) = self.indice_paises.get(pais_a) {
+            self.paises[idx_a].acordos_comerciais.retain(|id| id != pais_b);
+        }
+        if let Some(&idx_b) = self.indice_paises.get(pais_b) {
+            self.paises[idx_b].acordos_comerciais.retain(|id| id != pais_a);
+        }
+        Ok(())
+    }
+
+    /// Alterna a ativação do COMECON no Bloco Soviético, integrando os mercados socialistas com tarifas zeradas.
+    pub fn alternar_comecon(&mut self) -> ResultadoEconomia<bool> {
+        let bloco = self.blocos_comerciais
+            .iter_mut()
+            .find(|b| b.id == "bloco_sovietico")
+            .ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+                origem_entidade: "Comando",
+                origem_id: "alternar_comecon".into(),
+                alvo_entidade: "BlocoComercial",
+                alvo_id: "bloco_sovietico".into(),
+            })?;
+        bloco.comecon_ativo = !bloco.comecon_ativo;
+        Ok(bloco.comecon_ativo)
+    }
+
+    /// Cria uma nova rota de importação ou exportação para um determinado bem e parceiro comercial.
+    pub fn criar_rota_comercial(
+        &mut self,
+        pais_id: &str,
+        parceiro_pais_id: &str,
+        bem_id: &str,
+        exportacao: bool,
+        volume_maximo: f64,
+    ) -> ResultadoEconomia<String> {
+        if pais_id == parceiro_pais_id {
+            return Err(ErroEconomia::ValorInvalido {
+                entidade: "RotaComercial",
+                id: pais_id.into(),
+                detalhe: "não é possível criar rota comercial com o próprio país".into(),
+            });
+        }
+        let idx_p = *self.indice_paises.get(pais_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+            origem_entidade: "RotaComercial",
+            origem_id: pais_id.into(),
+            alvo_entidade: "Pais",
+            alvo_id: pais_id.into(),
+        })?;
+        let idx_parc = *self.indice_paises.get(parceiro_pais_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+            origem_entidade: "RotaComercial",
+            origem_id: parceiro_pais_id.into(),
+            alvo_entidade: "Pais",
+            alvo_id: parceiro_pais_id.into(),
+        })?;
+        let bem_idx = *self.catalogo.indice_bens.get(bem_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+            origem_entidade: "RotaComercial",
+            origem_id: bem_id.into(),
+            alvo_entidade: "Bem",
+            alvo_id: bem_id.into(),
+        })?;
+        if !self.catalogo.bens[bem_idx].comercializavel {
+            return Err(ErroEconomia::ValorInvalido {
+                entidade: "RotaComercial",
+                id: bem_id.into(),
+                detalhe: "o bem especificado não é comercializável no comércio exterior".into(),
+            });
+        }
+
+        // Restrição de bloco fechado (URSS e satélites até COMECON)
+        let bloco_p = self.bloco_do_pais(pais_id);
+        let bloco_parc = self.bloco_do_pais(parceiro_pais_id);
+        let p_fechado = bloco_p.map_or(false, |b| b.fechado && bloco_parc.map_or(true, |bp| bp.id != b.id));
+        let parc_fechado = bloco_parc.map_or(false, |b| b.fechado && bloco_p.map_or(true, |bp| bp.id != b.id));
+        if (p_fechado || parc_fechado) && !self.tem_acordo_comercial(pais_id, parceiro_pais_id) {
+            return Err(ErroEconomia::ValorInvalido {
+                entidade: "RotaComercial",
+                id: format!("{pais_id}_{parceiro_pais_id}"),
+                detalhe: "País em bloco econômico fechado requer acordo comercial prévio para negociar com o exterior.".into(),
+            });
+        }
+
+        let m_orig_id = if exportacao {
+            self.paises[idx_p].mercado_id.clone()
+        } else {
+            self.paises[idx_parc].mercado_id.clone()
+        };
+        let m_dest_id = if exportacao {
+            self.paises[idx_parc].mercado_id.clone()
+        } else {
+            self.paises[idx_p].mercado_id.clone()
+        };
+
+        if m_orig_id == m_dest_id {
+            return Err(ErroEconomia::ValorInvalido {
+                entidade: "RotaComercial",
+                id: m_orig_id,
+                detalhe: "ambos os países já pertencem ao mesmo mercado comum".into(),
+            });
+        }
+
+        let m_orig_idx = *self.indice_mercados.get(&m_orig_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+            origem_entidade: "RotaComercial",
+            origem_id: m_orig_id.clone(),
+            alvo_entidade: "Mercado",
+            alvo_id: m_orig_id.clone(),
+        })?;
+        let m_dest_idx = *self.indice_mercados.get(&m_dest_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+            origem_entidade: "RotaComercial",
+            origem_id: m_dest_id.clone(),
+            alvo_entidade: "Mercado",
+            alvo_id: m_dest_id.clone(),
+        })?;
+
+        let id_rota = format!(
+            "rota_{}_{}_{}_{}",
+            pais_id,
+            parceiro_pais_id,
+            bem_id,
+            if exportacao { "exp" } else { "imp" }
+        );
+
+        if let Some(r) = self.rotas_comerciais.iter_mut().find(|r| r.id == id_rota) {
+            r.volume_maximo = volume_maximo.max(1.0);
+            return Ok(id_rota);
+        }
+
+        validar_id_snake_case("RotaComercial", &id_rota)?;
+
+        self.rotas_comerciais.push(RotaComercial {
+            id: id_rota.clone(),
+            mercado_origem_id: m_orig_id,
+            mercado_destino_id: m_dest_id,
+            pais_operador_id: pais_id.to_string(),
+            bem_id: bem_id.to_string(),
+            volume_atual: 0.0,
+            volume_maximo: volume_maximo.max(1.0),
+            automatica: true,
+            lucro_ultimo_tick: 0.0,
+            origem_idx: m_orig_idx,
+            destino_idx: m_dest_idx,
+            pais_operador_idx: idx_p,
+            bem_idx,
+        });
+
+        Ok(id_rota)
+    }
+
+    /// Remove uma rota comercial pelo identificador.
+    pub fn remover_rota_comercial(&mut self, rota_id: &str) -> ResultadoEconomia<()> {
+        let pos = self.rotas_comerciais.iter().position(|r| r.id == rota_id).ok_or_else(|| {
+            ErroEconomia::ReferenciaInexistente {
+                origem_entidade: "MundoEconomico",
+                origem_id: rota_id.into(),
+                alvo_entidade: "RotaComercial",
+                alvo_id: rota_id.into(),
+            }
+        })?;
+        self.rotas_comerciais.remove(pos);
+        Ok(())
+    }
+
+    /// Alterna se a rota ajusta seu volume automaticamente conforme margem de lucro.
+    pub fn alternar_rota_automatica(&mut self, rota_id: &str) -> ResultadoEconomia<bool> {
+        let rota = self.rotas_comerciais.iter_mut().find(|r| r.id == rota_id).ok_or_else(|| {
+            ErroEconomia::ReferenciaInexistente {
+                origem_entidade: "MundoEconomico",
+                origem_id: rota_id.into(),
+                alvo_entidade: "RotaComercial",
+                alvo_id: rota_id.into(),
+            }
+        })?;
+        rota.automatica = !rota.automatica;
+        Ok(rota.automatica)
+    }
+
+    /// Ajusta o teto de volume operacional máximo de uma rota comercial.
+    pub fn ajustar_volume_rota(&mut self, rota_id: &str, novo_volume_maximo: f64) -> ResultadoEconomia<()> {
+        let rota = self.rotas_comerciais.iter_mut().find(|r| r.id == rota_id).ok_or_else(|| {
+            ErroEconomia::ReferenciaInexistente {
+                origem_entidade: "MundoEconomico",
+                origem_id: rota_id.into(),
+                alvo_entidade: "RotaComercial",
+                alvo_id: rota_id.into(),
+            }
+        })?;
+        rota.volume_maximo = novo_volume_maximo.max(1.0);
+        Ok(())
+    }
+
+    /// Define tarifas gerais de importação e exportação de um país.
+    pub fn definir_tarifa_geral(&mut self, pais_id: &str, importacao: f64, exportacao: f64) -> ResultadoEconomia<()> {
+        let p = self.obter_pais_mut(pais_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+            origem_entidade: "MundoEconomico",
+            origem_id: pais_id.into(),
+            alvo_entidade: "Pais",
+            alvo_id: pais_id.into(),
+        })?;
+        p.politica_fiscal.tarifa_importacao = importacao.clamp(0.0, 0.80);
+        p.politica_fiscal.tarifa_exportacao = exportacao.clamp(0.0, 0.80);
+        p.politica_fiscal.nivel_abertura_mercado = Some(p.politica_fiscal.nivel_abertura());
+        Ok(())
+    }
+
+    /// Define a tarifa específica de um bem (substituindo a tarifa geral para esse item).
+    pub fn definir_tarifa_bem(
+        &mut self,
+        pais_id: &str,
+        bem_id: &str,
+        tarifa_importacao: f64,
+        tarifa_exportacao: f64,
+    ) -> ResultadoEconomia<()> {
+        let p = self.obter_pais_mut(pais_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+            origem_entidade: "MundoEconomico",
+            origem_id: pais_id.into(),
+            alvo_entidade: "Pais",
+            alvo_id: pais_id.into(),
+        })?;
+        p.politica_fiscal.tarifas_importacao_bens.insert(bem_id.to_string(), tarifa_importacao.clamp(0.0, 0.80));
+        p.politica_fiscal.tarifas_exportacao_bens.insert(bem_id.to_string(), tarifa_exportacao.clamp(0.0, 0.80));
+        Ok(())
+    }
+
+    /// Ajusta o nível de abertura de mercado do país (0.0 a 1.0), recalculando tarifas gerais.
+    pub fn definir_nivel_abertura(&mut self, pais_id: &str, nivel: f64) -> ResultadoEconomia<()> {
+        let p = self.obter_pais_mut(pais_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+            origem_entidade: "MundoEconomico",
+            origem_id: pais_id.into(),
+            alvo_entidade: "Pais",
+            alvo_id: pais_id.into(),
+        })?;
+        p.politica_fiscal.definir_nivel_abertura(nivel);
+        Ok(())
+    }
+
+    /// Constrói um resumo comercial completo do país para a interface (F3).
+    pub fn resumo_comercio_pais(&self, pais_id: &str) -> ResumoComercioPais {
+        let Some(p) = self.obter_pais(pais_id) else {
+            return ResumoComercioPais::default();
+        };
+        let m_idx = self.paises.iter().find(|c| c.id == pais_id).map(|c| c.mercado_idx).unwrap_or(0);
+        let m = &self.mercados[m_idx];
+
+        let mut exp_total = 0.0;
+        let mut imp_total = 0.0;
+        for (g_idx, _bem) in self.catalogo.bens.iter().enumerate() {
+            let saldo = m.importacoes_liquidas_idx[g_idx];
+            let preco = m.precos_idx[g_idx];
+            if saldo > 0.0 {
+                imp_total += saldo * preco;
+            } else if saldo < 0.0 {
+                exp_total += (-saldo) * preco;
+            }
+        }
+
+        let bloco = self.bloco_do_pais(pais_id);
+        ResumoComercioPais {
+            total_exportacoes_valor: exp_total,
+            total_importacoes_valor: imp_total,
+            saldo_comercial: exp_total - imp_total,
+            receita_tarifas_total: p.orcamento.receita_tarifas,
+            nivel_abertura: p.politica_fiscal.nivel_abertura(),
+            tarifa_geral_importacao: p.politica_fiscal.tarifa_importacao,
+            tarifa_geral_exportacao: p.politica_fiscal.tarifa_exportacao,
+            acordos_comerciais: p.acordos_comerciais.clone(),
+            bloco_id: bloco.map(|b| b.id.clone()),
+            bloco_nome: bloco.map(|b| b.nome.clone()),
+            bloco_fechado: bloco.map_or(false, |b| b.fechado),
+            comecon_ativo: bloco.map_or(false, |b| b.comecon_ativo),
+            eh_lider_bloco: bloco.map_or(false, |b| b.lider_pais_id == pais_id),
+            membros_bloco: bloco.map(|b| b.membros.clone()).unwrap_or_default(),
+        }
+    }
+
+    /// Retorna detalhes de todas as rotas comerciais conectadas ao país do jogador.
+    pub fn detalhes_rotas_pais(&self, pais_id: &str) -> Vec<DetalheRotaComercial> {
+        let Some(pais) = self.obter_pais(pais_id) else {
+            return Vec::new();
+        };
+        let mercado_id = &pais.mercado_id;
+        let mut lista = Vec::new();
+
+        for rota in &self.rotas_comerciais {
+            let eh_origem = &rota.mercado_origem_id == mercado_id;
+            let eh_destino = &rota.mercado_destino_id == mercado_id;
+            let eh_operador = &rota.pais_operador_id == pais_id;
+
+            if !eh_origem && !eh_destino && !eh_operador {
+                continue;
+            }
+
+            let eh_exportacao = eh_origem;
+            let parceiro_mercado_id = if eh_exportacao {
+                &rota.mercado_destino_id
+            } else {
+                &rota.mercado_origem_id
+            };
+            let parceiro = self.mercados.iter().find(|m| &m.id == parceiro_mercado_id).map(|m| {
+                let p = &self.paises[m.pais_lider_idx];
+                (p.id.clone(), p.nome.clone())
+            }).unwrap_or_else(|| ("desconhecido".into(), "Parceiro Comercial".into()));
+
+            let g = rota.bem_idx;
+            let bem = &self.catalogo.bens[g];
+            let p_orig = self.mercados[rota.origem_idx].precos_idx[g];
+            let p_dest = self.mercados[rota.destino_idx].precos_idx[g];
+
+            let l_orig = self.mercados[rota.origem_idx].pais_lider_idx;
+            let l_dest = self.mercados[rota.destino_idx].pais_lider_idx;
+            let tarifa_orig = self.paises[l_orig].politica_fiscal.tarifa_exportacao_bem(&bem.id);
+            let tarifa_dest = self.paises[l_dest].politica_fiscal.tarifa_importacao_bem(&bem.id);
+            let tem_acordo = self.tem_acordo_comercial(pais_id, &parceiro.0);
+
+            lista.push(DetalheRotaComercial {
+                id: rota.id.clone(),
+                bem_id: bem.id.clone(),
+                bem_nome: bem.nome.clone(),
+                eh_exportacao,
+                parceiro_pais_id: parceiro.0,
+                parceiro_pais_nome: parceiro.1,
+                volume_atual: rota.volume_atual,
+                volume_maximo: rota.volume_maximo,
+                automatica: rota.automatica,
+                preco_origem: p_orig,
+                preco_destino: p_dest,
+                lucro_ultimo_tick: rota.lucro_ultimo_tick,
+                tarifa_origem: tarifa_orig,
+                tarifa_destino: tarifa_dest,
+                tem_acordo,
+            });
+        }
+
+        lista.sort_by(|a, b| b.lucro_ultimo_tick.total_cmp(&a.lucro_ultimo_tick));
+        lista
+    }
+
+    /// Lista todos os outros países disponíveis como parceiros comerciais com suas permissões.
+    pub fn opcoes_parceiros_pais(&self, pais_id: &str) -> Vec<OpcaoParceiroComercial> {
+        let bloco_p = self.bloco_do_pais(pais_id);
+        let mut opcoes = Vec::new();
+
+        for p in &self.paises {
+            if p.id == pais_id {
+                continue;
+            }
+            let tem_acordo = self.tem_acordo_comercial(pais_id, &p.id);
+            let bloco_outro = self.bloco_do_pais(&p.id);
+            let mesmo_bloco = match (bloco_p, bloco_outro) {
+                (Some(bp), Some(bo)) => bp.id == bo.id,
+                _ => false,
+            };
+
+            let p_fechado = bloco_p.map_or(false, |b| b.fechado && !mesmo_bloco);
+            let outro_fechado = bloco_outro.map_or(false, |b| b.fechado && !mesmo_bloco);
+
+            let (permitido, razao) = if (p_fechado || outro_fechado) && !tem_acordo {
+                (false, Some("País em bloco fechado: requer acordo comercial prévio".into()))
+            } else {
+                (true, None)
+            };
+
+            opcoes.push(OpcaoParceiroComercial {
+                pais_id: p.id.clone(),
+                nome: p.nome.clone(),
+                mercado_id: p.mercado_id.clone(),
+                tem_acordo,
+                mesmo_bloco,
+                permitido_comercio: permitido,
+                razao_bloqueio: razao,
+            });
+        }
+
+        opcoes.sort_by(|a, b| a.nome.cmp(&b.nome));
+        opcoes
     }
 
     /// Sincroniza os vetores numéricos rápidos de volta para os `BTreeMap<String, f64>` legíveis em RON.
@@ -1266,6 +1821,7 @@ impl MundoEconomico {
             estados: self.estados.clone(),
             provincias: self.provincias.clone(),
             rotas_comerciais: self.rotas_comerciais.clone(),
+            blocos_comerciais: self.blocos_comerciais.clone(),
         }
     }
 

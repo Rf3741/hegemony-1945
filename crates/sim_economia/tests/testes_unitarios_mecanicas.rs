@@ -637,3 +637,154 @@ fn teste_roundtrip_ron_determinismo_e_cadencia_semanal() {
     assert_eq!(rel_sem.dias_decorridos, 7);
     mundo_recarregado.auditar_estabilidade().unwrap();
 }
+
+#[test]
+fn teste_potencial_regional_culturas_e_limites_estado() {
+    let mut cenario = carregar_cenario_fixtures();
+    
+    // Configura o estado de São Paulo com apenas grãos permitidos (sem gado), e ferro limitado a 1 nível
+    if let Some(est) = cenario.estados.iter_mut().find(|e| e.id == "estado_sao_paulo") {
+        est.terra_aravel = 10;
+        est.culturas_permitidas = vec!["graos".into()];
+        est.limites_recursos.insert("ferro".into(), 1);
+        est.limites_recursos.insert("carvao".into(), 0); // Sem carvão
+        est.qualidade_recursos.insert("graos".into(), 1.25);
+    }
+
+    let mut mundo = MundoEconomico::novo(cenario).unwrap();
+
+    // Província campinas_santos (pertence a estado_sao_paulo)
+    let prov_sp = "campinas_santos";
+    
+    // Grãos são permitidos
+    assert!(mundo.pode_construir(prov_sp, "fazenda_graos"), "grãos devem ser permitidos em SP");
+
+    // Gado (pecuaria_pesca) NÃO é permitido em São Paulo nesta configuração
+    assert!(!mundo.pode_construir(prov_sp, "pecuaria_pesca"), "pecuária não deve ser permitida onde cultura não consta");
+    let err_gado = mundo.enfileirar_construcao("brasil", prov_sp, "pecuaria_pesca", false);
+    assert!(matches!(err_gado, Err(ErroEconomia::CapacidadeExcedida { .. })));
+
+    // Mina de carvão: não há jazida (limite 0)
+    assert!(!mundo.pode_construir(prov_sp, "mina_carvao"), "carvão com limite 0 não pode ser construído");
+    let err_carvao = mundo.enfileirar_construcao("brasil", prov_sp, "mina_carvao", false);
+    assert!(matches!(err_carvao, Err(ErroEconomia::CapacidadeExcedida { .. })));
+
+    // Mina de ferro: limite de 1 nível
+    assert!(mundo.pode_construir(prov_sp, "mina_ferro"), "ferro com limite 1 pode ser construído");
+    mundo.enfileirar_construcao("brasil", prov_sp, "mina_ferro", false).unwrap();
+
+    // Bônus de qualidade de recurso: grãos em SP tem qualidade 1.25 (+25% produtividade)
+    let est_sp = mundo.obter_estado("estado_sao_paulo").unwrap();
+    let def_graos = mundo.catalogo().tipos_predio.iter().find(|t| t.id == "fazenda_graos").unwrap();
+    assert_eq!(est_sp.fator_qualidade_predio(def_graos), 1.25);
+}
+
+#[test]
+fn teste_potencial_regional_cenario_real_1945_minas_sp_texas() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/data/economia");
+    let cenario = CenarioEconomia::carregar_diretorio(&dir).expect("cenário real deve carregar");
+    let mundo = MundoEconomico::novo(cenario).expect("mundo real deve ser válido");
+
+    // 1. Minas Gerais deve ter ferro, ouro e café permitidos
+    let est_mg = mundo.obter_estado("bra_minas_gerais").expect("Minas Gerais deve existir");
+    assert!(est_mg.cultura_permitida("cafe"), "MG deve permitir café");
+    assert!(est_mg.cultura_permitida("graos"), "MG deve permitir grãos");
+    assert!(est_mg.limite_recurso("ferro") >= 180, "MG deve ter grande jazida de ferro");
+    assert!(est_mg.limite_recurso("ouro_prata") >= 50, "MG deve ter ouro");
+    assert_eq!(est_mg.limite_recurso("pesca"), 0, "MG não tem costa marítima");
+    assert!(est_mg.qualidade_recursos.get("cafe").copied().unwrap_or(0.0) >= 1.20, "MG tem bônus de café");
+
+    // 2. Centro-Oeste (Goiás) deve ter gado e grãos, e NÃO café
+    let est_go = mundo.obter_estado("bra_goias").expect("Goiás deve existir");
+    assert!(est_go.cultura_permitida("gado"), "Goiás deve permitir gado");
+    assert!(est_go.cultura_permitida("graos"), "Goiás deve permitir grãos");
+    assert!(!est_go.cultura_permitida("cafe"), "Goiás não deve permitir café");
+    assert!(est_go.qualidade_recursos.get("gado").copied().unwrap_or(0.0) >= 1.20, "Goiás tem bônus de gado");
+
+    // 3. Texas deve ter petróleo e gás
+    let est_tx = mundo.obter_estado("usa_texas").expect("Texas deve existir");
+    assert!(est_tx.limite_recurso("petroleo") >= 200, "Texas deve ter petróleo abundante");
+    assert!(est_tx.limite_recurso("gas_natural") >= 150, "Texas deve ter gás natural");
+    assert!(est_tx.qualidade_recursos.get("petroleo").copied().unwrap_or(0.0) >= 1.20, "Texas tem bônus de petróleo");
+
+    // 4. Ruhr deve ter carvão
+    let est_ruhr = mundo.obter_estado("ger_nordrhein_westfalen").expect("Ruhr deve existir");
+    assert!(est_ruhr.limite_recurso("carvao") >= 300, "Ruhr deve ter muito carvão");
+    assert!(est_ruhr.qualidade_recursos.get("carvao").copied().unwrap_or(0.0) >= 1.20, "Ruhr tem bônus de carvão");
+
+    // 5. Katanga deve ter cobre e urânio
+    let est_kat = mundo.obter_estado("cod_sul").expect("Katanga (cod_sul) deve existir");
+    assert!(est_kat.limite_recurso("cobre") >= 150, "Katanga deve ter cobre abundante");
+    assert!(est_kat.limite_recurso("uranio") >= 100, "Katanga deve ter urânio");
+}
+
+#[test]
+fn teste_comercio_internacional_tarifas_acordos_e_blocos_comecon() {
+    let cenario = carregar_cenario_fixtures();
+    let mut mundo = MundoEconomico::novo(cenario).unwrap();
+
+    // 1. Tarifas gerais, por bem e nível de abertura
+    mundo.definir_tarifa_geral("belgica", 0.20, 0.05).unwrap();
+    let bel = mundo.obter_pais("belgica").unwrap();
+    assert_eq!(bel.politica_fiscal.tarifa_importacao, 0.20);
+    assert_eq!(bel.politica_fiscal.tarifa_exportacao, 0.05);
+
+    mundo.definir_tarifa_bem("belgica", "petroleo", 0.03, 0.01).unwrap();
+    let bel = mundo.obter_pais("belgica").unwrap();
+    assert_eq!(bel.politica_fiscal.tarifa_importacao_bem("petroleo"), 0.03);
+    assert_eq!(bel.politica_fiscal.tarifa_importacao_bem("graos"), 0.20);
+
+    mundo.definir_nivel_abertura("belgica", 0.85).unwrap();
+    let bel = mundo.obter_pais("belgica").unwrap();
+    assert!(bel.politica_fiscal.nivel_abertura() >= 0.80);
+
+    // 2. Acordos comerciais bilaterais
+    assert!(!mundo.tem_acordo_comercial("belgica", "estados_unidos"));
+    mundo.assinar_acordo_comercial("belgica", "estados_unidos").unwrap();
+    assert!(mundo.tem_acordo_comercial("belgica", "estados_unidos"));
+    assert!(mundo.tem_acordo_comercial("estados_unidos", "belgica"));
+
+    // 3. Controle e ciclo de vida de rotas comerciais
+    let rota_id = mundo
+        .criar_rota_comercial("belgica", "brasil", "graos", false, 50.0)
+        .unwrap();
+    assert!(mundo.rotas_comerciais().iter().any(|r| r.id == rota_id));
+
+    let auto = mundo.alternar_rota_automatica(&rota_id).unwrap();
+    assert!(!auto);
+
+    mundo.ajustar_volume_rota(&rota_id, 75.0).unwrap();
+    let rota = mundo.rotas_comerciais().iter().find(|r| r.id == rota_id).unwrap();
+    assert_eq!(rota.volume_maximo, 75.0);
+
+    mundo.remover_rota_comercial(&rota_id).unwrap();
+    assert!(!mundo.rotas_comerciais().iter().any(|r| r.id == rota_id));
+
+    // 4. Blocos e restrições: URSS fechada até COMECON
+    let bloco_sov = mundo.bloco_do_pais("uniao_sovietica").unwrap();
+    assert!(bloco_sov.fechado, "Mercado soviético começa fechado");
+    assert!(!bloco_sov.comecon_ativo, "COMECON começa inativo em 1945");
+
+    // Tentativa de rota externa sem acordo com país do bloco fechado deve falhar
+    let tentativa_sem_acordo = mundo.criar_rota_comercial("belgica", "uniao_sovietica", "ferramentas", true, 40.0);
+    assert!(
+        tentativa_sem_acordo.is_err(),
+        "Mercado fechado soviético deve impedir rota com o ocidente sem acordo bilateral"
+    );
+
+    // Com acordo comercial, rota é permitida
+    mundo.assinar_acordo_comercial("belgica", "uniao_sovietica").unwrap();
+    let rota_com_acordo = mundo.criar_rota_comercial("belgica", "uniao_sovietica", "ferramentas", true, 40.0);
+    assert!(rota_com_acordo.is_ok(), "Acordo comercial deve autorizar rota");
+
+    // 5. Ativação do COMECON
+    let comecon = mundo.alternar_comecon().unwrap();
+    assert!(comecon, "COMECON deve ser ativado");
+    let bloco_pos = mundo.bloco_do_pais("uniao_sovietica").unwrap();
+    assert!(bloco_pos.comecon_ativo, "COMECON ativo deve constar no bloco");
+
+    // Resumo comercial do país
+    let resumo = mundo.resumo_comercio_pais("belgica");
+    assert!(resumo.acordos_comerciais.contains(&"estados_unidos".to_string()));
+    assert!(resumo.acordos_comerciais.contains(&"uniao_sovietica".to_string()));
+}

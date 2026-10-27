@@ -31,8 +31,9 @@ pub use catalogo::{
 };
 pub use cenario::CenarioEconomia;
 pub use entidades::{
-    ConfigSimulacao, Estado, ItemConstrucao, Mercado, OrcamentoGoverno, Pais, PoliticaFiscal, Pop,
-    Predio, Provincia, RotaComercial,
+    BlocoComercial, ConfigSimulacao, DetalheRotaComercial, Estado, ItemConstrucao, Mercado,
+    OpcaoParceiroComercial, OrcamentoGoverno, Pais, PoliticaFiscal, Pop, PotencialRegional, Predio,
+    Provincia, ResumoComercioPais, RotaComercial,
 };
 pub use erro::{ErroEconomia, ResultadoEconomia, validar_id_snake_case};
 pub use gerador::{ParametrosEscalaMundial, gerar_cenario_escala_mundial};
@@ -40,7 +41,10 @@ pub use motor::consumo::calcular_fatias_substituicao;
 pub use motor::demografia::taxa_crescimento_anual_pop;
 pub use motor::mercado::{atualizar_precos_mercado_isolado, calcular_preco_alvo};
 pub use motor::global::{ConfigMercadoGlobal, MercadoGlobal};
-pub use motor::governo::{materiais_por_ponto, provincia_comporta_novo_nivel};
+pub use motor::governo::{
+    estado_comporta_novo_nivel, estado_niveis_recurso, materiais_por_ponto,
+    provincia_comporta_novo_nivel,
+};
 pub use motor::{MundoEconomico, RelatorioTick, TemposFasesTick};
 pub use tipos::{
     CategoriaBem, CategoriaNecessidade, CategoriaPredio, DataJogo, Estrato, FormulaPreco,

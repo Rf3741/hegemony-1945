@@ -137,7 +137,7 @@ pub(crate) fn processar_comercio_mundial(
                     let lider = mercados[m].pais_lider_idx;
                     paises[lider].orcamento.receita_tarifas += vol
                         * bem.preco_base
-                        * paises[lider].politica_fiscal.tarifa_importacao.max(0.0)
+                        * paises[lider].politica_fiscal.tarifa_importacao_bem(&bem.id)
                         * paises[lider].eficiencia_arrecadacao;
                 }
             }
@@ -153,8 +153,71 @@ pub(crate) fn processar_comercio_mundial(
                 let lider = mercados[m].pais_lider_idx;
                 paises[lider].orcamento.receita_tarifas += vol
                     * bem.preco_base
-                    * paises[lider].politica_fiscal.tarifa_importacao.max(0.0)
+                    * paises[lider].politica_fiscal.tarifa_importacao_bem(&bem.id)
                     * paises[lider].eficiencia_arrecadacao;
+            }
+        }
+    }
+}
+
+/// Comércio intra-bloco COMECON (quando ativo): os países do bloco socialista (URSS e satélites)
+/// trocam seus excedentes e cobrem déficits mutuamente com tarifas zeradas, isolados do mercado capitalista.
+pub(crate) fn processar_comercio_intra_bloco_comecon(
+    catalogo: &crate::catalogo::CatalogoEconomia,
+    mercados: &[crate::entidades::Mercado],
+    paises: &[crate::entidades::Pais],
+    blocos: &[crate::entidades::BlocoComercial],
+    proxima_oferta: &mut [f64],
+    proxima_demanda: &mut [f64],
+    importacoes_liquidas: &mut [f64],
+) {
+    let Some(bloco) = blocos.iter().find(|b| b.comecon_ativo) else {
+        return;
+    };
+    let n = catalogo.bens.len();
+    let mercados_bloco: Vec<usize> = mercados
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| {
+            let lider_id = &paises[m.pais_lider_idx].id;
+            bloco.membros.iter().any(|mb| mb == lider_id)
+        })
+        .map(|(idx, _)| idx)
+        .collect();
+
+    if mercados_bloco.len() < 2 {
+        return;
+    }
+
+    for g in 0..n {
+        let bem = &catalogo.bens[g];
+        if !bem.comercializavel {
+            continue;
+        }
+        let (mut cap_exp, mut dem_imp) = (0.0, 0.0);
+        for &m in &mercados_bloco {
+            let net = proxima_oferta[m * n + g] - proxima_demanda[m * n + g];
+            if net > 0.0 {
+                cap_exp += 0.5 * net;
+            } else {
+                dem_imp += -net;
+            }
+        }
+        let t = cap_exp.min(dem_imp);
+        if t > 1e-9 {
+            for &m in &mercados_bloco {
+                let i = m * n + g;
+                let net = proxima_oferta[i] - proxima_demanda[i];
+                if net > 0.0 {
+                    let vol = t * (0.5 * net) / cap_exp;
+                    proxima_demanda[i] += vol;
+                    importacoes_liquidas[i] -= vol;
+                } else if net < 0.0 {
+                    let vol = t * (-net) / dem_imp;
+                    proxima_oferta[i] += vol;
+                    importacoes_liquidas[i] += vol;
+                    // Intra-COMECON: sem cobrança de tarifas aduaneiras entre irmãos socialistas
+                }
             }
         }
     }
@@ -164,6 +227,12 @@ impl MundoEconomico {
     /// Abertura comercial (0.05..1.0) de um mercado: depende da lei de comércio e da tarifa de importação do país líder.
     pub fn abertura_comercial_mercado(&self, mercado_idx: usize) -> f64 {
         let lider = &self.paises[self.mercados[mercado_idx].pais_lider_idx];
+        if let Some(bloco) = self.bloco_do_pais(&lider.id) {
+            // Mercados de bloco fechado (URSS e satélites até COMECON) não participam do livre comércio global
+            if bloco.fechado {
+                return 0.0;
+            }
+        }
         let lei = (lider.mult_volume_comercio_lei / 1.25).clamp(0.2, 1.0);
         let tarifa = (1.0 - 2.0 * lider.politica_fiscal.tarifa_importacao.max(0.0)).clamp(0.2, 1.0);
         (lei * tarifa).clamp(0.05, 1.0)
@@ -260,7 +329,9 @@ impl MundoEconomico {
         else {
             return false;
         };
-        crate::motor::governo::provincia_comporta_novo_nivel(&self.catalogo, &self.provincias[p], t)
+        let prov = &self.provincias[p];
+        let estado = &self.estados[prov.estado_idx];
+        crate::motor::governo::estado_comporta_novo_nivel(&self.catalogo, estado, prov, t)
     }
 
     /// Custo estimado em materiais, a preços do mercado do país, de 1 nível do tipo de prédio.

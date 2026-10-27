@@ -160,7 +160,22 @@ pub(crate) fn executar_producao_diaria(
             };
 
             let econ_escala = 1.0 + 0.01 * (b.nivel.saturating_sub(1).min(25) as f64);
-            let escala = escala_inst * econ_escala * acesso * fator_insumos * mult_setor;
+            let mult_qualidade = estados[e_idx].fator_qualidade_predio(&catalogo.tipos_predio[b.cache.tipo_idx]);
+            let mult_fabrica = if categoria == CategoriaPredio::Industrial {
+                let bonus_mercado = if acesso >= 0.90 { 0.03 } else { 0.0 };
+                let bonus_insumo = if b.cache.insumos().iter().any(|&(g_in, _)| {
+                    let bem_id = &catalogo.bens[g_in as usize].id;
+                    estado_tem_insumo_local(&estados[e_idx], bem_id)
+                }) {
+                    0.05
+                } else {
+                    0.0
+                };
+                1.0 + bonus_mercado + bonus_insumo
+            } else {
+                1.0
+            };
+            let escala = escala_inst * econ_escala * acesso * fator_insumos * mult_setor * mult_qualidade * mult_fabrica;
 
             b.cache.escala_efetiva_ultimo_tick = escala;
             b.cache.fator_insumos_ultimo_tick = fator_insumos;
@@ -225,4 +240,29 @@ pub(crate) fn listar_bens_alimento_basico(catalogo: &CatalogoEconomia) -> Vec<us
         .enumerate()
         .filter_map(|(i, b)| (b.categoria == CategoriaBem::AlimentoBasico).then_some(i))
         .collect()
+}
+
+/// Verifica se um estado possui o recurso geológico ou cultura agrícola que origina um insumo fabril.
+fn estado_tem_insumo_local(estado: &Estado, bem_id: &str) -> bool {
+    let rec = match bem_id {
+        "minerio_ferro" | "ferro" => "ferro",
+        "carvao" => "carvao",
+        "petroleo" => "petroleo",
+        "gas_natural" => "gas_natural",
+        "bauxita" => "bauxita",
+        "cobre" => "cobre",
+        "madeira" => "madeira",
+        "ouro_prata" | "ouro" => "ouro_prata",
+        "peixe" | "pesca" => "pesca",
+        "borracha_natural" | "borracha" => "borracha",
+        "graos" => return estado.cultura_permitida("graos"),
+        "carne" | "la" => return estado.cultura_permitida("gado"),
+        "algodao" => return estado.cultura_permitida("algodao"),
+        "acucar" => return estado.cultura_permitida("acucar"),
+        "cafe_cha" => return estado.cultura_permitida("cafe"),
+        "tabaco" => return estado.cultura_permitida("tabaco"),
+        "frutas_legumes" => return estado.cultura_permitida("frutas"),
+        _ => return false,
+    };
+    estado.limite_recurso(rec) > 0
 }

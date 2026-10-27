@@ -14,7 +14,7 @@ use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, TaskPool, block_on, futures_lite::future};
 use sim_economia::{
     CatalogoEconomia, CenarioEconomia, Estado, MercadoGlobal, MundoEconomico, Pais, Provincia,
-    provincia_comporta_novo_nivel,
+    estado_comporta_novo_nivel, provincia_comporta_novo_nivel,
 };
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -61,6 +61,7 @@ pub struct Nucleo {
 pub enum Comando {
     Construir { provincia_id: String, tipo_id: String },
     CancelarObra(usize),
+    MoverObra { de: usize, para: usize },
     /// Troca, em todos os prédios do tipo no país, o método do slot do `metodo_id`.
     TrocarMetodoTodos { tipo_id: String, metodo_id: String },
     TrocarMetodo { provincia_id: String, tipo_id: String, metodo_id: String },
@@ -68,6 +69,26 @@ pub enum Comando {
     EscalarImposto(f64),
     /// Soma `delta` à tarifa de importação (limitada a 0..0,6).
     AjustarTarifa(f64),
+    /// Cria uma nova rota de importação ou exportação.
+    CriarRota { bem_id: String, parceiro_id: String, exportacao: bool, volume: f64 },
+    /// Remove rota comercial existente.
+    RemoverRota(String),
+    /// Alterna se a rota ajusta volume dinamicamente por rentabilidade.
+    AlternarRotaAuto(String),
+    /// Ajusta o volume máximo de uma rota comercial.
+    AjustarVolumeRota { rota_id: String, volume: f64 },
+    /// Define as tarifas gerais de importação e exportação.
+    DefinirTarifaGeral { importacao: f64, exportacao: f64 },
+    /// Define tarifa seletiva de importação/exportação sobre um bem específico.
+    DefinirTarifaBem { bem_id: String, tarifa_imp: f64, tarifa_exp: f64 },
+    /// Define o nível geral de abertura de mercado (0.0 = autarquia, 1.0 = livre-câmbio).
+    DefinirAbertura(f64),
+    /// Firma acordo comercial bilateral com outro país.
+    AssinarAcordo(String),
+    /// Revoga acordo comercial bilateral.
+    CancelarAcordo(String),
+    /// Alterna a ativação da integração comercial COMECON no Bloco Soviético.
+    AlternarComecon,
 }
 
 impl Nucleo {
@@ -96,11 +117,14 @@ impl Nucleo {
         self.tags.get(tag).cloned()
     }
 
-    pub fn avancar(&mut self, dias: u32) {
+    pub fn avancar(&mut self, dias: u32) -> usize {
+        let mut obras = 0;
         for _ in 0..dias {
-            self.mundo.executar_tick_diario();
+            let rel = self.mundo.executar_tick_diario();
+            obras += rel.obras_concluidas;
             self.mundo.atualizar_mercado_global(&mut self.global);
         }
+        obras
     }
 
     pub fn aplicar(&mut self, pais_id: &str, cmd: Comando) -> Result<String, String> {
@@ -115,6 +139,17 @@ impl Nucleo {
                     p.fila_construcao.remove(i);
                 }
                 Ok("Obra cancelada.".into())
+            }
+            Comando::MoverObra { de, para } => {
+                let p = self.mundo.obter_pais_mut(pais_id).ok_or("país inexistente")?;
+                let n = p.fila_construcao.len();
+                if de < n && para < n && de != para {
+                    let item = p.fila_construcao.remove(de);
+                    p.fila_construcao.insert(para, item);
+                    Ok("Fila de construção reordenada.".into())
+                } else {
+                    Ok("Posição mantida na fila.".into())
+                }
             }
             Comando::TrocarMetodo { provincia_id, tipo_id, metodo_id } => {
                 let atuais = self
@@ -158,6 +193,50 @@ impl Nucleo {
                 p.politica_fiscal.tarifa_importacao = (p.politica_fiscal.tarifa_importacao + d).clamp(0.0, 0.6);
                 self.mundo.atualizar_cache_fiscal_pais(pais_id).map_err(|e| e.to_string())?;
                 Ok("Tarifa de importação ajustada.".into())
+            }
+            Comando::CriarRota { bem_id, parceiro_id, exportacao, volume } => {
+                let id = self.mundo.criar_rota_comercial(pais_id, &parceiro_id, &bem_id, exportacao, volume)
+                    .map_err(|e| e.to_string())?;
+                Ok(format!("Rota comercial criada: {id}"))
+            }
+            Comando::RemoverRota(id) => {
+                self.mundo.remover_rota_comercial(&id).map_err(|e| e.to_string())?;
+                Ok("Rota comercial removida.".into())
+            }
+            Comando::AlternarRotaAuto(id) => {
+                let auto = self.mundo.alternar_rota_automatica(&id).map_err(|e| e.to_string())?;
+                Ok(if auto { "Rota em modo automático." } else { "Rota em volume manual fixo." }.into())
+            }
+            Comando::AjustarVolumeRota { rota_id, volume } => {
+                self.mundo.ajustar_volume_rota(&rota_id, volume).map_err(|e| e.to_string())?;
+                Ok("Volume máximo da rota ajustado.".into())
+            }
+            Comando::DefinirTarifaGeral { importacao, exportacao } => {
+                self.mundo.definir_tarifa_geral(pais_id, importacao, exportacao).map_err(|e| e.to_string())?;
+                self.mundo.atualizar_cache_fiscal_pais(pais_id).map_err(|e| e.to_string())?;
+                Ok("Tarifas gerais atualizadas.".into())
+            }
+            Comando::DefinirTarifaBem { bem_id, tarifa_imp, tarifa_exp } => {
+                self.mundo.definir_tarifa_bem(pais_id, &bem_id, tarifa_imp, tarifa_exp).map_err(|e| e.to_string())?;
+                self.mundo.atualizar_cache_fiscal_pais(pais_id).map_err(|e| e.to_string())?;
+                Ok(format!("Tarifa atualizada para {bem_id}."))
+            }
+            Comando::DefinirAbertura(nivel) => {
+                self.mundo.definir_nivel_abertura(pais_id, nivel).map_err(|e| e.to_string())?;
+                self.mundo.atualizar_cache_fiscal_pais(pais_id).map_err(|e| e.to_string())?;
+                Ok("Nível de abertura de mercado atualizado.".into())
+            }
+            Comando::AssinarAcordo(parceiro_id) => {
+                self.mundo.assinar_acordo_comercial(pais_id, &parceiro_id).map_err(|e| e.to_string())?;
+                Ok("Acordo comercial bilateral firmado.".into())
+            }
+            Comando::CancelarAcordo(parceiro_id) => {
+                self.mundo.cancelar_acordo_comercial(pais_id, &parceiro_id).map_err(|e| e.to_string())?;
+                Ok("Acordo comercial bilateral revogado.".into())
+            }
+            Comando::AlternarComecon => {
+                let ativo = self.mundo.alternar_comecon().map_err(|e| e.to_string())?;
+                Ok(if ativo { "COMECON ativado: cooperação e livre comércio no bloco socialista." } else { "COMECON desativado." }.into())
             }
         }
     }
@@ -277,6 +356,9 @@ impl Nucleo {
         v.pops.sort_by(|a, b| b.populacao.total_cmp(&a.populacao));
         v.desemprego = if pop_trab > 0.0 { desemp / pop_trab } else { 0.0 };
         v.pais = Some(pais.clone());
+        v.resumo_comercio = mundo.resumo_comercio_pais(pais_id);
+        v.rotas_comerciais = mundo.detalhes_rotas_pais(pais_id);
+        v.parceiros_comerciais = mundo.opcoes_parceiros_pais(pais_id);
         v
     }
 }
@@ -359,12 +441,20 @@ pub struct VistaEconomia {
     pub pops: Vec<VistaPop>,
     pub bens: Vec<VistaBem>,
     pub ranking: Vec<ResumoPaisEco>,
+    pub resumo_comercio: sim_economia::ResumoComercioPais,
+    pub rotas_comerciais: Vec<sim_economia::DetalheRotaComercial>,
+    pub parceiros_comerciais: Vec<sim_economia::OpcaoParceiroComercial>,
 }
 
 impl VistaEconomia {
-    /// Se o prédio comporta +1 nível na província (terra arável / recurso natural).
+    /// Se o prédio comporta +1 nível na província (terra arável, culturas permitidas, limites de recurso do estado).
     pub fn comporta(&self, prov: &Provincia, tipo_idx: usize) -> bool {
-        self.catalogo.as_ref().is_some_and(|c| provincia_comporta_novo_nivel(c, prov, tipo_idx))
+        let Some(cat) = self.catalogo.as_ref() else { return false };
+        if let Some(estado) = self.estados.iter().find(|e| e.id == prov.estado_id) {
+            estado_comporta_novo_nivel(cat, estado, prov, tipo_idx)
+        } else {
+            provincia_comporta_novo_nivel(cat, prov, tipo_idx)
+        }
     }
 }
 
@@ -372,12 +462,23 @@ impl VistaEconomia {
 // Integração com o Bevy
 // ---------------------------------------------------------------------------------------------
 
-type SaidaLote = (Nucleo, VistaEconomia, Vec<String>, f64);
+type SaidaLote = (Nucleo, VistaEconomia, Vec<String>, f64, usize);
+
+/// Conjunto de sistemas para ordenação com outros plugins (ex: visual das construções).
+#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EconomiaSimSet {
+    /// Recolhe o resultado do lote simulado pela thread.
+    Recolher,
+    /// Sincroniza dados da simulação (como novas construções para o mapa).
+    SincronizarConstrucoes,
+    /// Despacha o próximo lote de dias para a thread.
+    Despachar,
+}
 
 /// Estado da economia no ECS. `nucleo` fica `None` enquanto a thread processa um lote.
 #[derive(Resource)]
 pub struct EconomiaSim {
-    nucleo: Option<Nucleo>,
+    pub nucleo: Option<Nucleo>,
     tarefa: Option<Task<SaidaLote>>,
     pub vista: VistaEconomia,
     pendentes: u32,
@@ -389,6 +490,8 @@ pub struct EconomiaSim {
     pub ms_por_dia: f64,
     pub dias_perdidos: u64,
     tags: BTreeMap<String, String>,
+    pub obras_novas_lote: usize,
+    pub versao_construcao: u64,
 }
 
 impl EconomiaSim {
@@ -420,7 +523,14 @@ impl Plugin for EconomiaSimPlugin {
             .add_systems(Update, aguardar_economia.run_if(in_state(crate::estado::AppState::Carregando)))
             .add_systems(
                 Update,
-                (acumular_dias, definir_pais_economico, conduzir_economia)
+                (
+                    acumular_dias,
+                    definir_pais_economico,
+                    conduzir_economia_recolher.in_set(EconomiaSimSet::Recolher),
+                    conduzir_economia_despachar
+                        .in_set(EconomiaSimSet::Despachar)
+                        .after(EconomiaSimSet::Recolher),
+                )
                     .chain()
                     .run_if(resource_exists::<EconomiaSim>),
             );
@@ -455,6 +565,8 @@ fn aguardar_economia(mut commands: Commands, carga: Option<ResMut<CargaEconomia>
                 ms_por_dia: 0.0,
                 dias_perdidos: 0,
                 tags,
+                obras_novas_lote: 0,
+                versao_construcao: 0,
             });
         }
         Err(e) => error!("falha ao carregar a economia: {e}"),
@@ -483,18 +595,23 @@ fn definir_pais_economico(jogador: Option<Res<super::jogador::PaisJogador>>, mut
     }
 }
 
-fn conduzir_economia(mut eco: ResMut<EconomiaSim>) {
-    // 1) Recolhe o lote pronto
+fn recolher_interno(eco: &mut EconomiaSim) {
     if let Some(t) = eco.tarefa.as_mut()
-        && let Some((nucleo, vista, msgs, ms)) = block_on(future::poll_once(t))
+        && let Some((nucleo, vista, msgs, ms, obras)) = block_on(future::poll_once(t))
     {
         eco.tarefa = None;
         eco.nucleo = Some(nucleo);
         eco.vista = vista;
         eco.mensagens.extend(msgs);
         eco.ms_por_dia = if eco.ms_por_dia == 0.0 { ms } else { 0.8 * eco.ms_por_dia + 0.2 * ms };
+        if obras > 0 {
+            eco.obras_novas_lote += obras;
+            eco.versao_construcao = eco.versao_construcao.wrapping_add(1);
+        }
     }
-    // 2) Despacha o próximo lote
+}
+
+fn despachar_interno(eco: &mut EconomiaSim) {
     let precisa_vista = eco.pais_id.is_some() && eco.vista.pais_id.as_str() != eco.pais_id.as_deref().unwrap_or("");
     if eco.nucleo.is_none() || (eco.pendentes == 0 && eco.comandos.is_empty() && !precisa_vista) {
         return;
@@ -505,13 +622,32 @@ fn conduzir_economia(mut eco: ResMut<EconomiaSim>) {
     let pais = eco.pais_id.clone();
     let mut nucleo = eco.nucleo.take().expect("núcleo presente");
     eco.tarefa = Some(AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move {
-        let (vista, msgs, ms) = executar_lote(&mut nucleo, pais.as_deref(), cmds, dias);
-        (nucleo, vista, msgs, ms)
+        let (vista, msgs, ms, obras) = executar_lote(&mut nucleo, pais.as_deref(), cmds, dias);
+        (nucleo, vista, msgs, ms, obras)
     }));
 }
 
-/// Aplica comandos, avança `dias` e monta a vista. Devolve (vista, mensagens, ms por dia).
-pub fn executar_lote(nucleo: &mut Nucleo, pais: Option<&str>, cmds: Vec<Comando>, dias: u32) -> (VistaEconomia, Vec<String>, f64) {
+pub fn conduzir_economia_recolher(mut eco: ResMut<EconomiaSim>) {
+    recolher_interno(&mut *eco);
+}
+
+pub fn conduzir_economia_despachar(mut eco: ResMut<EconomiaSim>) {
+    despachar_interno(&mut *eco);
+}
+
+#[allow(dead_code)]
+pub fn conduzir_economia(mut eco: ResMut<EconomiaSim>) {
+    recolher_interno(&mut *eco);
+    despachar_interno(&mut *eco);
+}
+
+/// Aplica comandos, avança `dias` e monta a vista. Devolve (vista, mensagens, ms por dia, obras concluídas).
+pub fn executar_lote(
+    nucleo: &mut Nucleo,
+    pais: Option<&str>,
+    cmds: Vec<Comando>,
+    dias: u32,
+) -> (VistaEconomia, Vec<String>, f64, usize) {
     let mut msgs = Vec::new();
     if let Some(p) = pais {
         let idx = nucleo.mundo.indice_mercado_do_pais(p);
@@ -524,10 +660,10 @@ pub fn executar_lote(nucleo: &mut Nucleo, pais: Option<&str>, cmds: Vec<Comando>
         }
     }
     let t = Instant::now();
-    nucleo.avancar(dias);
+    let obras = nucleo.avancar(dias);
     let ms = if dias > 0 { t.elapsed().as_secs_f64() * 1000.0 / dias as f64 } else { 0.0 };
     let vista = pais.map(|p| nucleo.vista(p)).unwrap_or_default();
-    (vista, msgs, ms)
+    (vista, msgs, ms, obras)
 }
 
 #[cfg(test)]
@@ -550,12 +686,33 @@ mod testes {
         assert_eq!(n.id_pais("THA").as_deref(), Some("sia"));
     }
 
+    #[test]
+    fn mover_obra_reordena_fila_corretamente() {
+        let mut n = Nucleo::carregar(&dir(), 0).expect("cenário real");
+        let usa = n.id_pais("USA").unwrap();
+        let prov1 = n.mundo.provincias().iter().find(|p| p.pais_id == usa).unwrap().id.clone();
+        let prov2 = n.mundo.provincias().iter().filter(|p| p.pais_id == usa).nth(1).unwrap().id.clone();
+        let fila_base = n.mundo.obter_pais(&usa).unwrap().fila_construcao.len();
+        n.aplicar(&usa, Comando::Construir { provincia_id: prov1.clone(), tipo_id: "siderurgica".into() }).unwrap();
+        n.aplicar(&usa, Comando::Construir { provincia_id: prov2.clone(), tipo_id: "fabrica_armas_leves".into() }).unwrap();
+        let p = n.mundo.obter_pais(&usa).unwrap();
+        assert_eq!(p.fila_construcao.len(), fila_base + 2);
+        let idx1 = fila_base;
+        let idx2 = fila_base + 1;
+        assert_eq!(p.fila_construcao[idx1].tipo_predio_id, "siderurgica");
+        assert_eq!(p.fila_construcao[idx2].tipo_predio_id, "fabrica_armas_leves");
+        n.aplicar(&usa, Comando::MoverObra { de: idx2, para: idx1 }).unwrap();
+        let p = n.mundo.obter_pais(&usa).unwrap();
+        assert_eq!(p.fila_construcao[idx1].tipo_predio_id, "fabrica_armas_leves");
+        assert_eq!(p.fila_construcao[idx2].tipo_predio_id, "siderurgica");
+    }
+
     /// Teste headless: cenário real, 5 anos, jogador = EUA, com obra, troca de método e imposto.
     #[test]
     fn cinco_anos_headless_sem_nan_e_precos_na_faixa() {
         let mut n = Nucleo::carregar(&dir(), DIAS_AQUECIMENTO).expect("cenário real");
         let usa = n.id_pais("USA").unwrap();
-        let (v0, _, _) = executar_lote(&mut n, Some(&usa), vec![], 0);
+        let (v0, _, _, _) = executar_lote(&mut n, Some(&usa), vec![], 0);
         assert!(!v0.bens.is_empty() && v0.pais.is_some());
         // Constrói uma siderúrgica na primeira província que comporta
         let tipo_idx = n.catalogo.tipos_predio.iter().position(|t| t.id == "siderurgica").unwrap();
@@ -571,7 +728,7 @@ mod testes {
         let mut vista = v0;
         let mut cmds = Some(cmds);
         for _ in 0..(1826 / 30 + 1) {
-            let (v, m, _) = executar_lote(&mut n, Some(&usa), cmds.take().unwrap_or_default(), 30);
+            let (v, m, _, _) = executar_lote(&mut n, Some(&usa), cmds.take().unwrap_or_default(), 30);
             msgs_total.extend(m);
             total_dias += 30;
             vista = v;

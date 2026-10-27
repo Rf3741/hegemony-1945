@@ -1,7 +1,7 @@
 //! Empacotamento, leitura e escrita RON de um cenário econômico completo (`CenarioEconomia`).
 
 use crate::catalogo::{CatalogoEconomia, ler_arquivo_ron, ler_str_ron};
-use crate::entidades::{ConfigSimulacao, Estado, Mercado, Pais, Provincia, RotaComercial};
+use crate::entidades::{BlocoComercial, ConfigSimulacao, Estado, Mercado, Pais, Provincia, RotaComercial};
 use crate::erro::{ErroEconomia, ResultadoEconomia};
 use crate::tipos::DataJogo;
 use ron::ser::{PrettyConfig, to_string_pretty};
@@ -23,6 +23,8 @@ pub struct CenarioEconomia {
     pub provincias: Vec<Provincia>,
     #[serde(default)]
     pub rotas_comerciais: Vec<RotaComercial>,
+    #[serde(default)]
+    pub blocos_comerciais: Vec<BlocoComercial>,
 }
 
 fn escrever_arquivo_ron<T: Serialize>(caminho: &Path, valor: &T) -> ResultadoEconomia<()> {
@@ -50,12 +52,34 @@ impl CenarioEconomia {
         let catalogo = CatalogoEconomia::carregar_diretorio(dir)?;
         let mercados: Vec<Mercado> = ler_arquivo_ron(&dir.join("mercados.ron"))?;
         let paises: Vec<Pais> = ler_arquivo_ron(&dir.join("paises.ron"))?;
-        let estados: Vec<Estado> = ler_arquivo_ron(&dir.join("estados.ron"))?;
+        let mut estados: Vec<Estado> = ler_arquivo_ron(&dir.join("estados.ron"))?;
+        let caminho_potenciais = dir.join("potenciais.ron");
+        if caminho_potenciais.exists() {
+            let potenciais: Vec<crate::entidades::PotencialRegional> =
+                ler_arquivo_ron(&caminho_potenciais)?;
+            let mut pot_map: std::collections::HashMap<String, crate::entidades::PotencialRegional> =
+                potenciais.into_iter().map(|p| (p.estado_id.clone(), p)).collect();
+            for est in &mut estados {
+                if let Some(pot) = pot_map.remove(&est.id) {
+                    est.terra_aravel = pot.terra_aravel;
+                    est.culturas_permitidas = pot.culturas_permitidas;
+                    est.limites_recursos = pot.recursos;
+                    est.qualidade_recursos = pot.qualidade_recursos;
+                }
+            }
+        }
         let provincias: Vec<Provincia> = ler_arquivo_ron(&dir.join("provincias.ron"))?;
 
         let caminho_rotas = dir.join("rotas_comerciais.ron");
         let rotas_comerciais: Vec<RotaComercial> = if caminho_rotas.exists() {
             ler_arquivo_ron(&caminho_rotas)?
+        } else {
+            Vec::new()
+        };
+
+        let caminho_blocos = dir.join("blocos_comerciais.ron");
+        let blocos_comerciais: Vec<BlocoComercial> = if caminho_blocos.exists() {
+            ler_arquivo_ron(&caminho_blocos)?
         } else {
             Vec::new()
         };
@@ -76,6 +100,7 @@ impl CenarioEconomia {
             estados,
             provincias,
             rotas_comerciais,
+            blocos_comerciais,
         })
     }
 
@@ -96,6 +121,18 @@ impl CenarioEconomia {
         escrever_arquivo_ron(&dir.join("mercados.ron"), &self.mercados)?;
         escrever_arquivo_ron(&dir.join("paises.ron"), &self.paises)?;
         escrever_arquivo_ron(&dir.join("estados.ron"), &self.estados)?;
+        let potenciais: Vec<crate::entidades::PotencialRegional> = self
+            .estados
+            .iter()
+            .map(|e| crate::entidades::PotencialRegional {
+                estado_id: e.id.clone(),
+                terra_aravel: e.terra_aravel,
+                culturas_permitidas: e.culturas_permitidas.clone(),
+                recursos: e.limites_recursos.clone(),
+                qualidade_recursos: e.qualidade_recursos.clone(),
+            })
+            .collect();
+        escrever_arquivo_ron(&dir.join("potenciais.ron"), &potenciais)?;
         escrever_arquivo_ron(&dir.join("provincias.ron"), &self.provincias)?;
         escrever_arquivo_ron(&dir.join("rotas_comerciais.ron"), &self.rotas_comerciais)?;
         escrever_arquivo_ron(&dir.join("config_simulacao.ron"), &self.config)?;
