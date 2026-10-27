@@ -1,0 +1,50 @@
+# ==============================================================================
+# Configuração de Cargo e Linkers Rápidos para Bevy
+# ==============================================================================
+# O Bevy gera binários grandes com muitos metadados de reflexão e sistemas ECS.
+# Em modo de desenvolvimento, o linker padrão do GNU (`ld.bfd`) pode levar de 5 a 15
+# segundos apenas na etapa de linkagem a cada pequena alteração.
+#
+# Utilizar um linker moderno como mold (Linux) ou lld (Linux/Windows) reduz esse
+# tempo para menos de 1 segundo!
+#
+# ------------------------------------------------------------------------------
+# 1. Opção A: mold (Mais rápido no Linux - Recomendado)
+# ------------------------------------------------------------------------------
+# Como instalar:
+#   Ubuntu / Debian: sudo apt-get install -y mold clang
+#   Arch Linux:      sudo pacman -S mold clang
+#   Fedora:          sudo dnf install -y mold clang
+#
+# Para ativar mold, descomente o bloco abaixo:
+# [target.x86_64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# ------------------------------------------------------------------------------
+# 2. Opção B: LLD (LLVM Linker - Excelente alternativa amplamente disponível)
+# ------------------------------------------------------------------------------
+# Como instalar:
+#   Ubuntu / Debian: sudo apt-get install -y lld clang
+#   Arch Linux:      sudo pacman -S lld clang
+#   Fedora:          sudo dnf install -y lld clang
+#
+# Para ativar LLD no Linux, descomente o bloco abaixo:
+# [target.x86_64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+# ------------------------------------------------------------------------------
+# 3. Windows Nativo ou MSVC (x86_64-pc-windows-msvc)
+# ------------------------------------------------------------------------------
+# A flag /DEBUG:FASTLINK acelera a criação do PDB durante builds locais no Windows.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=/DEBUG:FASTLINK"]
+
+# ------------------------------------------------------------------------------
+# 4. Cross-compilação para Windows via MinGW (x86_64-pc-windows-gnu)
+# ------------------------------------------------------------------------------
+# Define o linker e arquivador para a toolchain MinGW-w64 no Linux.
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+ar = "x86_64-w64-mingw32-ar"

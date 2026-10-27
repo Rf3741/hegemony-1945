@@ -1,0 +1,160 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: Formatação de código com rustfmt
+  # ----------------------------------------------------------------------------
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust Toolchain (rustfmt)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Verificar formatação
+        run: cargo fmt --all --check
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Linter estático com clippy
+  # ----------------------------------------------------------------------------
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências do sistema para Bevy (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            pkg-config \
+            libasound2-dev \
+            libudev-dev \
+            libwayland-dev \
+            libxkbcommon-dev
+
+      - name: Instalar Rust Toolchain (clippy)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Configurar cache do Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "clippy-linux"
+
+      - name: Executar Clippy no Workspace
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  # ----------------------------------------------------------------------------
+  # Job 3: Testes automatizados (Linux e Windows)
+  # ----------------------------------------------------------------------------
+  test:
+    name: Testes (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências do sistema para Bevy (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            pkg-config \
+            libasound2-dev \
+            libudev-dev \
+            libwayland-dev \
+            libxkbcommon-dev
+
+      - name: Instalar Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Configurar cache do Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "test-${{ matrix.os }}"
+
+      - name: Executar testes unitários e de integração
+        run: cargo test --workspace --exclude guerra_fria --verbose
+
+  # ----------------------------------------------------------------------------
+  # Job 4: Compilação de todos os alvos (Linux e Windows)
+  # ----------------------------------------------------------------------------
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências do sistema para Bevy (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            pkg-config \
+            libasound2-dev \
+            libudev-dev \
+            libwayland-dev \
+            libxkbcommon-dev
+
+      - name: Instalar Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Configurar cache do Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "build-${{ matrix.os }}"
+
+      - name: Compilar todos os crates e alvos do Workspace
+        run: cargo build --workspace --all-targets --verbose

@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag manual para simular release (ex: v0.1.0)'
+        required: false
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: Compilação de Release e Empacotamento com Assets
+  # ----------------------------------------------------------------------------
+  build-release:
+    name: Build & Package (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: guerra-fria-${{ github.ref_name }}-linux-x86_64.tar.gz
+            bin_ext: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: guerra-fria-${{ github.ref_name }}-windows-x86_64.zip
+            bin_ext: ".exe"
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar dependências do sistema para Bevy (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            pkg-config \
+            libasound2-dev \
+            libudev-dev \
+            libwayland-dev \
+            libxkbcommon-dev
+
+      - name: Instalar Rust Toolchain com alvo específico
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Configurar cache do Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "release-${{ matrix.target }}"
+
+      - name: Compilar binários em modo Release
+        run: cargo build --release --target ${{ matrix.target }} -p guerra_fria -p gerador_mapa
+
+      # Empacotamento no Linux (tar.gz)
+      - name: Empacotar Release no Linux (.tar.gz com assets)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist/guerra-fria
+          cp "target/${{ matrix.target }}/release/guerra_fria" dist/guerra-fria/
+          cp "target/${{ matrix.target }}/release/gerador_mapa" dist/guerra-fria/
+          cp -r assets data dist/guerra-fria/
+          test -f README.md && cp README.md dist/guerra-fria/ || true
+          test -f BUILD.md && cp BUILD.md dist/guerra-fria/ || true
+          tar -czvf "${{ matrix.artifact_name }}" -C dist/guerra-fria .
+
+      # Empacotamento no Windows (.zip)
+      - name: Empacotar Release no Windows (.zip com assets)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/guerra-fria
+          Copy-Item "target/${{ matrix.target }}/release/guerra_fria.exe" -Destination dist/guerra-fria/
+          Copy-Item "target/${{ matrix.target }}/release/gerador_mapa.exe" -Destination dist/guerra-fria/
+          Copy-Item -Recurse assets, data -Destination dist/guerra-fria/
+          if (Test-Path README.md) { Copy-Item README.md -Destination dist/guerra-fria/ }
+          if (Test-Path BUILD.md) { Copy-Item BUILD.md -Destination dist/guerra-fria/ }
+          Compress-Archive -Path dist/guerra-fria/* -DestinationPath "${{ matrix.artifact_name }}"
+
+      - name: Upload do artefato compilado
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+          retention-days: 7
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Criação e Publicação do GitHub Release
+  # ----------------------------------------------------------------------------
+  publish-release:
+    name: Publicar GitHub Release
+    needs: build-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Baixar todos os artefatos de release
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publicar Release no GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: release-artifacts/*
