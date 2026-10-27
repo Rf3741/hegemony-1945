@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/simulacao",
+    "crates/gf_mapa",
     "crates/gerador_mapa",
     "crates/guerra_fria",
     "crates/sim_economia",
@@ -9,6 +10,7 @@ members = [
     "crates/sim_territorio",
     "crates/sim_guerra",
     "crates/bandeiras_resolver",
+    "crates/ui_refinada",
 ]
 
 [workspace.package]
@@ -25,12 +27,16 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 shapefile = { version = "0.9", features = ["encoding_rs"] }
 bevy = "0.20.0"
 bevy_egui = "0.43.1"
+egui = "0.36.2"
+egui_plot = "0.37"
 simulacao = { path = "crates/simulacao" }
+gf_mapa = { path = "crates/gf_mapa" }
 sim_economia = { path = "crates/sim_economia" }
 sim_politica = { path = "crates/sim_politica" }
 sim_territorio = { path = "crates/sim_territorio" }
 sim_guerra = { path = "crates/sim_guerra" }
 bandeiras_resolver = { path = "crates/bandeiras_resolver" }
+ui_refinada = { path = "crates/ui_refinada" }
 
 # Otimiza dependências no modo debug para manter 60 FPS no Bevy sem atrasar recompilações incrementais
 [profile.dev]

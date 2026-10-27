@@ -1,0 +1,28 @@
+[package]
+name = "ui_refinada"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "UI refinada de alto nível em Bevy + bevy_egui para Guerra Fria 1945"
+
+[lib]
+name = "ui_refinada"
+path = "src/lib.rs"
+
+[features]
+# Habilita o exemplo de demonstração com dados mock: cargo run -p ui_refinada --features demo --example demo
+demo = []
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
+required-features = ["demo"]
+
+[dependencies]
+bevy = { workspace = true }
+bevy_egui = { workspace = true }
+egui = { workspace = true }
+egui_plot = { workspace = true }
+serde = { workspace = true }
+ron = { workspace = true }
