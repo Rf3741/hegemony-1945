@@ -101,7 +101,7 @@ ui_refinada/
 │   └── fonts/                  # Fontes históricas locais (Barlow, Courier Prime, Oswald, Special Elite)
 └── src/
     ├── lib.rs                  # Entrada da biblioteca e re-exportações
-    ├── main.rs                 # Executável autônomo com Bevy App interativo
+    ├── examples/demo.rs          # Demo com mock_data (feature `demo`)
     ├── plugin.rs               # UiPlugin para o loop ECS do Bevy
     ├── mock_data.rs            # Cenários históricos de 1945 (EUA e URSS)
     ├── theme/                  # Paleta de cores e estilo visual de 1945
