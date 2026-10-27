@@ -90,6 +90,7 @@ impl Nucleo {
     }
 
     /// Id econômico do país a partir da tag do legado.
+    #[allow(dead_code)]
     pub fn id_pais(&self, tag_legado: &str) -> Option<String> {
         let tag = ALIAS_TAGS.iter().find(|(l, _)| *l == tag_legado).map_or(tag_legado, |(_, e)| *e);
         self.tags.get(tag).cloned()
@@ -341,6 +342,7 @@ pub struct ResumoPaisEco {
 #[derive(Debug, Clone, Default)]
 pub struct VistaEconomia {
     pub pais_id: String,
+    #[allow(dead_code)]
     pub dias: u64,
     pub catalogo: Option<Arc<CatalogoEconomia>>,
     pub pais: Option<Pais>,
@@ -650,5 +652,30 @@ mod testes_plugin {
         assert!(e.vista.pais.is_some() && !e.vista.bens.is_empty() && e.ms_por_dia > 0.0);
         assert!(e.mensagens.iter().any(|m| m.contains("Tarifa")), "{:?}", e.mensagens);
         eprintln!("45 dias em {:?}; {:.1} ms/dia", t.elapsed(), e.ms_por_dia);
+    }
+
+    /// Teste headless de carga inicial: carrega os arquivos de cenário de 1945 como no main() e valida que tudo carrega sem pânico.
+    #[test]
+    fn jogo_carga_inicial_cenario_real_sem_panico() {
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let (_catalogo_legado, mundo) = simulacao::mundo::MundoJogo::carregar_de_arquivos(
+            raiz.join("assets/map/provinces.ron"),
+            raiz.join("data/scenario_1945/countries_1945.ron"),
+            raiz.join("data/scenario_1945/province_owners_1945.ron"),
+        )
+        .expect("falha ao carregar o cenário legado de 1945");
+        assert!(!mundo.paises.is_empty(), "paises não podem ser vazios");
+
+        let catalogo: gf_mapa::CatalogoProvincias = ron::from_str(
+            &std::fs::read_to_string(raiz.join("assets/map/provinces.ron")).expect("provinces.ron"),
+        )
+        .expect("provinces.ron inválido");
+        assert!(!catalogo.provincias.is_empty(), "catálogo de províncias vazio");
+
+        // Carga da economia de 1945 pelo mesmo caminho do jogo
+        let dir = dir_economia(&raiz);
+        let nucleo = Nucleo::carregar(&dir, 0).expect("economia 1945 deve carregar sem pânico");
+        assert!(!nucleo.mundo.paises().is_empty());
+        assert!(!nucleo.mundo.provincias().is_empty());
     }
 }
