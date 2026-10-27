@@ -72,7 +72,9 @@ pub enum Comando {
 
 impl Nucleo {
     pub fn carregar(dir: &Path, aquecimento: u32) -> Result<Self, String> {
-        let cen = CenarioEconomia::carregar_diretorio(dir).map_err(|e| e.to_string())?;
+        let mut cen = CenarioEconomia::carregar_diretorio(dir).map_err(|e| e.to_string())?;
+        // Demografia e mercado de trabalho só a cada 7 dias: ~25% mais rápido, sem perder a produção/preços diários.
+        cen.config.modo_cadencia = sim_economia::ModoCadencia::DiarioComAjusteSemanal;
         let mut mundo = MundoEconomico::novo(cen).map_err(|e| e.to_string())?;
         for _ in 0..aquecimento {
             mundo.executar_tick_diario();
@@ -304,6 +306,7 @@ impl VistaPop {
 
 #[derive(Debug, Clone)]
 pub struct VistaBem {
+    #[allow(dead_code)]
     pub idx: usize,
     pub id: String,
     pub nome: String,
@@ -592,5 +595,60 @@ mod testes {
             vista.padrao_vida,
             vista.desemprego * 100.0
         );
+    }
+}
+
+#[cfg(test)]
+mod testes_plugin {
+    use super::*;
+    use crate::estado::AppState;
+    use crate::plugins::jogador::PaisJogador;
+    use crate::plugins::map::RaizProjeto;
+    use bevy::state::app::StatesPlugin;
+    use gf_mapa::tempo::DataSimulacao;
+
+    /// Fluxo completo no ECS sem janela: carga em background, escolha do país, ticks diários em thread e comandos.
+    #[test]
+    fn plugin_carrega_roda_lotes_e_aplica_comandos() {
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, StatesPlugin))
+            .init_state::<AppState>()
+            .add_message::<EventoTickDiario>()
+            .insert_resource(RaizProjeto(raiz))
+            .add_plugins(EconomiaSimPlugin);
+        app.update(); // entra em Carregando -> inicia a carga
+        let t = Instant::now();
+        while app.world().get_resource::<EconomiaSim>().is_none() {
+            assert!(t.elapsed().as_secs() < 120, "carga demorou demais");
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            app.update();
+        }
+        eprintln!("carga + aquecimento: {:?}", t.elapsed());
+        app.world_mut().insert_resource(PaisJogador("USA".into()));
+        for _ in 0..3 {
+            app.update();
+        }
+        // 45 dias de jogo disparados de uma vez (mais de um lote)
+        let data = DataSimulacao::default();
+        for i in 0..45u64 {
+            app.world_mut().write_message(EventoTickDiario { nova_data: data, total_ticks: i });
+        }
+        app.world_mut().resource_mut::<EconomiaSim>().enviar(Comando::AjustarTarifa(0.02));
+        let t = Instant::now();
+        loop {
+            app.update();
+            let e = app.world().resource::<EconomiaSim>();
+            if e.pendentes == 0 && e.tarefa.is_none() && e.vista.dias >= DIAS_AQUECIMENTO as u64 + 45 {
+                break;
+            }
+            assert!(t.elapsed().as_secs() < 60, "economia não avançou");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let e = app.world().resource::<EconomiaSim>();
+        assert_eq!(e.pais_id.as_deref(), Some("usa"));
+        assert!(e.vista.pais.is_some() && !e.vista.bens.is_empty() && e.ms_por_dia > 0.0);
+        assert!(e.mensagens.iter().any(|m| m.contains("Tarifa")), "{:?}", e.mensagens);
+        eprintln!("45 dias em {:?}; {:.1} ms/dia", t.elapsed(), e.ms_por_dia);
     }
 }
