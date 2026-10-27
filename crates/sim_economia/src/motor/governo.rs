@@ -139,7 +139,7 @@ pub(crate) fn compilar_cache_predio(
 
 /// Verifica se uma `Provincia` possui capacidade física (terra arável ou recurso natural)
 /// para receber `+1` nível de `tipo_predio_idx`.
-pub(crate) fn provincia_comporta_novo_nivel(
+pub fn provincia_comporta_novo_nivel(
     catalogo: &CatalogoEconomia,
     prov: &Provincia,
     tipo_predio_idx: usize,
@@ -208,6 +208,15 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
         let gasto_juros = pais.orcamento.divida * (juros_anual / 365.0);
         pais.orcamento.gasto_juros = gasto_juros;
 
+        // 2b. Avanço da fila de obras: pontos de construção, consumo de materiais e custo pago pelo orçamento
+        avancar_fila_construcao(
+            catalogo,
+            config,
+            &mercados[pais.mercado_idx],
+            pais,
+            pontos_construcao_setores_pais[c_idx],
+        );
+
         // 3. Reembolso parcial do fundo de investimento privado quando há obras privadas ativas
         let obras_privadas_ativas = pais.fila_construcao.iter().any(|i| i.privado);
         if obras_privadas_ativas && pais.orcamento.gasto_construcao > 0.0 {
@@ -259,27 +268,9 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
             tentar_enfileirar_obra_privada(catalogo, mercados, pais, provincias);
         }
 
-        // 7. Fase (9): Aplicação dos pontos de construção civil à fila
+        // 7. Fase (9): conclusão das obras que atingiram 100% dos pontos (o avanço ocorre antes do fechamento fiscal)
         if pais.fila_construcao.is_empty() {
             continue;
-        }
-
-        let mut pontos_disponiveis = (pais.pontos_construcao_base
-            + pontos_construcao_setores_pais[c_idx])
-            * pais.mult_eficiencia_construcao_lei;
-        let max_por_obra = config.pontos_maximos_por_obra_dia.max(1.0);
-
-        for item in &mut pais.fila_construcao {
-            if pontos_disponiveis <= 1e-6 {
-                break;
-            }
-            if !item.privado && pais.orcamento.em_calote {
-                continue;
-            }
-            let falta = (item.custo_total_pontos - item.progresso_pontos).max(0.0);
-            let aplicado = pontos_disponiveis.min(max_por_obra).min(falta);
-            item.progresso_pontos += aplicado;
-            pontos_disponiveis -= aplicado;
         }
 
         // Concluir obras que atingiram 100% dos pontos
@@ -303,6 +294,108 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
     }
 
     obras_concluidas_total
+}
+
+/// Receita de materiais consumidos por ponto de construção, conforme a categoria do prédio:
+/// pares `(id do bem, quantidade por ponto)`.
+pub fn materiais_por_ponto(categoria: CategoriaPredio) -> &'static [(&'static str, f64)] {
+    match categoria {
+        CategoriaPredio::RuralAgricola => &[
+            ("material_construcao", 0.15),
+            ("ferramentas", 0.08),
+            ("madeira", 0.10),
+        ],
+        CategoriaPredio::Extrativo => &[
+            ("material_construcao", 0.20),
+            ("aco", 0.12),
+            ("maquinas", 0.06),
+        ],
+        CategoriaPredio::Industrial | CategoriaPredio::Infraestrutura => &[
+            ("material_construcao", 0.30),
+            ("aco", 0.10),
+            ("maquinas", 0.04),
+            ("ferramentas", 0.03),
+        ],
+        _ => &[("material_construcao", 0.35), ("aco", 0.10)],
+    }
+}
+
+/// Aplica os pontos de construção do dia à fila do país, consome materiais do mercado
+/// (a demanda entra no mercado no tick seguinte), cobra o custo do orçamento (obras públicas)
+/// ou do fundo privado (obras privadas) e desacelera a obra quando falta material de construção.
+fn avancar_fila_construcao(
+    catalogo: &CatalogoEconomia,
+    config: &ConfigSimulacao,
+    mercado: &Mercado,
+    pais: &mut Pais,
+    pontos_setores: f64,
+) {
+    pais.demanda_obras.clear();
+    pais.orcamento.gasto_obras_materiais = 0.0;
+    pais.pontos_aplicados_ultimo_tick = 0.0;
+    if pais.fila_construcao.is_empty() {
+        return;
+    }
+    let num_bens = catalogo.bens.len();
+    pais.demanda_obras.resize(num_bens, 0.0);
+
+    let mut pontos_disponiveis =
+        (pais.pontos_construcao_base + pontos_setores) * pais.mult_eficiencia_construcao_lei;
+    let max_por_obra = config.pontos_maximos_por_obra_dia.max(1.0);
+    let idx_material = catalogo.indice_bens.get("material_construcao").copied();
+    let mut custo_publico = 0.0;
+    let mut custo_privado = 0.0;
+
+    for item in &mut pais.fila_construcao {
+        if pontos_disponiveis <= 1e-6 {
+            break;
+        }
+        if !item.privado && pais.orcamento.em_calote {
+            continue;
+        }
+        let falta = (item.custo_total_pontos - item.progresso_pontos).max(0.0);
+        // Escassez de material de construção desacelera a obra (piso de 15%)
+        let fator = idx_material
+            .map(|g| mercado.fator_suprimento_idx[g])
+            .unwrap_or(1.0)
+            .clamp(0.15, 1.0);
+        let aplicado = (pontos_disponiveis.min(max_por_obra) * fator).min(falta);
+        pontos_disponiveis -= aplicado / fator;
+        item.progresso_pontos += aplicado;
+        pais.pontos_aplicados_ultimo_tick += aplicado;
+
+        let categoria = catalogo.tipos_predio[item.tipo_predio_idx].categoria;
+        let mut custo = 0.0;
+        for &(bem_id, qtd) in materiais_por_ponto(categoria) {
+            if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                pais.demanda_obras[g] += qtd * aplicado;
+                custo += qtd * aplicado * mercado.precos_idx[g];
+            }
+        }
+        if item.privado {
+            custo_privado += custo;
+        } else {
+            custo_publico += custo;
+        }
+    }
+    pais.orcamento.gasto_obras_materiais = custo_publico;
+    pais.fundo_investimento_privado = (pais.fundo_investimento_privado - custo_privado).max(0.0);
+}
+
+/// Estima o custo em materiais (preços do mercado) de um prédio inteiro de `custo_pontos` pontos.
+pub fn custo_materiais_estimado(
+    catalogo: &CatalogoEconomia,
+    mercado: &Mercado,
+    categoria: CategoriaPredio,
+    custo_pontos: f64,
+) -> f64 {
+    let mut total = 0.0;
+    for &(bem_id, qtd) in materiais_por_ponto(categoria) {
+        if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+            total += qtd * custo_pontos * mercado.precos_idx[g];
+        }
+    }
+    total
 }
 
 fn materializar_nivel_predio(

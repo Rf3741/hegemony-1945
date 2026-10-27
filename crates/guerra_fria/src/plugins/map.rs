@@ -214,7 +214,12 @@ fn aguardar_carga(
     tarefa: Option<ResMut<TarefaMapa>>,
     mut imagens: ResMut<Assets<Image>>,
     mut proximo: ResMut<NextState<AppState>>,
+    economia: Option<Res<super::economia_sim::EconomiaSim>>,
 ) {
+    // O menu só abre quando a economia (sim_economia) também terminou de carregar.
+    if economia.is_none() {
+        return;
+    }
     let Some(mut tarefa) = tarefa else { return };
     let Some(res) = block_on(future::poll_once(&mut tarefa.0)) else { return };
     commands.remove_resource::<TarefaMapa>();
@@ -253,7 +258,7 @@ fn tela_carregando(mut contextos: EguiContexts, tempo: Res<Time>) -> Result {
     let ctx = contextos.ctx_mut()?;
     let pontos = ".".repeat((tempo.elapsed_secs() * 2.0) as usize % 4);
     egui::Area::new("carregando".into()).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
-        ui.heading(format!("Carregando o mundo de 1945{pontos}"));
+        ui.heading(format!("Carregando o mapa e a economia de 1945{pontos}"));
     });
     Ok(())
 }

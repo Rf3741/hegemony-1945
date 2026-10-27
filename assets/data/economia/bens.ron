@@ -1,0 +1,497 @@
+[
+    (
+        id: "graos",
+        nome: "Grãos e Cereais",
+        categoria: AlimentoBasico,
+        preco_base: 20.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: AlimentacaoBasica, peso: 1.15, fracao_maxima: 0.85, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "carne",
+        nome: "Carne Bovina e Suína",
+        categoria: AlimentoBasico,
+        preco_base: 32.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: AlimentacaoBasica, peso: 1.05, fracao_maxima: 0.6, fracao_minima: 0.0),
+            (necessidade: ArtigosLuxo, peso: 1.3, fracao_maxima: 0.5, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "peixe",
+        nome: "Pescados e Frutos do Mar",
+        categoria: AlimentoBasico,
+        preco_base: 24.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: AlimentacaoBasica, peso: 0.95, fracao_maxima: 0.5, fracao_minima: 0.0),
+            (necessidade: ArtigosLuxo, peso: 1.1, fracao_maxima: 0.4, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "frutas_legumes",
+        nome: "Frutas e Hortaliças",
+        categoria: AlimentoBasico,
+        preco_base: 22.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: AlimentacaoBasica, peso: 0.95, fracao_maxima: 0.45, fracao_minima: 0.0),
+            (necessidade: ArtigosLuxo, peso: 1.1, fracao_maxima: 0.4, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "madeira",
+        nome: "Madeira em Toras",
+        categoria: MateriaPrima,
+        preco_base: 20.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: EnergiaAquecimento, peso: 1.0, fracao_maxima: 0.7, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "algodao",
+        nome: "Algodão e Fibras Vegetais",
+        categoria: MateriaPrima,
+        preco_base: 25.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "la",
+        nome: "Lã e Peles Naturais",
+        categoria: MateriaPrima,
+        preco_base: 28.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "borracha_natural",
+        nome: "Borracha Natural (Látex)",
+        categoria: MateriaPrima,
+        preco_base: 35.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "carvao",
+        nome: "Carvão Mineral e Antracito",
+        categoria: Energia,
+        preco_base: 25.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: EnergiaAquecimento, peso: 0.95, fracao_maxima: 0.8, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "petroleo",
+        nome: "Petróleo Bruto",
+        categoria: Energia,
+        preco_base: 30.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "gas_natural",
+        nome: "Gás Natural",
+        categoria: Energia,
+        preco_base: 22.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: EnergiaAquecimento, peso: 1.05, fracao_maxima: 0.6, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "combustiveis_refinados",
+        nome: "Combustíveis Refinados",
+        categoria: Energia,
+        preco_base: 45.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 1.2, fracao_maxima: 0.4, fracao_minima: 0.1),
+            (necessidade: EnergiaAquecimento, peso: 0.8, fracao_maxima: 0.4, fracao_minima: 0.0),
+            (necessidade: MobilidadeComunicacao, peso: 1.2, fracao_maxima: 0.45, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "eletricidade",
+        nome: "Energia Elétrica",
+        categoria: LocalNaoComercializavel,
+        preco_base: 30.0,
+        comercializavel: false,
+        substituicoes: [
+            (necessidade: EnergiaAquecimento, peso: 1.15, fracao_maxima: 0.75, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "minerio_ferro",
+        nome: "Minério de Ferro",
+        categoria: MateriaPrima,
+        preco_base: 28.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "bauxita",
+        nome: "Bauxita e Alumina",
+        categoria: MateriaPrima,
+        preco_base: 32.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "cobre",
+        nome: "Cobre e Concentrados",
+        categoria: MateriaPrima,
+        preco_base: 40.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "chumbo_zinco",
+        nome: "Chumbo e Zinco",
+        categoria: MateriaPrima,
+        preco_base: 34.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "ouro_prata",
+        nome: "Ouro e Metais Preciosos",
+        categoria: MateriaPrima,
+        preco_base: 100.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "uranio",
+        nome: "Minério de Urânio e Tório",
+        categoria: MateriaPrima,
+        preco_base: 80.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "aco",
+        nome: "Aço e Laminados",
+        categoria: Industrial,
+        preco_base: 50.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "aluminio",
+        nome: "Alumínio Primário e Ligas Leves",
+        categoria: Industrial,
+        preco_base: 60.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "produtos_quimicos",
+        nome: "Produtos Químicos e Fertilizantes",
+        categoria: Industrial,
+        preco_base: 45.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "plasticos_sinteticos",
+        nome: "Plásticos e Polímeros Sintéticos",
+        categoria: Industrial,
+        preco_base: 48.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "material_construcao",
+        nome: "Materiais de Construção e Cimento",
+        categoria: Industrial,
+        preco_base: 32.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: VestuarioDomestico, peso: 1.0, fracao_maxima: 0.5, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "ferramentas",
+        nome: "Ferramentas e Máquinas-Ferramenta",
+        categoria: Industrial,
+        preco_base: 46.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "maquinas",
+        nome: "Maquinário Pesado e Turbinas",
+        categoria: Industrial,
+        preco_base: 70.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "alimentos_processados",
+        nome: "Alimentos Industrializados e Conservas",
+        categoria: Consumo,
+        preco_base: 36.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: AlimentacaoBasica, peso: 0.95, fracao_maxima: 0.6, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "acucar",
+        nome: "Açúcar e Melados",
+        categoria: Consumo,
+        preco_base: 26.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: AlimentacaoBasica, peso: 0.8, fracao_maxima: 0.3, fracao_minima: 0.0),
+            (necessidade: ArtigosLuxo, peso: 0.9, fracao_maxima: 0.4, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "cafe_cha",
+        nome: "Café, Chá e Mate",
+        categoria: Consumo,
+        preco_base: 32.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 0.95, fracao_maxima: 0.5, fracao_minima: 0.0),
+            (necessidade: ServicosUrbanos, peso: 0.9, fracao_maxima: 0.35, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "tabaco",
+        nome: "Tabaco e Cigarros",
+        categoria: Consumo,
+        preco_base: 30.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 1.3, fracao_maxima: 0.6, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "bebidas_alcoolicas",
+        nome: "Bebidas Alcoólicas",
+        categoria: Consumo,
+        preco_base: 35.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 1.3, fracao_maxima: 0.6, fracao_minima: 0.0),
+            (necessidade: ServicosUrbanos, peso: 0.9, fracao_maxima: 0.4, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "roupas",
+        nome: "Vestuário e Têxteis Fabris",
+        categoria: Consumo,
+        preco_base: 38.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 0.5, fracao_maxima: 0.3, fracao_minima: 0.0),
+            (necessidade: VestuarioDomestico, peso: 1.4, fracao_maxima: 1.0, fracao_minima: 0.3),
+        ],
+    ),
+    (
+        id: "moveis",
+        nome: "Móveis e Utilidades Domésticas",
+        categoria: Consumo,
+        preco_base: 42.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 0.4, fracao_maxima: 0.2, fracao_minima: 0.0),
+            (necessidade: VestuarioDomestico, peso: 1.2, fracao_maxima: 0.8, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "eletrodomesticos",
+        nome: "Eletrodomésticos Populares",
+        categoria: Consumo,
+        preco_base: 55.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ServicosUrbanos, peso: 1.1, fracao_maxima: 0.45, fracao_minima: 0.0),
+            (necessidade: VestuarioDomestico, peso: 1.4, fracao_maxima: 0.6, fracao_minima: 0.1),
+        ],
+    ),
+    (
+        id: "eletronicos",
+        nome: "Rádios, TV e Eletrônicos",
+        categoria: Consumo,
+        preco_base: 65.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ServicosUrbanos, peso: 1.2, fracao_maxima: 0.45, fracao_minima: 0.0),
+            (necessidade: VestuarioDomestico, peso: 1.3, fracao_maxima: 0.5, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "automoveis",
+        nome: "Automóveis Populares",
+        categoria: Consumo,
+        preco_base: 85.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 0.4, fracao_maxima: 0.2, fracao_minima: 0.0),
+            (necessidade: MobilidadeComunicacao, peso: 1.3, fracao_maxima: 0.5, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "medicamentos",
+        nome: "Medicamentos e Antibióticos",
+        categoria: Consumo,
+        preco_base: 48.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ServicosUrbanos, peso: 1.467, fracao_maxima: 1.0, fracao_minima: 0.1),
+        ],
+    ),
+    (
+        id: "roupas_luxo",
+        nome: "Alta-Costura e Roupas Finas",
+        categoria: Luxo,
+        preco_base: 110.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 1.4, fracao_maxima: 0.9, fracao_minima: 0.0),
+            (necessidade: VestuarioDomestico, peso: 0.7, fracao_maxima: 0.3, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "moveis_luxo",
+        nome: "Móveis de Mogno e Tapeçaria Fina",
+        categoria: Luxo,
+        preco_base: 120.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 1.25, fracao_maxima: 0.85, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "automoveis_luxo",
+        nome: "Automóveis de Luxo e Limusines",
+        categoria: Luxo,
+        preco_base: 160.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 1.8, fracao_maxima: 0.85, fracao_minima: 0.3),
+        ],
+    ),
+    (
+        id: "joias_artigos_luxo",
+        nome: "Alta Joalheria e Obras de Arte",
+        categoria: Luxo,
+        preco_base: 150.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ArtigosLuxo, peso: 1.4, fracao_maxima: 1.0, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "servicos",
+        nome: "Serviços Pessoais e Comerciais",
+        categoria: LocalNaoComercializavel,
+        preco_base: 30.0,
+        comercializavel: false,
+        substituicoes: [
+            (necessidade: MobilidadeComunicacao, peso: 1.0, fracao_maxima: 0.6, fracao_minima: 0.0),
+            (necessidade: ServicosUrbanos, peso: 1.3, fracao_maxima: 0.7, fracao_minima: 0.1),
+        ],
+    ),
+    (
+        id: "transporte",
+        nome: "Transporte Coletivo e Ferroviário",
+        categoria: LocalNaoComercializavel,
+        preco_base: 32.0,
+        comercializavel: false,
+        substituicoes: [
+            (necessidade: MobilidadeComunicacao, peso: 1.25, fracao_maxima: 0.8, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "telecomunicacoes",
+        nome: "Telefonia e Comunicações",
+        categoria: LocalNaoComercializavel,
+        preco_base: 35.0,
+        comercializavel: false,
+        substituicoes: [
+            (necessidade: MobilidadeComunicacao, peso: 1.2, fracao_maxima: 0.5, fracao_minima: 0.0),
+            (necessidade: ServicosUrbanos, peso: 1.1, fracao_maxima: 0.4, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "servicos_financeiros",
+        nome: "Serviços Financeiros e Bancários",
+        categoria: Consumo,
+        preco_base: 50.0,
+        comercializavel: true,
+        substituicoes: [
+            (necessidade: ServicosUrbanos, peso: 1.4, fracao_maxima: 0.85, fracao_minima: 0.0),
+        ],
+    ),
+    (
+        id: "armas_leves",
+        nome: "Armas Leves de Infantaria",
+        categoria: Militar,
+        preco_base: 55.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "municao",
+        nome: "Munições e Explosivos Bélicos",
+        categoria: Militar,
+        preco_base: 50.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "artilharia_blindados",
+        nome: "Blindados e Artilharia Pesada",
+        categoria: Militar,
+        preco_base: 120.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "avioes_militares",
+        nome: "Aeronaves Militares a Jato",
+        categoria: Militar,
+        preco_base: 180.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+    (
+        id: "navios_militares",
+        nome: "Navios de Guerra e Submarinos",
+        categoria: Militar,
+        preco_base: 250.0,
+        comercializavel: true,
+        substituicoes: [
+        ],
+    ),
+]

@@ -48,6 +48,12 @@ pub(crate) fn executar_producao_diaria(
         pais.orcamento.gasto_juros = 0.0;
         pais.orcamento.saldo_diario = 0.0;
 
+        // Demanda por materiais das obras do tick anterior (cimento, aço, máquinas...)
+        let off_obras = pais.mercado_idx * num_bens;
+        for (g, q) in pais.demanda_obras.iter().enumerate() {
+            proxima_demanda[off_obras + g] += *q;
+        }
+
         pais.burocracia_produzida = 15.0;
         pais.forca_militar_total = 0.0;
         pais.pib_diario = 0.0;

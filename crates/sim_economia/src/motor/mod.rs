@@ -4,6 +4,7 @@
 pub mod consumo;
 pub mod demografia;
 pub mod distribuicao;
+pub mod global;
 pub mod governo;
 pub mod mercado;
 pub mod producao;
@@ -582,6 +583,20 @@ impl MundoEconomico {
             &mut self.buffers.proxima_demanda,
             &mut self.buffers.importacoes_liquidas,
         );
+        if self.config.comercio_mundial_automatico {
+            let abertura: Vec<f64> =
+                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m)).collect();
+            global::processar_comercio_mundial(
+                &self.catalogo,
+                &self.config,
+                &self.mercados,
+                &mut self.paises,
+                &abertura,
+                &mut self.buffers.proxima_oferta,
+                &mut self.buffers.proxima_demanda,
+                &mut self.buffers.importacoes_liquidas,
+            );
+        }
         mercado::fechar_mercados_e_atualizar_precos(
             &self.catalogo,
             &self.config,
@@ -735,6 +750,20 @@ impl MundoEconomico {
             &mut self.buffers.proxima_demanda,
             &mut self.buffers.importacoes_liquidas,
         );
+        if self.config.comercio_mundial_automatico {
+            let abertura: Vec<f64> =
+                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m)).collect();
+            global::processar_comercio_mundial(
+                &self.catalogo,
+                &self.config,
+                &self.mercados,
+                &mut self.paises,
+                &abertura,
+                &mut self.buffers.proxima_oferta,
+                &mut self.buffers.proxima_demanda,
+                &mut self.buffers.importacoes_liquidas,
+            );
+        }
         mercado::fechar_mercados_e_atualizar_precos(
             &self.catalogo,
             &self.config,

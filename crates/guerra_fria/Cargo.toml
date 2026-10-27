@@ -13,3 +13,5 @@ ron.workspace = true
 serde.workspace = true
 simulacao.workspace = true
 gf_mapa.workspace = true
+sim_economia.workspace = true
+egui_plot.workspace = true

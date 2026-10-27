@@ -167,6 +167,8 @@ pub fn gerar_cenario_escala_mundial(
             mult_volume_comercio_lei: 1.0,
             exige_propriedade_estatal_lei: false,
             utilizacao_construcao_ultimo_tick: 0.0,
+            demanda_obras: Vec::new(),
+            pontos_aplicados_ultimo_tick: 0.0,
         });
     }
 

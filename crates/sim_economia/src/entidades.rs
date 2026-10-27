@@ -205,6 +205,41 @@ pub struct Predio {
 }
 
 impl Predio {
+    /// Escala efetiva de produção no último tick (níveis equivalentes, já com ocupação, insumos e acesso).
+    #[inline]
+    pub fn escala_efetiva(&self) -> f64 {
+        self.cache.escala_efetiva_ultimo_tick
+    }
+
+    /// Fator de disponibilidade de insumos no último tick (0..1).
+    #[inline]
+    pub fn fator_insumos(&self) -> f64 {
+        self.cache.fator_insumos_ultimo_tick
+    }
+
+    /// Margem de lucro do último tick (lucro / receita).
+    #[inline]
+    pub fn margem_lucro(&self) -> f64 {
+        self.cache.margem_lucro_ultimo_tick
+    }
+
+    /// Insumos por nível por dia: `(índice do bem no catálogo, quantidade)`.
+    #[inline]
+    pub fn insumos_por_nivel(&self) -> &[(u16, f64)] {
+        self.cache.insumos()
+    }
+
+    /// Produtos por nível por dia: `(índice do bem no catálogo, quantidade)`.
+    #[inline]
+    pub fn produtos_por_nivel(&self) -> &[(u16, f64)] {
+        self.cache.produtos()
+    }
+
+    /// Vagas por tipo de pop: `(índice do tipo de pop, vagas por nível, empregados)`.
+    pub fn vagas_por_tipo(&self) -> impl Iterator<Item = (usize, u32, f64)> + '_ {
+        self.cache.vagas().iter().map(|v| (v.tipo_pop_idx as usize, v.vagas_por_nivel, v.empregados))
+    }
+
     /// Total de trabalhadores atualmente empregados neste prédio.
     #[inline]
     pub fn total_empregados(&self) -> f64 {
@@ -426,6 +461,9 @@ pub struct OrcamentoGoverno {
     pub gasto_militar: f64,
     #[serde(default)]
     pub gasto_construcao: f64,
+    /// Materiais (cimento, aço, máquinas) consumidos pelas obras públicas no último tick.
+    #[serde(default)]
+    pub gasto_obras_materiais: f64,
     #[serde(default)]
     pub gasto_subsidios: f64,
     #[serde(default)]
@@ -451,6 +489,7 @@ impl OrcamentoGoverno {
         self.gasto_burocracia
             + self.gasto_militar
             + self.gasto_construcao
+            + self.gasto_obras_materiais
             + self.gasto_subsidios
             + self.gasto_juros
     }
@@ -526,6 +565,12 @@ pub struct Pais {
     pub(crate) exige_propriedade_estatal_lei: bool,
     #[serde(skip)]
     pub(crate) utilizacao_construcao_ultimo_tick: f64,
+    /// Demanda por bem (índice do catálogo) gerada pelas obras no tick anterior; entra no mercado no tick seguinte.
+    #[serde(skip)]
+    pub(crate) demanda_obras: Vec<f64>,
+    /// Pontos de construção efetivamente aplicados à fila no último tick.
+    #[serde(skip)]
+    pub pontos_aplicados_ultimo_tick: f64,
 }
 
 /// Mercado comum ou nacional onde bens são precificados por oferta e demanda agregadas.
@@ -610,6 +655,17 @@ pub struct ConfigSimulacao {
     pub taxa_demissao_diaria: f64,
     /// Se `true`, países usam o `fundo_investimento_privado` acumulado para enfileirar obras privadas automaticamente.
     pub habilitar_investimento_privado_automatico: bool,
+    /// Comércio mundial automático: mercados com excedente abastecem mercados deficitários e o
+    /// "resto do mundo" cobre parte do déficit residual, tudo limitado pela abertura comercial.
+    #[serde(default = "padrao_true")]
+    pub comercio_mundial_automatico: bool,
+    /// Fração máxima do déficit local de um bem coberta por importação do resto do mundo (com abertura 1.0).
+    #[serde(default = "fracao_importacao_padrao")]
+    pub fracao_maxima_importacao_residual: f64,
+}
+
+const fn fracao_importacao_padrao() -> f64 {
+    0.6
 }
 
 impl Default for ConfigSimulacao {
@@ -626,6 +682,8 @@ impl Default for ConfigSimulacao {
             taxa_contratacao_diaria: 0.04,
             taxa_demissao_diaria: 0.025,
             habilitar_investimento_privado_automatico: true,
+            comercio_mundial_automatico: true,
+            fracao_maxima_importacao_residual: 0.6,
         }
     }
 }

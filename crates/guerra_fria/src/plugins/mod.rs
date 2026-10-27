@@ -1,5 +1,7 @@
 pub mod audio;
+pub mod economia_sim;
 pub mod economy;
+pub mod mercado_ui;
 pub mod jogador;
 pub mod map;
 pub mod politics;

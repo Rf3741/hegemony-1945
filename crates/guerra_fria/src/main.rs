@@ -7,7 +7,9 @@ use bevy::window::WindowResolution;
 use bevy_egui::EguiPlugin;
 use plugins::{
     audio::AudioPlugin,
+    economia_sim::EconomiaSimPlugin,
     economy::{EconomyPlugin, RecursoMundo},
+    mercado_ui::MercadoUiPlugin,
     jogador::JogadorPlugin,
     map::MapPlugin,
     politics::PoliticsPlugin,
@@ -59,6 +61,6 @@ fn main() {
         .insert_resource(RecursoMundo(mundo))
         .insert_resource(plugins::map::RaizProjeto(raiz))
         .insert_resource(plugins::map::RecursoCatalogo(catalogo))
-        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin))
+        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin))
         .run();
 }

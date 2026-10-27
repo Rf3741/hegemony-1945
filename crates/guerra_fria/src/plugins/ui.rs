@@ -1,5 +1,7 @@
 //! Interface egui: barra superior (data e controles de tempo) e painel de província.
+use super::economia_sim::EconomiaSim;
 use super::economy::RecursoMundo;
+use super::mercado_ui::PainelMercado;
 use super::jogador::{PainelPais, PaisJogador, hud_pais, resumo_pais};
 use super::map::{ProvinciaSelecionada, RecursoCatalogo};
 use super::time::RecursoRelogio;
@@ -63,11 +65,14 @@ fn barra_hud(
     mut contextos: EguiContexts,
     jogador: Option<Res<PaisJogador>>,
     mundo: Res<RecursoMundo>,
+    eco: Option<Res<EconomiaSim>>,
     mut painel: ResMut<PainelPais>,
+    mut mercado: ResMut<PainelMercado>,
 ) -> Result {
+    let Some(eco) = eco else { return Ok(()) };
     let Some(p) = jogador.and_then(|j| mundo.paises.get(&j.0)) else { return Ok(()) };
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
-    egui::Panel::top("barra_hud").show(&mut raiz, |ui| hud_pais(ui, p, &mut painel.aberto));
+    egui::Panel::top("barra_hud").show(&mut raiz, |ui| hud_pais(ui, p, &eco, &mut painel.aberto, &mut mercado.aberto));
     Ok(())
 }
 

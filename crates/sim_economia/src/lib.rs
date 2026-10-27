@@ -39,6 +39,8 @@ pub use gerador::{ParametrosEscalaMundial, gerar_cenario_escala_mundial};
 pub use motor::consumo::calcular_fatias_substituicao;
 pub use motor::demografia::taxa_crescimento_anual_pop;
 pub use motor::mercado::{atualizar_precos_mercado_isolado, calcular_preco_alvo};
+pub use motor::global::{ConfigMercadoGlobal, MercadoGlobal};
+pub use motor::governo::{materiais_por_ponto, provincia_comporta_novo_nivel};
 pub use motor::{MundoEconomico, RelatorioTick, TemposFasesTick};
 pub use tipos::{
     CategoriaBem, CategoriaNecessidade, CategoriaPredio, DataJogo, Estrato, FormulaPreco,
