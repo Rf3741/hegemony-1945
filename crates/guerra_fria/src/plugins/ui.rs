@@ -20,7 +20,11 @@ pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(EguiPrimaryContextPass, (barra_superior, painel_provincia));
+        app.add_systems(
+            EguiPrimaryContextPass,
+            (barra_superior, painel_provincia)
+                .run_if(crate::estado::em_partida),
+        );
     }
 }
 

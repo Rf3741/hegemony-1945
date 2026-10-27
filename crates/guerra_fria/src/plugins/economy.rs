@@ -10,7 +10,7 @@ pub struct EconomyPlugin;
 
 impl Plugin for EconomyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, processar_tick_economia);
+        app.add_systems(Update, processar_tick_economia.run_if(in_state(crate::estado::AppState::Jogando)));
     }
 }
 

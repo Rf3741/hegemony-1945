@@ -19,7 +19,7 @@ impl Plugin for TimePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(RecursoRelogio(RelogioSimulacao::novo()))
             .add_message::<EventoTickDiario>()
-            .add_systems(Update, (controlar_relogio_teclado, atualizar_tempo_sistema));
+            .add_systems(Update, (controlar_relogio_teclado, atualizar_tempo_sistema).run_if(in_state(crate::estado::AppState::Jogando)));
     }
 }
 

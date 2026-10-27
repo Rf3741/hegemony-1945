@@ -1,4 +1,5 @@
 //! Cliente gráfico do jogo Guerra Fria (1945): Bevy + bevy_egui.
+mod estado;
 mod plugins;
 
 use bevy::prelude::*;
@@ -55,6 +56,6 @@ fn main() {
         .insert_resource(RecursoMundo(mundo))
         .insert_resource(plugins::map::RaizProjeto(raiz))
         .insert_resource(plugins::map::RecursoCatalogo(catalogo))
-        .add_plugins((TimePlugin, EconomyPlugin, PoliticsPlugin, MapPlugin, UiPlugin))
+        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, PoliticsPlugin, MapPlugin, UiPlugin))
         .run();
 }

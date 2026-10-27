@@ -6,7 +6,7 @@ pub struct PoliticsPlugin;
 
 impl Plugin for PoliticsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, processar_tick_politica);
+        app.add_systems(Update, processar_tick_politica.run_if(in_state(crate::estado::AppState::Jogando)));
     }
 }
 

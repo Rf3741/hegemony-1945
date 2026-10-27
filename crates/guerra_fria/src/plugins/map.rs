@@ -7,6 +7,9 @@ use bevy::input::mouse::AccumulatedMouseScroll;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::window::PrimaryWindow;
+use super::super::estado::AppState;
+use bevy::tasks::{AsyncComputeTaskPool, Task, TaskPool, block_on, futures_lite::future};
+use bevy_egui::{EguiContexts, egui, EguiPrimaryContextPass};
 use bevy_egui::input::EguiWantsInput;
 use gf_mapa::mapa::{CatalogoProvincias, id_de_cor_provincia};
 use std::path::PathBuf;
@@ -23,7 +26,6 @@ pub struct DadosMapa {
     pub largura: u32,
     pub altura: u32,
     pub ids: Vec<u32>,
-    pub textura: Handle<Image>,
 }
 
 /// Província atualmente selecionada (0 = nenhuma).
@@ -34,6 +36,8 @@ pub struct ProvinciaSelecionada(pub u32);
 struct ArrastoCamera {
     inicio: Option<Vec2>,
     moveu: f32,
+    /// O clique começou fora da UI (pode virar seleção).
+    ativo: bool,
 }
 
 const COR_OCEANO_RGBA: [u8; 4] = [28, 58, 96, 255];
@@ -44,57 +48,113 @@ impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ProvinciaSelecionada>()
             .init_resource::<ArrastoCamera>()
-            .add_systems(Startup, carregar_mapa)
-            .add_systems(Update, (mover_camera, selecionar_provincia));
+            .add_systems(Startup, |mut c: Commands| {
+                c.spawn(Camera2d);
+            })
+            .add_systems(OnEnter(AppState::Carregando), iniciar_carga)
+            .add_systems(Update, aguardar_carga.run_if(in_state(AppState::Carregando)))
+            .add_systems(EguiPrimaryContextPass, tela_carregando.run_if(in_state(AppState::Carregando)))
+            .add_systems(
+                Update,
+                (mover_camera, selecionar_provincia)
+                    .chain()
+                    .run_if(crate::estado::em_partida),
+            );
     }
 }
 
-fn carregar_mapa(
-    mut commands: Commands,
-    raiz: Res<RaizProjeto>,
-    catalogo: Res<RecursoCatalogo>,
-    mundo: Res<RecursoMundo>,
-    mut imagens: ResMut<Assets<Image>>,
-) {
-    let img = image::open(raiz.0.join("assets/map/provinces.png"))
-        .expect("falha ao abrir provinces.png")
-        .to_rgb8();
-    let (w, h) = img.dimensions();
+/// Entrada pura (sem recursos ECS) para gerar o mapa em segundo plano.
+pub struct EntradaMapa {
+    pub caminho_png: PathBuf,
+    /// Cor RGBA por id de província (índice = id).
+    pub cor_prov: Vec<[u8; 4]>,
+    /// Índice do dono por id de província (0 = sem dono).
+    pub dono_prov: Vec<u32>,
+}
 
+/// Resultado do processamento em segundo plano.
+pub struct SaidaMapa {
+    pub largura: u32,
+    pub altura: u32,
+    pub ids: Vec<u32>,
+    pub pixels: Vec<u8>,
+    /// Caixa delimitadora por id: [x_min, y_min, x_max, y_max] (inclusive).
+    pub caixas: Vec<Option<[u32; 4]>>,
+}
+
+#[derive(Resource)]
+struct TarefaMapa(Task<Result<SaidaMapa, String>>);
+
+/// Retângulo dos pixels de uma província, em coordenadas de imagem.
+#[derive(Resource, Default)]
+pub struct CaixasProvincia(pub Vec<Option<[u32; 4]>>);
+
+/// Sprite de realce de seleção; `deslocamento` é o deslocamento horizontal da cópia (wrap).
+#[derive(Component)]
+struct Realce {
+    deslocamento: f32,
+}
+
+/// Normaliza a coordenada x do mundo para [-largura/2, largura/2) (wrap horizontal).
+pub fn normalizar_x(x: f32, largura: f32) -> f32 {
+    (x + largura / 2.0).rem_euclid(largura) - largura / 2.0
+}
+
+/// Converte posição do mundo em pixel da imagem, com wrap horizontal.
+/// Retorna `None` se estiver fora na vertical.
+pub fn pixel_do_mundo(pos: Vec2, largura: u32, altura: u32) -> Option<(u32, u32)> {
+    let px = (pos.x + largura as f32 / 2.0).floor().rem_euclid(largura as f32) as u32;
+    let py = (altura as f32 / 2.0 - pos.y).floor();
+    if py < 0.0 || py >= altura as f32 {
+        return None;
+    }
+    Some((px.min(largura - 1), py as u32))
+}
+
+/// Gera ids, pixels coloridos (com bordas) e caixas delimitadoras. Função pura.
+pub fn gerar_mapa(ent: &EntradaMapa) -> Result<SaidaMapa, String> {
+    let img = image::open(&ent.caminho_png).map_err(|e| e.to_string())?.to_rgb8();
+    let (w, h) = img.dimensions();
     let ids: Vec<u32> = img
         .pixels()
         .map(|p| id_de_cor_provincia((p[0], p[1], p[2])).unwrap_or(0))
         .collect();
+    let (pixels, caixas) = colorir(&ids, w, h, &ent.cor_prov, &ent.dono_prov);
+    Ok(SaidaMapa { largura: w, altura: h, ids, pixels, caixas })
+}
 
-    // Cor de cada província conforme o dono em 1945.
-    let mut cor_prov = vec![COR_OCEANO_RGBA; catalogo.0.provincias.iter().map(|p| p.id).max().unwrap_or(0) as usize + 1];
-    for prov in &catalogo.0.provincias {
-        if let Some(tag) = mundo.dono_por_provincia.get(&prov.id)
-            && let Some(pais) = mundo.paises.get(tag)
-        {
-            cor_prov[prov.id as usize] = [pais.cor.0, pais.cor.1, pais.cor.2, 255];
-        }
-    }
-
-    let dono_idx = |id: u32| -> &str {
-        mundo.dono_por_provincia.get(&id).map(String::as_str).unwrap_or("")
-    };
-
+/// Colore o mapa (cor do dono + bordas de país/província) e calcula as caixas.
+pub fn colorir(
+    ids: &[u32],
+    w: u32,
+    h: u32,
+    cor_prov: &[[u8; 4]],
+    dono_prov: &[u32],
+) -> (Vec<u8>, Vec<Option<[u32; 4]>>) {
     let (wu, hu) = (w as usize, h as usize);
+    let dono = |id: u32| dono_prov.get(id as usize).copied().unwrap_or(0);
+    let mut caixas: Vec<Option<[u32; 4]>> = vec![None; cor_prov.len()];
     let mut dados = vec![0u8; wu * hu * 4];
     for y in 0..hu {
         for x in 0..wu {
             let i = y * wu + x;
             let id = ids[i];
-            let mut c = if id == 0 { COR_OCEANO_RGBA } else { cor_prov[id as usize] };
+            let mut c = if id == 0 { COR_OCEANO_RGBA } else { cor_prov.get(id as usize).copied().unwrap_or(COR_OCEANO_RGBA) };
             if id != 0 {
-                let mut borda_pais = false;
-                let mut borda_prov = false;
-                for (nx, ny) in [(x + 1, y), (x, y + 1)] {
-                    if nx < wu && ny < hu {
-                        let vizinho = ids[ny * wu + nx];
-                        if vizinho != id {
-                            if vizinho == 0 || dono_idx(vizinho) != dono_idx(id) {
+                if let Some(slot) = caixas.get_mut(id as usize) {
+                    let (xu, yu) = (x as u32, y as u32);
+                    *slot = Some(match *slot {
+                        None => [xu, yu, xu, yu],
+                        Some([a, b, cc, d]) => [a.min(xu), b.min(yu), cc.max(xu), d.max(yu)],
+                    });
+                }
+                let (mut borda_pais, mut borda_prov) = (false, false);
+                // Vizinhos à direita (com wrap horizontal) e abaixo.
+                for (nx, ny) in [((x + 1) % wu, y), (x, y + 1)] {
+                    if ny < hu {
+                        let v = ids[ny * wu + nx];
+                        if v != id {
+                            if v == 0 || dono(v) != dono(id) {
                                 borda_pais = true;
                             } else {
                                 borda_prov = true;
@@ -105,31 +165,97 @@ fn carregar_mapa(
                 if borda_pais {
                     c = [15, 15, 15, 255];
                 } else if borda_prov {
-                    c = [
-                        (c[0] as f32 * 0.72) as u8,
-                        (c[1] as f32 * 0.72) as u8,
-                        (c[2] as f32 * 0.72) as u8,
-                        255,
-                    ];
+                    c = [(c[0] as f32 * 0.72) as u8, (c[1] as f32 * 0.72) as u8, (c[2] as f32 * 0.72) as u8, 255];
                 }
             }
             dados[i * 4..i * 4 + 4].copy_from_slice(&c);
         }
     }
+    (dados, caixas)
+}
 
+/// RGBA do realce: branco translúcido apenas nos pixels da província dentro da caixa.
+pub fn pixels_realce(ids: &[u32], largura: u32, id: u32, caixa: [u32; 4]) -> Vec<u8> {
+    let [x0, y0, x1, y1] = caixa;
+    let (bw, bh) = ((x1 - x0 + 1) as usize, (y1 - y0 + 1) as usize);
+    let mut out = vec![0u8; bw * bh * 4];
+    for by in 0..bh {
+        let linha = (y0 as usize + by) * largura as usize + x0 as usize;
+        for bx in 0..bw {
+            if ids[linha + bx] == id {
+                out[(by * bw + bx) * 4..(by * bw + bx) * 4 + 4].copy_from_slice(&[255, 255, 255, 90]);
+            }
+        }
+    }
+    out
+}
+
+fn iniciar_carga(mut commands: Commands, raiz: Res<RaizProjeto>, catalogo: Res<RecursoCatalogo>, mundo: Res<RecursoMundo>) {
+    let max_id = catalogo.0.provincias.iter().map(|p| p.id).max().unwrap_or(0) as usize + 1;
+    let mut cor_prov = vec![COR_OCEANO_RGBA; max_id];
+    let mut dono_prov = vec![0u32; max_id];
+    let mut indices: std::collections::HashMap<&str, u32> = std::collections::HashMap::new();
+    for prov in &catalogo.0.provincias {
+        if let Some(tag) = mundo.dono_por_provincia.get(&prov.id)
+            && let Some(pais) = mundo.paises.get(tag)
+        {
+            cor_prov[prov.id as usize] = [pais.cor.0, pais.cor.1, pais.cor.2, 255];
+            let n = indices.len() as u32 + 1;
+            dono_prov[prov.id as usize] = *indices.entry(tag.as_str()).or_insert(n);
+        }
+    }
+    let entrada = EntradaMapa { caminho_png: raiz.0.join("assets/map/provinces.png"), cor_prov, dono_prov };
+    let tarefa = AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move { gerar_mapa(&entrada) });
+    commands.insert_resource(TarefaMapa(tarefa));
+}
+
+fn aguardar_carga(
+    mut commands: Commands,
+    tarefa: Option<ResMut<TarefaMapa>>,
+    mut imagens: ResMut<Assets<Image>>,
+    mut proximo: ResMut<NextState<AppState>>,
+) {
+    let Some(mut tarefa) = tarefa else { return };
+    let Some(res) = block_on(future::poll_once(&mut tarefa.0)) else { return };
+    commands.remove_resource::<TarefaMapa>();
+    let saida = match res {
+        Ok(s) => s,
+        Err(e) => {
+            error!("falha ao gerar o mapa: {e}");
+            return;
+        }
+    };
     let mut imagem = Image::new(
-        Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+        Extent3d { width: saida.largura, height: saida.altura, depth_or_array_layers: 1 },
         TextureDimension::D2,
-        dados,
+        saida.pixels,
         TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
+        RenderAssetUsages::RENDER_WORLD,
     );
     imagem.sampler = ImageSampler::nearest();
     let handle = imagens.add(imagem);
+    // Três cópias lado a lado para o wrap horizontal.
+    for k in [-1.0f32, 0.0, 1.0] {
+        commands.spawn((Sprite::from_image(handle.clone()), Transform::from_xyz(k * saida.largura as f32, 0.0, 0.0)));
+        commands.spawn((
+            Realce { deslocamento: k * saida.largura as f32 },
+            Sprite::default(),
+            Transform::from_xyz(0.0, 0.0, 1.0),
+            Visibility::Hidden,
+        ));
+    }
+    commands.insert_resource(CaixasProvincia(saida.caixas));
+    commands.insert_resource(DadosMapa { largura: saida.largura, altura: saida.altura, ids: saida.ids });
+    proximo.set(AppState::Menu);
+}
 
-    commands.spawn(Camera2d);
-    commands.spawn(Sprite::from_image(handle.clone()));
-    commands.insert_resource(DadosMapa { largura: w, altura: h, ids, textura: handle });
+fn tela_carregando(mut contextos: EguiContexts, tempo: Res<Time>) -> Result {
+    let ctx = contextos.ctx_mut()?;
+    let pontos = ".".repeat((tempo.elapsed_secs() * 2.0) as usize % 4);
+    egui::Area::new("carregando".into()).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
+        ui.heading(format!("Carregando o mundo de 1945{pontos}"));
+    });
+    Ok(())
 }
 
 fn mover_camera(
@@ -141,6 +267,7 @@ fn mover_camera(
     janela: Query<&Window, With<PrimaryWindow>>,
     botoes: Res<ButtonInput<MouseButton>>,
     mut arrasto: ResMut<ArrastoCamera>,
+    mapa: Option<Res<DadosMapa>>,
 ) {
     let Ok((mut tf, mut proj)) = camera.single_mut() else { return };
     let Projection::Orthographic(ortho) = &mut *proj else { return };
@@ -162,6 +289,10 @@ fn mover_camera(
         if botoes.just_pressed(MouseButton::Left) && !sobre_ui {
             arrasto.inicio = Some(pos);
             arrasto.moveu = 0.0;
+            arrasto.ativo = true;
+        }
+        if botoes.just_released(MouseButton::Left) && arrasto.inicio.is_some() {
+            arrasto.inicio = None;
         }
         if botoes.pressed(MouseButton::Left)
             && let Some(ant) = arrasto.inicio
@@ -173,6 +304,9 @@ fn mover_camera(
             arrasto.inicio = Some(pos);
         }
     }
+    if let Some(m) = mapa {
+        tf.translation.x = normalizar_x(tf.translation.x, m.largura as f32);
+    }
 }
 
 fn selecionar_provincia(
@@ -181,47 +315,93 @@ fn selecionar_provincia(
     janela: Query<&Window, With<PrimaryWindow>>,
     camera: Query<(&Camera, &GlobalTransform), With<Camera2d>>,
     mapa: Option<Res<DadosMapa>>,
+    caixas: Option<Res<CaixasProvincia>>,
     mut selecionada: ResMut<ProvinciaSelecionada>,
     mut imagens: ResMut<Assets<Image>>,
+    mut realces: Query<(&Realce, &mut Sprite, &mut Transform, &mut Visibility)>,
     egui: Res<EguiWantsInput>,
 ) {
-    if !botoes.just_released(MouseButton::Left) || arrasto.moveu > 4.0 {
+    if !botoes.just_released(MouseButton::Left) || arrasto.moveu > 4.0 || !arrasto.ativo {
         return;
     }
-    if egui.is_pointer_over_area() {
+    if egui.is_pointer_over_area() || egui.wants_pointer_input() {
         return;
     }
+    let Some(caixas) = caixas else { return };
     let (Some(mapa), Ok(janela), Ok((cam, gt))) = (mapa, janela.single(), camera.single()) else { return };
     let Some(cursor) = janela.cursor_position() else { return };
     let Ok(mundo_pos) = cam.viewport_to_world_2d(gt, cursor) else { return };
-    let px = (mundo_pos.x + mapa.largura as f32 / 2.0).floor();
-    let py = (mapa.altura as f32 / 2.0 - mundo_pos.y).floor();
-    if px < 0.0 || py < 0.0 || px >= mapa.largura as f32 || py >= mapa.altura as f32 {
-        selecionada.0 = 0;
-        return;
-    }
-    let id = mapa.ids[py as usize * mapa.largura as usize + px as usize];
-    let anterior = selecionada.0;
+    let id = match pixel_do_mundo(mundo_pos, mapa.largura, mapa.altura) {
+        Some((px, py)) => mapa.ids[py as usize * mapa.largura as usize + px as usize],
+        None => 0,
+    };
     selecionada.0 = id;
-    if anterior != id {
-        realcar(&mapa, &mut imagens, anterior, false);
-        realcar(&mapa, &mut imagens, id, true);
+    let caixa = caixas.0.get(id as usize).copied().flatten();
+    for (r, mut sprite, mut tf, mut vis) in &mut realces {
+        match (id != 0, caixa) {
+            (true, Some(cx)) => {
+                let (bw, bh) = ((cx[2] - cx[0] + 1), (cx[3] - cx[1] + 1));
+                let dados = pixels_realce(&mapa.ids, mapa.largura, id, cx);
+                let mut img = Image::new(
+                    Extent3d { width: bw, height: bh, depth_or_array_layers: 1 },
+                    TextureDimension::D2,
+                    dados,
+                    TextureFormat::Rgba8UnormSrgb,
+                    RenderAssetUsages::RENDER_WORLD,
+                );
+                img.sampler = ImageSampler::nearest();
+                sprite.image = imagens.add(img);
+                let cxm = (cx[0] + cx[2] + 1) as f32 / 2.0 - mapa.largura as f32 / 2.0;
+                let cym = mapa.altura as f32 / 2.0 - (cx[1] + cx[3] + 1) as f32 / 2.0;
+                tf.translation.x = cxm + r.deslocamento;
+                tf.translation.y = cym;
+                *vis = Visibility::Visible;
+            }
+            _ => *vis = Visibility::Hidden,
+        }
     }
 }
 
-/// Clareia (ou restaura) os pixels de uma província para indicar seleção.
-fn realcar(mapa: &DadosMapa, imagens: &mut Assets<Image>, id: u32, ligar: bool) {
-    if id == 0 {
-        return;
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test]
+    fn wrap_x() {
+        assert_eq!(normalizar_x(0.0, 100.0), 0.0);
+        assert_eq!(normalizar_x(60.0, 100.0), -40.0);
+        assert_eq!(normalizar_x(-60.0, 100.0), 40.0);
     }
-    let Some(mut img) = imagens.get_mut(&mapa.textura) else { return };
-    let Some(dados) = img.data.as_mut() else { return };
-    for (i, &pid) in mapa.ids.iter().enumerate() {
-        if pid == id {
-            for k in 0..3 {
-                let v = dados[i * 4 + k] as i32;
-                dados[i * 4 + k] = if ligar { (v + 70).min(255) } else { (v - 70).max(0) } as u8;
-            }
-        }
+
+    #[test]
+    fn pixel_com_wrap_e_limites() {
+        assert_eq!(pixel_do_mundo(Vec2::new(-50.0, 25.0), 100, 50), Some((0, 0)));
+        assert_eq!(pixel_do_mundo(Vec2::new(51.0, 0.0), 100, 50), Some((1, 25)));
+        assert_eq!(pixel_do_mundo(Vec2::new(-51.0, 0.0), 100, 50), Some((99, 25)));
+        assert_eq!(pixel_do_mundo(Vec2::new(0.0, 30.0), 100, 50), None);
+    }
+
+    #[test]
+    fn colorir_caixas_e_bordas() {
+        // 4x2: ids 1 1 2 0 / 1 1 2 0
+        let ids = [1, 1, 2, 0, 1, 1, 2, 0];
+        let cor = [COR_OCEANO_RGBA, [200, 0, 0, 255], [0, 200, 0, 255]];
+        let dono = [0, 1, 2];
+        let (px, caixas) = colorir(&ids, 4, 2, &cor, &dono);
+        assert_eq!(caixas[1], Some([0, 0, 1, 1]));
+        assert_eq!(caixas[2], Some([2, 0, 2, 1]));
+        // pixel (1,0) tem vizinho de outro país à direita: borda escura.
+        assert_eq!(&px[4..8], &[15, 15, 15, 255]);
+        // pixel (0,0): vizinho à direita é a mesma província, abaixo também.
+        assert_eq!(&px[0..4], &[200, 0, 0, 255]);
+    }
+
+    #[test]
+    fn realce_so_nos_pixels_da_provincia() {
+        let ids = [1, 2, 1, 1];
+        let r = pixels_realce(&ids, 2, 1, [0, 0, 1, 1]);
+        assert_eq!(r[3], 90);
+        assert_eq!(r[7], 0);
+        assert_eq!(r[11], 90);
     }
 }
