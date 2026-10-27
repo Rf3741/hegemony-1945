@@ -32,7 +32,8 @@ fn raiz_projeto() -> PathBuf {
 }
 
 fn main() {
-    let raiz = raiz_projeto();
+    // Caminho absoluto: o AssetServer resolve caminhos relativos a partir do crate quando roda via cargo.
+    let raiz = raiz_projeto().canonicalize().unwrap_or_else(|_| raiz_projeto());
     let (_catalogo_legado, mundo) = MundoJogo::carregar_de_arquivos(
         raiz.join("assets/map/provinces.ron"),
         raiz.join("data/scenario_1945/countries_1945.ron"),
