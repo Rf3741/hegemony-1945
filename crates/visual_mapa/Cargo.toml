@@ -1,0 +1,31 @@
+[package]
+name = "visual_mapa"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Plugin Bevy do mapa vivo: cidades por nivel 1-8, industrias, transporte, eras, LOD e atlas de sprites (Guerra Fria)"
+
+[features]
+default = []
+# Demonstracao: dados falsos, tempo acelerado, camera, fundo e HUD egui.
+demo = ["dep:bevy_egui"]
+
+[dependencies]
+bevy.workspace = true
+gf_mapa.workspace = true
+ron.workspace = true
+serde.workspace = true
+image.workspace = true
+bevy_egui = { workspace = true, optional = true }
+
+[[example]]
+name = "demo"
+required-features = ["demo"]
+
+[[example]]
+name = "mapa_real"
+required-features = ["demo"]
+
+[[example]]
+name = "economia_1945"
+required-features = ["demo"]

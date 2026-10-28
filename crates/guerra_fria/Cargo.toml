@@ -14,4 +14,5 @@ serde.workspace = true
 simulacao.workspace = true
 gf_mapa.workspace = true
 sim_economia.workspace = true
+visual_mapa.workspace = true
 egui_plot.workspace = true

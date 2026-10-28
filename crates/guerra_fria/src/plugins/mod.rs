@@ -8,3 +8,4 @@ pub mod map;
 pub mod politics;
 pub mod time;
 pub mod ui;
+pub mod visual_construcoes;

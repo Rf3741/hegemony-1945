@@ -16,6 +16,7 @@ use plugins::{
     politics::PoliticsPlugin,
     time::TimePlugin,
     ui::UiPlugin,
+    visual_construcoes::VisualConstrucoesPlugin,
 };
 use simulacao::mundo::MundoJogo;
 use std::path::PathBuf;
@@ -60,8 +61,12 @@ fn main() {
         }))
         .add_plugins(EguiPlugin::default())
         .insert_resource(RecursoMundo(mundo))
-        .insert_resource(plugins::map::RaizProjeto(raiz))
+        .insert_resource(plugins::map::RaizProjeto(raiz.clone()))
         .insert_resource(plugins::map::RecursoCatalogo(catalogo))
-        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin))
+        .insert_resource(visual_mapa::VisualMapaConfig {
+            raiz_dados: raiz.join("crates/visual_mapa/assets/visual"),
+            ..default()
+        })
+        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, VisualConstrucoesPlugin))
         .run();
 }

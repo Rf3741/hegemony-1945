@@ -36,6 +36,7 @@ impl Plugin for UiPlugin {
 fn barra_superior(
     mut contextos: EguiContexts,
     mut relogio: ResMut<RecursoRelogio>,
+    camada_visivel: Option<Res<visual_mapa::CamadaConstrucoesVisivel>>,
 ) -> Result {
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
     egui::Panel::top("barra_superior").show(&mut raiz, |ui| {
@@ -56,7 +57,12 @@ fn barra_superior(
             if relogio.pausado {
                 ui.label("PAUSADO");
             }
-            ui.label("Espaço: pausa | 1-5: velocidade | WASD/arrastar: mover | scroll: zoom");
+            if let Some(c) = camada_visivel {
+                let texto = if c.0 { "🏛 Construções: [V] Ativas" } else { "🏛 Construções: [V] Ocultas" };
+                ui.label(texto);
+                ui.separator();
+            }
+            ui.label("Espaço: pausa | 1-5: vel | WASD: mover | scroll: zoom | V: construções");
         });
     });
     Ok(())
