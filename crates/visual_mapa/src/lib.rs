@@ -17,6 +17,7 @@ pub mod config;
 pub mod dados;
 pub mod entrada;
 pub mod era;
+pub mod estilo;
 pub mod industria;
 pub mod linhas;
 pub mod lod;
@@ -45,6 +46,7 @@ pub use entrada::{
     PredioEconomiaEntrada, populacao_urbana_para_nivel, populacao_urbana_para_nivel_fracionario,
 };
 pub use era::GerenciadorEras;
+pub use estilo::EstiloMapa;
 pub use lod::{EstadoLod, LimitesZoomVisual, NivelLod};
 pub use mapa::{EstadoModoMapa, ModoMapa};
 pub use mapeamento::{
@@ -86,13 +88,19 @@ impl Plugin for VisualMapaPlugin {
             .init_resource::<IndiceEntidadesEconomia>()
             .init_resource::<AtlasVisual>()
             .init_resource::<CatalogoMapeamentoPredios>()
+            .init_resource::<estilo::EstiloMapa>()
             .init_resource::<rios::ConfigRios>()
             .init_resource::<rotas::ConfigRotas>()
             .init_resource::<rotas::EstadoRotas>()
             .add_systems(Startup, rios::criar_rios_sistema)
             .add_systems(
                 Update,
-                (rotas::reconstruir_rotas_sistema, rotas::lod_rotas_sistema, rios::lod_rios_sistema)
+                (
+                    rotas::reconstruir_rotas_sistema,
+                    rotas::lod_rotas_sistema,
+                    rios::lod_rios_sistema,
+                    estilo::limitar_construcoes_sistema,
+                )
                     .chain()
                     .after(VisualMapaSet::Animar),
             )

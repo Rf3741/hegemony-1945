@@ -8,6 +8,7 @@ pub mod jogador;
 pub mod map;
 pub mod politics;
 pub mod rotas_ponte;
+pub mod rotulos_pais;
 pub mod time;
 pub mod ui;
 pub mod visual_construcoes;

@@ -61,7 +61,7 @@ fn tela_menu(
     mut busca: Local<String>,
 ) -> Result {
     let mut escolhido: Option<String> = None;
-    egui::Window::new("Guerra Fria - 1945: escolha seu país")
+    egui::Window::new("Hegemony: 1945 — escolha seu país")
         .collapsible(false)
         .resizable(false)
         .anchor(egui::Align2::LEFT_TOP, [10.0, 10.0])

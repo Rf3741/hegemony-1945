@@ -6,7 +6,7 @@
 //! Cada malha tem 3 cópias (wrap horizontal, como o sprite do mapa).
 
 use crate::linhas::ConstrutorLinhas;
-use crate::lod::{EstadoLod, NivelLod};
+use crate::estilo::EstiloMapa;
 use bevy::prelude::*;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
@@ -54,26 +54,45 @@ pub fn carregar_arquivo_rios(caminho: &Path) -> Result<ArquivoRios, String> {
     ron::from_str(&txt).map_err(|e| e.to_string())
 }
 
-/// Largura (unidades de mundo) e cor por ordem do rio.
+/// Cor por ordem do rio (azul suave, semitransparente).
 pub fn estilo_rio(ordem: u8) -> (f32, Color) {
+    // O primeiro valor é só um peso relativo (maior rio = maior); a largura real é em pixels de tela.
     match ordem {
-        0..=3 => (2.6, Color::srgb(0.30, 0.55, 0.84)),
-        4..=5 => (2.0, Color::srgb(0.32, 0.58, 0.86)),
-        6..=7 => (1.5, Color::srgb(0.36, 0.61, 0.87)),
-        _ => (1.1, Color::srgb(0.40, 0.64, 0.88)),
+        0..=3 => (1.0, Color::srgba(0.36, 0.60, 0.86, 0.5)),
+        4..=5 => (0.9, Color::srgba(0.38, 0.62, 0.88, 0.5)),
+        6..=7 => (0.7, Color::srgba(0.40, 0.65, 0.89, 0.45)),
+        _ => (0.6, Color::srgba(0.42, 0.67, 0.90, 0.4)),
     }
 }
 
-/// Gera as malhas (principais, afluentes). Função pura.
-pub fn construir_malhas_rios(arq: &ArquivoRios) -> (ConstrutorLinhas, ConstrutorLinhas) {
+/// Gera as malhas (principais, afluentes) para a escala de câmera dada: a largura vira
+/// `px * escala` unidades de mundo, ou seja, `px` pixels na tela. Função pura.
+pub fn construir_malhas_rios_escala(arq: &ArquivoRios, escala: f32, estilo: &crate::estilo::EstiloMapa) -> (ConstrutorLinhas, ConstrutorLinhas) {
     let (mut principal, mut menor) = (ConstrutorLinhas::novo(), ConstrutorLinhas::novo());
     for r in &arq.rios {
         let pts: Vec<Vec2> = r.pontos.iter().map(|&(x, y)| Vec2::new(x, y)).collect();
-        let (w, cor) = estilo_rio(r.ordem);
-        let dest = if r.ordem <= 6 { &mut principal } else { &mut menor };
-        dest.polilinha(&pts, w, cor);
+        let (peso, mut cor) = estilo_rio(r.ordem);
+        let eh_principal = r.ordem <= 6;
+        let px = if eh_principal { estilo.rios_px_principal } else { estilo.rios_px_menor } * peso;
+        cor.set_alpha(cor.alpha() * estilo.rios_alfa / 0.5);
+        let dest = if eh_principal { &mut principal } else { &mut menor };
+        dest.polilinha(&pts, (px * escala).max(0.2), cor);
     }
     (principal, menor)
+}
+
+/// Compatibilidade: malhas na escala 1.0.
+pub fn construir_malhas_rios(arq: &ArquivoRios) -> (ConstrutorLinhas, ConstrutorLinhas) {
+    construir_malhas_rios_escala(arq, 1.0, &crate::estilo::EstiloMapa::default())
+}
+
+/// Dados mantidos para refazer as malhas quando o zoom muda (largura constante na tela).
+#[derive(Resource)]
+pub struct RiosDados {
+    pub arq: ArquivoRios,
+    pub malha_principal: Handle<Mesh>,
+    pub malha_menor: Handle<Mesh>,
+    pub balde: i32,
 }
 
 pub fn criar_rios_sistema(
@@ -92,13 +111,16 @@ pub fn criar_rios_sistema(
             return;
         }
     };
-    let (principal, menor) = construir_malhas_rios(&arq);
+    let estilo = EstiloMapa::default();
+    let (principal, menor) = construir_malhas_rios_escala(&arq, 1.0, &estilo);
+    let mut hs: [Handle<Mesh>; 2] = [Handle::default(), Handle::default()];
     let mat = materiais.add(ColorMaterial::from_color(Color::WHITE));
     for (constr, eh_principal, z) in [(menor, false, 1.5), (principal, true, 1.6)] {
         if constr.vazio() {
             continue;
         }
         let h = meshes.add(constr.construir());
+        hs[eh_principal as usize] = h.clone();
         for k in [-1.0f32, 0.0, 1.0] {
             commands.spawn((
                 Mesh2d(h.clone()),
@@ -109,19 +131,37 @@ pub fn criar_rios_sistema(
         }
     }
     info!("visual_mapa: {} rios carregados.", arq.rios.len());
+    commands.insert_resource(RiosDados { malha_principal: hs[1].clone(), malha_menor: hs[0].clone(), arq, balde: i32::MIN });
 }
 
-/// Afluentes só aparecem fora do zoom global.
-pub fn lod_rios_sistema(lod: Res<EstadoLod>, mut q: Query<(&CamadaRios, &mut Visibility)>) {
-    if !lod.is_changed() {
+/// Refaz as malhas quando o zoom muda (balde de meio passo em log2) e esconde afluentes ao longe.
+pub fn lod_rios_sistema(
+    estilo: Res<EstiloMapa>,
+    camera: Query<&Projection, With<Camera2d>>,
+    dados: Option<ResMut<RiosDados>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut q: Query<(&CamadaRios, &mut Visibility)>,
+) {
+    let escala = camera.single().ok().map(|p| match p { Projection::Orthographic(o) => o.scale, _ => 1.0 }).unwrap_or(1.0);
+    for (c, mut v) in &mut q {
+        let alvo = if c.principal || escala < estilo.rios_menores_escala_max { Visibility::Inherited } else { Visibility::Hidden };
+        if *v != alvo {
+            *v = alvo;
+        }
+    }
+    let Some(mut d) = dados else { return };
+    let balde = (escala.max(0.05).log2() * 2.0).round() as i32;
+    if balde == d.balde {
         return;
     }
-    for (c, mut v) in &mut q {
-        *v = if c.principal || lod.nivel_atual != NivelLod::Global {
-            Visibility::Inherited
-        } else {
-            Visibility::Hidden
-        };
+    d.balde = balde;
+    let esc = 2f32.powf(balde as f32 / 2.0);
+    let (p, m) = construir_malhas_rios_escala(&d.arq, esc, &estilo);
+    if !p.vazio() {
+        let _ = meshes.insert(&d.malha_principal, p.construir());
+    }
+    if !m.vazio() {
+        let _ = meshes.insert(&d.malha_menor, m.construir());
     }
 }
 
@@ -144,5 +184,6 @@ mod tests {
     #[test]
     fn rio_maior_mais_largo() {
         assert!(estilo_rio(1).0 > estilo_rio(9).0);
+        assert!(estilo_rio(1).1.alpha() < 1.0);
     }
 }

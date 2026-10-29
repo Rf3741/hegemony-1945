@@ -11,7 +11,7 @@
 use crate::config::CamadaConstrucoesVisivel;
 use crate::entrada::{AnoVisual, EntradaVisual};
 use crate::linhas::ConstrutorLinhas;
-use crate::lod::{EstadoLod, NivelLod};
+use crate::lod::EstadoLod;
 use crate::projecao::ProjecaoMapa;
 use bevy::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -61,7 +61,7 @@ pub struct ConfigRotas {
 
 impl Default for ConfigRotas {
     fn default() -> Self {
-        Self { ativo: true, vizinhas: 3, dist_max: 380.0, largura_mapa: 5632.0, nivel_min_ferrovia: 3, ano_rodovias: 1950.0 }
+        Self { ativo: true, vizinhas: 2, dist_max: 90.0, largura_mapa: 5632.0, nivel_min_ferrovia: 4, ano_rodovias: 1950.0 }
     }
 }
 
@@ -216,10 +216,10 @@ pub struct MalhasRotas {
     pub ferrovias: ConstrutorLinhas,
 }
 
-const COR_TERRA: Color = Color::srgb(0.60, 0.50, 0.34);
-const COR_ASFALTO: Color = Color::srgb(0.86, 0.84, 0.78);
-const COR_CONTORNO: Color = Color::srgb(0.17, 0.16, 0.15);
-const COR_LEITO: Color = Color::srgb(0.20, 0.20, 0.22);
+const COR_TERRA: Color = Color::srgba(0.45, 0.36, 0.24, 0.45);
+const COR_ASFALTO: Color = Color::srgba(0.80, 0.78, 0.72, 0.5);
+const COR_CONTORNO: Color = Color::srgba(0.17, 0.16, 0.15, 0.35);
+const COR_LEITO: Color = Color::srgba(0.12, 0.12, 0.14, 0.55);
 const COR_DORMENTE: Color = Color::srgb(0.28, 0.20, 0.13);
 const COR_TRILHO: Color = Color::srgb(0.88, 0.88, 0.90);
 
@@ -233,18 +233,17 @@ pub fn construir_malhas(nos: &[NoRota], arestas: &[Aresta], ano: f32, cfg: &Conf
         // Contorno primeiro (todas as estradas de um mesmo tipo no mesmo buffer: contorno e miolo
         // são desenhados em ordem por aresta, o que basta para vias que raramente se cruzam).
         match tipo {
-            ViaTipo::Terra => estradas.polilinha(&pts, 0.8 + 0.28 * infra, COR_TERRA),
+            ViaTipo::Terra => estradas.polilinha(&pts, 0.35 + 0.05 * infra, COR_TERRA),
             ViaTipo::Rodovia => {
-                estradas.polilinha(&pts, 2.4 + 0.5 * infra, COR_CONTORNO);
-                estradas.polilinha(&pts, 1.4 + 0.5 * infra, COR_ASFALTO);
+                estradas.polilinha(&pts, 0.55 + 0.08 * infra, COR_ASFALTO);
             }
         }
         if e.ferrovia {
-            let off = if tipo == ViaTipo::Rodovia || e.infra >= 2 { 2.2 + 0.3 * infra } else { 0.0 };
+            let off = if tipo == ViaTipo::Rodovia || e.infra >= 2 { 1.2 } else { 0.0 };
             let trilha = deslocar(&pts, off);
             ferrovia(&mut ferrovias, &trilha, infra, e.pesada);
             if e.pesada {
-                ferrovia(&mut ferrovias, &deslocar(&pts, off + 4.2), infra, false);
+                ferrovia(&mut ferrovias, &deslocar(&pts, off + 1.4), infra, false);
             }
         }
     }
@@ -264,35 +263,9 @@ fn deslocar(pts: &[Vec2], d: f32) -> Vec<Vec2> {
         .collect()
 }
 
-/// Ferrovia: leito escuro, dormentes transversais a cada ~3 unidades e dois trilhos claros.
-fn ferrovia(c: &mut ConstrutorLinhas, pts: &[Vec2], infra: f32, _pesada: bool) {
-    let larg = 2.4 + 0.35 * infra;
-    c.polilinha(pts, 0.9, COR_LEITO);
-    let passo = 3.0;
-    let mut resto = 0.0f32;
-    for par in pts.windows(2) {
-        let (a, b) = (par[0], par[1]);
-        let len = a.distance(b);
-        if len < 1e-3 {
-            continue;
-        }
-        let dir = (b - a) / len;
-        let n = Vec2::new(-dir.y, dir.x);
-        let mut s = resto;
-        while s < len {
-            let p = a + dir * s;
-            let (h, t) = (larg * 0.5, 0.55);
-            c.quad(
-                [p - n * h - dir * t, p + n * h - dir * t, p + n * h + dir * t, p - n * h + dir * t],
-                [COR_DORMENTE; 4],
-            );
-            s += passo;
-        }
-        resto = s - len;
-        for lado in [-0.28f32, 0.28] {
-            c.segmento(a + n * larg * lado, b + n * larg * lado, 0.35, 0.1, COR_TRILHO);
-        }
-    }
+/// Ferrovia: uma linha fina e escura (discreta).
+fn ferrovia(c: &mut ConstrutorLinhas, pts: &[Vec2], _infra: f32, _pesada: bool) {
+    c.polilinha(pts, 0.4, COR_LEITO);
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -373,10 +346,11 @@ pub fn reconstruir_rotas_sistema(
 pub fn lod_rotas_sistema(
     lod: Res<EstadoLod>,
     camada: Option<Res<CamadaConstrucoesVisivel>>,
+    estilo: Res<crate::estilo::EstiloMapa>,
     mut q: Query<&mut Visibility, With<CamadaRotas>>,
 ) {
     let ligada = camada.is_none_or(|c| c.0);
-    let alvo = if ligada && lod.nivel_atual != NivelLod::Global { Visibility::Inherited } else { Visibility::Hidden };
+    let alvo = if ligada && lod.escala_camera > 0.0 && lod.escala_camera < estilo.rotas_escala_max { Visibility::Inherited } else { Visibility::Hidden };
     for mut v in &mut q {
         if *v != alvo {
             *v = alvo;

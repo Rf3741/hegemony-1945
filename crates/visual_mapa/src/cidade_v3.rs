@@ -501,6 +501,7 @@ pub fn layout_rotulos_sistema(
     mut acumulado: Local<f32>,
     camada: Option<Res<CamadaConstrucoesVisivel>>,
     lod: Res<EstadoLod>,
+    estilo: Res<crate::estilo::EstiloMapa>,
     camera: Query<(&Transform, &Projection), With<Camera2d>>,
     janela: Query<&Window, With<PrimaryWindow>>,
     cidades: Query<&CidadeVisual>,
@@ -512,7 +513,7 @@ pub fn layout_rotulos_sistema(
     }
     *acumulado = 0.0;
     let Some((centro, escala)) = escala_da_camera(&camera) else { return };
-    let visivel = camada.map_or(true, |c| c.0);
+    let visivel = camada.map_or(true, |c| c.0) && escala < estilo.cidades_escala_max;
     let (largura, altura) = janela.single().map(|w| (w.width(), w.height())).unwrap_or((1600.0, 900.0));
     let px = tamanho_rotulo_px(escala);
     let nivel_min = nivel_min_rotulo(escala);

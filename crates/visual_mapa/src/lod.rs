@@ -34,7 +34,7 @@ impl Default for LimitesZoomVisual {
         Self {
             escala_longe: 2.0,
             escala_perto: 0.85,
-            nivel_min_cidade_longe: 6,
+            nivel_min_cidade_longe: 7,
             nivel_min_nome_medio: 5,
             fumaca_ativa: true,
         }
