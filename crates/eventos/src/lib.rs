@@ -207,6 +207,14 @@ impl CatalogoEventos {
         eventos.extend(v.into_iter().map(Evento::de_marco));
         eventos.retain(|e| !e.opcoes.is_empty());
         eventos.sort_by_key(|e| e.data);
+        let mut vistos = BTreeSet::new();
+        eventos.retain(|e| {
+            let novo = vistos.insert(e.id.clone());
+            if !novo {
+                eprintln!("[eventos] aviso: id duplicado '{}' ignorado", e.id);
+            }
+            novo
+        });
         Ok(Self { eventos })
     }
 
