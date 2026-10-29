@@ -19,6 +19,7 @@ use plugins::{
     ui::UiPlugin,
     rotas_ponte::RotasPontePlugin,
     visual_construcoes::VisualConstrucoesPlugin,
+    rotulos_pais::RotulosPaisPlugin,
 };
 use simulacao::mundo::MundoJogo;
 use std::path::PathBuf;
@@ -69,6 +70,6 @@ fn main() {
             raiz_dados: raiz.join("crates/visual_mapa/assets/visual"),
             ..default()
         })
-        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, ConstrucaoUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, RotasPontePlugin, VisualConstrucoesPlugin))
+        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, ConstrucaoUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, RotasPontePlugin, VisualConstrucoesPlugin, RotulosPaisPlugin))
         .run();
 }
