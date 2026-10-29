@@ -58,7 +58,7 @@ pub fn carregar_centroides_provincias(caminho: &Path) -> HashMap<String, (f32, f
     if let Ok(texto) = std::fs::read_to_string(caminho) {
         if let Ok(ron_data) = ron::from_str::<MapaRon>(&texto) {
             for p in ron_data.provincias {
-                mapa.insert(p.adm1_code, p.centroide);
+                mapa.entry(p.adm1_code).or_insert(p.centroide); // 1ª província do estado = centroide original
             }
         }
     }

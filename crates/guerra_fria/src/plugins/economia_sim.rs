@@ -828,6 +828,9 @@ mod testes_plugin {
         )
         .expect("provinces.ron inválido");
         assert!(!catalogo.provincias.is_empty(), "catálogo de províncias vazio");
+        // Dono e controlador por província, inicializados do dono do estado.
+        assert_eq!(mundo.dono_por_provincia.len(), catalogo.provincias.len());
+        assert_eq!(mundo.controlador_por_provincia, mundo.dono_por_provincia);
 
         // Carga da economia de 1945 pelo mesmo caminho do jogo
         let dir = dir_economia(&raiz);

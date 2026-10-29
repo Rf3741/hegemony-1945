@@ -665,7 +665,7 @@ fn repintar_mapa(
             }
         }
     }
-    let (pixels, _) = colorir(&dados.ids, dados.largura, dados.altura, &cor_prov, &cores.dono_prov);
+    let (pixels, _) = colorir(&dados.ids, dados.largura, dados.altura, &cor_prov, &cores.dono_prov, &cores.estado_prov);
     if let Some(mut img) = imagens.get_mut(&imagem.0) {
         img.data = Some(pixels);
     }

@@ -172,6 +172,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         provincias.push(ProvinciaMapa {
             id,
             adm1_code,
+            estado: nome_final.clone(),
             nome: nome_final,
             cor,
             centroide: (lon as f32, lat as f32),

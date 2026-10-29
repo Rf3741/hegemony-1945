@@ -79,7 +79,11 @@ pub struct MundoJogo {
     pub tensao_mundial: f32,
     pub paises: BTreeMap<String, EstadoPais>,
     pub mercados: BTreeMap<String, Mercado>,
+    /// Dono (soberania) por PROVÍNCIA, herdado do estado em 1945.
     pub dono_por_provincia: HashMap<u32, String>,
+    /// Controlador (ocupante atual) por PROVÍNCIA; começa igual ao dono. A guerra ocupa província a província.
+    #[serde(default)]
+    pub controlador_por_provincia: HashMap<u32, String>,
     pub populacao_por_provincia: HashMap<u32, u64>,
     pub ticks_executados: u64,
 }
@@ -269,6 +273,7 @@ impl MundoJogo {
             tensao_mundial: 35.0,
             paises,
             mercados,
+            controlador_por_provincia: dono_por_provincia.clone(),
             dono_por_provincia,
             populacao_por_provincia,
             ticks_executados: 0,

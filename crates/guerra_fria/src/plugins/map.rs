@@ -33,6 +33,8 @@ pub struct DadosMapa {
 pub struct CoresMapa {
     pub cor_prov: Vec<[u8; 4]>,
     pub dono_prov: Vec<u32>,
+    /// Índice do ESTADO (região admin-1 pai) por id de província (0 = nenhum).
+    pub estado_prov: Vec<u32>,
 }
 
 /// Imagem (textura) do mapa exibida.
@@ -96,6 +98,8 @@ pub struct EntradaMapa {
     pub cor_prov: Vec<[u8; 4]>,
     /// Índice do dono por id de província (0 = sem dono).
     pub dono_prov: Vec<u32>,
+    /// Índice do estado por id de província (0 = nenhum).
+    pub estado_prov: Vec<u32>,
 }
 
 /// Resultado do processamento em segundo plano.
@@ -146,7 +150,7 @@ pub fn gerar_mapa(ent: &EntradaMapa) -> Result<SaidaMapa, String> {
         .map(|p| id_de_cor_provincia((p[0], p[1], p[2])).unwrap_or(0))
         .collect();
     relevo_para(w, h, Some(&ent.caminho_png));
-    let (pixels, caixas) = colorir(&ids, w, h, &ent.cor_prov, &ent.dono_prov);
+    let (pixels, caixas) = colorir(&ids, w, h, &ent.cor_prov, &ent.dono_prov, &ent.estado_prov);
     Ok(SaidaMapa { largura: w, altura: h, ids, pixels, caixas })
 }
 
@@ -157,10 +161,12 @@ pub fn colorir(
     h: u32,
     cor_prov: &[[u8; 4]],
     dono_prov: &[u32],
+    estado_prov: &[u32],
 ) -> (Vec<u8>, Vec<Option<[u32; 4]>>) {
     let (wu, hu) = (w as usize, h as usize);
     let dono = |id: u32| dono_prov.get(id as usize).copied().unwrap_or(0);
     let relevo = RELEVO.get().and_then(|r| r.as_deref()).filter(|v| v.len() == wu * hu);
+    let estado = |id: u32| estado_prov.get(id as usize).copied().unwrap_or(0);
     let mut caixas: Vec<Option<[u32; 4]>> = vec![None; cor_prov.len()];
     let mut dados = vec![0u8; wu * hu * 4];
     let mut borda = vec![0u8; wu * hu];
@@ -209,13 +215,14 @@ pub fn colorir(
             }
             {
                 // Vizinhos à direita (com wrap horizontal) e abaixo; marca os DOIS lados da borda
-                // (país = 2, província = 1) para a fronteira ficar com 2 px de espessura.
+                // (país = 3, estado = 2, província = 1) para a fronteira ficar com 2 px de espessura.
                 for (nx, ny) in [((x + 1) % wu, y), (x, y + 1)] {
                     if ny < hu {
                         let ni = ny * wu + nx;
                         let v = ids[ni];
                         if v != id {
-                            let tipo = if v == 0 || dono(v) != dono(id) { 2 } else { 1 };
+                            // 3 = país, 2 = estado, 1 = província
+                            let tipo = if v == 0 || dono(v) != dono(id) { 3 } else if estado(v) != estado(id) { 2 } else { 1 };
                             borda[i] = borda[i].max(tipo);
                             borda[ni] = borda[ni].max(tipo);
                         }
@@ -247,22 +254,24 @@ fn aplicar_bordas(dados: &mut [u8], borda: &[u8], ids: &[u32], w: usize, h: usiz
     // Anel de brilho: 1 = adjacente à fronteira de país, 2 = a duas casas.
     let mut anel = vec![0u8; w * h];
     for i in 0..w * h {
-        if borda[i] != 2 && ids[i] != 0 && viz(i).iter().flatten().any(|&n| borda[n] == 2) {
+        if borda[i] != 3 && ids[i] != 0 && viz(i).iter().flatten().any(|&n| borda[n] == 3) {
             anel[i] = 1;
         }
     }
     for i in 0..w * h {
-        if borda[i] != 2 && anel[i] == 0 && ids[i] != 0 && viz(i).iter().flatten().any(|&n| anel[n] == 1) {
+        if borda[i] != 3 && anel[i] == 0 && ids[i] != 0 && viz(i).iter().flatten().any(|&n| anel[n] == 1) {
             anel[i] = 2;
         }
     }
     for i in 0..w * h {
         let px = &mut dados[i * 4..i * 4 + 4];
-        if borda[i] == 2 {
+        if borda[i] == 3 {
             px.copy_from_slice(&COR_FRONTEIRA_PAIS);
-        } else if borda[i] == 1 {
+        } else if borda[i] > 0 {
+            // estado: marcada; província: bem sutil
+            let f = if borda[i] == 2 { 0.72 } else { 0.92 };
             for c in px.iter_mut().take(3) {
-                *c = (*c as f32 * 0.90) as u8;
+                *c = (*c as f32 * f) as u8;
             }
         } else if anel[i] > 0 {
             let f = if anel[i] == 1 { 0.10 } else { 0.04 };
@@ -293,8 +302,12 @@ fn iniciar_carga(mut commands: Commands, raiz: Res<RaizProjeto>, catalogo: Res<R
     let max_id = catalogo.0.provincias.iter().map(|p| p.id).max().unwrap_or(0) as usize + 1;
     let mut cor_prov = vec![COR_OCEANO_RGBA; max_id];
     let mut dono_prov = vec![0u32; max_id];
+    let mut estado_prov = vec![0u32; max_id];
+    let mut estados_idx: std::collections::HashMap<&str, u32> = std::collections::HashMap::new();
     let mut indices: std::collections::HashMap<&str, u32> = std::collections::HashMap::new();
     for prov in &catalogo.0.provincias {
+        let n_est = estados_idx.len() as u32 + 1;
+        estado_prov[prov.id as usize] = *estados_idx.entry(prov.adm1_code.as_str()).or_insert(n_est);
         if let Some(tag) = mundo.dono_por_provincia.get(&prov.id)
             && let Some(pais) = mundo.paises.get(tag)
         {
@@ -303,8 +316,8 @@ fn iniciar_carga(mut commands: Commands, raiz: Res<RaizProjeto>, catalogo: Res<R
             dono_prov[prov.id as usize] = *indices.entry(tag.as_str()).or_insert(n);
         }
     }
-    commands.insert_resource(CoresMapa { cor_prov: cor_prov.clone(), dono_prov: dono_prov.clone() });
-    let entrada = EntradaMapa { caminho_png: raiz.0.join("assets/map/provinces.png"), cor_prov, dono_prov };
+    commands.insert_resource(CoresMapa { cor_prov: cor_prov.clone(), dono_prov: dono_prov.clone(), estado_prov: estado_prov.clone() });
+    let entrada = EntradaMapa { caminho_png: raiz.0.join("assets/map/provinces.png"), cor_prov, dono_prov, estado_prov };
     let tarefa = AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move { gerar_mapa(&entrada) });
     commands.insert_resource(TarefaMapa(tarefa));
 }
@@ -493,7 +506,7 @@ mod testes {
         let ids = [1, 1, 2, 0, 1, 1, 2, 0];
         let cor = [COR_OCEANO_RGBA, [200, 0, 0, 255], [0, 200, 0, 255]];
         let dono = [0, 1, 2];
-        let (px, caixas) = colorir(&ids, 4, 2, &cor, &dono);
+        let (px, caixas) = colorir(&ids, 4, 2, &cor, &dono, &[0, 1, 2]);
         assert_eq!(caixas[1], Some([0, 0, 1, 1]));
         assert_eq!(caixas[2], Some([2, 0, 2, 1]));
         // pixel (1,0) tem vizinho de outro país à direita: borda escura.
@@ -502,6 +515,29 @@ mod testes {
         assert_eq!(&px[8..12], &[15, 15, 15, 255]);
         // pixel (0,0): com o wrap horizontal encosta no oceano (pixel 3), então também é fronteira.
         assert_eq!(&px[0..4], &[15, 15, 15, 255]);
+    }
+
+    #[test]
+    fn gerar_mapa_real_com_provincias_e_tempo() {
+        let raiz = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let cat: CatalogoProvincias =
+            ron::from_str(&std::fs::read_to_string(raiz.join("assets/map/provinces.ron")).unwrap()).unwrap();
+        let n = cat.provincias.len() + 1;
+        let cor_prov = vec![[100, 100, 100, 255]; n];
+        // estado por província: índice do adm1; dono: tudo igual (só bordas de província/estado)
+        let mut idx = std::collections::HashMap::new();
+        let mut estado_prov = vec![0u32; n];
+        for p in &cat.provincias {
+            let k = idx.len() as u32 + 1;
+            estado_prov[p.id as usize] = *idx.entry(p.adm1_code.clone()).or_insert(k);
+        }
+        let ent = EntradaMapa { caminho_png: raiz.join("assets/map/provinces.png"), cor_prov, dono_prov: vec![1; n], estado_prov };
+        let t = std::time::Instant::now();
+        let s = gerar_mapa(&ent).unwrap();
+        eprintln!("gerar_mapa: {:?}", t.elapsed());
+        assert_eq!(s.pixels.len(), (s.largura * s.altura * 4) as usize);
+        let com_caixa = s.caixas.iter().flatten().count();
+        assert!(com_caixa > 6000, "{com_caixa}");
     }
 
     #[test]

@@ -82,6 +82,7 @@ pub fn sincronizar_dados_construcoes_sistema(
             cat.0
                 .provincias
                 .iter()
+                .rev() // a 1ª província de cada estado (a do centroide original) prevalece
                 .map(|p| (p.adm1_code.clone(), p.centroide))
                 .collect()
         })

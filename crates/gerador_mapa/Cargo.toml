@@ -2,6 +2,7 @@
 name = "gerador_mapa"
 version.workspace = true
 edition.workspace = true
+default-run = "gerador_mapa"
 license.workspace = true
 description = "Pipeline de geração de províncias e cenário histórico de 1945 a partir do Natural Earth 10m"
 

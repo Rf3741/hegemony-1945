@@ -3096,6 +3096,7 @@ dependencies = [
 name = "gf_mapa"
 version = "0.1.0"
 dependencies = [
+ "image",
  "ron",
  "serde",
  "thiserror 2.0.21",
