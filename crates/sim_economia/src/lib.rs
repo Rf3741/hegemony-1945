@@ -40,6 +40,7 @@ pub use gerador::{ParametrosEscalaMundial, gerar_cenario_escala_mundial};
 pub use motor::consumo::calcular_fatias_substituicao;
 pub use motor::demografia::taxa_crescimento_anual_pop;
 pub use motor::mercado::{atualizar_precos_mercado_isolado, calcular_preco_alvo};
+pub use motor::producao::atualizar_infraestrutura_estados;
 pub use motor::global::{ConfigMercadoGlobal, MercadoGlobal};
 pub use motor::governo::{
     estado_comporta_novo_nivel, estado_niveis_recurso, materiais_por_ponto,

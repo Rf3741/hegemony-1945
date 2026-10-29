@@ -44,6 +44,12 @@ struct CidadeTerritorioRon {
     pais_tag: String,
     #[serde(default)]
     eh_capital_estado: bool,
+    #[serde(default)]
+    eh_porto: bool,
+    #[serde(default)]
+    ano_fundacao: Option<u16>,
+    #[serde(default)]
+    mudancas_nome: Vec<(u16, String)>,
 }
 
 /// Carrega as coordenadas (longitude, latitude) dos centroides das províncias a partir de `provinces.ron`.
@@ -77,6 +83,9 @@ pub fn carregar_cidades_cenario(caminho: &Path) -> Vec<CidadeDemograficaEntrada>
                     eh_capital: c.eh_capital_estado,
                     posicao: (c.longitude, c.latitude),
                     bloco: Some(BlocoVisual::de_pais(&c.pais_tag)),
+                    ano_fundacao: c.ano_fundacao,
+                    mudancas_nome: c.mudancas_nome,
+                    eh_porto: c.eh_porto,
                 });
             }
         }

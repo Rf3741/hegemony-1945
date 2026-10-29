@@ -495,6 +495,17 @@
         metodos_padrao: ["ferrovia_locomotivas_vapor", "propriedade_privada"],
     ),
     (
+        id: "rodovia",
+        nome: "Rede Rodoviária e Pavimentação",
+        categoria: Infraestrutura,
+        custo_pontos_construcao: 150.0,
+        usa_terra_aravel: false,
+        recurso_natural_requerido: None,
+        financiado_pelo_governo: false,
+        metodos_permitidos: ["rodovia_asfalto", "rodovia_macadame", "propriedade_privada", "propriedade_estatal", "propriedade_cooperativa"],
+        metodos_padrao: ["rodovia_asfalto", "propriedade_privada"],
+    ),
+    (
         id: "porto_comercial",
         nome: "Porto Marítimo Comercial e Cais de Cabotagem",
         categoria: Infraestrutura,

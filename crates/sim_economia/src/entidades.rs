@@ -30,6 +30,10 @@ const fn infra_padrao() -> f64 {
     25.0
 }
 
+fn padrao_terreno() -> String {
+    "planicie".to_string()
+}
+
 const fn pontos_construcao_base_padrao() -> f64 {
     10.0
 }
@@ -380,6 +384,40 @@ pub struct Estado {
     #[serde(default = "padrao_um")]
     pub acesso_mercado: f64,
 
+    /// Capacidade total de infraestrutura operacional do estado (Victoria 3).
+    #[serde(default)]
+    pub infraestrutura_capacidade: f64,
+    /// Uso total de infraestrutura consumido por todos os níveis de prédios produtivos.
+    #[serde(default)]
+    pub infraestrutura_uso: f64,
+    /// Penalidade de infraestrutura / debuff sobre a produtividade quando uso > capacidade (0.0 a 0.95).
+    #[serde(default)]
+    pub penalidade_infraestrutura: f64,
+    /// Terreno predominante do estado (ex.: "planicie", "montanhas", "colinas", "selva", "deserto", "floresta", "pantano", "tundra").
+    #[serde(default = "padrao_terreno")]
+    pub terreno: String,
+    /// Indica se o estado tem litoral marítimo (habilita portos comerciais e escoamento naval).
+    #[serde(default)]
+    pub eh_costeiro: bool,
+    /// Nível de urbanização do estado (pontos gerados por população urbana e prédios industriais/cívicos).
+    #[serde(default)]
+    pub urbanizacao: f64,
+    /// Parcela da capacidade oriunda de prédios de ferrovia (`rede_ferroviaria`).
+    #[serde(default)]
+    pub infraestrutura_ferrovias: f64,
+    /// Parcela da capacidade oriunda de prédios rodoviários (`rodovia`).
+    #[serde(default)]
+    pub infraestrutura_rodovias: f64,
+    /// Parcela da capacidade oriunda de portos comerciais (`porto_comercial`).
+    #[serde(default)]
+    pub infraestrutura_portos: f64,
+    /// Parcela da capacidade oriunda do terreno e geografia base.
+    #[serde(default)]
+    pub infraestrutura_base_terreno: f64,
+    /// Parcela da capacidade oriunda da urbanização.
+    #[serde(default)]
+    pub infraestrutura_urbanizacao: f64,
+
     /// Limite agregado de terra arável do estado (capacidade total para fazendas e plantações).
     #[serde(default)]
     pub terra_aravel: u32,
@@ -402,6 +440,37 @@ pub struct Estado {
 }
 
 impl Estado {
+    /// Saldo líquido de capacidade de infraestrutura (positivo = folga, negativo = déficit/gargalo).
+    #[inline]
+    pub fn saldo_infraestrutura(&self) -> f64 {
+        self.infraestrutura_capacidade - self.infraestrutura_uso
+    }
+
+    /// Taxa de utilização da infraestrutura (0.0 a 1.0 = normal, > 1.0 = sobrecarga).
+    #[inline]
+    pub fn taxa_utilizacao_infraestrutura(&self) -> f64 {
+        if self.infraestrutura_capacidade <= 1e-6 {
+            if self.infraestrutura_uso > 0.0 { 2.0 } else { 0.0 }
+        } else {
+            self.infraestrutura_uso / self.infraestrutura_capacidade
+        }
+    }
+
+    /// Fator de modificação de relevo / terreno geográfico sobre a infraestrutura base.
+    #[inline]
+    pub fn modificador_terreno(&self) -> f64 {
+        match self.terreno.to_lowercase().as_str() {
+            "montanhas" | "montanha" => 0.50,
+            "colinas" | "colina" => 0.80,
+            "deserto" => 0.60,
+            "selva" | "floresta_tropical" | "selva_tropical" => 0.60,
+            "floresta" => 0.85,
+            "pantano" => 0.65,
+            "tundra" => 0.55,
+            _ => 1.00,
+        }
+    }
+
     /// Índices das províncias pertencentes a este estado no `MundoEconomico`.
     #[inline]
     pub fn provincias_indices(&self) -> &[usize] {
@@ -696,6 +765,12 @@ pub struct ItemConstrucao {
     /// Se `true`, financiado pelo fundo de investimento privado em vez do orçamento estatal direto.
     #[serde(default)]
     pub privado: bool,
+    /// Retorno ou lucro líquido diário estimado por nível do projeto (Victoria 3).
+    #[serde(default)]
+    pub retorno_esperado: f64,
+    /// Breve justificativa de mercado da decisão do setor privado.
+    #[serde(default)]
+    pub justificativa: String,
 
     #[serde(skip)]
     pub(crate) provincia_idx: usize,
@@ -729,6 +804,18 @@ pub struct Pais {
     /// Reserva acumulada pelo reinvestimento de capitalistas/aristocratas para construções privadas.
     #[serde(default)]
     pub fundo_investimento_privado: f64,
+    /// Aporte total diário recebido pelo fundo privado a partir de lucros/dividendos no último tick.
+    #[serde(default)]
+    pub aporte_fundo_privado_ultimo_tick: f64,
+    /// Despesa total diária do fundo privado com materiais de construção no último tick.
+    #[serde(default)]
+    pub gasto_fundo_privado_ultimo_tick: f64,
+    /// Pontos de construção efetivamente alocados ao setor privado no último tick.
+    #[serde(default)]
+    pub pontos_privados_ultimo_tick: f64,
+    /// Pontos de construção efetivamente alocados ao setor público/estatal no último tick.
+    #[serde(default)]
+    pub pontos_publicos_ultimo_tick: f64,
     #[serde(default)]
     pub burocracia_produzida: f64,
     #[serde(default)]
@@ -775,6 +862,42 @@ impl Pais {
     #[inline]
     pub fn estados_indices(&self) -> &[usize] {
         &self.estados_indices
+    }
+
+    /// Parcela teórica de pontos de construção dedicada ao setor privado segundo a lei econômica (0.0 a 1.0).
+    #[inline]
+    pub fn alocacao_privada_lei(&self) -> f64 {
+        match self.politica_fiscal.lei_sistema_economico_id.as_str() {
+            "laissez_faire" => 0.75,
+            "intervencionismo" | "economia_mista" | "extrativismo_colonial" => 0.50,
+            "tradicionalismo_agrario" => 0.25,
+            "planificacao_central" => 0.00,
+            _ => 0.50,
+        }
+    }
+
+    /// Parcela teórica de pontos de construção dedicada ao setor público/estatal (0.0 a 1.0).
+    #[inline]
+    pub fn alocacao_estatal_lei(&self) -> f64 {
+        1.0 - self.alocacao_privada_lei()
+    }
+
+    /// Indica se a lei do sistema econômico exige propriedade estatal e proíbe investimento privado autônomo.
+    #[inline]
+    pub fn exige_propriedade_estatal(&self) -> bool {
+        self.exige_propriedade_estatal_lei
+    }
+
+    /// Itera sobre todas as obras privadas ativas ou em espera na fila nacional.
+    #[inline]
+    pub fn obras_privadas(&self) -> impl Iterator<Item = &ItemConstrucao> {
+        self.fila_construcao.iter().filter(|i| i.privado)
+    }
+
+    /// Itera sobre todas as obras públicas/estatais na fila nacional.
+    #[inline]
+    pub fn obras_estatais(&self) -> impl Iterator<Item = &ItemConstrucao> {
+        self.fila_construcao.iter().filter(|i| !i.privado)
     }
 }
 

@@ -29,9 +29,12 @@ pub(crate) fn executar_producao_diaria(
     pontos_construcao_setores_pais.fill(0.0);
     pop_incorporada_pais.fill(0.0);
 
+    // 0. Recalcular a infraestrutura de todos os estados (Victoria 3)
+    atualizar_infraestrutura_estados(catalogo, estados, provincias);
+
     for (e_idx, est) in estados.iter().enumerate() {
-        infra_gerada_estado[e_idx] = est.infraestrutura_bonus;
-        infra_usada_estado[e_idx] = 0.0;
+        infra_gerada_estado[e_idx] = est.infraestrutura_capacidade;
+        infra_usada_estado[e_idx] = est.infraestrutura_uso;
     }
 
     // 1. Resetar acumuladores diários dos países e estimar utilização da fila de construção
@@ -47,6 +50,10 @@ pub(crate) fn executar_producao_diaria(
         pais.orcamento.gasto_subsidios = 0.0;
         pais.orcamento.gasto_juros = 0.0;
         pais.orcamento.saldo_diario = 0.0;
+        pais.aporte_fundo_privado_ultimo_tick = 0.0;
+        pais.gasto_fundo_privado_ultimo_tick = 0.0;
+        pais.pontos_privados_ultimo_tick = 0.0;
+        pais.pontos_publicos_ultimo_tick = 0.0;
 
         // Demanda por materiais das obras do tick anterior (cimento, aço, máquinas...)
         let off_obras = pais.mercado_idx * num_bens;
@@ -84,8 +91,6 @@ pub(crate) fn executar_producao_diaria(
         let acesso = estados[e_idx].acesso_mercado;
         let est_inc = estados[e_idx].incorporado;
         let offset_mercado = m_idx * num_bens;
-
-        infra_gerada_estado[e_idx] += prov.infraestrutura_base;
 
         let mut pop_prov = 0.0;
         let mut camponeses_ativos = 0.0;
@@ -138,15 +143,6 @@ pub(crate) fn executar_producao_diaria(
             let nivel_f = b.nivel as f64;
             let escala_inst = nivel_f * r_emp;
             let categoria = catalogo.tipos_predio[b.cache.tipo_idx].categoria;
-
-            infra_gerada_estado[e_idx] += escala_inst * b.cache.infraestrutura_por_nivel;
-            let peso_uso = match categoria {
-                CategoriaPredio::Industrial | CategoriaPredio::Extrativo => 1.5,
-                CategoriaPredio::RuralAgricola => 0.8,
-                CategoriaPredio::Infraestrutura => 0.1,
-                _ => 0.5,
-            };
-            infra_usada_estado[e_idx] += escala_inst * peso_uso;
 
             let mut fator_insumos = 1.0_f64;
             for &(g_in, _) in b.cache.insumos() {
@@ -202,14 +198,10 @@ pub(crate) fn executar_producao_diaria(
         prov.vagas_abertas_cache = vagas_abertas_prov;
     }
 
-    // 3. Consolidar acesso ao mercado por Estado (750 escalares)
+    // 3. Consolidar acesso ao mercado por Estado
     for (e_idx, est) in estados.iter_mut().enumerate() {
-        let usada = infra_usada_estado[e_idx];
-        est.acesso_mercado = if usada <= 1.0 {
-            1.0
-        } else {
-            (infra_gerada_estado[e_idx] / usada).clamp(0.40, 1.0)
-        };
+        infra_gerada_estado[e_idx] = est.infraestrutura_capacidade;
+        infra_usada_estado[e_idx] = est.infraestrutura_uso;
     }
 
     // 4. Consolidar eficiência de arrecadação por País (150 escalares)
@@ -265,4 +257,147 @@ fn estado_tem_insumo_local(estado: &Estado, bem_id: &str) -> bool {
         _ => return false,
     };
     estado.limite_recurso(rec) > 0
+}
+
+/// Recalcula e consolida a capacidade, uso, penalidade e acesso ao mercado de todos os `Estado`s (estilo Victoria 3).
+///
+/// Componentes da Capacidade:
+/// 1. Base do terreno físico: `20.0 * modificador_terreno() + (se costeiro 5.0) + infraestrutura_bonus`
+/// 2. Urbanização: `(urbanizacao * 0.10).min(40.0)`, oriunda de população urbana e prédios industriais/cívicos
+/// 3. Ferrovias (`rede_ferroviaria`): infraestrutura por nível ponderada pelo emprego operacional
+/// 4. Rodovias (`rodovia`): infraestrutura por nível ponderada pelo emprego operacional
+/// 5. Portos comerciais (`porto_comercial`): infraestrutura por nível ponderada pelo emprego (apenas estados costeiros)
+///
+/// Componentes do Uso:
+/// - Cada nível de prédio produtivo consome infraestrutura:
+///   - Industrial: 2.0 por nível
+///   - Extrativo: 2.0 por nível
+///   - Rural / Agrícola: 1.0 por nível
+///   - Governamental / Militar / Construção: 1.0 por nível
+///   - Prédios de infraestrutura: 0.0
+///
+/// Debuff / Penalidade de Produtividade:
+/// - Se uso <= capacidade: acesso = 1.0, penalidade = 0.0 (sem debuff)
+/// - Se uso > capacidade: acesso = (capacidade / uso).clamp(0.05, 1.0)
+///                        penalidade = 1.0 - acesso
+pub fn atualizar_infraestrutura_estados(
+    catalogo: &CatalogoEconomia,
+    estados: &mut [Estado],
+    provincias: &[Provincia],
+) {
+    for est in estados.iter_mut() {
+        est.infraestrutura_ferrovias = 0.0;
+        est.infraestrutura_rodovias = 0.0;
+        est.infraestrutura_portos = 0.0;
+        est.urbanizacao = 0.0;
+        est.infraestrutura_urbanizacao = 0.0;
+        est.infraestrutura_uso = 0.0;
+
+        let base_terreno = 20.0 * est.modificador_terreno()
+            + if est.eh_costeiro { 5.0 } else { 0.0 }
+            + est.infraestrutura_bonus;
+        est.infraestrutura_base_terreno = base_terreno;
+    }
+
+    for prov in provincias {
+        let e_idx = prov.estado_idx;
+        if e_idx >= estados.len() {
+            continue;
+        }
+
+        // Urbanização demográfica (populações urbanas não-subsistência)
+        let mut pop_urbana = 0.0;
+        for pop in &prov.pops {
+            if let Some(tp) = catalogo.tipos_pop.get(pop.tipo_idx) {
+                if !tp.subsistencia {
+                    pop_urbana += pop.populacao;
+                }
+            }
+        }
+        estados[e_idx].urbanizacao += pop_urbana / 25_000.0;
+
+        // Prédios formais
+        for b in &prov.predios {
+            if b.nivel == 0 {
+                continue;
+            }
+            let vagas_totais = b.total_vagas();
+            let emp_totais = b.total_empregados();
+            let r_emp = if vagas_totais <= 0.0 {
+                1.0
+            } else {
+                (emp_totais / vagas_totais).clamp(0.0, 1.0)
+            };
+            if r_emp <= 1e-7 {
+                continue;
+            }
+
+            let escala_inst = (b.nivel as f64) * r_emp;
+            let def = &catalogo.tipos_predio[b.cache.tipo_idx];
+            let categoria = def.categoria;
+
+            // Urbanização vinda da malha construída
+            match categoria {
+                CategoriaPredio::Industrial
+                | CategoriaPredio::Governamental
+                | CategoriaPredio::Construcao => {
+                    estados[e_idx].urbanizacao += 2.0 * (b.nivel as f64);
+                }
+                CategoriaPredio::Extrativo => {
+                    estados[e_idx].urbanizacao += 1.0 * (b.nivel as f64);
+                }
+                CategoriaPredio::RuralAgricola => {
+                    estados[e_idx].urbanizacao += 0.5 * (b.nivel as f64);
+                }
+                _ => {}
+            }
+
+            // Geração de capacidade por modais de infraestrutura
+            let infra_gerada = escala_inst * b.cache.infraestrutura_por_nivel;
+            if def.id == "rede_ferroviaria" {
+                estados[e_idx].infraestrutura_ferrovias += infra_gerada;
+            } else if def.id == "rodovia" {
+                estados[e_idx].infraestrutura_rodovias += infra_gerada;
+            } else if def.id == "porto_comercial" {
+                if estados[e_idx].eh_costeiro {
+                    estados[e_idx].infraestrutura_portos += infra_gerada;
+                }
+            } else if categoria == CategoriaPredio::Infraestrutura {
+                // Outro prédio categorizado como infraestrutura (ex.: central telecom)
+                estados[e_idx].infraestrutura_base_terreno += infra_gerada;
+            }
+
+            // Consumo de infraestrutura por nível de prédio produtivo
+            let peso_uso = match categoria {
+                CategoriaPredio::Industrial | CategoriaPredio::Extrativo => 2.0,
+                CategoriaPredio::RuralAgricola => 1.0,
+                CategoriaPredio::Governamental
+                | CategoriaPredio::Militar
+                | CategoriaPredio::Construcao => 1.0,
+                CategoriaPredio::Infraestrutura => 0.0,
+            };
+            estados[e_idx].infraestrutura_uso += escala_inst * peso_uso;
+        }
+    }
+
+    // Consolidação final de capacidade, urbanização, acesso ao mercado e penalidade
+    for est in estados.iter_mut() {
+        est.infraestrutura_urbanizacao = (est.urbanizacao * 0.10).min(40.0);
+        est.infraestrutura_capacidade = est.infraestrutura_base_terreno
+            + est.infraestrutura_urbanizacao
+            + est.infraestrutura_ferrovias
+            + est.infraestrutura_rodovias
+            + est.infraestrutura_portos;
+
+        if est.infraestrutura_uso <= est.infraestrutura_capacidade || est.infraestrutura_uso <= 1.0 {
+            est.acesso_mercado = 1.0;
+            est.penalidade_infraestrutura = 0.0;
+        } else {
+            let cap = est.infraestrutura_capacidade.max(0.0);
+            let uso = est.infraestrutura_uso;
+            let acesso = (cap / uso).clamp(0.05, 1.0);
+            est.acesso_mercado = acesso;
+            est.penalidade_infraestrutura = 1.0 - acesso;
+        }
+    }
 }

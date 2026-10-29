@@ -371,6 +371,7 @@ impl MundoEconomico {
             reconciliar_empregados_provincia(prov, &mut scratch_emp, &mut scratch_pop);
         }
         governo::atualizar_terra_aravel_estados(&mut cenario.estados, &cenario.provincias);
+        producao::atualizar_infraestrutura_estados(&catalogo, &mut cenario.estados, &cenario.provincias);
 
         // 5. Validar filas de construção iniciais dos países
         for pais in &mut cenario.paises {
@@ -725,6 +726,7 @@ impl MundoEconomico {
             &self.catalogo,
             &self.config,
             &self.mercados,
+            &self.estados,
             &mut self.paises,
             &mut self.provincias,
             self.dias_decorridos,
@@ -905,6 +907,7 @@ impl MundoEconomico {
             &self.catalogo,
             &self.config,
             &self.mercados,
+            &self.estados,
             &mut self.paises,
             &mut self.provincias,
             self.dias_decorridos,
@@ -1019,6 +1022,8 @@ impl MundoEconomico {
             progresso_pontos: 0.0,
             custo_total_pontos: def.custo_pontos_construcao,
             privado,
+            retorno_esperado: 0.0,
+            justificativa: String::new(),
             provincia_idx: p_idx,
             tipo_predio_idx: tp_idx,
         });
@@ -1431,6 +1436,26 @@ impl MundoEconomico {
         Ok(bloco.comecon_ativo)
     }
 
+    /// Verifica se um país possui ao menos um porto comercial ativo (nível > 0).
+    /// Caso o catálogo não defina o tipo de prédio "porto_comercial" (ex.: fixtures de teste mínimas),
+    /// retorna `true` para manter compatibilidade.
+    pub fn pais_tem_porto_ativo(&self, pais_id: &str) -> bool {
+        let Some(&c_idx) = self.indice_paises.get(pais_id) else { return false };
+        let Some(&porto_idx) = self.catalogo.indice_tipos_predio.get("porto_comercial") else {
+            return true;
+        };
+        for &p_idx in &self.paises[c_idx].provincias_indices {
+            if let Some(prov) = self.provincias.get(p_idx) {
+                for b in &prov.predios {
+                    if b.cache.tipo_idx == porto_idx && b.nivel > 0 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Cria uma nova rota de importação ou exportação para um determinado bem e parceiro comercial.
     pub fn criar_rota_comercial(
         &mut self,
@@ -1445,6 +1470,13 @@ impl MundoEconomico {
                 entidade: "RotaComercial",
                 id: pais_id.into(),
                 detalhe: "não é possível criar rota comercial com o próprio país".into(),
+            });
+        }
+        if !self.pais_tem_porto_ativo(pais_id) {
+            return Err(ErroEconomia::ValorInvalido {
+                entidade: "RotaComercial",
+                id: format!("{pais_id}_{parceiro_pais_id}"),
+                detalhe: "Comércio marítimo requer ao menos um porto comercial ativo no país operador.".into(),
             });
         }
         let idx_p = *self.indice_paises.get(pais_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
@@ -1743,6 +1775,7 @@ impl MundoEconomico {
     /// Lista todos os outros países disponíveis como parceiros comerciais com suas permissões.
     pub fn opcoes_parceiros_pais(&self, pais_id: &str) -> Vec<OpcaoParceiroComercial> {
         let bloco_p = self.bloco_do_pais(pais_id);
+        let tem_porto_operador = self.pais_tem_porto_ativo(pais_id);
         let mut opcoes = Vec::new();
 
         for p in &self.paises {
@@ -1759,7 +1792,9 @@ impl MundoEconomico {
             let p_fechado = bloco_p.map_or(false, |b| b.fechado && !mesmo_bloco);
             let outro_fechado = bloco_outro.map_or(false, |b| b.fechado && !mesmo_bloco);
 
-            let (permitido, razao) = if (p_fechado || outro_fechado) && !tem_acordo {
+            let (permitido, razao) = if !tem_porto_operador {
+                (false, Some("Comércio marítimo bloqueado: país requer ao menos um porto comercial ativo".into()))
+            } else if (p_fechado || outro_fechado) && !tem_acordo {
                 (false, Some("País em bloco fechado: requer acordo comercial prévio".into()))
             } else {
                 (true, None)

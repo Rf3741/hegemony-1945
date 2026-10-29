@@ -357,6 +357,10 @@ fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPai
                 ui.colored_label(egui::Color32::LIGHT_RED, "País em calote (dívida no limite de crédito)!");
             }
         });
+        ui.horizontal(|ui| {
+            ui.colored_label(egui::Color32::from_rgb(120, 200, 255), format!("💼 Fundo de Investimento Privado: {}", fmt_din(pais.fundo_investimento_privado)));
+            ui.label(format!("(+{}/d aportes, -{}/d obras)", fmt_din(pais.aporte_fundo_privado_ultimo_tick), fmt_din(pais.gasto_fundo_privado_ultimo_tick)));
+        });
         let pf = &pais.politica_fiscal;
         ui.horizontal_wrapped(|ui| {
             ui.label(format!("Imposto de renda: {:.0}% / {:.0}% / {:.0}% (baixo/médio/alto), dividendos {:.0}%", pf.aliquota_imposto_renda_baixo * 100.0, pf.aliquota_imposto_renda_medio * 100.0, pf.aliquota_imposto_renda_alto * 100.0, pf.aliquota_imposto_dividendos * 100.0));
@@ -760,13 +764,24 @@ pub fn aba_construcao(
         // =========================================================================
         // 1. BANNER DE RESUMO NACIONAL & ALERTA DE PREJUÍZO
         // =========================================================================
+        let cota_priv = pais.alocacao_privada_lei();
+        let cota_est = pais.alocacao_estatal_lei();
+        let lei_nome = pais.politica_fiscal.lei_sistema_economico_id.replace('_', " ");
+
         ui.heading("Construção & Prédios (Estilo Victoria 3)");
         ui.horizontal_wrapped(|ui| {
             ui.label(format!("Capacidade de Construção: {:.0} pts/dia (máx. 25 pts/obra)", v.pontos_construcao_dia));
             ui.separator();
-            ui.label(format!("Gasto diário com materiais: {}", fmt_din(pais.orcamento.gasto_obras_materiais)));
+            ui.label(format!(
+                "Alocação da Lei: {:.0}% Estatal ({:.1} pts/d) | {:.0}% Privado ({:.1} pts/d) [{}]",
+                cota_est * 100.0,
+                v.pontos_construcao_dia * cota_est,
+                cota_priv * 100.0,
+                v.pontos_construcao_dia * cota_priv,
+                lei_nome
+            ));
             ui.separator();
-            ui.label(format!("Setor estatal: {}", fmt_din(pais.orcamento.gasto_construcao)));
+            ui.label(format!("Gasto estatal com materiais: {}", fmt_din(pais.orcamento.gasto_obras_materiais)));
         });
 
         if predios_com_prejuizo > 0 {
@@ -792,32 +807,36 @@ pub fn aba_construcao(
         ui.separator();
 
         // =========================================================================
-        // 2. FILA DE CONSTRUÇÃO COM REORDENAÇÃO, PROGRESSO E TEMPO ESTIMADO
+        // 2A. FILA DE OBRAS PÚBLICAS / ESTATAIS (DECISÃO DO GOVERNO)
         // =========================================================================
-        let n_fila = pais.fila_construcao.len();
+        let obras_estatais: Vec<(usize, &sim_economia::ItemConstrucao)> = pais
+            .fila_construcao
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| !item.privado)
+            .collect();
+        let n_estatais = obras_estatais.len();
+
         ui.horizontal(|ui| {
-            ui.heading(format!("Fila de Construção ({n_fila})"));
-            if n_fila > 0 {
-                ui.label(format!("Capacidade total disponível: {:.0} pts/dia", v.pontos_construcao_dia));
-            }
+            ui.heading(format!("🏛 Obras Públicas e Estatais ({n_estatais})"));
+            ui.label(format!("Cota reservada: {:.1} pts/dia | Financiamento: Orçamento Público", v.pontos_construcao_dia * cota_est));
         });
 
-        if pais.fila_construcao.is_empty() {
-            ui.label("A fila nacional de obras está vazia. Escolha um prédio e um estado abaixo para iniciar um projeto.");
+        if n_estatais == 0 {
+            ui.label("A fila estatal está vazia. Escolha um prédio e um estado abaixo no planejador para encomendar uma obra pública.");
         } else {
-            let pts_disponiveis = v.pontos_construcao_dia.max(1.0);
+            let pts_est_disponiveis = (v.pontos_construcao_dia * cota_est).max(1.0);
             let max_por_obra = 25.0f64;
-            let mut pts_restantes_hoje = pts_disponiveis;
+            let mut pts_restantes_hoje = pts_est_disponiveis;
             let mut dias_acumulados = 0.0f64;
 
-            egui::Grid::new("grid_fila_construcao")
+            egui::Grid::new("grid_fila_estatal")
                 .striped(true)
                 .min_col_width(50.0)
                 .show(ui, |ui| {
                     ui.strong("#");
                     ui.strong("Prédio");
                     ui.strong("Localização");
-                    ui.strong("Setor");
                     ui.strong("Progresso");
                     ui.strong("Ritmo");
                     ui.strong("Tempo Estimado");
@@ -825,7 +844,7 @@ pub fn aba_construcao(
                     ui.strong("Ação");
                     ui.end_row();
 
-                    for (i, item) in pais.fila_construcao.iter().enumerate() {
+                    for (pos_ordem, &(idx_original, item)) in obras_estatais.iter().enumerate() {
                         let nome_t = cat.tipos_predio.iter().find(|t| t.id == item.tipo_predio_id)
                             .map_or(item.tipo_predio_id.as_str(), |t| t.nome.as_str());
                         let prov = v.provincias.iter().find(|p| p.id == item.provincia_id);
@@ -836,12 +855,10 @@ pub fn aba_construcao(
                         let frac = (item.progresso_pontos / item.custo_total_pontos.max(1.0)).clamp(0.0, 1.0) as f32;
                         let falta = (item.custo_total_pontos - item.progresso_pontos).max(0.0);
 
-                        // Alocação diária deste item no tick atual
                         let alocacao_hoje = (pts_restantes_hoje.min(max_por_obra)).min(falta);
                         pts_restantes_hoje = (pts_restantes_hoje - alocacao_hoje).max(0.0);
 
-                        // Tempo estimado
-                        let dias_desta_obra = falta / max_por_obra.min(pts_disponiveis);
+                        let dias_desta_obra = falta / max_por_obra.min(pts_est_disponiveis);
                         let dias_conclusao = if alocacao_hoje > 0.0 {
                             dias_desta_obra
                         } else {
@@ -850,7 +867,7 @@ pub fn aba_construcao(
                         dias_acumulados += dias_desta_obra;
 
                         // #
-                        ui.label(format!("{}", i + 1));
+                        ui.label(format!("{}", pos_ordem + 1));
 
                         // Prédio
                         ui.horizontal(|ui| {
@@ -861,13 +878,6 @@ pub fn aba_construcao(
                         // Localização
                         ui.label(if nome_e.is_empty() { nome_p.to_string() } else { format!("{nome_p} ({nome_e})") });
 
-                        // Setor
-                        if item.privado {
-                            ui.colored_label(egui::Color32::from_rgb(120, 180, 240), "💼 Privado");
-                        } else {
-                            ui.colored_label(egui::Color32::from_rgb(240, 200, 100), "🏛 Público");
-                        }
-
                         // Progresso
                         ui.add(
                             egui::ProgressBar::new(frac)
@@ -876,7 +886,9 @@ pub fn aba_construcao(
                         );
 
                         // Ritmo
-                        if alocacao_hoje > 0.0 {
+                        if pais.orcamento.em_calote {
+                            ui.colored_label(egui::Color32::LIGHT_RED, "Paralisado (Calote)");
+                        } else if alocacao_hoje > 0.0 {
                             ui.colored_label(egui::Color32::LIGHT_GREEN, format!("{alocacao_hoje:.1} pts/d"));
                         } else {
                             ui.colored_label(egui::Color32::GRAY, "Aguardando");
@@ -889,28 +901,123 @@ pub fn aba_construcao(
                             ui.label(format!("~{dias_conclusao:.0} d (em fila)"));
                         }
 
-                        // Reordenação
+                        // Reordenação na fila do país
                         ui.horizontal(|ui| {
-                            if ui.add_enabled(i > 0, egui::Button::new("⤒")).on_hover_text("Mover para o topo da fila").clicked() {
-                                cmds.push(Comando::MoverObra { de: i, para: 0 });
+                            if ui.add_enabled(pos_ordem > 0, egui::Button::new("⤒")).on_hover_text("Mover para o topo").clicked() {
+                                cmds.push(Comando::MoverObra { de: idx_original, para: 0 });
                             }
-                            if ui.add_enabled(i > 0, egui::Button::new("⬆")).on_hover_text("Subir 1 posição").clicked() {
-                                cmds.push(Comando::MoverObra { de: i, para: i - 1 });
+                            if ui.add_enabled(pos_ordem > 0, egui::Button::new("⬆")).on_hover_text("Subir 1 posição").clicked() {
+                                cmds.push(Comando::MoverObra { de: idx_original, para: idx_original.saturating_sub(1) });
                             }
-                            if ui.add_enabled(i + 1 < n_fila, egui::Button::new("⬇")).on_hover_text("Descer 1 posição").clicked() {
-                                cmds.push(Comando::MoverObra { de: i, para: i + 1 });
+                            if ui.add_enabled(pos_ordem + 1 < n_estatais, egui::Button::new("⬇")).on_hover_text("Descer 1 posição").clicked() {
+                                cmds.push(Comando::MoverObra { de: idx_original, para: (idx_original + 1).min(pais.fila_construcao.len().saturating_sub(1)) });
                             }
                         });
 
-                        // Ação
-                        if ui.button("❌").on_hover_text("Cancelar esta obra").clicked() {
-                            cmds.push(Comando::CancelarObra(i));
+                        // Ação (Cancelar obra pública)
+                        if ui.button("❌").on_hover_text("Cancelar esta obra pública").clicked() {
+                            cmds.push(Comando::CancelarObra(idx_original));
                         }
 
                         ui.end_row();
                     }
                 });
         }
+        ui.add_space(8.0);
+
+        // =========================================================================
+        // 2B. SETOR PRIVADO: FUNDO DE INVESTIMENTO E OBRAS AUTÔNOMAS (VICTORIA 3)
+        // =========================================================================
+        egui::Frame::new()
+            .fill(egui::Color32::from_rgba_unmultiplied(22, 32, 48, 220))
+            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(70, 130, 200)))
+            .inner_margin(10.0)
+            .corner_radius(6.0)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.heading("💼 Setor Privado: Fundo de Investimento & Obras Autônomas");
+                    ui.label(format!("Cota por Lei: {:.0}% ({:.1} pts/dia)", cota_priv * 100.0, v.pontos_construcao_dia * cota_priv));
+                });
+
+                ui.horizontal_wrapped(|ui| {
+                    ui.colored_label(egui::Color32::from_rgb(100, 205, 255), format!("💰 Fundo Acumulado: {}", fmt_din(pais.fundo_investimento_privado)));
+                    ui.separator();
+                    ui.colored_label(egui::Color32::LIGHT_GREEN, format!("📥 Aportes de Dividendos: +{}/dia", fmt_din(pais.aporte_fundo_privado_ultimo_tick)));
+                    ui.separator();
+                    ui.colored_label(egui::Color32::from_rgb(255, 185, 110), format!("📤 Custo Materiais Privados: -{}/dia", fmt_din(pais.gasto_fundo_privado_ultimo_tick)));
+                    ui.separator();
+                    ui.colored_label(egui::Color32::WHITE, format!("⚡ Ritmo: {:.1} pts/dia alocados", pais.pontos_privados_ultimo_tick));
+                });
+                ui.add_space(6.0);
+
+                let obras_privadas: Vec<&sim_economia::ItemConstrucao> = pais
+                    .fila_construcao
+                    .iter()
+                    .filter(|item| item.privado)
+                    .collect();
+
+                if obras_privadas.is_empty() {
+                    if pais.exige_propriedade_estatal() {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(255, 150, 150),
+                            "🏛 Economia Centralmente Planificada (Gosplan): O setor privado está desativado. 100% dos lucros e investimentos são estatais.",
+                        );
+                    } else {
+                        ui.label("Nenhuma obra privada em andamento no momento. Capitalistas e aristocratas acumulam reservas no Fundo e iniciam novas obras pelo retorno esperado, respeitando o potencial regional e a infraestrutura.");
+                    }
+                } else {
+                    egui::Grid::new("grid_fila_privada")
+                        .striped(true)
+                        .min_col_width(50.0)
+                        .show(ui, |ui| {
+                            ui.strong("#");
+                            ui.strong("Prédio");
+                            ui.strong("Localização");
+                            ui.strong("Progresso");
+                            ui.strong("Ritmo");
+                            ui.strong("Retorno Esperado");
+                            ui.strong("Financiamento");
+                            ui.end_row();
+
+                            for (i, item) in obras_privadas.iter().enumerate() {
+                                let nome_t = cat.tipos_predio.iter().find(|t| t.id == item.tipo_predio_id)
+                                    .map_or(item.tipo_predio_id.as_str(), |t| t.nome.as_str());
+                                let prov = v.provincias.iter().find(|p| p.id == item.provincia_id);
+                                let nome_p = prov.map_or(item.provincia_id.as_str(), |p| p.nome.as_str());
+                                let nome_e = prov.and_then(|pr| v.estados.iter().find(|e| e.id == pr.estado_id))
+                                    .map_or("", |e| e.nome.as_str());
+
+                                let frac = (item.progresso_pontos / item.custo_total_pontos.max(1.0)).clamp(0.0, 1.0) as f32;
+
+                                ui.label(format!("{}", i + 1));
+                                ui.horizontal(|ui| {
+                                    icones.mostrar(ui, &item.tipo_predio_id, 16.0);
+                                    ui.label(nome_t);
+                                });
+                                ui.label(if nome_e.is_empty() { nome_p.to_string() } else { format!("{nome_p} ({nome_e})") });
+                                ui.add(
+                                    egui::ProgressBar::new(frac)
+                                        .desired_width(120.0)
+                                        .text(format!("{:.0}% ({:.0}/{:.0})", frac * 100.0, item.progresso_pontos, item.custo_total_pontos))
+                                );
+                                if pais.pontos_privados_ultimo_tick > 0.0 {
+                                    ui.colored_label(egui::Color32::LIGHT_GREEN, "Ativo");
+                                } else {
+                                    ui.colored_label(egui::Color32::GRAY, "Aguardando");
+                                }
+                                if !item.justificativa.is_empty() {
+                                    ui.label(&item.justificativa);
+                                } else if item.retorno_esperado > 0.0 {
+                                    ui.label(format!("+£{:.0}/dia", item.retorno_esperado));
+                                } else {
+                                    ui.label("Lucrativo");
+                                }
+                                ui.colored_label(egui::Color32::from_rgb(120, 200, 255), "💼 100% Fundo Privado");
+                                ui.end_row();
+                            }
+                        });
+                }
+            });
         ui.separator();
 
         // =========================================================================

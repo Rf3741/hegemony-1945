@@ -3,6 +3,7 @@
 
 use crate::catalogo::CatalogoEconomia;
 use crate::entidades::{Mercado, Pais, Provincia};
+use crate::motor::governo;
 use crate::tipos::{CategoriaPredio, RegimePropriedade};
 
 /// Capacidade máxima de reserva de caixa operacional por nível de prédio.
@@ -216,14 +217,20 @@ pub(crate) fn executar_distribuicao_rendas(
             reservas_prov += b.reservas_caixa;
             b.dividendos_ultimo_tick = dividendos;
             if dividendos > 0.0 {
-                let saturacao_fundo =
-                    (paises[c_idx].fundo_investimento_privado / 250_000.0).clamp(0.0, 1.0);
+                let (taxa_cap_base, taxa_ari_base, _) = governo::parametros_sistema_economico(
+                    &paises[c_idx].politica_fiscal.lei_sistema_economico_id,
+                );
+                // Saturação suave baseada na escala do PIB anual do país (sem teto artificial de 250k)
+                let cap_escala = (paises[c_idx].pib_diario * 365.0).max(500_000.0);
+                let saturacao = (paises[c_idx].fundo_investimento_privado / (cap_escala * 2.0)).clamp(0.0, 1.0);
+
                 match regime_efetivo {
                     RegimePropriedade::PrivadoCapitalista => {
-                        let taxa_inv = 0.25 * (1.0 - 0.80 * saturacao_fundo);
+                        let taxa_inv = (taxa_cap_base * (1.0 - 0.40 * saturacao)).max(0.0);
                         let aporte_inv = dividendos * taxa_inv;
                         let div_liquido = dividendos - aporte_inv;
                         paises[c_idx].fundo_investimento_privado += aporte_inv;
+                        paises[c_idx].aporte_fundo_privado_ultimo_tick += aporte_inv;
                         if pop_cap_local > 0.0 {
                             dividendos_cap_prov[p_idx] += div_liquido * 0.70;
                             dividendos_cap_pais[c_idx] += div_liquido * 0.30;
@@ -232,10 +239,11 @@ pub(crate) fn executar_distribuicao_rendas(
                         }
                     }
                     RegimePropriedade::Aristocratico => {
-                        let taxa_inv = 0.12 * (1.0 - 0.80 * saturacao_fundo);
+                        let taxa_inv = (taxa_ari_base * (1.0 - 0.40 * saturacao)).max(0.0);
                         let aporte_inv = dividendos * taxa_inv;
                         let div_liquido = dividendos - aporte_inv;
                         paises[c_idx].fundo_investimento_privado += aporte_inv;
+                        paises[c_idx].aporte_fundo_privado_ultimo_tick += aporte_inv;
                         if pop_ari_local > 0.0 {
                             dividendos_ari_prov[p_idx] += div_liquido * 0.75;
                             dividendos_ari_pais[c_idx] += div_liquido * 0.25;
@@ -270,6 +278,7 @@ pub(crate) fn executar_distribuicao_rendas(
                 pais.orcamento.receita_dividendos_estatais += dividendos_cap_pais[c_idx];
             } else {
                 pais.fundo_investimento_privado += dividendos_cap_pais[c_idx];
+                pais.aporte_fundo_privado_ultimo_tick += dividendos_cap_pais[c_idx];
             }
             dividendos_cap_pais[c_idx] = 0.0;
         }
@@ -278,6 +287,7 @@ pub(crate) fn executar_distribuicao_rendas(
                 pais.orcamento.receita_dividendos_estatais += dividendos_ari_pais[c_idx];
             } else {
                 pais.fundo_investimento_privado += dividendos_ari_pais[c_idx];
+                pais.aporte_fundo_privado_ultimo_tick += dividendos_ari_pais[c_idx];
             }
             dividendos_ari_pais[c_idx] = 0.0;
         }

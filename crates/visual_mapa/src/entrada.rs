@@ -87,6 +87,12 @@ pub struct CidadeEntrada {
     pub era: Option<usize>,
     /// Nível máximo previsto (só dimensiona o fallback procedural). `None` = nível + 2.
     pub nivel_maximo: Option<u8>,
+    /// Ano em que a cidade foi fundada (ex: 1960 para Brasília). Antes deste ano, ela não existe.
+    pub ano_fundacao: Option<u16>,
+    /// Histórico de mudanças de nome com o ano correspondente (ex: [(1961, "Volgogrado")]).
+    pub mudancas_nome: Vec<(u16, String)>,
+    /// Se a cidade possui infraestrutura portuária.
+    pub eh_porto: bool,
 }
 
 impl Default for CidadeEntrada {
@@ -102,6 +108,9 @@ impl Default for CidadeEntrada {
             bloco: None,
             era: None,
             nivel_maximo: None,
+            ano_fundacao: None,
+            mudancas_nome: Vec::new(),
+            eh_porto: false,
         }
     }
 }
@@ -246,6 +255,12 @@ pub struct CidadeDemograficaEntrada {
     pub posicao: (f32, f32),
     #[serde(default)]
     pub bloco: Option<BlocoVisual>,
+    #[serde(default)]
+    pub ano_fundacao: Option<u16>,
+    #[serde(default)]
+    pub mudancas_nome: Vec<(u16, String)>,
+    #[serde(default)]
+    pub eh_porto: bool,
 }
 
 impl Default for CidadeDemograficaEntrada {
@@ -259,6 +274,9 @@ impl Default for CidadeDemograficaEntrada {
             eh_capital: false,
             posicao: (0.0, 0.0),
             bloco: None,
+            ano_fundacao: None,
+            mudancas_nome: Vec::new(),
+            eh_porto: false,
         }
     }
 }

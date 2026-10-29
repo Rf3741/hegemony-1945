@@ -53,7 +53,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(AssetPlugin { file_path: raiz.join("assets").to_string_lossy().into_owned(), ..default() }).set(WindowPlugin {
             primary_window: Some(Window {
-                title: "Guerra Fria - 1945".into(),
+                title: "Hegemony: 1945".into(),
                 resolution: WindowResolution::new(1600, 900),
                 ..default()
             }),

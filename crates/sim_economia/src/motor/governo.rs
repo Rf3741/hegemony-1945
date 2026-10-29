@@ -317,6 +317,13 @@ pub fn estado_comporta_novo_nivel(
         return true;
     }
 
+    // 3. Portos marítimos exigem estado costeiro
+    if def.id == "porto_comercial" || def.id == "porto_pesca" {
+        if !estado.eh_costeiro && estado.limite_recurso("pesca") == 0 {
+            return false;
+        }
+    }
+
     true
 }
 
@@ -344,6 +351,27 @@ pub(crate) fn atualizar_terra_aravel_estados(estados: &mut [Estado], provincias:
     }
 }
 
+/// Retorna os parâmetros de investimento privado e alocação de construção conforme a lei econômica:
+/// `(taxa_reinvestimento_capitalista, taxa_reinvestimento_aristocrata, parcela_construcao_privada)` (estilo Victoria 3).
+///
+/// - Laissez-Faire: Capitalistas investem forte (35%), aristocratas 10%, 75% da capacidade de construção para o setor privado.
+/// - Intervencionismo: Equilibrado (25% cap, 12% ari), 50% privado / 50% estatal.
+/// - Economia Mista: (20% cap, 10% ari), 50% privado / 50% estatal.
+/// - Tradicionalismo Agrário: Aristocratas investem 20% (agrícola/rural), cap 10%, 25% privado / 75% estatal.
+/// - Extrativismo Colonial: 15% cap, 15% ari, 50% privado.
+/// - Planificação Central (Gosplan): 0% privado, 100% estatal; lucros vão 100% para o orçamento do Estado.
+pub fn parametros_sistema_economico(lei_id: &str) -> (f64, f64, f64) {
+    match lei_id {
+        "laissez_faire" => (0.35, 0.10, 0.75),
+        "intervencionismo" => (0.25, 0.12, 0.50),
+        "economia_mista" => (0.20, 0.10, 0.50),
+        "tradicionalismo_agrario" => (0.10, 0.20, 0.25),
+        "extrativismo_colonial" => (0.15, 0.15, 0.50),
+        "planificacao_central" => (0.00, 0.00, 0.00),
+        _ => (0.20, 0.10, 0.50),
+    }
+}
+
 /// Executa o fechamento fiscal diário (juros, dívida, limite de crédito e calote)
 /// e avança a fila nacional de construção civil, retornando o total de prédios concluídos no dia.
 #[allow(clippy::too_many_arguments)]
@@ -351,6 +379,7 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
     catalogo: &CatalogoEconomia,
     config: &ConfigSimulacao,
     mercados: &[Mercado],
+    estados: &[Estado],
     paises: &mut [Pais],
     provincias: &mut [Provincia],
     dias_decorridos: u64,
@@ -362,7 +391,9 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
     for (c_idx, pais) in paises.iter_mut().enumerate() {
         // 1. Limite de crédito lastreado no PIB anualizado + reservas privadas dos prédios do país
         let reservas_predios = reservas_predios_pais[c_idx];
-        let limite_credito = (50_000.0 + pais.pib_diario * 180.0 + reservas_predios).max(10_000.0);
+        let limite_credito = (50_000.0 + pais.pib_diario * 730.0 + reservas_predios)
+            .max(pais.orcamento.limite_credito)
+            .max(10_000.0);
         pais.orcamento.limite_credito = limite_credito;
 
         // 2. Juros progressivos sobre a dívida soberana
@@ -373,7 +404,7 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
         let gasto_juros = pais.orcamento.divida * (juros_anual / 365.0);
         pais.orcamento.gasto_juros = gasto_juros;
 
-        // 2b. Avanço da fila de obras: pontos de construção, consumo de materiais e custo pago pelo orçamento
+        // 2b. Avanço da fila de obras: pontos compartilhados por setor, consumo de materiais e custos
         avancar_fila_construcao(
             catalogo,
             config,
@@ -382,18 +413,15 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
             pontos_construcao_setores_pais[c_idx],
         );
 
-        // 3. Reembolso parcial do fundo de investimento privado quando há obras privadas ativas
-        let obras_privadas_ativas = pais.fila_construcao.iter().any(|i| i.privado);
-        if obras_privadas_ativas && pais.orcamento.gasto_construcao > 0.0 {
-            let reembolso = pais
-                .orcamento
-                .gasto_construcao
-                .min(pais.fundo_investimento_privado * 0.50);
-            pais.fundo_investimento_privado =
-                (pais.fundo_investimento_privado - reembolso).max(0.0);
-            // Abate o custo estatal líquido da construção financiada pelo setor privado
-            pais.orcamento.gasto_construcao =
-                (pais.orcamento.gasto_construcao - reembolso).max(0.0);
+        // 3. Reembolso proporcional do setor de construção pelo uso privado de pontos (Victoria 3)
+        if pais.orcamento.gasto_construcao > 0.0 && pais.pontos_aplicados_ultimo_tick > 0.0 {
+            let frac_priv = (pais.pontos_privados_ultimo_tick / pais.pontos_aplicados_ultimo_tick).clamp(0.0, 1.0);
+            if frac_priv > 0.0 {
+                let reembolso = (pais.orcamento.gasto_construcao * frac_priv).min(pais.fundo_investimento_privado);
+                pais.fundo_investimento_privado = (pais.fundo_investimento_privado - reembolso).max(0.0);
+                pais.orcamento.gasto_construcao = (pais.orcamento.gasto_construcao - reembolso).max(0.0);
+                pais.gasto_fundo_privado_ultimo_tick += reembolso;
+            }
         }
 
         // 4. Consolidação do saldo diário no tesouro / dívida
@@ -424,13 +452,20 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
         }
 
         // 6. Investimento privado autônomo (capitalistas/aristocratas aplicando o fundo acumulado)
+        let (_, _, cota_priv) = parametros_sistema_economico(&pais.politica_fiscal.lei_sistema_economico_id);
+        let pts_totais = (pais.pontos_construcao_base + pontos_construcao_setores_pais[c_idx])
+            * pais.mult_eficiencia_construcao_lei;
+        let max_obras_privadas = ((pts_totais * cota_priv) / 20.0).ceil().clamp(1.0, 6.0) as usize;
+        let obras_priv_ativas = pais.fila_construcao.iter().filter(|i| i.privado).count();
+
         if config.habilitar_investimento_privado_automatico
             && (dias_decorridos + c_idx as u64).is_multiple_of(7)
             && !pais.exige_propriedade_estatal_lei
-            && pais.fundo_investimento_privado >= 3_500.0
-            && pais.fila_construcao.iter().filter(|i| i.privado).count() < 2
+            && cota_priv > 0.0
+            && pais.fundo_investimento_privado >= 2_000.0
+            && obras_priv_ativas < max_obras_privadas
         {
-            tentar_enfileirar_obra_privada(catalogo, mercados, pais, provincias);
+            tentar_enfileirar_obra_privada(catalogo, mercados, estados, pais, provincias, pts_totais);
         }
 
         // 7. Fase (9): conclusão das obras que atingiram 100% dos pontos (o avanço ocorre antes do fechamento fiscal)
@@ -485,9 +520,15 @@ pub fn materiais_por_ponto(categoria: CategoriaPredio) -> &'static [(&'static st
     }
 }
 
-/// Aplica os pontos de construção do dia à fila do país, consome materiais do mercado
-/// (a demanda entra no mercado no tick seguinte), cobra o custo do orçamento (obras públicas)
-/// ou do fundo privado (obras privadas) e desacelera a obra quando falta material de construção.
+/// Aplica os pontos de construção do dia divididos entre setor estatal e setor privado (Victoria 3).
+///
+/// Regras de rateio e transbordo:
+/// 1. A capacidade diária é particionada segundo a lei econômica (ex.: Laissez-Faire 75% privado / 25% estatal,
+///    Intervencionismo 50/50, Tradicionalismo 25/75, Planificação Central 0/100).
+/// 2. Se um setor não possui obras ativas (ou está em calote / sem fundos), seus pontos transbordam
+///    livremente para o outro setor, evitando desperdício de capacidade física construída.
+/// 3. Materiais de obras estatais são cobrados do tesouro (`orcamento.gasto_obras_materiais`).
+/// 4. Materiais de obras privadas são debitados diretamente do `fundo_investimento_privado`.
 fn avancar_fila_construcao(
     catalogo: &CatalogoEconomia,
     config: &ConfigSimulacao,
@@ -497,54 +538,204 @@ fn avancar_fila_construcao(
 ) {
     pais.demanda_obras.clear();
     pais.orcamento.gasto_obras_materiais = 0.0;
+    pais.gasto_fundo_privado_ultimo_tick = 0.0;
     pais.pontos_aplicados_ultimo_tick = 0.0;
+    pais.pontos_privados_ultimo_tick = 0.0;
+    pais.pontos_publicos_ultimo_tick = 0.0;
+
     if pais.fila_construcao.is_empty() {
         return;
     }
     let num_bens = catalogo.bens.len();
     pais.demanda_obras.resize(num_bens, 0.0);
 
-    let mut pontos_disponiveis =
-        (pais.pontos_construcao_base + pontos_setores) * pais.mult_eficiencia_construcao_lei;
+    let pts_totais = (pais.pontos_construcao_base + pontos_setores) * pais.mult_eficiencia_construcao_lei;
+    let (_, _, cota_priv) = parametros_sistema_economico(&pais.politica_fiscal.lei_sistema_economico_id);
+    let cota_est = 1.0 - cota_priv;
+
+    let tem_estatais = pais.fila_construcao.iter().any(|i| !i.privado && !pais.orcamento.em_calote);
+    let tem_privadas = pais.fila_construcao.iter().any(|i| i.privado && pais.fundo_investimento_privado > 1.0);
+
+    let (mut pts_est_disp, mut pts_priv_disp) = match (tem_estatais, tem_privadas) {
+        (true, true) => (pts_totais * cota_est, pts_totais * cota_priv),
+        (true, false) => (pts_totais, 0.0),
+        (false, true) => (0.0, pts_totais),
+        (false, false) => (0.0, 0.0),
+    };
+
     let max_por_obra = config.pontos_maximos_por_obra_dia.max(1.0);
     let idx_material = catalogo.indice_bens.get("material_construcao").copied();
+    let fator_material = idx_material
+        .map(|g| mercado.fator_suprimento_idx[g])
+        .unwrap_or(1.0)
+        .clamp(0.15, 1.0);
+
     let mut custo_publico = 0.0;
     let mut custo_privado = 0.0;
 
+    // Passagem 1: Atende as obras de cada setor com suas cotas reservadas
     for item in &mut pais.fila_construcao {
-        if pontos_disponiveis <= 1e-6 {
-            break;
-        }
-        if !item.privado && pais.orcamento.em_calote {
+        let falta = (item.custo_total_pontos - item.progresso_pontos).max(0.0);
+        if falta <= 1e-6 {
             continue;
         }
-        let falta = (item.custo_total_pontos - item.progresso_pontos).max(0.0);
-        // Escassez de material de construção desacelera a obra (piso de 15%)
-        let fator = idx_material
-            .map(|g| mercado.fator_suprimento_idx[g])
-            .unwrap_or(1.0)
-            .clamp(0.15, 1.0);
-        let aplicado = (pontos_disponiveis.min(max_por_obra) * fator).min(falta);
-        pontos_disponiveis -= aplicado / fator;
-        item.progresso_pontos += aplicado;
-        pais.pontos_aplicados_ultimo_tick += aplicado;
 
-        let categoria = catalogo.tipos_predio[item.tipo_predio_idx].categoria;
-        let mut custo = 0.0;
-        for &(bem_id, qtd) in materiais_por_ponto(categoria) {
-            if let Some(&g) = catalogo.indice_bens.get(bem_id) {
-                pais.demanda_obras[g] += qtd * aplicado;
-                custo += qtd * aplicado * mercado.precos_idx[g];
+        if item.privado {
+            if pts_priv_disp <= 1e-6 || pais.fundo_investimento_privado <= 1.0 {
+                continue;
+            }
+            let aplicar_pts = (pts_priv_disp.min(max_por_obra) * fator_material).min(falta);
+            if aplicar_pts <= 1e-6 {
+                continue;
+            }
+
+            let categoria = catalogo.tipos_predio[item.tipo_predio_idx].categoria;
+            let mut custo_item = 0.0;
+            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
+                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                    custo_item += qtd * aplicar_pts * mercado.precos_idx[g];
+                }
+            }
+
+            let (aplicar_efetivo, custo_efetivo) = if custo_item > pais.fundo_investimento_privado && custo_item > 1e-6 {
+                let frac = (pais.fundo_investimento_privado / custo_item).clamp(0.0, 1.0);
+                (aplicar_pts * frac, pais.fundo_investimento_privado)
+            } else {
+                (aplicar_pts, custo_item)
+            };
+
+            if aplicar_efetivo > 1e-6 {
+                pts_priv_disp -= aplicar_efetivo / fator_material;
+                item.progresso_pontos += aplicar_efetivo;
+                pais.pontos_privados_ultimo_tick += aplicar_efetivo;
+                pais.fundo_investimento_privado = (pais.fundo_investimento_privado - custo_efetivo).max(0.0);
+                custo_privado += custo_efetivo;
+
+                for &(bem_id, qtd) in materiais_por_ponto(categoria) {
+                    if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                        pais.demanda_obras[g] += qtd * aplicar_efetivo;
+                    }
+                }
+            }
+        } else {
+            // Obra estatal
+            if pts_est_disp <= 1e-6 || pais.orcamento.em_calote {
+                continue;
+            }
+            let aplicar_pts = (pts_est_disp.min(max_por_obra) * fator_material).min(falta);
+            if aplicar_pts <= 1e-6 {
+                continue;
+            }
+
+            let categoria = catalogo.tipos_predio[item.tipo_predio_idx].categoria;
+            let mut custo_item = 0.0;
+            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
+                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                    custo_item += qtd * aplicar_pts * mercado.precos_idx[g];
+                }
+            }
+
+            pts_est_disp -= aplicar_pts / fator_material;
+            item.progresso_pontos += aplicar_pts;
+            pais.pontos_publicos_ultimo_tick += aplicar_pts;
+            custo_publico += custo_item;
+
+            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
+                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                    pais.demanda_obras[g] += qtd * aplicar_pts;
+                }
             }
         }
-        if item.privado {
-            custo_privado += custo;
-        } else {
-            custo_publico += custo;
+    }
+
+    // Passagem 2: Transbordo de pontos não utilizados para o outro setor
+    if pts_priv_disp > 1e-6 && !pais.orcamento.em_calote {
+        for item in &mut pais.fila_construcao {
+            if pts_priv_disp <= 1e-6 {
+                break;
+            }
+            if item.privado {
+                continue;
+            }
+            let falta = (item.custo_total_pontos - item.progresso_pontos).max(0.0);
+            if falta <= 1e-6 {
+                continue;
+            }
+            let aplicar_pts = (pts_priv_disp.min(max_por_obra) * fator_material).min(falta);
+            if aplicar_pts <= 1e-6 {
+                continue;
+            }
+
+            let categoria = catalogo.tipos_predio[item.tipo_predio_idx].categoria;
+            let mut custo_item = 0.0;
+            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
+                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                    custo_item += qtd * aplicar_pts * mercado.precos_idx[g];
+                }
+            }
+
+            pts_priv_disp -= aplicar_pts / fator_material;
+            item.progresso_pontos += aplicar_pts;
+            pais.pontos_publicos_ultimo_tick += aplicar_pts;
+            custo_publico += custo_item;
+
+            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
+                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                    pais.demanda_obras[g] += qtd * aplicar_pts;
+                }
+            }
+        }
+    } else if pts_est_disp > 1e-6 && pais.fundo_investimento_privado > 1.0 {
+        for item in &mut pais.fila_construcao {
+            if pts_est_disp <= 1e-6 || pais.fundo_investimento_privado <= 1.0 {
+                break;
+            }
+            if !item.privado {
+                continue;
+            }
+            let falta = (item.custo_total_pontos - item.progresso_pontos).max(0.0);
+            if falta <= 1e-6 {
+                continue;
+            }
+            let aplicar_pts = (pts_est_disp.min(max_por_obra) * fator_material).min(falta);
+            if aplicar_pts <= 1e-6 {
+                continue;
+            }
+
+            let categoria = catalogo.tipos_predio[item.tipo_predio_idx].categoria;
+            let mut custo_item = 0.0;
+            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
+                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                    custo_item += qtd * aplicar_pts * mercado.precos_idx[g];
+                }
+            }
+
+            let (aplicar_efetivo, custo_efetivo) = if custo_item > pais.fundo_investimento_privado && custo_item > 1e-6 {
+                let frac = (pais.fundo_investimento_privado / custo_item).clamp(0.0, 1.0);
+                (aplicar_pts * frac, pais.fundo_investimento_privado)
+            } else {
+                (aplicar_pts, custo_item)
+            };
+
+            if aplicar_efetivo > 1e-6 {
+                pts_est_disp -= aplicar_efetivo / fator_material;
+                item.progresso_pontos += aplicar_efetivo;
+                pais.pontos_privados_ultimo_tick += aplicar_efetivo;
+                pais.fundo_investimento_privado = (pais.fundo_investimento_privado - custo_efetivo).max(0.0);
+                custo_privado += custo_efetivo;
+
+                for &(bem_id, qtd) in materiais_por_ponto(categoria) {
+                    if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                        pais.demanda_obras[g] += qtd * aplicar_efetivo;
+                    }
+                }
+            }
         }
     }
+
     pais.orcamento.gasto_obras_materiais = custo_publico;
-    pais.fundo_investimento_privado = (pais.fundo_investimento_privado - custo_privado).max(0.0);
+    pais.gasto_fundo_privado_ultimo_tick = custo_privado;
+    pais.pontos_aplicados_ultimo_tick = pais.pontos_privados_ultimo_tick + pais.pontos_publicos_ultimo_tick;
 }
 
 /// Estima o custo em materiais (preços do mercado) de um prédio inteiro de `custo_pontos` pontos.
@@ -603,40 +794,109 @@ fn materializar_nivel_predio(
     true
 }
 
+/// Seleciona e enfileira uma nova obra autônoma financiada pelo setor privado (Victoria 3).
+///
+/// Critérios de decisão do investidor privado:
+/// 1. Lucratividade esperada (receita - insumos - salários > 0 e margem líquida >= 5%).
+/// 2. Demanda insatisfeita: prioriza bens com escassez no mercado local (preço alto / demanda > oferta).
+/// 3. Viabilidade de insumos: recusa fábricas cujos insumos estejam em déficit severo (fator de suprimento < 65%).
+/// 4. Potencial regional: respeita depósitos minerais, terra arável livre e culturas aptas (`estado_comporta_novo_nivel`).
+/// 5. Infraestrutura: evita estados com déficit operacional e penalidade de acesso ao mercado.
+/// 6. Mão de obra: exige trabalhadores desempregados ou camponeses disponíveis na província.
+/// 7. Lei econômica: veta investimentos industriais sob Tradicionalismo Agrário e veta qualquer obra privada sob Planificação Central.
 fn tentar_enfileirar_obra_privada(
     catalogo: &CatalogoEconomia,
     mercados: &[Mercado],
+    estados: &[Estado],
     pais: &mut Pais,
     provincias: &[Provincia],
+    _pontos_totais: f64,
 ) {
-    let precos = &mercados[pais.mercado_idx].precos_idx;
-    let mut melhor_escolha: Option<(usize, usize, f64, f64)> = None; // (prov_idx, tipo_idx, score, custo_pts)
+    if pais.exige_propriedade_estatal_lei {
+        return;
+    }
+    if pais.fundo_investimento_privado < 2_000.0 {
+        return;
+    }
+
+    let lei_id = pais.politica_fiscal.lei_sistema_economico_id.as_str();
+    let m = &mercados[pais.mercado_idx];
+    let precos = &m.precos_idx;
+    let ofertas = &m.oferta_idx;
+    let demandas = &m.demanda_idx;
+    let suprimentos = &m.fator_suprimento_idx;
+
+    let mut melhor_escolha: Option<(usize, usize, f64, f64, f64, String)> = None;
 
     for (tp_idx, padrao) in catalogo.tipos_predio_padrao.iter().enumerate() {
+        let def_tipo = &catalogo.tipos_predio[tp_idx];
         if padrao.financiado_pelo_governo {
             continue;
         }
 
-        // Estima lucratividade diária de 1 nível usando os métodos padrão pré-compilados
-        let mut rec = 0.0;
-        for &(g, q) in &padrao.produtos_padrao {
-            rec += q * precos[g];
-        }
-        let mut ins = 0.0;
-        for &(g, q) in &padrao.insumos_padrao {
-            ins += q * precos[g];
-        }
-        let lucro_est = rec - ins - padrao.folha_base_padrao;
-        if lucro_est <= 0.0 {
+        // Restrição setorial sob Tradicionalismo Agrário (aristocratas investem no campo/minas)
+        if lei_id == "tradicionalismo_agrario"
+            && def_tipo.categoria != CategoriaPredio::RuralAgricola
+            && def_tipo.categoria != CategoriaPredio::Extrativo
+        {
             continue;
         }
+
+        // 1. Insumos: verificar disponibilidade e custo no mercado local
+        let mut fator_insumos_min = 1.0f64;
+        let mut custo_insumos = 0.0f64;
+        for &(g, q) in &padrao.insumos_padrao {
+            fator_insumos_min = fator_insumos_min.min(suprimentos[g]);
+            custo_insumos += q * precos[g];
+        }
+        if fator_insumos_min < 0.65 {
+            continue; // Falta de matéria-prima estrangularia o prédio de imediato
+        }
+
+        // 2. Receita e Demanda Insatisfeita
+        let mut receita = 0.0f64;
+        let mut mult_demanda = 1.0f64;
+        for &(g, q) in &padrao.produtos_padrao {
+            let p = precos[g];
+            receita += q * p;
+            let p_base = catalogo.bens[g].preco_base;
+            let ratio_p = (p / p_base.max(1e-6)).clamp(0.5, 2.0);
+            let d = demandas[g];
+            let o = ofertas[g].max(1.0);
+            let ratio_od = (d / o).clamp(0.5, 2.0);
+            mult_demanda *= (ratio_p * 0.60 + ratio_od * 0.40).clamp(0.40, 2.20);
+        }
+
+        // 3. Lucro líquido projetado por nível diário
+        let lucro_est = receita - custo_insumos - padrao.folha_base_padrao;
+        if lucro_est <= 0.0 {
+            continue; // Sem prédios que dariam prejuízo
+        }
+        let margem = lucro_est / receita.max(1.0);
+        if margem < 0.05 {
+            continue; // Margem muito estreita para atrair capital privado
+        }
+
         let retorno_por_ponto = lucro_est / padrao.custo_pontos_construcao.max(1.0);
 
+        // 4. Avaliar províncias e estados nacionais aptos
         for &p_idx in &pais.provincias_indices {
             let prov = &provincias[p_idx];
+            let e_idx = prov.estado_idx;
+            if e_idx >= estados.len() {
+                continue;
+            }
+            let estado = &estados[e_idx];
+
+            // Potencial regional geográfico (recursos, terra arável, litoral)
+            if !estado_comporta_novo_nivel(catalogo, estado, prov, tp_idx) {
+                continue;
+            }
             if !provincia_comporta_novo_nivel(catalogo, prov, tp_idx) {
                 continue;
             }
+
+            // Não duplicar a mesma obra na mesma província enquanto pendente
             if pais
                 .fila_construcao
                 .iter()
@@ -644,37 +904,74 @@ fn tentar_enfileirar_obra_privada(
             {
                 continue;
             }
-            let mao_de_obra_disp: f64 = prov.pops.iter().map(|p| p.desempregados()).sum();
+
+            // Infraestrutura: respeitar gargalos e acesso ao mercado
+            let saldo_infra = estado.saldo_infraestrutura();
+            if estado.acesso_mercado < 0.70 || estado.penalidade_infraestrutura > 0.30 {
+                continue;
+            }
+            let mod_infra = if saldo_infra >= 2.0 && estado.acesso_mercado >= 0.98 {
+                1.25
+            } else if saldo_infra < 0.0 {
+                (1.0 + saldo_infra / 15.0).clamp(0.40, 1.0)
+            } else {
+                1.0
+            };
+
+            // Mão de obra disponível (desempregados + camponeses de subsistência)
+            let desempregados: f64 = prov.pops.iter().map(|p| p.desempregados()).sum();
+            let camponeses: f64 = prov
+                .pops
+                .iter()
+                .filter(|p| catalogo.tipos_pop.get(p.tipo_idx).map_or(false, |tp| tp.subsistencia))
+                .map(|p| p.populacao)
+                .sum();
             let vagas_abertas: f64 = prov
                 .predios
                 .iter()
                 .map(|b| (b.total_vagas() - b.total_empregados()).max(0.0))
                 .sum();
-            let mao_de_obra_liquida = mao_de_obra_disp - vagas_abertas;
-            if mao_de_obra_liquida < 300.0 {
+            let mao_de_obra_liquida = desempregados + camponeses * 0.25 - vagas_abertas;
+            if mao_de_obra_liquida < 250.0 {
                 continue;
             }
-            let score = retorno_por_ponto * (1.0 + (mao_de_obra_liquida / 50_000.0).min(0.5));
-            if melhor_escolha.is_none_or(|(_, _, melhor_s, _)| score > melhor_s) {
-                melhor_escolha = Some((p_idx, tp_idx, score, padrao.custo_pontos_construcao));
+            let mod_labor = (1.0 + (mao_de_obra_liquida / 40_000.0).min(0.50)).clamp(0.80, 1.50);
+
+            // Bônus de qualidade de jazida mineral ou fertilidade agrícola
+            let mod_qualidade = estado.fator_qualidade_predio(def_tipo).clamp(0.80, 1.50);
+
+            let score = retorno_por_ponto * mult_demanda * mod_infra * mod_labor * mod_qualidade;
+
+            if melhor_escolha.as_ref().is_none_or(|(_, _, best_s, _, _, _)| score > *best_s) {
+                let just = format!(
+                    "Retorno: £{:.0}/dia (margem {:.0}%) | Demanda {:.0}%",
+                    lucro_est,
+                    margem * 100.0,
+                    mult_demanda * 100.0,
+                );
+                melhor_escolha = Some((
+                    p_idx,
+                    tp_idx,
+                    score,
+                    padrao.custo_pontos_construcao,
+                    lucro_est,
+                    just,
+                ));
             }
         }
     }
 
-    if let Some((p_idx, tp_idx, _, custo_pts)) = melhor_escolha {
-        let reserva_necessaria = (custo_pts * 20.0).max(2_000.0);
-        if pais.fundo_investimento_privado >= reserva_necessaria {
-            // Deduz sinal inicial de capitalização do projeto
-            pais.fundo_investimento_privado -= reserva_necessaria * 0.35;
-            pais.fila_construcao.push(ItemConstrucao {
-                provincia_id: provincias[p_idx].id.clone(),
-                tipo_predio_id: catalogo.tipos_predio[tp_idx].id.clone(),
-                progresso_pontos: 0.0,
-                custo_total_pontos: custo_pts,
-                privado: true,
-                provincia_idx: p_idx,
-                tipo_predio_idx: tp_idx,
-            });
-        }
+    if let Some((p_idx, tp_idx, _, custo_pts, lucro_est, just)) = melhor_escolha {
+        pais.fila_construcao.push(ItemConstrucao {
+            provincia_id: provincias[p_idx].id.clone(),
+            tipo_predio_id: catalogo.tipos_predio[tp_idx].id.clone(),
+            progresso_pontos: 0.0,
+            custo_total_pontos: custo_pts,
+            privado: true,
+            retorno_esperado: lucro_est,
+            justificativa: just,
+            provincia_idx: p_idx,
+            tipo_predio_idx: tp_idx,
+        });
     }
 }

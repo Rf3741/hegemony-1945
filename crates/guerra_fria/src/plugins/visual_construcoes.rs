@@ -105,6 +105,9 @@ pub fn sincronizar_dados_construcoes_sistema(
                 bloco: c.bloco,
                 era: Some(0),
                 nivel_maximo: Some(8),
+                ano_fundacao: c.ano_fundacao,
+                mudancas_nome: c.mudancas_nome.clone(),
+                eh_porto: c.eh_porto,
             });
             entrada_eco.cidades.push(c.clone());
         }
