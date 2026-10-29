@@ -455,7 +455,7 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
         let (_, _, cota_priv) = parametros_sistema_economico(&pais.politica_fiscal.lei_sistema_economico_id);
         let pts_totais = (pais.pontos_construcao_base + pontos_construcao_setores_pais[c_idx])
             * pais.mult_eficiencia_construcao_lei;
-        let max_obras_privadas = ((pts_totais * cota_priv) / 20.0).ceil().clamp(1.0, 6.0) as usize;
+        let max_obras_privadas = ((pts_totais * cota_priv) / 20.0).ceil().clamp(1.0, 3.0) as usize;
         let obras_priv_ativas = pais.fila_construcao.iter().filter(|i| i.privado).count();
 
         if config.habilitar_investimento_privado_automatico
@@ -464,6 +464,7 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
             && cota_priv > 0.0
             && pais.fundo_investimento_privado >= 2_000.0
             && obras_priv_ativas < max_obras_privadas
+            && !pais.orcamento.em_calote
         {
             tentar_enfileirar_obra_privada(catalogo, mercados, estados, pais, provincias, pts_totais);
         }

@@ -164,3 +164,41 @@ fn balanco_1945_estavel_nos_paises_grandes() {
         m.auditar_estabilidade().unwrap();
     }
 }
+
+fn niveis_totais(m: &MundoEconomico) -> (u64, u64) {
+    let (mut n, mut b) = (0u64, 0u64);
+    for p in m.provincias() {
+        for pr in &p.predios {
+            n += pr.nivel as u64;
+            b += 1;
+        }
+    }
+    (n, b)
+}
+
+#[test]
+fn construcao_automatica_5_anos_ritmo_realista_e_tick_rapido() {
+    let mut m = carregar();
+    let (n0, b0) = niveis_totais(&m);
+    let niveis_pais = |m: &MundoEconomico, id: &str| -> u64 {
+        m.provincias().iter().filter(|p| p.pais_id == id).flat_map(|p| p.predios.iter()).map(|b| b.nivel as u64).sum()
+    };
+    let (usa0, ger0) = (niveis_pais(&m, "usa"), niveis_pais(&m, "ger"));
+    let t = std::time::Instant::now();
+    let mut maxima_fila = 0usize;
+    let mut obras = 0usize;
+    for dia in 1..=1826u32 {
+        let r = m.executar_tick_diario();
+        obras += r.obras_concluidas;
+        if dia % 30 == 0 {
+            maxima_fila = maxima_fila.max(m.paises().iter().map(|p| p.fila_construcao.len()).max().unwrap_or(0));
+        }
+    }
+    let medio_ms = t.elapsed().as_secs_f64() * 1000.0 / 1826.0;
+    let (n1, b1) = niveis_totais(&m);
+    eprintln!("prédios 1945: {b0} ({n0} níveis); 1950: {b1} ({n1} níveis); obras: {obras}; fila máx: {maxima_fila}; tick médio {medio_ms:.1} ms");
+    eprintln!("EUA níveis {usa0} -> {}; ALE {ger0} -> {}", niveis_pais(&m, "usa"), niveis_pais(&m, "ger"));
+    assert!(medio_ms < 30.0, "tick médio {medio_ms:.1} ms");
+    assert!(n1 as f64 <= n0 as f64 * 1.25, "níveis explodiram: {n0} -> {n1}");
+    assert!(maxima_fila <= 6, "fila por país grande demais: {maxima_fila}");
+}
