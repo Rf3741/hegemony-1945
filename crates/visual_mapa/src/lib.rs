@@ -23,6 +23,7 @@ pub mod mapeamento;
 pub mod predio;
 pub mod projecao;
 pub mod rotas_maritimas;
+pub mod trafego;
 pub mod transporte;
 
 #[cfg(feature = "demo")]
@@ -50,6 +51,8 @@ pub use predio::{
     alternar_camada_construcoes_sistema, calcular_offset_espiral, tamanho_sprite_predio,
 };
 pub use projecao::{ProjecaoMapa, geo_para_mundo};
+pub use rotas_maritimas::Canal;
+pub use trafego::{ConfigTrafego, FluxosComercio, RelatorioCanais};
 
 /// Conjuntos de sistemas do plugin (para ordenar contra os do cliente).
 #[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -79,6 +82,7 @@ impl Plugin for VisualMapaPlugin {
             .init_resource::<IndiceEntidadesEconomia>()
             .init_resource::<AtlasVisual>()
             .init_resource::<CatalogoMapeamentoPredios>()
+            .add_plugins(trafego::TrafegoPlugin)
             .add_systems(
                 Startup,
                 (
