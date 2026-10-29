@@ -138,6 +138,7 @@ fn test_simulacao_mundo_sintetico() {
         ProvinciaMapa {
             id: 1,
             adm1_code: "USA-001".to_string(),
+            estado: String::new(),
             nome: "Distrito de Columbia".to_string(),
             cor: cor_unica_provincia(1),
             centroide: (-77.0, 38.9),
@@ -150,6 +151,7 @@ fn test_simulacao_mundo_sintetico() {
         ProvinciaMapa {
             id: 2,
             adm1_code: "SOV-001".to_string(),
+            estado: String::new(),
             nome: "Moscou".to_string(),
             cor: cor_unica_provincia(2),
             centroide: (37.6, 55.7),

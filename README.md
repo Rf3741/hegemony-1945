@@ -10,7 +10,8 @@ Requisitos: Rust estável (edição 2024) e, no Linux, as bibliotecas do Bevy (`
 
 ```bash
 cargo run --release -p guerra_fria      # o jogo (rode a partir da raiz do repositório)
-cargo run -p gerador_mapa               # ferramenta de dados do mapa
+cargo run -p gerador_mapa               # regioes admin-1 (ESTADOS) do Natural Earth -> assets/map (copie para data/estados_mapa/)
+cargo run --release -p gerador_mapa --bin subdividir   # estados -> PROVINCIAS (~36k km2) em assets/map + donos por provincia (~4 s)
 cargo test --workspace --exclude guerra_fria   # testes (sem GPU)
 ```
 

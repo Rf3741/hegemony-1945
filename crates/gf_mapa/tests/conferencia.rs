@@ -67,7 +67,7 @@ fn catalogo_ids_sequenciais_cores_bijetivas_e_adm1_unicos() {
         assert_eq!(p.id as usize, i + 1);
         assert_eq!(p.cor, cor_unica_provincia(p.id));
         assert_eq!(id_de_cor_provincia(p.cor), Some(p.id));
-        assert!(adm1.insert(p.adm1_code.clone()), "adm1 duplicado {}", p.adm1_code);
+        adm1.insert(p.adm1_code.clone()); // varias provincias por estado (adm1)
         assert!(cores.insert(p.cor));
         assert!(c.obter_por_id(p.id).is_some());
     }

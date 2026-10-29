@@ -9,3 +9,6 @@ description = "Mapa (projecao de Miller, cor RGB de provincias, catalogo) e temp
 ron.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+image.workspace = true

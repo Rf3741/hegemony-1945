@@ -101,8 +101,10 @@ fn painel_provincia(
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
     egui::Panel::right("painel_provincia").min_size(260.0).show(&mut raiz, |ui| {
         ui.heading(&prov.nome);
-        ui.label(format!("ID da província: {}", prov.id));
-        ui.label(format!("Código ADM1: {}", prov.adm1_code));
+        let estado = if prov.estado.is_empty() { prov.adm1_code.as_str() } else { prov.estado.as_str() };
+        ui.label(format!("Estado: {estado}"));
+        ui.label(format!("ID da província: {} | Código do estado (ADM1): {}", prov.id, prov.adm1_code));
+        ui.label(format!("Área da província: {:.0} km²", prov.area));
         ui.label(format!("País moderno: {}", prov.pais_moderno));
         if let Some(tag) = mundo.dono_por_provincia.get(&prov.id) {
             let nome = mundo.paises.get(tag).map(|p| p.nome.as_str()).unwrap_or("?");
@@ -116,7 +118,9 @@ fn painel_provincia(
         if let Some(pop) = mundo.populacao_por_provincia.get(&prov.id) {
             ui.label(format!("População da província: {pop}"));
         }
-        ui.label(format!("Vizinhas: {}", prov.vizinhos.len()));
+        let irmas = catalogo.0.provincias.iter().filter(|p| p.adm1_code == prov.adm1_code).count();
+        ui.label(format!("Vizinhas: {} | Províncias do estado: {irmas}", prov.vizinhos.len()));
+        ui.label("Construção, economia e política são por estado.");
         if let Some(eco) = &eco {
             egui::ScrollArea::vertical().id_salt("scroll_painel_prov").show(ui, |ui| secao_construir_aqui(ui, &eco.vista, &prov.adm1_code, &mut constr));
         }
