@@ -3265,6 +3265,7 @@ dependencies = [
  "ron",
  "serde",
  "sim_economia",
+ "sim_politica",
  "simulacao",
  "visual_mapa",
 ]

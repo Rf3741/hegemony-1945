@@ -7,6 +7,8 @@ pub mod mercado_ui;
 pub mod jogador;
 pub mod map;
 pub mod politics;
+pub mod politica_sim;
+pub mod politica_ui;
 pub mod rotas_ponte;
 pub mod rotulos_pais;
 pub mod time;

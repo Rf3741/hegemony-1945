@@ -9,7 +9,7 @@ use sim_economia::{
     TipoPredio, materiais_por_ponto,
 };
 use simulacao::mundo::EstadoPais;
-use simulacao::politica::CategoriaLei;
+use super::politica_sim::PoliticaSim;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Tag do país controlado pelo jogador.
@@ -58,8 +58,6 @@ impl Notificacoes {
 #[derive(Resource, Default)]
 struct Anterior {
     tag: String,
-    leis: BTreeMap<CategoriaLei, String>,
-    dias_eleicao: Option<u32>,
     negativo: bool,
     obras_na_fila: usize,
     calote: bool,
@@ -196,12 +194,18 @@ fn detectar_eventos(
     jogador: Res<PaisJogador>,
     mundo: Res<RecursoMundo>,
     mut eco: Option<ResMut<EconomiaSim>>,
+    mut pol: Option<ResMut<PoliticaSim>>,
     tempo: Res<Time<Real>>,
     mut ant: ResMut<Anterior>,
     mut notas: ResMut<Notificacoes>,
 ) {
     let Some(p) = mundo.paises.get(&jogador.0) else { return };
     let agora = tempo.elapsed_secs_f64();
+    if let Some(pol) = pol.as_mut() {
+        for m in pol.mensagens.drain(..) {
+            notas.push(m, agora);
+        }
+    }
     let (mut obras, mut calote) = (ant.obras_na_fila, ant.calote);
     if let Some(eco) = eco.as_mut() {
         for m in eco.mensagens.drain(..) {
@@ -222,14 +226,6 @@ fn detectar_eventos(
     ant.calote = calote;
     let negativo = calote;
     if ant.tag == jogador.0 {
-        if p.politica.dias_ate_eleicao.unwrap_or(0) > ant.dias_eleicao.unwrap_or(0) && ant.dias_eleicao.is_some() {
-            notas.push("Eleição realizada: a correlação de forças mudou.", agora);
-        }
-        for (cat, lei) in &p.politica.leis_ativas {
-            if ant.leis.get(cat) != Some(lei) {
-                notas.push(format!("Lei aprovada: {} -> {}", cat.nome_pt(), nome_lei(lei)), agora);
-            }
-        }
         if negativo && !ant.negativo {
             notas.push("O tesouro está zerado e o país está se endividando!", agora);
         }
@@ -237,8 +233,6 @@ fn detectar_eventos(
         notas.push(format!("Você governa: {}", p.nome), agora);
     }
     ant.tag = jogador.0.clone();
-    ant.leis = p.politica.leis_ativas.clone();
-    ant.dias_eleicao = p.politica.dias_ate_eleicao;
     ant.negativo = negativo;
 }
 
@@ -258,33 +252,11 @@ fn toasts(mut contextos: EguiContexts, tempo: Res<Time<Real>>, mut notas: ResMut
     Ok(())
 }
 
-pub fn nome_lei(chave: &str) -> String {
-    let mut s = chave.replace('_', " ");
-    if let Some(c) = s.get(0..1) {
-        s = c.to_uppercase() + &s[1..];
-    }
-    s
-}
-
-/// Leis selecionáveis em cada categoria.
-fn opcoes_lei(cat: CategoriaLei) -> &'static [&'static str] {
-    match cat {
-        CategoriaLei::Governo => &["oligarquia", "voto_censitario", "voto_capacitario", "sufragio_universal", "partido_unico", "autocracia"],
-        CategoriaLei::Economia => &["livre_mercado", "capitalismo_de_intervencao", "economia_planificada"],
-        CategoriaLei::Trabalho => &["regulamentacao_basica", "sem_regulamentacao", "sindicatos_fortes"],
-        CategoriaLei::DireitosCivis => &["liberdades_restringidas", "liberdades_amplas", "estado_policial"],
-        CategoriaLei::SistemaTributario => &["tributacao_regressiva", "tributacao_proporcional", "tributacao_progressiva", "requisicao_estatal"],
-        CategoriaLei::SaudeEEducacao => &["escolas_religiosas", "sistema_publico_basico", "sistema_publico_universal"],
-        CategoriaLei::Exercito => &["alistamento_obrigatorio", "exercito_profissional", "milicia_popular"],
-    }
-}
-
 fn painel_pais(
     mut contextos: EguiContexts,
     mut painel: ResMut<PainelPais>,
-    jogador: Res<PaisJogador>,
-    mut mundo: ResMut<RecursoMundo>,
     mut eco: ResMut<EconomiaSim>,
+    mut pol: Option<ResMut<PoliticaSim>>,
     mut icones: ResMut<Icones>,
 ) -> Result {
     if !painel.aberto {
@@ -304,7 +276,12 @@ fn painel_pais(
         egui::ScrollArea::vertical().show(ui, |ui| match aba {
             Aba::Economia => aba_economia(ui, &mut eco, &mut painel, &mut icones),
             Aba::Construcao => aba_construcao(ui, &mut eco, &mut painel, &mut icones),
-            Aba::Politica => aba_politica(ui, &mut mundo, &jogador.0),
+            Aba::Politica => match pol.as_mut() {
+                Some(p) => super::politica_ui::aba_politica(ui, p),
+                None => {
+                    ui.label("Política ainda carregando...");
+                }
+            },
             Aba::Ranking => aba_ranking(ui, &eco.vista),
         });
     });
@@ -420,72 +397,6 @@ fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPai
     for c in cmds {
         eco.enviar(c);
     }
-}
-
-fn aba_politica(ui: &mut egui::Ui, mundo: &mut RecursoMundo, tag: &str) {
-    let Some(p) = mundo.paises.get_mut(tag) else { return };
-    ui.heading("Leis");
-    if let Some(r) = &p.politica.reforma_ativa {
-        ui.colored_label(
-            egui::Color32::YELLOW,
-            format!(
-                "Reforma em andamento: {} -> {} (marco {}/3, {}/30 dias, chance {:.0}%)",
-                r.categoria.nome_pt(),
-                nome_lei(&r.nova_lei),
-                r.marcos_concluidos,
-                r.dias_no_marco,
-                r.chance_avanco * 100.0
-            ),
-        );
-    } else {
-        ui.label("Nenhuma reforma em andamento (só uma por vez).");
-    }
-    let mut iniciar: Option<(CategoriaLei, &'static str)> = None;
-    let reformando = p.politica.reforma_ativa.is_some();
-    for cat in CategoriaLei::TODAS {
-        let atual = p.politica.lei_ativa(cat).to_string();
-        ui.horizontal_wrapped(|ui| {
-            ui.strong(format!("{}:", cat.nome_pt()));
-            ui.label(nome_lei(&atual));
-        });
-        ui.horizontal_wrapped(|ui| {
-            ui.add_space(16.0);
-            for &op in opcoes_lei(cat) {
-                if op == atual {
-                    continue;
-                }
-                if ui.add_enabled(!reformando, egui::Button::new(format!("Reformar para: {}", nome_lei(op)))).clicked() {
-                    iniciar = Some((cat, op));
-                }
-            }
-        });
-    }
-    if let Some((c, l)) = iniciar {
-        p.politica.iniciar_reforma(c, l);
-    }
-    ui.separator();
-    ui.heading("Grupos de interesse");
-    egui::Grid::new("gis").striped(true).show(ui, |ui| {
-        ui.strong("Grupo");
-        ui.strong("Clout");
-        ui.strong("Aprovação");
-        ui.strong("Governo");
-        ui.end_row();
-        for g in p.politica.grupos.values() {
-            ui.label(g.id.nome_pt());
-            ui.label(format!("{:.0}%", g.clout * 100.0));
-            ui.label(format!("{:.1}", g.aprovacao));
-            ui.label(if g.em_governo { "sim" } else { "-" });
-            ui.end_row();
-        }
-    });
-    ui.separator();
-    ui.label(format!("Legitimidade: {:.1}%", p.politica.legitimidade));
-    ui.label(format!("Esfera de influência: {}", p.politica.esfera_atual().rotulo_pt()));
-    match p.politica.dias_ate_eleicao {
-        Some(d) => ui.label(format!("Próxima eleição em {} dias (~{:.1} anos)", d, d as f32 / 365.0)),
-        None => ui.label("Este regime não realiza eleições."),
-    };
 }
 
 fn aba_ranking(ui: &mut egui::Ui, v: &VistaEconomia) {
