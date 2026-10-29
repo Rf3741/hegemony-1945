@@ -3275,6 +3275,7 @@ dependencies = [
  "image",
  "ron",
  "serde",
+ "sim_diplomacia",
  "sim_economia",
  "sim_politica",
  "simulacao",
@@ -5310,6 +5311,14 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
+
+[[package]]
+name = "sim_diplomacia"
+version = "0.1.0"
+dependencies = [
+ "ron",
+ "serde",
+]
 
 [[package]]
 name = "sim_economia"
