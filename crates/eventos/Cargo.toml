@@ -1,0 +1,11 @@
+[package]
+name = "eventos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sistema de eventos historicos: carga RON, gatilhos, efeitos e escolha da IA"
+
+[dependencies]
+serde.workspace = true
+ron.workspace = true
+simulacao.workspace = true

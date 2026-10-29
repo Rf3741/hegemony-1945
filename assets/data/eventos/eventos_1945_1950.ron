@@ -1,0 +1,1011 @@
+// ==============================================================================
+// EVENTOS HISTÓRICOS 1945-1950 - GUERRA FRIA (Estilo Victoria 3)
+// 28 grandes eventos históricos com datas de gatilho, condições, nações-alvo,
+// opções estratégicas divergentes, efeitos em modificadores, prestígio e alinhamento.
+// ==============================================================================
+
+[
+    // --------------------------------------------------------------------------
+    // 1. CONFERÊNCIA DE YALTA (Fevereiro de 1945)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "conferencia_yalta_1945",
+        titulo: "A Conferência de Yalta e a Partilha da Europa",
+        descricao: "No Palácio de Livadia, na Crimeia, os 'Três Grandes' (Roosevelt, Stalin e Churchill) reúnem-se para traçar o mapa do pós-guerra na Europa. Debatem as quatro zonas de ocupação na Alemanha, as fronteiras da Polônia com a Linha Curzon e a promessa soviética de eleições livres no Leste e entrada na guerra contra o Japão.",
+        data_gatilho: DataGatilho(ano: 1945, mes: 2, dia: 11),
+        paises_alvo: ["USA", "SOV", "GBR"],
+        condicoes: [
+            "guerra_na_europa_em_andamento",
+        ],
+        opcoes: [
+            OpcaoEvento(
+                id: "yalta_acordo_historico",
+                texto: "Ratificar a Declaração sobre a Europa Libertada e as Zonas de Ocupação",
+                descricao_resultado: "Garante a entrada soviética na guerra do Pacífico e o compromisso solene com a fundação das Nações Unidas, ao custo de aceitar a esfera de influência soviética na Polônia e nos Bálcãs.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: 0.10),
+                    Modificador(id: "progresso_fundacao_onu", valor: 0.35),
+                    Modificador(id: "legitimidade_internacional", valor: 15.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 5.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "yalta_posicao_intransigente",
+                texto: "Exigir eleições supervisionadas imediatamente e rejeitar concessões na Polônia",
+                descricao_resultado: "Gera atrito imediato com Moscou; a URSS ameaça não participar da conferência de São Francisco nem declarar guerra ao Império do Japão.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: 0.35),
+                    Modificador(id: "hostilidade_eua_urss", valor: 0.40),
+                    Modificador(id: "aprovacao_militares", valor: 10.0),
+                    Modificador(id: "aprovacao_partido_comunista", valor: -15.0),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 2. MORTE DE ROOSEVELT E POSSE DE TRUMAN (Abril de 1945)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "morte_roosevelt_truman_1945",
+        titulo: "Morte de Franklin D. Roosevelt e a Nova Firmeza de Truman",
+        descricao: "Em 12 de abril de 1945, o presidente Franklin Delano Roosevelt falece repentinamente em Warm Springs, Geórgia. O vice-presidente Harry S. Truman assume o Salão Oval num momento de extrema sensibilidade geopolítica, trazendo uma postura muito mais enérgica e desconfiada em relação às intenções soviéticas na Europa Oriental.",
+        data_gatilho: DataGatilho(ano: 1945, mes: 4, dia: 12),
+        paises_alvo: ["USA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "truman_diplomacia_dura",
+                texto: "Adotar uma diplomacia direta e inflexível com Moscou ('Guerra sem Luvas de Pelica')",
+                descricao_resultado: "Truman adverte abertamente Molotov sobre o cumprimento estrito dos acordos de Yalta, marcando o fim da complacência diplomática de tempo de guerra.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: 0.15),
+                    Modificador(id: "autoridade_estatal", valor: 0.10),
+                    Modificador(id: "aprovacao_militares", valor: 10.0),
+                    Modificador(id: "aprovacao_industriais", valor: 5.0),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEvento(
+                id: "truman_continuidade_conciliadora",
+                texto: "Preservar a linha conciliadora e a amizade pessoal com o marechal Stalin",
+                descricao_resultado: "Tenta apaziguar os generais soviéticos para assegurar cooperação duradoura na ocupação conjunta da Europa Central.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: -0.10),
+                    Modificador(id: "aprovacao_intelectuais", valor: 5.0),
+                    Modificador(id: "aprovacao_militares", valor: -10.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 3. A QUEDA DE BERLIM E A RENDIÇÃO DO TERCEIRO REICH (Maio de 1945)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "queda_berlim_fim_reich_1945",
+        titulo: "A Queda de Berlim e o Fim do Terceiro Reich na Europa",
+        descricao: "Em 8 de maio de 1945, com Berlim em ruínas e a bandeira vermelha tremulando sobre a cúpula do Reichstag, o marechal Wilhelm Keitel assina a rendição incondicional de todas as forças armadas alemãs. O Terceiro Reich desmorona; a Alemanha deixa de existir como Estado soberano e é submetida ao Conselho de Controle Aliado.",
+        data_gatilho: DataGatilho(ano: 1945, mes: 5, dia: 8),
+        paises_alvo: ["GER", "SOV", "USA", "GBR", "FRA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "berlim_ocupacao_quadripartite",
+                texto: "Instituir as quatro zonas de ocupação militar e dar início à desnazificação",
+                descricao_resultado: "A Alemanha é dividida em zonas de ocupação americana, soviética, britânica e francesa, iniciando o processo militar de julgamento em Nuremberg.",
+                efeitos: [
+                    Modificador(id: "desmilitarizacao_alema", valor: 1.0),
+                    Modificador(id: "entusiasmo_vitoria_aliada", valor: 0.40),
+                    Modificador(id: "aprovacao_militares", valor: 15.0),
+                    Modificador(id: "aprovacao_veteranos_guerra", valor: 20.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoEvento(
+                id: "berlim_plano_morgenthau_severo",
+                texto: "Implementar o Plano Morgenthau de pastoralização forçada e desindustrialização total",
+                descricao_resultado: "Destrói a base fabril da bacia do Ruhr e inunda as minas de carvão alemãs, gerando fome e caos humanitário agudo no centro da Europa.",
+                efeitos: [
+                    Modificador(id: "colapso_industrial_alemao", valor: 0.60),
+                    Modificador(id: "fome_e_radicalismo_alemanha", valor: 0.50),
+                    Modificador(id: "aprovacao_intelectuais", valor: -20.0),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 4. FUNDAÇÃO DA ONU (Conferência de São Francisco, Junho-Outubro de 1945)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "conferencia_sao_francisco_onu_1945",
+        titulo: "A Conferência de São Francisco e a Fundação das Nações Unidas",
+        descricao: "Delegados de 50 nações reúnem-se na Ópera de São Francisco para concluir e assinar a Carta das Nações Unidas. Criada para substituir a falecida Liga das Nações e preservar a humanidade do flagelo da guerra, a ONU estabelece a Assembleia Geral e o Conselho de Segurança com cinco membros permanentes dotados de veto.",
+        data_gatilho: DataGatilho(ano: 1945, mes: 6, dia: 26),
+        paises_alvo: ["USA", "SOV", "GBR", "FRA", "CHI"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "onu_aprovar_carta_veto",
+                texto: "Ratificar a Carta da ONU com o poder de veto no Conselho de Segurança",
+                descricao_resultado: "Consolida a nova ordem jurídica multilateral internacional, salvaguardando a soberania das superpotências por meio do mecanismo de veto.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional", valor: 25.0),
+                    Modificador(id: "estabilidade_diplomatica_global", valor: 0.20),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                    Modificador(id: "aprovacao_burocracia_estatal", valor: 10.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoEvento(
+                id: "onu_rejeitar_privilegio_veto",
+                texto: "Defender a igualdade soberana sem veto permanente para grandes potências",
+                descricao_resultado: "A URSS e os EUA recusam-se a ingressar numa entidade capaz de impor decisões de guerra contra suas próprias vontades; a ONU nasce natimorta.",
+                efeitos: [
+                    Modificador(id: "anarquia_internacional_fator", valor: 0.40),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.30),
+                    Modificador(id: "aprovacao_militares", valor: 10.0),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 5. CONFERÊNCIA DE POTSDAM (Julho-Agosto de 1945)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "conferencia_potsdam_1945",
+        titulo: "A Conferência de Potsdam e as Reparações de Guerra",
+        descricao: "Stalin, Truman e Clement Attlee (que substituiu Churchill no meio da conferência após a vitória trabalhista) encontram-se em Potsdam. Truman recebe notícias confidenciais do teste nuclear Trinity em Alamogordo e informa enigmaticamente a Stalin que os EUA desenvolveram uma arma de destruição inédita.",
+        data_gatilho: DataGatilho(ano: 1945, mes: 8, dia: 2),
+        paises_alvo: ["USA", "SOV", "GBR"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "potsdam_aceitar_fronteiras_oder_neisse",
+                texto: "Reconhecer a linha Oder-Neisse para a Polônia e partilhar as reparações de guerra",
+                descricao_resultado: "Milhões de alemães étnicos são transferidos da Prússia Oriental e Silésia; a URSS inicia a desmontagem de fábricas industriais em sua zona leste.",
+                efeitos: [
+                    Modificador(id: "reparacoes_industriais_urss", valor: 0.35),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.15),
+                    Modificador(id: "aprovacao_militares", valor: 5.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "potsdam_bloquear_reparacoes_soviéticas",
+                texto: "Suspender transferências industriais da zona ocidental para o setor soviético",
+                descricao_resultado: "Acelera a ruptura geopolítica e precipita a divisão permanente da Alemanha antes do fim do ano de 1945.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: 0.35),
+                    Modificador(id: "hostilidade_eua_urss", valor: 0.40),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 6. BOMBARDEIOS ATÔMICOS DE HIROSHIMA E NAGASAKI (Agosto de 1945)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "bombardeios_atomicos_hiroshima_nagasaki_1945",
+        titulo: "Hiroshima e Nagasaki: O Alvorecer da Era Atômica",
+        descricao: "Em 6 e 9 de agosto de 1945, o governo americano lança as bombas atômicas sobre as cidades japonesas de Hiroshima e Nagasaki. Simultaneamente, a União Soviética cumpre o acordo de Yalta e declara guerra ao Japão, lançando 1,5 milhão de soldados na Operação Tempestade de Agosto na Manchúria.",
+        data_gatilho: DataGatilho(ano: 1945, mes: 8, dia: 9),
+        paises_alvo: ["USA", "JAP", "SOV"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "atomica_choque_rendicao_imediata",
+                texto: "Exigir a rendição incondicional imediata de Tóquio sob ameaça de aniquilação",
+                descricao_resultado: "O imperador Hirohito grava a mensagem de rádio histórica pedindo ao povo japonês que 'suporte o insuportável', encerrando a Segunda Guerra Mundial.",
+                efeitos: [
+                    Modificador(id: "monopolio_nuclear_americano", valor: 1.0),
+                    Modificador(id: "corrida_armamentista_nuclear", valor: 0.50),
+                    Modificador(id: "capacidade_destrutiva_estrategica", valor: 0.60),
+                    Modificador(id: "aprovacao_militares", valor: 20.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoEvento(
+                id: "atomica_bloqueio_convencional_invasao",
+                texto: "Não empregar as armas atômicas; executar a Operação Downfall de invasão anfíbia",
+                descricao_resultado: "A invasão das ilhas principais japonesas custa centenas de milhares de baixas aliadas e a URSS ocupa Hokkaido e o norte de Honshu.",
+                efeitos: [
+                    Modificador(id: "baixas_militares_extremas", valor: 0.50),
+                    Modificador(id: "particao_sovietica_do_japao", valor: 0.60),
+                    Modificador(id: "radicalismo_geral", valor: 0.30),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 7. RENDIÇÃO DO JAPÃO E OCUPAÇÃO DE MACARTHUR (Setembro de 1945)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "rendicao_japao_ocupacao_macarthur_1945",
+        titulo: "Rendição do Japão e Início da Ocupação Aliada (SCAP)",
+        descricao: "Em 2 de setembro de 1945, na Baía de Tóquio, a bordo do couraçado USS Missouri, representantes japoneses assinam o termo de capitulação final. O general Douglas MacArthur assume como Comandante Supremo das Potências Aliadas (SCAP), iniciando a desmilitarização radical, o desmantelamento dos zaibatsu e a nova constituição pacifista.",
+        data_gatilho: DataGatilho(ano: 1945, mes: 9, dia: 2),
+        paises_alvo: ["JAP", "USA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "japao_reforma_democratica_preservar_imperador",
+                texto: "Preservar a figura do Imperador como símbolo de Estado e impor reformas liberais",
+                descricao_resultado: "Artigo 9º renuncia para sempre à guerra; reforma agrária democratiza a posse da terra e sindicatos são legalizados sob tutela americana.",
+                efeitos: [
+                    Modificador(id: "democratizacao_pacifica_japao", valor: 0.40),
+                    Modificador(id: "reforma_agraria_japonesa", valor: 0.35),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                    Modificador(id: "aprovacao_camponeses", valor: 20.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "japao_julgar_imperador_abolição_monarquia",
+                texto: "Julgar o Imperador Hirohito em tribunal de guerra e extinguir a dinastia imperial",
+                descricao_resultado: "Provoca fúria patriótica e guerrilha subterrânea fanática entre os oficiais militares japoneses desmobilizados.",
+                efeitos: [
+                    Modificador(id: "radicalismo_nacionalista_japao", valor: 0.50),
+                    Modificador(id: "custo_ocupacao_militar_japao", valor: 0.40),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 8. CRISE DO IRÃ (Março de 1946)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "crise_do_ira_1946",
+        titulo: "A Crise do Irã e a Primeira Prova de Força na ONU",
+        descricao: "A URSS recusa-se a retirar o Exército Vermelho do norte do Irã no prazo fixado pelo Tratado Tripartite de 1942, patrocinando repúblicas separatistas no Azerbaijão e Curdistão (Mahabad) e pressionando Teerã por concessões de petróleo no Cáspio.",
+        data_gatilho: DataGatilho(ano: 1946, mes: 3, dia: 2),
+        paises_alvo: ["PER", "SOV", "USA", "GBR"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "ira_ultimato_e_retirada_sovietica",
+                texto: "Pressionar na ONU e enviar ultimato diplomático firme a Moscou",
+                descricao_resultado: "Stalin recua diante da ameaça de sanções e da firmeza anglo-americana; as tropas soviéticas evacuam e o exército iraniano restaura o controle em Tabriz.",
+                efeitos: [
+                    Modificador(id: "prestígio_onu_primeiro_sucesso", valor: 0.25),
+                    Modificador(id: "seguranca_petroleo_oriente_medio", valor: 0.30),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.15),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEvento(
+                id: "ira_concessao_petroleo_permanencia_sovietica",
+                texto: "Permitir o protetorado soviético no norte em troca de compensações coloniais",
+                descricao_resultado: "O Irã divide-se em zonas permanentes de influência e a URSS obtém acesso direto às jazidas de petróleo do Golfo Pérsico.",
+                efeitos: [
+                    Modificador(id: "influencia_sovietica_oriente_medio", valor: 0.45),
+                    Modificador(id: "aprovacao_partido_comunista", valor: 15.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 9. DISCURSO DA CORTINA DE FERRO (Churchill em Fulton, Março de 1946)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "discurso_cortina_de_ferro_1946",
+        titulo: "O Discurso de Fulton: 'Uma Cortina de Ferro Desceu sobre a Europa'",
+        descricao: "No Westminster College em Fulton, Missouri, ao lado do presidente Truman, Winston Churchill profere uma das advertências mais emblemáticas do século XX: 'De Stettin, no Báltico, a Trieste, no Adriático, uma cortina de ferro desceu sobre o continente', denunciando o cerco totalitário de Moscou sobre as capitais da Europa Oriental.",
+        data_gatilho: DataGatilho(ano: 1946, mes: 3, dia: 5),
+        paises_alvo: ["USA", "GBR", "SOV"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "fulton_endossar_diagnostico_churchill",
+                texto: "Endossar formalmente o alerta de Churchill e consolidar a união anglo-americana",
+                descricao_resultado: "A opinião pública ocidental desperta para a gravidade da ameaça soviética; Stalin compara o discurso de Churchill ao belicismo de Hitler.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: 0.20),
+                    Modificador(id: "coesao_bloco_ocidental", valor: 0.25),
+                    Modificador(id: "polarizacao_ideologica_global", valor: 0.30),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "fulton_desautorizar_tom_belicista",
+                texto: "Distanciar-se do discurso para evitar provocar o ressentimento de Moscou",
+                descricao_resultado: "Alivia temporariamente o clima na imprensa, mas desorienta os aliados europeus que temem o avanço do Exército Vermelho.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: -0.10),
+                    Modificador(id: "inseguranca_aliados_europeus", valor: 0.25),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 10. PLEBISCITO DA REPÚBLICA ITALIANA (Junho de 1946)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "plebiscito_republica_italiana_1946",
+        titulo: "O Plebiscito Italiano: O Fim da Monarquia Savoia",
+        descricao: "Em 2 de junho de 1946, os italianos vão às urnas no primeiro sufrágio plenamente universal com voto feminino da história do país para decidir entre monarquia e república. Marcada pela cumplicidade da Coroa com a ditadura fascista de Mussolini, a dinastia Savoia é banida e a República Italiana é proclamada.",
+        data_gatilho: DataGatilho(ano: 1946, mes: 6, dia: 2),
+        paises_alvo: ["ITA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "italia_vitoria_republicana",
+                texto: "Reconhecer a vitória republicana e promulgar a nova constituição democrática",
+                descricao_resultado: "O rei Umberto II parte para o exílio em Portugal; a Itália ingressa no concerto das democracias ocidentais sob a liderança democrata-cristã de Alcide De Gasperi.",
+                efeitos: [
+                    Modificador(id: "estabilidade_democratica_italia", valor: 0.30),
+                    Modificador(id: "legitimidade_base", valor: 20.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                    Modificador(id: "aprovacao_trabalhadores", valor: 10.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "italia_vitoria_monarquica_sul",
+                texto: "Apoiar a conservação da monarquia baseada nos votos agrários do sul",
+                descricao_resultado: "Gera insurreição armada comunista no norte industrial de Milão e Turim, ameaçando cisão civil violenta no país.",
+                efeitos: [
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.40),
+                    Modificador(id: "risco_guerra_civil_italiana", valor: 0.35),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 11. CRISE DOS ESTREITOS TURCOS (Agosto de 1946)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "crise_estreitos_turcos_1946",
+        titulo: "A Crise dos Estreitos Turcos e a Pressão Soviética no Mar Negro",
+        descricao: "Moscou envia uma nota diplomática enérgica a Ancara exigindo a revisão da Convenção de Montreux, a exclusão das potências não ribeirinhas do Mar Negro e o estabelecimento de bases militares soviéticas conjuntas no Bósforo e nos Dardanelos.",
+        data_gatilho: DataGatilho(ano: 1946, mes: 8, dia: 7),
+        paises_alvo: ["TUR", "SOV", "USA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "turquia_rejeitar_apoio_naval_eua",
+                texto: "Rejeitar categoricamente o ultimato com apoio da frota naval americana (USS Missouri)",
+                descricao_resultado: "Ancara mobiliza suas divisões de fronteira; Washington desloca a Sexta Frota no Mediterrâneo, impedindo o controle soviético dos Estreitos.",
+                efeitos: [
+                    Modificador(id: "seguranca_bósforo_ocidental", valor: 0.35),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.15),
+                    Modificador(id: "alinhamento_turquia_ocidente", valor: 0.40),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "turquia_ceder_base_bósforo",
+                texto: "Ceder uma base naval conjunta a Moscou para evitar invasão do Exército Vermelho",
+                descricao_resultado: "A Turquia é incorporada à órbita de segurança de Moscou e o Mar Negro torna-se lago soviético incontestado.",
+                efeitos: [
+                    Modificador(id: "acesso_naval_sovietico_mediterraneo", valor: 0.50),
+                    Modificador(id: "queda_prestigio_eua", valor: -25.0),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 12. GUERRA CIVIL GREGA (1946)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "guerra_civil_grega_1946",
+        titulo: "A Eclosão da Guerra Civil Grega: Monarquistas vs. Comunistas",
+        descricao: "Após o ataque a Litohoro em março de 1946, o Exército Democrático da Grécia (DSE), braço armado do Partido Comunista Grego (KKE), inicia uma insurgência guerrilheira em larga escala a partir das montanhas do norte, com apoio logístico e santuário na Iugoslávia de Tito e na Albânia.",
+        data_gatilho: DataGatilho(ano: 1946, mes: 10, dia: 28),
+        paises_alvo: ["GRE", "GBR", "USA", "YUG"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "grecia_apoio_monarquico_repressao",
+                texto: "Manter apoio firme ao governo real e reforçar operações de contra-insurgência",
+                descricao_resultado: "O governo ateniense combate os rebeldes, mas o custo financeiro exaure o tesouro britânico, que prepara sua retirada do Mediterrâneo oriental.",
+                efeitos: [
+                    Modificador(id: "custo_operacao_contra_guerrilha", valor: 0.30),
+                    Modificador(id: "tensao_regional_balcas", valor: 0.25),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEvento(
+                id: "grecia_acordo_paz_governo_coalizao",
+                texto: "Buscar compromisso político e incluir ministros comunistas no gabinete",
+                descricao_resultado: "Permite a transição desarmada, mas arrisca a tomada gradual do Estado pelas milícias pró-soviéticas.",
+                efeitos: [
+                    Modificador(id: "estabilidade_temporaria_grecia", valor: 0.20),
+                    Modificador(id: "risco_golpe_comunista_grecia", valor: 0.40),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 13. INÍCIO DA GUERRA DA INDOCHINA (Dezembro de 1946)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "inssurreicao_indochina_1946",
+        titulo: "O Bombardeio de Haiphong e a Eclosão da Guerra da Indochina",
+        descricao: "Após o bombardeio naval francês ao porto de Haiphong em novembro e a ofensiva de Hanói em dezembro, as negociações entre a França e a República Democrática do Vietnã fracassam. Ho Chi Minh e o general Vo Nguyen Giap retiram-se para as montanhas de Viet Bac para travar uma guerra de guerrilha popular prolongada.",
+        data_gatilho: DataGatilho(ano: 1946, mes: 12, dia: 19),
+        paises_alvo: ["FIC", "FRA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "indochina_repressao_militar_colonial",
+                texto: "Enviar o Corpo Expedicionário Francês para reconquistar a colônia pela força",
+                descricao_resultado: "Inicia uma guerra colonial sangrenta de oito anos que drenará os cofres franceses e culminará no cerco de Dien Bien Phu.",
+                efeitos: [
+                    Modificador(id: "guerra_colonial_indochina", valor: 1.0),
+                    Modificador(id: "custo_manutencao_imperio", valor: 0.35),
+                    Modificador(id: "radicalismo_anticolonial_anual", valor: 0.50),
+                    Modificador(id: "aprovacao_movimento_anticolonial", valor: 25.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "indochina_reconhecer_independencia_ho_chi_minh",
+                texto: "Reconhecer a soberania do Vietnã sob liderança de Ho Chi Minh no seio da União Francesa",
+                descricao_resultado: "Evita o atoleiro militar, mas causa indignação nos meios militares nacionalistas e colonos franceses em Saigon.",
+                efeitos: [
+                    Modificador(id: "independencia_vietna_pacifica", valor: 0.50),
+                    Modificador(id: "aprovacao_militares_franceses", valor: -30.0),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 14. DOUTRINA TRUMAN (Março de 1947)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "doutrina_truman_1947",
+        titulo: "Proclamação da Doutrina Truman: A Política de Contenção",
+        descricao: "Em discurso solene perante sessão conjunta do Congresso dos EUA, o presidente Harry S. Truman declara que a política americana deve ser 'apoiar os povos livres que estão resistindo a tentativas de subjugação por minorias armadas ou por pressões externas', solicitando US$ 400 milhões em ajuda militar e econômica para a Grécia e a Turquia.",
+        data_gatilho: DataGatilho(ano: 1947, mes: 3, dia: 12),
+        paises_alvo: ["USA", "GRE", "TUR", "SOV"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "truman_aprovar_doutrina_contencao",
+                texto: "Aprovar o pacote de socorro e proclamar a Contenção global do comunismo",
+                descricao_resultado: "Os EUA assumem formalmente o papel de garantidor da segurança mundial livre, substituindo o império britânico no Mediterrâneo oriental.",
+                efeitos: [
+                    Modificador(id: "doutrina_contencao_ativa", valor: 1.0),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.25),
+                    Modificador(id: "capacidade_intervencao_global", valor: 0.30),
+                    Modificador(id: "aprovacao_militares", valor: 15.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoEvento(
+                id: "truman_rejeitar_engajamento_isolacionismo",
+                texto: "Rejeitar o compromisso externo e retornar ao isolacionismo tradicional",
+                descricao_resultado: "A Grécia cai nas mãos das guerrilhas comunistas e a Turquia é forçada a assinar pacto desigual de submissão com a URSS.",
+                efeitos: [
+                    Modificador(id: "avanco_comunista_mediterraneo", valor: 0.60),
+                    Modificador(id: "queda_prestigio_eua", valor: -30.0),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 15. O PLANO MARSHALL (Junho de 1947)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "anuncio_plano_marshall_1947",
+        titulo: "O Plano Marshall: O Programa de Recuperação Europeia",
+        descricao: "Em discurso na Universidade de Harvard, o Secretário de Estado George C. Marshall propõe um vasto plano de ajuda financeira de bilhões de dólares para reconstruir a infraestrutura, agricultura e indústrias da Europa arruinada pela guerra, visando impedir o colapso econômico que favoreceria o avanço eleitoral comunista.",
+        data_gatilho: DataGatilho(ano: 1947, mes: 6, dia: 5),
+        paises_alvo: ["USA", "GBR", "FRA", "ITA", "GER"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "marshall_financiar_recuperacao_ampla",
+                texto: "Lançar o Plano Marshall com financiamento maciço de US$ 13 bilhões",
+                descricao_resultado: "Impulsiona o milagre econômico na Europa Ocidental, cria mercados para exportações americanas e cimenta a aliança política ocidental.",
+                efeitos: [
+                    Modificador(id: "recuperacao_industrial_europeia", valor: 0.40),
+                    Modificador(id: "exportacoes_americanas_expansao", valor: 0.35),
+                    Modificador(id: "coesao_bloco_ocidental", valor: 0.40),
+                    Modificador(id: "aprovacao_industriais", valor: 20.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoEvento(
+                id: "marshall_bloquear_ajuda_estrangeira",
+                texto: "Rejeitar subsídios internacionais para priorizar o corte de impostos domésticos",
+                descricao_resultado: "A Europa mergulha em hiperinflação e miséria; partidos comunistas vencem eleições na França e Itália.",
+                efeitos: [
+                    Modificador(id: "crise_economica_europeia", valor: 0.50),
+                    Modificador(id: "radicalismo_trabalhadores_europa", valor: 0.45),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 16. INDEPENDÊNCIA E PARTIÇÃO DA ÍNDIA (Agosto de 1947)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "particao_e_independencia_india_1947",
+        titulo: "A Meia-Noite da Liberdade: Independência e Partição da Índia",
+        descricao: "À meia-noite de 15 de agosto de 1947, o vice-rei Louis Mountbatten transfere a soberania: o Raj Britânico chega ao fim e surgem a Índia independente e o Domínio do Paquistão. A Linha Radcliffe divide o Punjab e Bengala, desencadeando a maior migração em massa forçada da história humana e massacres intercomunitários brutais.",
+        data_gatilho: DataGatilho(ano: 1947, mes: 8, dia: 15),
+        paises_alvo: ["IND", "GBR"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "india_particao_dois_estados",
+                texto: "Proclamar a independência com a partição entre Índia e Paquistão",
+                descricao_resultado: "Jawaharlal Nehru discursa sobre o 'encontro com o destino'; nascem duas repúblicas em meio a 15 milhões de refugiados e 1 milhão de mortos nos conflitos.",
+                efeitos: [
+                    Modificador(id: "descolonizacao_sul_asia", valor: 1.0),
+                    Modificador(id: "conflito_fronteira_caxemira", valor: 0.50),
+                    Modificador(id: "aprovacao_movimento_anticolonial", valor: 30.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "india_manter_presenca_militar_britanica",
+                texto: "Tentar prorrogar o governo colonial com repressão militar reforçada",
+                descricao_resultado: "Provoca insurreição armada generalizada de 400 milhões de habitantes; as forças britânicas entram em colapso desordenado.",
+                efeitos: [
+                    Modificador(id: "colapso_militar_britanico_india", valor: 0.70),
+                    Modificador(id: "radicalismo_anticolonial_anual", valor: 0.60),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 17. FUNDAÇÃO DO COMINFORM (Outubro de 1947)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "fundacao_cominform_1947",
+        titulo: "A Criação do Cominform e a Doutrina Zhdanov dos Dois Campos",
+        descricao: "Em Szklarska Poręba, Polônia, delegados de nove partidos comunistas europeus criam o Cominform. Andrei Zhdanov formula a teoria oficial que divide o mundo em dois campos antagônicos: o 'campo imperialista e antidemocrático' liderado pelos EUA e o 'campo anti-imperialista e democrático' liderado pela URSS.",
+        data_gatilho: DataGatilho(ano: 1947, mes: 10, dia: 5),
+        paises_alvo: ["SOV", "POL", "FRA", "ITA", "YUG", "CZE"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "cominform_adotar_linha_dura_zhdanov",
+                texto: "Proclamar a disciplina partidária estrita e rejeitar o Plano Marshall como armadilha",
+                descricao_resultado: "Partidos comunistas do Leste eliminam as últimas coalizões com partidos liberais e camponeses, impondo a coletivização forçada.",
+                efeitos: [
+                    Modificador(id: "coesao_bloco_sovietico", valor: 0.35),
+                    Modificador(id: "polarizacao_ideologica_global", valor: 0.35),
+                    Modificador(id: "aprovacao_partido_comunista", valor: 20.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "cominform_permitir_vias_nacionais_socialismo",
+                texto: "Permitir autonomia e 'vias nacionais' próprias para cada nação do Leste",
+                descricao_resultado: "Reduz o atrito nos Bálcãs e na Tchecoslováquia, mas enfraquece a autoridade centralizadora de Moscou.",
+                efeitos: [
+                    Modificador(id: "autonomia_leste_europeu", valor: 0.30),
+                    Modificador(id: "aprovacao_intelectuais", valor: 10.0),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 18. PARTILHA DA PALESTINA E CRIAÇÃO DE ISRAEL (Novembro 1947 / Maio 1948)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "partilha_palestina_israel_1947_1948",
+        titulo: "A Resolução 181 da ONU e a Proclamação do Estado de Israel",
+        descricao: "Em 29 de novembro de 1947, a Assembleia Geral da ONU aprova a Resolução 181 recomendando a partilha da Palestina britânica em um Estado judeu e um Estado árabe, com Jerusalém sob regime internacional. Em 14 de maio de 1948, com a retirada britânica, David Ben-Gurion proclama o Estado de Israel, desencadeando a imediata invasão pelas forças da Liga Árabe.",
+        data_gatilho: DataGatilho(ano: 1948, mes: 5, dia: 14),
+        paises_alvo: ["PAL", "GBR", "USA", "SOV"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "israel_reconhecimento_imediato",
+                texto: "Reconhecer formalmente o Estado de Israel no minuto de sua fundação",
+                descricao_resultado: "EUA e URSS reconhecem Israel; a Guerra Árabe-Israelense de 1948 eclode com combates intensos no Neguev, Galileia e Jerusalém.",
+                efeitos: [
+                    Modificador(id: "conflito_arabe_israelense_ativo", valor: 1.0),
+                    Modificador(id: "crise_refugiados_palestinos_nakba", valor: 0.50),
+                    Modificador(id: "tensao_regional_oriente_medio", valor: 0.40),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "israel_postergar_para_tutela_onu",
+                texto: "Manter a tutela fiduciária internacional da ONU sem proclamar independência",
+                descricao_resultado: "Milícias sionistas (Haganah, Irgun) e exércitos árabes entram em confronto direto contra as forças remanescentes da ONU.",
+                efeitos: [
+                    Modificador(id: "anarquia_militar_palestina", valor: 0.50),
+                    Modificador(id: "baixas_forcas_paz_onu", valor: 0.35),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 19. GOLPE DE PRAGA NA TCHECOSLOVÁQUIA (Fevereiro de 1948)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "golpe_de_praga_1948",
+        titulo: "O Golpe de Praga: A Consolidação Comunista na Tchecoslováquia",
+        descricao: "Última democracia multipartidária no Leste Europeu, a Tchecoslováquia sofre crise quando ministros não comunistas renunciam em protesto contra o controle policial do KSC. Com apoio de milícias operárias armadas e pressão soviética, o primeiro-ministro Klement Gottwald força o presidente Edvard Beneš a aceitar um gabinete puramente comunista. Jan Masaryk é encontrado morto misteriosamente.",
+        data_gatilho: DataGatilho(ano: 1948, mes: 2, dia: 25),
+        paises_alvo: ["CZE", "SOV", "USA", "GBR", "FRA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "praga_consolidacao_stalinista",
+                texto: "Estabelecer o monopólio comunista e expurgar a oposição burguesa",
+                descricao_resultado: "A Tchecoslováquia é integrada plenamente ao bloco soviético; o choque em Washington e Londres acelera a criação da OTAN.",
+                efeitos: [
+                    Modificador(id: "alinhamento_tchecoslovaco_sovietico", valor: 1.0),
+                    Modificador(id: "urgencia_criacao_otan", valor: 0.50),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.25),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "praga_resistencia_presidencial_eleicoes",
+                texto: "Beneš rejeita a chantagem de Gottwald e convoca novas eleições antecipadas",
+                descricao_resultado: "O Exército Vermelho cerca as fronteiras tchecas e milícias comunistas tomam estações de rádio e ferrovias em combates de rua.",
+                efeitos: [
+                    Modificador(id: "crise_militar_centro_europa", valor: 0.45),
+                    Modificador(id: "risco_guerra_aberta_europa", valor: 0.35),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 20. RUPTURA TITO-STALIN (Junho de 1948)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "ruptura_tito_stalin_1948",
+        titulo: "A Ruptura Tito-Stalin: O Cisma Soviético-Iugoslávia",
+        descricao: "O marechal Josip Broz Tito recusa-se a submeter a economia e o exército iugoslavo à tutela de conselheiros de Moscou, além de perseguir planos de federação balcânica independente. Em 28 de junho de 1948, o Cominform expulsa o Partido Comunista da Iugoslávia, denunciando Tito como 'renegado traidor e lacaio do imperialismo'.",
+        data_gatilho: DataGatilho(ano: 1948, mes: 6, dia: 28),
+        paises_alvo: ["YUG", "SOV", "USA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "tito_resistir_stalin_autonomia",
+                texto: "Manter a resistência heróica e construir o socialismo autogestionário iugoslavo",
+                descricao_resultado: "Tito sobrevive aos expurgos, recebe créditos econômicos e armas dos EUA e inaugura o modelo de Não-Alinhamento.",
+                efeitos: [
+                    Modificador(id: "iugoslavia_socialismo_autogestionario", valor: 1.0),
+                    Modificador(id: "divisao_movimento_comunista", valor: 0.35),
+                    Modificador(id: "expurgos_titoistas_leste_europeu", valor: 0.40),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "tito_capitular_autocritica_moscou",
+                texto: "Tito faz autocrítica pública e aceita a subordinação total ao Kremlin",
+                descricao_resultado: "Stalin substitui Tito por quadros leais do NKVD; a Iugoslávia é reduzida a mais um satélite submisso na Cortina de Ferro.",
+                efeitos: [
+                    Modificador(id: "monolito_sovietico_reforcado", valor: 0.30),
+                    Modificador(id: "aprovacao_partido_comunista", valor: 15.0),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 21. O BLOQUEIO DE BERLIM E A PONTE AÉREA (Junho 1948 - Maio 1949)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "bloqueio_de_berlim_ponte_aerea_1948",
+        titulo: "O Bloqueio de Berlim e a Ponte Aérea Aliada (Operação Vittles)",
+        descricao: "Em represália à introdução do novo Deutsche Mark nas zonas ocidentais, a União Soviética corta todas as conexões rodoviárias, ferroviárias e fluviais que abastecem Berlim Ocidental. Isolando 2,2 milhões de berlinenses sem alimentos e carvão, Stalin testa a determinação ocidental. O general Lucius Clay responde organizando a gigantesca Ponte Aérea de Berlim.",
+        data_gatilho: DataGatilho(ano: 1948, mes: 6, dia: 24),
+        paises_alvo: ["USA", "GBR", "FRA", "SOV", "GER"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "berlim_sustentar_ponte_aerea_incondicional",
+                texto: "Mobilizar a Ponte Aérea ('Rosinenbomber') e alimentar Berlim pelo ar",
+                descricao_resultado: "Aviões C-47 e C-54 pousam a cada 90 segundos em Tempelhof; após 11 meses e 2,3 milhões de toneladas entregues, Stalin é forçado a levantar o bloqueio em humilhação diplomática.",
+                efeitos: [
+                    Modificador(id: "vitoria_moral_berlim_ocidental", valor: 0.50),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.30),
+                    Modificador(id: "aceleracao_criacao_alemanha_ocidental", valor: 0.40),
+                    Modificador(id: "prestigio_americano_maximo", valor: 25.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoEvento(
+                id: "berlim_evacuar_guarnicao_recuar",
+                texto: "Retirar as tropas aliadas para a Alemanha Ocidental diante do custo logístico",
+                descricao_resultado: "Berlim unificada cai inteiramente sob domínio soviético; o prestígio ocidental na Europa sofre golpe irreparável.",
+                efeitos: [
+                    Modificador(id: "perda_berlim_para_soviéticos", valor: 0.70),
+                    Modificador(id: "desmoralizacao_aliados_europeus", valor: 0.60),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 22. ASSINATURA DO TRATADO DA OTAN (Abril de 1949)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "tratado_do_atlantico_norte_otan_1949",
+        titulo: "Fundação da OTAN: O Tratado do Atlântico Norte",
+        descricao: "Em Washington D.C., ministros das Relações Exteriores de doze nações (EUA, Reino Unido, França, Canadá, Itália, Bélgica, Holanda, Luxemburgo, Dinamarca, Noruega, Islândia e Portugal) assinam o Tratado do Atlântico Norte. O célebre Artigo 5º consagra o princípio de que um ataque armado contra um será considerado um ataque contra todos.",
+        data_gatilho: DataGatilho(ano: 1949, mes: 4, dia: 4),
+        paises_alvo: ["USA", "GBR", "FRA", "ITA", "SOV"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "otan_ratificar_alianca_militar",
+                texto: "Ratificar a OTAN e estacionar tropas americanas permanentes na Europa",
+                descricao_resultado: "A segurança europeia passa a ser formalmente lastreada pelo guarda-chuva nuclear americano; Moscou protesta contra a aliança bélica imperialista.",
+                efeitos: [
+                    Modificador(id: "fundacao_formal_otan", valor: 1.0),
+                    Modificador(id: "garantia_defesa_coletiva_art5", valor: 0.50),
+                    Modificador(id: "dissuasao_nuclear_na_europa", valor: 0.40),
+                    Modificador(id: "aprovacao_militares", valor: 20.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoEvento(
+                id: "otan_rejeitar_artigo_5_defesa_mutua",
+                texto: "Assinar apenas pacto econômico sem cláusula automática de engajamento militar",
+                descricao_resultado: "A aliança torna-se inócua; a Europa Ocidental permanece indefesa perante as divisões blindadas do Exército Vermelho.",
+                efeitos: [
+                    Modificador(id: "fraqueza_defensiva_europeia", valor: 0.50),
+                    Modificador(id: "vulnerabilidade_militar_ocidente", valor: 0.40),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 23. CRIAÇÃO DA RFA E DA RDA (Maio / Outubro de 1949)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "criacao_rfa_e_rda_1949",
+        titulo: "A Bipartição Definitiva da Alemanha: Criação da RFA e RDA",
+        descricao: "Em 23 de maio de 1949, o Conselho Parlamentar em Bonn promulga a Lei Fundamental, fundando a República Federal da Alemanha (RFA), sob a liderança do chanceler Konrad Adenauer. Em resposta, em 7 de outubro de 1949, o setor soviético proclama a República Democrática Alemã (RDA), sob Wilhelm Pieck e Walter Ulbricht, consolidando a divisão alemã por mais de 40 anos.",
+        data_gatilho: DataGatilho(ano: 1949, mes: 5, dia: 23),
+        paises_alvo: ["GER", "USA", "SOV", "GBR", "FRA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "alemanha_aceitar_biparticao_institucional",
+                texto: "Reconhecer a criação dos dois Estados alemães antagônicos",
+                descricao_resultado: "A linha entre as Alemanhas torna-se a fronteira mais fortificada e militarizada do planeta.",
+                efeitos: [
+                    Modificador(id: "alemanha_dividida_fronteira_dupla", valor: 1.0),
+                    Modificador(id: "polarizacao_ideologica_global", valor: 0.30),
+                    Modificador(id: "recuperacao_industrial_rfa", valor: 0.35),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "alemanha_propor_unificacao_neutra_desmilitarizada",
+                texto: "Propor uma Alemanha unificada, neutra e sem alianças militares (Nota de Stalin antecipada)",
+                descricao_resultado: "Adenauer e Washington rejeitam veementemente por temerem a 'finlandização' de toda a Alemanha sob manipulação soviética.",
+                efeitos: [
+                    Modificador(id: "debates_neutralidade_alema", valor: 0.30),
+                    Modificador(id: "incerteza_geopolitica_bonn", valor: 0.25),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 24. O PRIMEIRO TESTE NUCLEAR SOVIÉTICO (Agosto de 1949)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "primeiro_teste_nuclear_sovietico_1949",
+        titulo: "O Teste Nuclear Soviético RDS-1: Fim do Monopólio Atômico",
+        descricao: "Em 29 de agosto de 1949, no polígono de Semipalatinsk, Cazaquistão, a União Soviética detona com sucesso sua primeira bomba atômica de plutônio (RDS-1, codinome 'Primeiro Relâmpago' e apelidada 'Joe-1' pela CIA). Aviões espiões americanos B-29 detectam partículas radioativas na atmosfera: o monopólio nuclear dos EUA desmorona anos antes do previsto.",
+        data_gatilho: DataGatilho(ano: 1949, mes: 8, dia: 29),
+        paises_alvo: ["SOV", "USA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "nuclear_paridade_bomba_h_corrida",
+                texto: "Acelerar o desenvolvimento da Bomba de Hidrogênio (Termonuclear)",
+                descricao_resultado: "Truman autoriza o programa de choque da 'Superbomba'; tem início a era da Destruição Mútua Assegurada (MAD).",
+                efeitos: [
+                    Modificador(id: "paridade_nuclear_estrategica", valor: 1.0),
+                    Modificador(id: "corrida_armamentista_nuclear", valor: 0.60),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.35),
+                    Modificador(id: "aprovacao_militares", valor: 25.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoEvento(
+                id: "nuclear_propor_banimento_total_armas",
+                texto: "Propor a destruição imediata de todos os arsenais atômicos na ONU",
+                descricao_resultado: "Sem mecanismos de inspeção confiáveis dentro do território soviético, a proposta é vista como ingênua e descartada.",
+                efeitos: [
+                    Modificador(id: "desilusao_desarmamento_nuclear", valor: 0.40),
+                    Modificador(id: "vulnerabilidade_estrategica_fator", valor: 0.30),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 25. PROCLAMAÇÃO DA REPÚBLICA POPULAR DA CHINA (Outubro de 1949)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "proclamacao_republica_popular_china_1949",
+        titulo: "Mao na Praça Tiananmen: A Proclamação da República Popular da China",
+        descricao: "Em 1º de outubro de 1949, do alto do Portão da Paz Celestial em Pequim, Mao Zedong proclama solenemente a fundação da República Popular da China: 'O povo chinês se pôs de pé!'. O Kuomintang de Chiang Kai-shek é derrotado na Guerra Civil Chinesa e refugia-se na ilha de Formosa (Taiwan), transferindo um quarto da humanidade para o campo socialista.",
+        data_gatilho: DataGatilho(ano: 1949, mes: 10, dia: 1),
+        paises_alvo: ["CCP", "CHI", "USA", "SOV"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "china_vitoria_mao_reconhecimento_sovietico",
+                texto: "Celebrar a gigantesca vitória estratégica da Revolução Proletária",
+                descricao_resultado: "Moscou ganha um imenso aliado na Ásia; em Washington, eclode o histérico debate sobre 'Quem perdeu a China?', impulsionando o macarthismo.",
+                efeitos: [
+                    Modificador(id: "expansao_bloco_comunista_asia", valor: 0.80),
+                    Modificador(id: "reforma_agraria_radical_china", valor: 0.50),
+                    Modificador(id: "histeria_anticomunista_macarthismo", valor: 0.45),
+                    Modificador(id: "aprovacao_partido_comunista", valor: 30.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoEvento(
+                id: "china_bloqueio_naval_reconhecer_apenas_taiwan",
+                texto: "Impor embargo comercial total e manter Taiwan como única voz legítima da China na ONU",
+                descricao_resultado: "Cria um abismo diplomático de décadas e solidifica a aliança incondicional entre Pequim e Moscou.",
+                efeitos: [
+                    Modificador(id: "isolamento_diplomatico_pequim", valor: 0.40),
+                    Modificador(id: "conflito_estreito_de_taiwan", valor: 0.50),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 26. TRATADO DE AMIZADE SINO-SOVIÉTICO (Fevereiro de 1950)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "tratado_amizade_sino_sovietico_1950",
+        titulo: "O Tratado de Amizade, Aliança e Assistência Mútua Sino-Soviético",
+        descricao: "Após dois meses de difíceis negociações secretas em Moscou entre Stalin e Mao Zedong, a URSS e a República Popular da China assinam uma aliança militar e de ajuda mútua por trinta anos. A URSS concede US$ 300 milhões em créditos e milhares de especialistas técnicos para a industrialização pesada chinesa.",
+        data_gatilho: DataGatilho(ano: 1950, mes: 2, dia: 14),
+        paises_alvo: ["SOV", "CCP", "USA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "sino_sovietico_alianca_eurasiatica",
+                texto: "Selar a grande aliança estratégica eurasiática de ferro",
+                descricao_resultado: "O eixo Moscou-Pequim estende o bloco socialista do Elba ao Mar Amarelo, alterando drasticamente o equilíbrio de poder global.",
+                efeitos: [
+                    Modificador(id: "alianca_militar_sino_sovietica", valor: 1.0),
+                    Modificador(id: "transferencia_tecnologica_china", valor: 0.35),
+                    Modificador(id: "alarme_estrategico_pentagono", valor: 0.40),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "sino_sovietico_rejeitar_concessoes_manchuria",
+                texto: "Mao rejeita a tutela soviética sobre ferrovias e bases navais em Port Arthur",
+                descricao_resultado: "Evita concessões desiguais, mas a China comunista fica privada da ajuda industrial e dos caças a jato soviéticos.",
+                efeitos: [
+                    Modificador(id: "desenvolvimento_industrial_chines_lento", valor: 0.30),
+                    Modificador(id: "distanciamento_precoce_moscou", valor: 0.35),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 27. DIRETRIZ NSC-68 (Abril de 1950)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "diretriz_nsc_68_1950",
+        titulo: "A Diretriz NSC-68: A Militarização da Contenção Global",
+        descricao: "Elaborada por Paul Nitze e aprovada pelo Conselho de Segurança Nacional dos EUA, a diretriz ultra-secreta NSC-68 pinta a URSS como uma potência fanática motivada pela dominação mundial. O documento recomenda a quadruplicação imediata do orçamento militar americano (de US$ 13 bilhões para US$ 50 bilhões anuais) e a expansão global da rede de bases militares.",
+        data_gatilho: DataGatilho(ano: 1950, mes: 4, dia: 14),
+        paises_alvo: ["USA"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "nsc68_quadruplicar_orcamento_militar",
+                texto: "Adotar as recomendações do NSC-68 e expandir drasticamente as Forças Armadas",
+                descricao_resultado: "Consolida o complexo militar-industrial americano e garante a prontidão militar total no momento exato em que a Ásia pega fogo.",
+                efeitos: [
+                    Modificador(id: "orcamento_militar_expansao_maciça", valor: 0.80),
+                    Modificador(id: "capacidade_mobilizacao_global", valor: 0.50),
+                    Modificador(id: "forca_industria_belica", valor: 0.40),
+                    Modificador(id: "aprovacao_militares", valor: 25.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEvento(
+                id: "nsc68_rejeitar_gasto_belico_proteger_balanco",
+                texto: "Preservar a disciplina fiscal e limitar os gastos militares ao mínimo estrito",
+                descricao_resultado: "Reduz a dívida pública, mas deixa o exército americano com divisões esqueléticas e armamento obsoleto quando eclodir a guerra.",
+                efeitos: [
+                    Modificador(id: "vulnerabilidade_militar_convencional", valor: 0.45),
+                    Modificador(id: "aprovacao_industriais", valor: 10.0),
+                    Modificador(id: "aprovacao_militares", valor: -25.0),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 28. ECLOSÃO DA GUERRA DA COREIA (Junho de 1950)
+    // --------------------------------------------------------------------------
+    EventoHistorico(
+        id: "eclosao_guerra_coreia_1950",
+        titulo: "Cruzando o Paralelo 38: Eclosão da Guerra da Coreia",
+        descricao: "Na madrugada de 25 de junho de 1950, após receber autorização de Stalin e Mao, as divisões blindadas do Exército Popular da Coreia do Norte de Kim Il-sung cruzam em massa o Paralelo 38, capturando Seul em três dias. Com a ausência soviética na ONU (devido ao boicote sobre a representação de Taiwan), o Conselho de Segurança vota para enviar tropas para repelir a agressão.",
+        data_gatilho: DataGatilho(ano: 1950, mes: 6, dia: 25),
+        paises_alvo: ["KOR", "USA", "SOV", "CCP"],
+        condicoes: [],
+        opcoes: [
+            OpcaoEvento(
+                id: "coreia_intervencao_total_onu_macarthur",
+                texto: "Intervir sob a bandeira da ONU e ordenar o envio das tropas americanas",
+                descricao_resultado: "MacArthur desembarca em Incheon e expulsa as tropas do Norte, mas a aproximação com o Rio Yalu atrai centenas de milhares de 'voluntários' chineses para o combate.",
+                efeitos: [
+                    Modificador(id: "guerra_da_coreia_ativa", valor: 1.0),
+                    Modificador(id: "mobilizacao_militar_total", valor: 0.50),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.40),
+                    Modificador(id: "aprovacao_militares", valor: 20.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoEvento(
+                id: "coreia_abandonar_seul_evitar_conflito_asiatico",
+                texto: "Recusar o engajamento e considerar a Coreia fora do perímetro defensivo americano",
+                descricao_resultado: "A Coreia é unificada sob Kim Il-sung; Tóquio entra em pânico temendo invasão comunista iminente.",
+                efeitos: [
+                    Modificador(id: "unificacao_comunista_coreia", valor: 0.70),
+                    Modificador(id: "colapso_credibilidade_eua_asia", valor: 0.60),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+]
