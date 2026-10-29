@@ -1,0 +1,10 @@
+[package]
+name = "sim_diplomacia"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Motor puro de diplomacia, esferas de influência e organizações da Guerra Fria"
+
+[dependencies]
+ron.workspace = true
+serde.workspace = true
