@@ -526,10 +526,11 @@ struct Sombra;
 
 #[derive(Resource)]
 struct RecursosTrafego {
-    casco: Handle<Mesh>,
+    cascos: [Handle<Mesh>; 3],
     aviao_helice: Handle<Mesh>,
     aviao_jato: Handle<Mesh>,
     mat_navio: [Handle<ColorMaterial>; 3],
+    mat_vertice: Handle<ColorMaterial>,
     mat_helice: Handle<ColorMaterial>,
     mat_jato: Handle<ColorMaterial>,
 }
@@ -553,8 +554,95 @@ fn malha_poligonos(polis: &[&[[f32; 2]]]) -> Mesh {
         .with_inserted_indices(Indices::U32(idx))
 }
 
+/// Malha com cor por vértice: cada peça é (polígono convexo, cor); camadas posteriores ficam por cima.
+fn malha_colorida(pecas: &[(&[[f32; 2]], [f32; 4])]) -> Mesh {
+    let mut pos: Vec<[f32; 3]> = Vec::new();
+    let mut cores: Vec<[f32; 4]> = Vec::new();
+    let mut idx: Vec<u32> = Vec::new();
+    for (camada, (p, cor)) in pecas.iter().enumerate() {
+        let base = pos.len() as u32;
+        pos.extend(p.iter().map(|v| [v[0], v[1], 0.02 * camada as f32]));
+        cores.extend(std::iter::repeat(*cor).take(p.len()));
+        for i in 1..(p.len() as u32 - 1) {
+            idx.extend([base, base + i, base + i + 1]);
+        }
+    }
+    let n = pos.len();
+    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, pos)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 0.0, 1.0]; n])
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 0.0]; n])
+        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, cores)
+        .with_inserted_indices(Indices::U32(idx))
+}
+
+fn caixa(x0: f32, x1: f32, y0: f32, y1: f32) -> [[f32; 2]; 4] {
+    [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+}
+
+/// Silhuetas de navio com comprimento 1 (proa em +x): cargueiro, petroleiro, graneleiro.
+fn malhas_navios() -> [Mesh; 3] {
+    let ponte = [0.90, 0.90, 0.86, 1.0];
+    let chamine = [0.75, 0.22, 0.18, 1.0];
+    // Cargueiro: casco 3,3:1, ponte e chaminé à ré, contêineres coloridos à vante.
+    let h = [
+        [-0.5, -0.15], [0.28, -0.15], [0.5, 0.0], [0.28, 0.15], [-0.5, 0.15],
+    ];
+    let (b1, b2, b3, b4) = (caixa(-0.12, 0.0, -0.10, 0.10), caixa(0.02, 0.14, -0.10, 0.10), caixa(0.16, 0.26, -0.08, 0.08), caixa(-0.46, -0.30, -0.10, 0.10));
+    let (cb, ch) = (caixa(-0.27, -0.20, -0.04, 0.04), caixa(-0.20, -0.15, -0.04, 0.04));
+    let cargueiro = malha_colorida(&[
+        (&h, [0.20, 0.22, 0.27, 1.0]),
+        (&b1, [0.80, 0.30, 0.18, 1.0]),
+        (&b2, [0.22, 0.45, 0.75, 1.0]),
+        (&b3, [0.85, 0.70, 0.20, 1.0]),
+        (&b4, ponte),
+        (&cb, [0.97, 0.97, 0.95, 1.0]),
+        (&ch, chamine),
+    ]);
+    // Petroleiro: mais comprido e baixo, tubulação no convés.
+    let h = [[-0.5, -0.11], [0.34, -0.11], [0.5, 0.0], [0.34, 0.11], [-0.5, 0.11]];
+    let (dutos, p, c) = (caixa(-0.20, 0.36, -0.015, 0.015), caixa(-0.47, -0.34, -0.085, 0.085), caixa(-0.40, -0.35, -0.04, 0.04));
+    let tanques = caixa(-0.22, 0.34, -0.07, 0.07);
+    let petroleiro = malha_colorida(&[
+        (&h, [0.10, 0.11, 0.14, 1.0]),
+        (&tanques, [0.30, 0.20, 0.17, 1.0]),
+        (&dutos, [0.75, 0.75, 0.70, 1.0]),
+        (&p, ponte),
+        (&c, chamine),
+    ]);
+    // Graneleiro: largo, proa curta, escotilhas.
+    let h = [[-0.5, -0.18], [0.36, -0.18], [0.5, -0.06], [0.5, 0.06], [0.36, 0.18], [-0.5, 0.18]];
+    let (e1, e2, e3, e4) = (caixa(-0.22, -0.08, -0.12, 0.12), caixa(-0.05, 0.09, -0.12, 0.12), caixa(0.12, 0.26, -0.12, 0.12), caixa(0.29, 0.38, -0.09, 0.09));
+    let (p, c) = (caixa(-0.46, -0.30, -0.13, 0.13), caixa(-0.38, -0.32, -0.05, 0.05));
+    let esc = [0.45, 0.36, 0.24, 1.0];
+    let graneleiro = malha_colorida(&[
+        (&h, [0.36, 0.28, 0.20, 1.0]),
+        (&e1, esc), (&e2, esc), (&e3, esc), (&e4, esc),
+        (&p, ponte),
+        (&c, chamine),
+    ]);
+    [cargueiro, petroleiro, graneleiro]
+}
+
+/// Tamanho de ícone em pixels de TELA -> unidades de mundo (compensa a escala da câmera,
+/// como os marcadores de cidade). Pequeno de longe, maior de perto.
+fn px_para_mundo(px: f32, escala_camera: f32) -> f32 {
+    px * escala_camera.max(0.02)
+}
+
+/// Comprimento do navio em pixels de tela (6 px longe, ~16 px perto).
+fn navio_px(escala_camera: f32) -> f32 {
+    (10.0 * escala_camera.max(0.05).powf(-0.25)).clamp(6.0, 16.0)
+}
+
+/// Envergadura/comprimento do avião em pixels de tela (5 px longe, ~14 px perto).
+fn aviao_px(escala_camera: f32) -> f32 {
+    (9.0 * escala_camera.max(0.05).powf(-0.25)).clamp(5.0, 14.0)
+}
+
 fn criar_recursos(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut mats: ResMut<Assets<ColorMaterial>>) {
-    let casco = meshes.add(malha_poligonos(&[&[[-0.5, -0.22], [0.28, -0.22], [0.5, 0.0], [0.28, 0.22], [-0.5, 0.22]]]));
+    let [m0, m1, m2] = malhas_navios();
+    let cascos = [meshes.add(m0), meshes.add(m1), meshes.add(m2)];
     let helice = meshes.add(malha_poligonos(&[
         &[[-0.5, -0.05], [0.45, -0.05], [0.5, 0.0], [0.45, 0.05], [-0.5, 0.05]],
         &[[-0.08, -0.5], [0.12, -0.5], [0.12, 0.5], [-0.08, 0.5]],
@@ -569,10 +657,11 @@ fn criar_recursos(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut 
     ]));
     let mut cm = |r: f32, g: f32, b: f32| mats.add(ColorMaterial::from_color(Color::srgb(r, g, b)));
     commands.insert_resource(RecursosTrafego {
-        casco,
+        cascos,
         aviao_helice: helice,
         aviao_jato: jato,
         mat_navio: [cm(0.22, 0.24, 0.28), cm(0.08, 0.08, 0.10), cm(0.42, 0.30, 0.20)],
+        mat_vertice: cm(1.0, 1.0, 1.0),
         mat_helice: cm(0.78, 0.75, 0.62),
         mat_jato: cm(0.95, 0.96, 0.98),
     });
@@ -643,11 +732,12 @@ fn gerenciar_plano_sistema(
 fn spawnar_navios(commands: &mut Commands, plano: &[RotaNavios], rec: &RecursosTrafego) {
     let mut idx = 0u32;
     for p in plano {
-        let (comp, larg, mat) = match p.tipo {
-            TipoNavio::Cargueiro => (15.0, 6.0, 0),
-            TipoNavio::Petroleiro => (19.0, 7.5, 1),
-            TipoNavio::Graneleiro => (17.0, 6.5, 2),
+        let mat = match p.tipo {
+            TipoNavio::Cargueiro => 0,
+            TipoNavio::Petroleiro => 1,
+            TipoNavio::Graneleiro => 2,
         };
+        let larg_faixa = [0.26, 0.19, 0.32][mat];
         let cor = cor_pais(&p.operador);
         let len = p.rota.comprimento();
         for k in 0..p.navios {
@@ -656,9 +746,9 @@ fn spawnar_navios(commands: &mut Commands, plano: &[RotaNavios], rec: &RecursosT
             let (pos, _) = p.rota.amostrar(len * frac);
             commands
                 .spawn((
-                    Mesh2d(rec.casco.clone()),
-                    MeshMaterial2d(rec.mat_navio[mat].clone()),
-                    Transform::from_translation(pos.extend(Z_NAVIO)).with_scale(Vec3::new(comp, larg, 1.0)),
+                    Mesh2d(rec.cascos[mat].clone()),
+                    MeshMaterial2d(rec.mat_vertice.clone()),
+                    Transform::from_translation(pos.extend(Z_NAVIO)).with_scale(Vec3::splat(8.0)),
                     Visibility::Hidden,
                     NavioVisual {
                         rota: p.rota.clone(),
@@ -675,17 +765,19 @@ fn spawnar_navios(commands: &mut Commands, plano: &[RotaNavios], rec: &RecursosT
                     },
                 ))
                 .with_children(|c| {
-                    // bandeira na cor do país, na popa (coordenadas locais do casco unitário)
+                    // faixa na cor do país, na popa (coordenadas locais do casco de comprimento 1)
                     c.spawn((
-                        Sprite::from_color(cor, Vec2::new(0.22, 0.5)),
-                        Transform::from_xyz(-0.30, 0.0, 0.1),
+                        Sprite::from_color(cor, Vec2::new(0.05, larg_faixa)),
+                        Transform::from_xyz(-0.48, 0.0, 0.3),
                     ));
-                    // esteira
-                    c.spawn((
-                        Sprite::from_color(Color::srgba(1.0, 1.0, 1.0, 0.28), Vec2::new(0.9, 0.35)),
-                        Transform::from_xyz(-1.0, 0.0, -0.1),
-                        Esteira,
-                    ));
+                    // esteira sutil: duas linhas curtas semitransparentes atrás do navio
+                    for (x, comp, a) in [(-0.85, 0.6, 0.22), (-1.35, 0.5, 0.10)] {
+                        c.spawn((
+                            Sprite::from_color(Color::srgba(1.0, 1.0, 1.0, a), Vec2::new(comp, 0.07)),
+                            Transform::from_xyz(x, 0.0, -0.1),
+                            Esteira,
+                        ));
+                    }
                 });
             idx += 1;
         }
@@ -711,7 +803,8 @@ fn mover_navios_sistema(
     mut q: Query<(&mut NavioVisual, &mut Transform, &mut Visibility)>,
 ) {
     let dt = time.delta_secs().min(0.1);
-    let (passo, esc) = lod_trafego(&lod);
+    let (passo, _) = lod_trafego(&lod);
+    let esc = lod.escala_camera;
     for (mut n, mut tr, mut vis) in &mut q {
         let comp_rota = n.rota.comprimento();
         if n.espera > 0.0 {
@@ -746,12 +839,13 @@ fn mover_navios_sistema(
         n.angulo += dif * (1.0 - (-5.0 * dt).exp());
         tr.translation = (pos + normal * n.lateral).extend(Z_NAVIO);
         tr.rotation = Quat::from_rotation_z(n.angulo);
-        let base = match n.tipo {
-            TipoNavio::Cargueiro => Vec2::new(15.0, 6.0),
-            TipoNavio::Petroleiro => Vec2::new(19.0, 7.5),
-            TipoNavio::Graneleiro => Vec2::new(17.0, 6.5),
+        let mult = match n.tipo {
+            TipoNavio::Cargueiro => 1.0,
+            TipoNavio::Petroleiro => 1.2,
+            TipoNavio::Graneleiro => 0.95,
         };
-        tr.scale = (base * esc * cfg.escala_icones).extend(1.0);
+        let l = px_para_mundo(navio_px(esc) * mult * cfg.escala_icones, esc);
+        tr.scale = Vec3::new(l, l, 1.0);
         let ver = cfg.ativo && camada.0 && n.idx % passo == 0;
         let novo = if ver { Visibility::Inherited } else { Visibility::Hidden };
         if *vis != novo {
@@ -831,7 +925,7 @@ fn mover_avioes_sistema(
     let ativos = avioes_ativos_no_ano(ano.0, cfg.max_avioes);
     let jato_frac = fracao_jato_no_ano(ano.0);
     let aero: Vec<Vec2> = cidades.cidades.iter().take(cfg.cidades_aeroporto).map(|c| c.mundo).collect();
-    let (passo, esc) = lod_trafego(&lod);
+    let esc = lod.escala_camera;
     for (mut a, mut tr, mut vis, mut mesh, mut mat, filhos) in &mut q {
         let ativo = cfg.ativo && camada.0 && (a.ordem as usize) < ativos
             && match lod.nivel_atual {
@@ -839,7 +933,6 @@ fn mover_avioes_sistema(
                 NivelLod::Regional => a.ordem % 2 == 0,
                 NivelLod::Local => true,
             };
-        let _ = passo;
         let novo = if ativo { Visibility::Inherited } else { Visibility::Hidden };
         if *vis != novo {
             *vis = novo;
@@ -881,7 +974,7 @@ fn mover_avioes_sistema(
         let alt = (a.t.min(1.0 - a.t) * 6.0).clamp(0.0, 1.0); // 0 no solo, 1 em cruzeiro
         tr.translation = pos.extend(Z_AVIAO);
         tr.rotation = Quat::from_rotation_z(a.angulo);
-        let tam = if a.jato { 15.0 } else { 11.0 } * esc * cfg.escala_icones * (0.7 + 0.3 * alt);
+        let tam = px_para_mundo(aviao_px(esc) * if a.jato { 1.25 } else { 1.0 } * cfg.escala_icones, esc) * (0.7 + 0.3 * alt);
         tr.scale = Vec3::new(tam, tam, 1.0);
         for &c in filhos {
             if let Ok((mut s, _)) = sombras.get_mut(c) {
