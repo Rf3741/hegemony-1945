@@ -17,11 +17,14 @@ pub mod dados;
 pub mod entrada;
 pub mod era;
 pub mod industria;
+pub mod linhas;
 pub mod lod;
 pub mod mapa;
 pub mod mapeamento;
 pub mod predio;
 pub mod projecao;
+pub mod rios;
+pub mod rotas;
 pub mod transporte;
 
 #[cfg(feature = "demo")]
@@ -78,6 +81,16 @@ impl Plugin for VisualMapaPlugin {
             .init_resource::<IndiceEntidadesEconomia>()
             .init_resource::<AtlasVisual>()
             .init_resource::<CatalogoMapeamentoPredios>()
+            .init_resource::<rios::ConfigRios>()
+            .init_resource::<rotas::ConfigRotas>()
+            .init_resource::<rotas::EstadoRotas>()
+            .add_systems(Startup, rios::criar_rios_sistema)
+            .add_systems(
+                Update,
+                (rotas::reconstruir_rotas_sistema, rotas::lod_rotas_sistema, rios::lod_rios_sistema)
+                    .chain()
+                    .after(VisualMapaSet::Animar),
+            )
             .add_systems(
                 Startup,
                 (
