@@ -79,6 +79,9 @@ pub struct ProvinciaMapa {
     pub id: u32,
     /// Código estável do Natural Earth 10m Admin-1 (ex: `"BRA-1311"`, `"USA-3521"`).
     pub adm1_code: String,
+    /// Nome do ESTADO (região admin-1 pai, agrupador estilo Victoria 3). Vazio em catálogos antigos.
+    #[serde(default)]
+    pub estado: String,
     /// Nome de exibição em português brasileiro (ou topônimo local quando não traduzido).
     pub nome: String,
     /// Cor RGB única no bitmap `assets/map/provinces.png`.
