@@ -30,7 +30,7 @@ pub use catalogo::{
     Bem, CatalogoEconomia, LeiEconomica, MetodoProducao, SubstituicaoNecessidade, TipoPop,
     TipoPredio, ler_arquivo_ron, ler_str_ron,
 };
-pub use canais::{CanalHistorico, canal_disponivel, canais, dono_canal};
+pub use canais::{CanalHistorico, canal_disponivel, canais, dono_canal, pedagio_diario};
 pub use cenario::CenarioEconomia;
 pub use entidades::{
     BlocoComercial, ConfigSimulacao, DetalheRotaComercial, Estado, ItemConstrucao, Mercado,

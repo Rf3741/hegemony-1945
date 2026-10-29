@@ -605,6 +605,17 @@ impl MundoEconomico {
         })
     }
 
+    /// Pedágio diário dos canais (calendário histórico): credita o tesouro do país dono.
+    fn cobrar_pedagios_canais(&mut self) {
+        for c in crate::canais::canais() {
+            if let Some((dono, valor)) = crate::canais::pedagio_diario(&c.id, self.data_atual)
+                && let Some(&i) = self.indice_paises.get(dono)
+            {
+                self.paises[i].orcamento.tesouro += valor;
+            }
+        }
+    }
+
     /// Executa 1 tick diário completo do motor econômico, avançando o calendário em 1 dia.
     pub fn executar_tick_diario(&mut self) -> RelatorioTick {
         self.buffers.importacoes_liquidas.fill(0.0);
@@ -765,6 +776,7 @@ impl MundoEconomico {
         );
 
         self.dias_decorridos = proximo_dia_num;
+        self.cobrar_pedagios_canais();
         self.data_atual.avancar_dia();
 
         let pib_mundial_diario = self.paises.iter().map(|p| p.pib_diario).sum();
@@ -947,6 +959,7 @@ impl MundoEconomico {
         t.governo_ms = i6.elapsed().as_secs_f64() * 1_000.0;
 
         self.dias_decorridos = proximo_dia_num;
+        self.cobrar_pedagios_canais();
         self.data_atual.avancar_dia();
 
         let pib_mundial_diario = self.paises.iter().map(|p| p.pib_diario).sum();

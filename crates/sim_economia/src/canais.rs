@@ -23,6 +23,8 @@ pub struct CanalHistorico {
     pub id: String,
     pub nome: String,
     pub pedagio_por_navio: f64,
+    /// Fluxo estimado de navios por dia quando o canal opera.
+    pub navios_por_dia: f64,
     pub abertura: Dt,
     pub donos: Vec<DonoPeriodo>,
     pub fechamentos: Vec<Fechamento>,
@@ -59,6 +61,15 @@ pub fn dono_canal(id: &str, data: DataJogo) -> Option<&'static str> {
     c.donos.iter().filter(|d| d.desde <= t).max_by_key(|d| d.desde).map(|d| d.pais.as_str())
 }
 
+/// Receita diária estimada de pedágio `(país dono, valor)` na data; `None` se fechado ou sem dono.
+pub fn pedagio_diario(id: &str, data: DataJogo) -> Option<(&'static str, f64)> {
+    if !canal_disponivel(id, data) {
+        return None;
+    }
+    let c = canais().iter().find(|c| c.id == id)?;
+    Some((dono_canal(id, data)?, c.navios_por_dia * c.pedagio_por_navio))
+}
+
 #[cfg(test)]
 mod testes {
     use super::*;
@@ -78,6 +89,16 @@ mod testes {
         assert!(!canal_disponivel("suez", d(1967, 6, 5)));
         assert!(!canal_disponivel("suez", d(1975, 6, 5)));
         assert!(canal_disponivel("suez", d(1975, 6, 6)));
+    }
+
+    #[test]
+    fn pedagio_segue_a_historia() {
+        let (dono, v) = pedagio_diario("suez", d(1945, 1, 1)).unwrap();
+        assert_eq!(dono, "gbr");
+        assert!(v > 0.0);
+        assert_eq!(pedagio_diario("suez", d(1960, 1, 1)).unwrap().0, "egy");
+        assert!(pedagio_diario("suez", d(1957, 1, 1)).is_none());
+        assert!(pedagio_diario("volga_don", d(1945, 1, 1)).is_none());
     }
 
     #[test]
