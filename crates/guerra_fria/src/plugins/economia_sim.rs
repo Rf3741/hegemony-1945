@@ -276,7 +276,7 @@ impl Nucleo {
                 id: p.id.clone(),
                 nome: p.nome.clone(),
                 pib_anual: p.pib_diario * 365.0,
-                populacao: mundo.populacao_total_pais(&p.id).unwrap_or(0.0),
+                populacao: mundo.populacao_exibida_pais(&p.id).unwrap_or(0.0),
                 padrao_vida: mundo.padrao_de_vida_medio_pais(&p.id).unwrap_or(0.0),
             });
         }
@@ -325,7 +325,7 @@ impl Nucleo {
         let Some(pais) = mundo.obter_pais(pais_id) else { return v };
         v.pib_anual = pais.pib_diario * 365.0;
         v.padrao_vida = mundo.padrao_de_vida_medio_pais(pais_id).unwrap_or(0.0);
-        v.populacao = mundo.populacao_total_pais(pais_id).unwrap_or(0.0);
+        v.populacao = mundo.populacao_exibida_pais(pais_id).unwrap_or(0.0);
         v.pontos_construcao_dia = mundo.pontos_construcao_dia(pais_id).unwrap_or(0.0);
         v.custo_materiais = cat.tipos_predio.iter().map(|t| mundo.custo_materiais_obra(pais_id, &t.id).unwrap_or(0.0)).collect();
         v.estados = mundo.estados().iter().filter(|e| e.pais_id == pais_id).cloned().collect();
