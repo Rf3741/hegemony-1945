@@ -4,7 +4,9 @@ use std::path::Path;
 
 fn carregar() -> MundoEconomico {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/data/economia");
-    MundoEconomico::novo(CenarioEconomia::carregar_diretorio(&dir).unwrap()).unwrap()
+    let mut cen = CenarioEconomia::carregar_diretorio(&dir).unwrap();
+    cen.config.modo_cadencia = sim_economia::ModoCadencia::DiarioComAjusteSemanal;
+    MundoEconomico::novo(cen).unwrap()
 }
 
 fn relatorio(m: &MundoEconomico, rotulo: &str) {
@@ -78,7 +80,7 @@ fn diagnostico_dias() {
 fn diagnostico_predios() {
     let mut m = carregar();
     let id = std::env::var("PAIS").unwrap_or("bra".into());
-    for _ in 0..3 { m.executar_tick_diario(); }
+    for _ in 0..std::env::var("DIAS").ok().and_then(|s| s.parse().ok()).unwrap_or(3) { m.executar_tick_diario(); }
     let mut agg: std::collections::BTreeMap<String, [f64; 7]> = Default::default();
     for pr in m.provincias().iter().filter(|x| x.pais_id == id) {
         for b in &pr.predios {
@@ -106,4 +108,22 @@ fn diagnostico_infra() {
     let mut hist = [0; 5];
     for e in m.estados() { let a = e.acesso_mercado; hist[((a*4.0).floor() as usize).min(4)] += 1; }
     eprintln!("EST hist acesso mundial (0-.25,.25-.5,.5-.75,.75-1,1) {hist:?}");
+}
+
+#[test]
+fn diagnostico_mercado() {
+    let mut m = carregar();
+    let id = std::env::var("PAIS").unwrap_or("bra".into());
+    let mid = m.obter_pais(&id).unwrap().mercado_id.clone();
+    let mut dia = 0;
+    for alvo in [1, 3, 6, 12] {
+        while dia < alvo { m.executar_tick_diario(); dia += 1; }
+        eprintln!("MERC dia {dia} mercado {mid}");
+        for bem in &m.catalogo().bens {
+            let o = m.oferta_atual(&mid, &bem.id).unwrap();
+            let d = m.demanda_atual(&mid, &bem.id).unwrap();
+            let p = m.preco_atual(&mid, &bem.id).unwrap();
+            if o + d > 0.0 { eprintln!("MERC {:26} oferta {:>12.0} demanda {:>12.0} preco/base {:.2}", bem.id, o, d, p / bem.preco_base); }
+        }
+    }
 }

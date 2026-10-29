@@ -375,8 +375,10 @@ pub(crate) fn executar_consumo_tributos_e_bem_estar(
 
             // 2e. Orçamento doméstico de consumo com colchão suavizador de poupança (15 dias)
             let reserva_alvo = 15.0 * renda_liquida;
+            // Poupança limitada a 15% da renda: sem esse piso, pops com reserva inicial baixa passavam
+            // semanas poupando ~90% da renda e a demanda por bens despencava (colapso de 1945).
             let orcamento_consumo = (renda_liquida + 0.06 * (pop.riqueza_reservas - reserva_alvo))
-                .clamp(0.0, renda_liquida + 0.25 * pop.riqueza_reservas);
+                .clamp(0.85 * renda_liquida, renda_liquida + 0.25 * pop.riqueza_reservas);
 
             pop.riqueza_reservas =
                 (pop.riqueza_reservas + renda_liquida - orcamento_consumo).max(0.0);
