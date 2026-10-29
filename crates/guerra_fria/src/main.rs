@@ -20,6 +20,7 @@ use plugins::{
     rotas_ponte::RotasPontePlugin,
     visual_construcoes::VisualConstrucoesPlugin,
     rotulos_pais::RotulosPaisPlugin,
+    tecnologia_ui::TecnologiaUiPlugin,
 };
 use simulacao::mundo::MundoJogo;
 use std::path::PathBuf;
@@ -71,5 +72,6 @@ fn main() {
             ..default()
         })
         .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, ConstrucaoUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, RotasPontePlugin, VisualConstrucoesPlugin, RotulosPaisPlugin))
+        .add_plugins(TecnologiaUiPlugin)
         .run();
 }

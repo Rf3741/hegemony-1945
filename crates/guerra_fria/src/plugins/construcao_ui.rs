@@ -166,14 +166,15 @@ pub fn opcoes_para_provincia(v: &VistaEconomia, prov: &Provincia) -> Vec<OpcaoCo
         .iter()
         .enumerate()
         .map(|(i, t)| {
-            let comporta = v.comporta(prov, i);
+            let bloqueio_tec = v.bloqueio_predios.get(&t.id);
+            let comporta = bloqueio_tec.is_none() && v.comporta(prov, i);
             let mat = calcular_custo_materiais_obra(cat, t, &v.bens);
             let luc = calcular_lucratividade_esperada(cat, t, &t.metodos_padrao, &v.bens, 4.0);
             let q = est.map_or(1.0, |e| e.fator_qualidade_predio(t));
             let (potencial, motivo) = match est {
                 Some(e) => {
                     let p = texto_potencial(v, e, t);
-                    let m = if comporta { String::new() } else { p.clone() };
+                    let m = if let Some(tec) = bloqueio_tec { format!("Requer tecnologia: {tec}") } else if comporta { String::new() } else { p.clone() };
                     (p, m)
                 }
                 None => ("-".into(), String::new()),

@@ -53,10 +53,16 @@ impl Plugin for VisualConstrucoesPlugin {
 /// Sincroniza o ano contínuo do visual do mapa a partir do relógio do jogo.
 fn sincronizar_relogio_visual_sistema(
     relogio: Option<Res<RecursoRelogio>>,
+    tec: Option<Res<super::tecnologia_ui::TecnologiaSim>>,
     mut ano: ResMut<AnoVisual>,
 ) {
     if let Some(r) = relogio {
-        let ano_calc = r.data.ano as f32 + (r.data.mes as f32 - 1.0) / 12.0;
+        let mut ano_calc = r.data.ano as f32 + (r.data.mes as f32 - 1.0) / 12.0;
+        // Era visual do país do jogador (tecnologia): limita o ano à faixa da era alcançada (sem transição antes da hora).
+        if let Some(t) = tec {
+            let era = t.era_jogador as f32;
+            ano_calc = ano_calc.clamp(era, era + 7.99);
+        }
         if (ano.0 - ano_calc).abs() > 0.005 {
             ano.0 = ano_calc;
         }

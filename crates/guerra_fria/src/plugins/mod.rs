@@ -12,3 +12,4 @@ pub mod rotulos_pais;
 pub mod time;
 pub mod ui;
 pub mod visual_construcoes;
+pub mod tecnologia_ui;
