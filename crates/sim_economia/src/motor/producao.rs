@@ -357,8 +357,8 @@ pub fn atualizar_infraestrutura_estados(
 
             // Geração de capacidade por modais de infraestrutura
             // Infraestrutura física depende do nível construído, não da tripulação: estradas e trilhos
-            // continuam existindo mesmo com falta de operários (piso de 40% de eficiência).
-            let infra_gerada = (b.nivel as f64) * (0.4 + 0.6 * r_emp) * b.cache.infraestrutura_por_nivel;
+            // continuam existindo mesmo com falta de operários (independente da ocupação).
+            let infra_gerada = (b.nivel as f64) * b.cache.infraestrutura_por_nivel;
             if def.id == "rede_ferroviaria" {
                 estados[e_idx].infraestrutura_ferrovias += infra_gerada;
             } else if def.id == "rodovia" {

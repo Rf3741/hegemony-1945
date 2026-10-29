@@ -655,7 +655,7 @@ impl MundoEconomico {
         );
         if self.config.comercio_mundial_automatico {
             let abertura: Vec<f64> =
-                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m).max(0.35)).collect();
+                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m).max(0.8)).collect();
             global::processar_comercio_mundial(
                 &self.catalogo,
                 &self.config,
@@ -833,7 +833,7 @@ impl MundoEconomico {
         );
         if self.config.comercio_mundial_automatico {
             let abertura: Vec<f64> =
-                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m).max(0.35)).collect();
+                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m).max(0.8)).collect();
             global::processar_comercio_mundial(
                 &self.catalogo,
                 &self.config,

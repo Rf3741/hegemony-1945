@@ -208,3 +208,54 @@ fn construcao_automatica_5_anos_ritmo_realista_e_tick_rapido() {
     assert!(n1 as f64 <= n0 as f64 * 1.25, "níveis explodiram: {n0} -> {n1}");
     assert!(maxima_fila <= 6, "fila por país grande demais: {maxima_fila}");
 }
+
+#[test]
+#[ignore = "diagnóstico manual"]
+fn diagnostico_escala() {
+    let mut m = carregar();
+    let id = std::env::var("PAIS").unwrap_or("bra".into());
+    for _ in 0..std::env::var("DIAS").ok().and_then(|s| s.parse().ok()).unwrap_or(200) { m.executar_tick_diario(); }
+    let mut agg: std::collections::BTreeMap<String, [f64; 4]> = Default::default();
+    for pr in m.provincias().iter().filter(|x| x.pais_id == id) {
+        for b in &pr.predios {
+            let e = agg.entry(b.tipo_predio_id.clone()).or_default();
+            e[0] += b.nivel as f64; e[1] += b.escala_efetiva(); e[2] += b.fator_insumos() * b.nivel as f64; e[3] += b.taxa_ocupacao() * b.nivel as f64;
+        }
+    }
+    for (k, v) in agg { eprintln!("ESC {k:28} niveis {:>6.0} escala/nivel {:.2} fator_ins {:.2} ocup {:.2}", v[0], v[1] / v[0], v[2] / v[0], v[3] / v[0]); }
+    let a: Vec<f64> = m.estados().iter().filter(|e| e.pais_id == id).map(|e| e.acesso_mercado).collect();
+    eprintln!("ESC acesso medio {:.2}", a.iter().sum::<f64>() / a.len() as f64);
+}
+
+#[test]
+#[ignore = "diagnóstico manual"]
+fn diagnostico_suprimento() {
+    let mut m = carregar();
+    for _ in 0..200 { m.executar_tick_diario(); }
+    let mid = m.obter_pais("bra").unwrap().mercado_id.clone();
+    for bem in &m.catalogo().bens {
+        let o = m.oferta_atual(&mid, &bem.id).unwrap();
+        let d = m.demanda_atual(&mid, &bem.id).unwrap();
+        let sup = if d <= 1e-6 || 2.0 * o >= d { 1.0 } else { 2.0 * o / d };
+        eprintln!("SUP {:26} sup {:.2} oferta {:>10.0} demanda {:>10.0} preco/base {:.2}", bem.id, sup, o, d, m.preco_atual(&mid, &bem.id).unwrap() / bem.preco_base);
+    }
+}
+
+#[test]
+fn cinco_anos_desemprego_e_pib_dos_grandes_estaveis() {
+    let mut m = carregar();
+    let pib0: Vec<f64> = GRANDES.iter().map(|id| m.obter_pais(id).unwrap().pib_diario).collect();
+    for dia in 1..=1826 {
+        m.executar_tick_diario();
+        if dia % 365 == 0 {
+            for (i, id) in GRANDES.iter().enumerate() {
+                let p = m.obter_pais(id).unwrap();
+                let d = m.taxa_desemprego_media_pais(id).unwrap();
+                eprintln!("ano {} {id}: desemp {:.1}% PIB {:.0}% do inicial", dia / 365, 100.0 * d, 100.0 * p.pib_diario / pib0[i]);
+                assert!(d < 0.18, "{id}: desemprego {:.1}% no ano {}", 100.0 * d, dia / 365);
+                assert!(p.pib_diario > 0.70 * pib0[i], "{id}: PIB em {:.0}% do inicial no ano {}", 100.0 * p.pib_diario / pib0[i], dia / 365);
+                assert!(!p.orcamento.em_calote, "{id}: calote");
+            }
+        }
+    }
+}

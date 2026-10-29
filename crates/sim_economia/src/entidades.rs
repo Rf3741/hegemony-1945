@@ -1078,7 +1078,7 @@ impl Default for ConfigSimulacao {
             taxa_demissao_diaria: 0.025,
             habilitar_investimento_privado_automatico: true,
             comercio_mundial_automatico: true,
-            fracao_maxima_importacao_residual: 0.6,
+            fracao_maxima_importacao_residual: 1.0,
         }
     }
 }
