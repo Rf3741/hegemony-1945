@@ -1,0 +1,984 @@
+// ==============================================================================
+// MARCOS DE MUDANÇA DE ERA E PONTOS DE INFLEXÃO GLOBAL (1945-1991)
+// Módulo: evolucao_ideologica - Jogo de Grande Estratégia Guerra Fria
+// ==============================================================================
+// Define os grandes marcos geopolíticos e ideológicos que deslocam a opinião
+// mundial, ativam novas correntes de pensamento, alteram as posturas dos Grupos
+// de Interesse e reconfiguram a polaridade do sistema internacional.
+// Possuem gatilhos sistêmicos (condições históricas e dinâmicas) e opções.
+// ==============================================================================
+
+[
+    // --------------------------------------------------------------------------
+    // 1. MORTE DE STALIN E A LUTA SUCESSÓRIA (1953)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "morte_de_stalin",
+        titulo: "A Morte de Josef Stalin e a Transição Soviética",
+        era: "era_pos_guerra_1945",
+        descricao: "Em março de 1953, o falecimento do líder supremo da União Soviética abre uma disputa fratricida no Politburo entre Beria, Malenkov, Molotov e Khrushchev. O desaparecimento de Stalin encerra a era do terror absoluto, abre espaço para a reabilitação de prisioneiros do Gulag e desencadeia incerteza profunda em todo o bloco comunista.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1953,
+            ano_limite_historico: 1954,
+            paises_envolvidos: ["SOV"],
+            condicoes_sistemicas: [
+                "soviete_supremo_em_sessao",
+                "stalin_no_poder",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "tensao_guerra_fria", valor: -0.15),
+            Modificador(id: "autoridade_estatal", valor: -0.10),
+            Modificador(id: "radicalismo_intelectuais", valor: -0.10),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoSovietico",
+                modificadores: [
+                    Modificador(id: "disciplina_produtiva_estatal", valor: -0.15),
+                    Modificador(id: "legitimidade_base", valor: -10.0),
+                    Modificador(id: "aprovacao_nomenklatura_partidaria", valor: 10.0),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "reformista_sovietico",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "khrushchev_triunfo_degelo",
+                texto: "Apoiar a liderança coletiva reformista de Khrushchev ('Degelo Político')",
+                resultado_historico: "Khrushchev consolida o poder, neutraliza Beria e inicia o esvaziamento progressivo do Gulag, inaugurando a era de relaxamento cultural relativo.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: -0.10),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                    Modificador(id: "aprovacao_militares", valor: -5.0),
+                    Modificador(id: "inovacao_tecnologica_fator", valor: 0.10),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoDecisao(
+                id: "molotov_ortodoxia_stalinista",
+                texto: "Preservar a linha dura stalinista sem concessões aos reformistas",
+                resultado_historico: "A ala conservadora do partido mantém o controle inflexível, intensifica o centralismo e rejeita qualquer abertura ideológica.",
+                efeitos: [
+                    Modificador(id: "disciplina_produtiva_estatal", valor: 0.20),
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "aprovacao_intelectuais", valor: -20.0),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.15),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 2. CONFERÊNCIA DE BANDUNG E O TERCEIRO MUNDO (1955)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "conferencia_de_bandung",
+        titulo: "A Conferência de Bandung e o Nascimento do Movimento Não-Alinhado",
+        era: "era_degelo_1953",
+        descricao: "Em abril de 1955, vinte e nove nações asiáticas e africanas recém-independentes reúnem-se na Indonésia, lideradas por Sukarno, Zhou Enlai, Nehru, Nasser e Tito. Proclamam os princípios da autodeterminação dos povos, do anticolonialismo intransigente e da recusa em subordinar-se a Washington ou a Moscou, criando uma terceira força na geopolítica global.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1955,
+            ano_limite_historico: 1956,
+            paises_envolvidos: ["INS", "IND", "EGY", "YUG", "CHI"],
+            condicoes_sistemicas: [
+                "paises_independentes_asia_africa_presentes",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "entusiasmo_construcao_nacional", valor: 0.20),
+            Modificador(id: "legitimidade_soberania_popular", valor: 0.25),
+            Modificador(id: "radicalismo_anticolonial_anual", valor: 0.30),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "NaoAlinhado",
+                modificadores: [
+                    Modificador(id: "legitimidade_base", valor: 20.0),
+                    Modificador(id: "coesao_nacional_patriotismo", valor: 0.15),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "nacionalista_terceiro_mundo",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "bandung_adotar_principios",
+                texto: "Assinar a Declaração de Bandung e liderar o Movimento Não-Alinhado",
+                resultado_historico: "Consolida a soberania diplomática e atrai prestígio massivo entre as nações em desenvolvimento.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.30),
+                    Modificador(id: "aprovacao_movimento_anticolonial", valor: 25.0),
+                    Modificador(id: "hostilidade_bloco_ocidental", valor: 0.10),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoDecisao(
+                id: "bandung_alinhamento_ocidental",
+                texto: "Rejeitar a conferência como subterfúgio neutralista e jurar lealdade ao Bloco Ocidental",
+                resultado_historico: "Assegura garantias militares e subsídios dos EUA, mas aliena profundamente a opinião pública anticolonial.",
+                efeitos: [
+                    Modificador(id: "investimento_privado_fator", valor: 0.15),
+                    Modificador(id: "aprovacao_movimento_anticolonial", valor: -30.0),
+                    Modificador(id: "radicalismo_geral", valor: 0.15),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 3. A CRISE DE SUEZ E O DECLÍNIO IMPERIAL EUROPEU (1956)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "crise_de_suez",
+        titulo: "A Crise de Suez e o Colapso do Imperialismo Tradicional",
+        era: "era_degelo_1953",
+        descricao: "Gamal Abdel Nasser nacionaliza a Companhia do Canal de Suez. Em resposta, Grã-Bretanha, França e Israel desferem uma invasão militar coordenada. Eisenhower e Khrushchev, em rara convergência de interesses, exigem a retirada imediata das forças anglo-francesas, expondo publicamente que as velhas potências coloniais europeias já não podem ditar os rumos do planeta.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1956,
+            ano_limite_historico: 1957,
+            paises_envolvidos: ["EGY", "GBR", "FRA", "USA", "SOV"],
+            condicoes_sistemicas: [
+                "egito_republicano_nasser",
+                "canal_suez_estatizado",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "custo_manutencao_imperio", valor: 0.35),
+            Modificador(id: "legitimidade_internacional_onu", valor: 0.20),
+            Modificador(id: "radicalismo_anticolonial_anual", valor: 0.40),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoOcidental",
+                modificadores: [
+                    Modificador(id: "legitimidade_base", valor: -10.0),
+                    Modificador(id: "forca_administracao_colonial", valor: -0.30),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "socialista_arabe",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "suez_vitoria_pan_arabe",
+                texto: "Comemorar a vitória política e avançar o projeto da República Árabe Unida",
+                resultado_historico: "Nasser torna-se o herói inquestionável do nacionalismo árabe, expandindo a influência soviética no Oriente Médio.",
+                efeitos: [
+                    Modificador(id: "coesao_nacional_patriotismo", valor: 0.25),
+                    Modificador(id: "aprovacao_militares", valor: 20.0),
+                    Modificador(id: "aprovacao_movimento_anticolonial", valor: 30.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoDecisao(
+                id: "suez_capitulacao_militar",
+                texto: "Ceder às pressões diplomáticas e devolver o canal aos acionistas anglo-franceses",
+                resultado_historico: "Provoca a queda do governo egípcio e desmoraliza o movimento de libertação nacional em todo o mundo árabe.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: -35.0),
+                    Modificador(id: "risco_golpe_de_estado_militar", valor: 0.50),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 4. O DISCURSO SECRETO DO XX CONGRESSO DO PCUS (1956)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "discurso_secreto_desestalinizacao",
+        titulo: "O Discurso Secreto de Khrushchev e a Desestalinização",
+        era: "era_degelo_1953",
+        descricao: "Na sessão a portas fechadas do XX Congresso do PCUS em fevereiro de 1956, Nikita Khrushchev profere o discurso 'Sobre o Culto da Personalidade e suas Consequências'. Denuncia publicamente os expurgos, as confissões forçadas e os crimes de Stalin. O texto vaza para o Ocidente, abalando profundamente os partidos comunistas em todo o planeta e desencadeando a fúria de Mao Zedong.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1956,
+            ano_limite_historico: 1957,
+            paises_envolvidos: ["SOV", "CHI", "POL", "HUN"],
+            condicoes_sistemicas: [
+                "khrushchev_primeiro_secretario",
+                "xx_congresso_pcus_realizado",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "tensao_guerra_fria", valor: -0.10),
+            Modificador(id: "conformidade_ideologica_total", valor: -0.30),
+            Modificador(id: "radicalismo_intelectuais", valor: -0.15),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoSovietico",
+                modificadores: [
+                    Modificador(id: "autoridade_estatal", valor: -0.15),
+                    Modificador(id: "aprovacao_intelectuais", valor: 20.0),
+                    Modificador(id: "aprovacao_partido_comunista", valor: -10.0),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "reformista_sovietico",
+            "eurocomunista",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "divulgar_discurso_secreto",
+                texto: "Confirmar a denúncia dos crimes de Stalin e reabilitar as vítimas",
+                resultado_historico: "Desencadeia o Outubro Polonês e a Revolução Húngara, iniciando a ruptura sino-soviética irreversível.",
+                efeitos: [
+                    Modificador(id: "liberdades_locais_garantia", valor: 0.20),
+                    Modificador(id: "aprovacao_intelectuais", valor: 25.0),
+                    Modificador(id: "desobediencia_hierarquica_tropas", valor: 0.10),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoDecisao(
+                id: "suprimir_discurso_manter_mito",
+                texto: "Repudiar o rascunho do discurso e consolidar o mito sagrado de Stalin",
+                resultado_historico: "Preserva a unidade férrea com Mao Zedong, mas perpetua a asfixia intelectual no Leste Europeu.",
+                efeitos: [
+                    Modificador(id: "disciplina_produtiva_estatal", valor: 0.20),
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "aprovacao_intelectuais", valor: -25.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 5. A REVOLUÇÃO HÚNGARA E A REPRESSÃO DOS TANQUES (1956)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "revolucao_hungara_1956",
+        titulo: "A Revolução Húngara e a Intervenção Soviética",
+        era: "era_degelo_1953",
+        descricao: "Em outubro de 1956, manifestações estudantis em Budapeste transformam-se em uma insurreição nacional armada contra o domínio soviético. O primeiro-ministro Imre Nagy proclama a neutralidade da Hungria e a saída do Pacto de Varsóvia. Em resposta, os tanques soviéticos esmagam a revolta em combates sangrentos, sepultando as ilusões ocidentais sobre o degelo comunista.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1956,
+            ano_limite_historico: 1957,
+            paises_envolvidos: ["HUN", "SOV"],
+            condicoes_sistemicas: [
+                "desestalinizacao_em_curso",
+                "hungria_no_pacto_de_varsovia",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "tensao_guerra_fria", valor: 0.25),
+            Modificador(id: "hostilidade_bloco_ocidental", valor: 0.30),
+            Modificador(id: "fuga_de_cerebros_imigracao", valor: 0.25),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoSovietico",
+                modificadores: [
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.35),
+                    Modificador(id: "legitimidade_base", valor: -15.0),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "eurocomunista",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "intervencao_tanques_budapeste",
+                texto: "Ordenar a Operação Turbilhão e esmagar a insurreição pelas armas",
+                resultado_historico: "Restaura o controle militar sob János Kádár, ao custo de milhares de mortos e condenação internacional unânime.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.25),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.40),
+                    Modificador(id: "aprovacao_militares", valor: 15.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: -30.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoDecisao(
+                id: "tolerar_neutralidade_hungara",
+                texto: "Aceitar a neutralidade finlandizada da Hungria e retirar as tropas",
+                resultado_historico: "Causa pânico em todo o Pacto de Varsóvia e ameaça desintegrar a barreira de segurança defensiva soviética.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional", valor: 25.0),
+                    Modificador(id: "risco_golpe_de_estado_militar", valor: 0.40),
+                    Modificador(id: "autoridade_estatal", valor: -0.30),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 6. A REVOLUÇÃO CUBANA E O SOCIALISMO NO CARIBE (1959)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "revolucao_cubana_1959",
+        titulo: "O Triunfo da Revolução Cubana e o Desafio ao Hemisfério",
+        era: "era_degelo_1953",
+        descricao: "Em 1º de janeiro de 1959, o ditador Fulgencio Batista foge de Havana perante o avanço triunfal do Movimento 26 de Julho, liderado por Fidel Castro e Che Guevara. A subsequente reforma agrária radical e nacionalização de refinarias e plantações americanas empurra Cuba para a órbita soviética, trazendo a Guerra Fria para 150 km do litoral da Flórida.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1959,
+            ano_limite_historico: 1961,
+            paises_envolvidos: ["CUB", "USA", "SOV"],
+            condicoes_sistemicas: [
+                "cuba_sob_ditadura_batista",
+                "guerrilha_sierra_maestra_ativa",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "tensao_guerra_fria", valor: 0.30),
+            Modificador(id: "mobilizacao_revolucionaria_maxima", valor: 0.35),
+            Modificador(id: "conspiracao_golpista_apoio", valor: 0.20),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoOcidental",
+                modificadores: [
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.20),
+                    Modificador(id: "fuga_de_capitais_risco", valor: 0.25),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "maoista",
+            "nacionalista_terceiro_mundo",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "declarar_carater_socialista",
+                texto: "Proclamar o caráter marxista-leninista da Revolução e aliar-se a Moscou",
+                resultado_historico: "Garante proteção militar soviética, compra garantida da safra de açúcar e atrai a fúria do embargo comercial norte-americano.",
+                efeitos: [
+                    Modificador(id: "mobilizacao_revolucionaria_maxima", valor: 0.40),
+                    Modificador(id: "aprovacao_camponeses", valor: 30.0),
+                    Modificador(id: "aprovacao_industriais", valor: -50.0),
+                    Modificador(id: "hostilidade_bloco_ocidental", valor: 0.50),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoDecisao(
+                id: "manter_nacionalismo_democratico",
+                texto: "Preservar a linha nacionalista democrática pluripartidária e negociar com Washington",
+                resultado_historico: "Evita o embargo petrolífero, mas gera profunda frustração entre as alas radicais da guerrilha.",
+                efeitos: [
+                    Modificador(id: "investimento_privado_fator", valor: 0.15),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                    Modificador(id: "mobilizacao_revolucionaria_maxima", valor: -0.20),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 7. O ANO DA ÁFRICA E A DESCOLONIZAÇÃO EM MASSA (1960)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "ano_da_africa_descolonizacao_1960",
+        titulo: "O Ano da África e a Onda Irrefreável de Independências",
+        era: "era_coexistencia_1962",
+        descricao: "Em 1960, dezessete colônias africanas conquistam sua independência formal em um único ano (Nigéria, Congo, Costa do Marfim, Senegal, entre outras). O centro de gravidade da Assembleia Geral da ONU desloca-se decisivamente para as nações não-brancas, sepultando o mito da missão civilizadora imperial e abrindo uma nova arena de disputa entre a CIA e a KGB.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1960,
+            ano_limite_historico: 1962,
+            paises_envolvidos: ["FRA", "GBR", "BEL", "CGO", "NGA"],
+            condicoes_sistemicas: [
+                "onda_independencias_africanas",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "extincao_custos_guerra_colonial", valor: 0.40),
+            Modificador(id: "legitimidade_soberania_popular", valor: 0.35),
+            Modificador(id: "forca_movimento_anticolonial", valor: 0.50),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "NaoAlinhado",
+                modificadores: [
+                    Modificador(id: "legitimidade_base", valor: 25.0),
+                    Modificador(id: "entusiasmo_construcao_nacional", valor: 0.30),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "nacionalista_terceiro_mundo",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "reconhecer_independencias_imediatas",
+                texto: "Conceder a independência formal e estabelecer acordos de cooperação pós-colonial",
+                resultado_historico: "Desmobiliza tropas metropolitanas exaustas e preserva os interesses comerciais e culturais.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional_onu", valor: 0.30),
+                    Modificador(id: "custo_manutencao_imperio", valor: -0.40),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoDecisao(
+                id: "resistir_armas_manter_colonias",
+                texto: "Enviar reforços expedicionários para esmagar as frentes de libertação",
+                resultado_historico: "Mergulha a metrópole em guerras assimétricas intermináveis, falência orçamentária e isolamento internacional.",
+                efeitos: [
+                    Modificador(id: "custo_manutencao_imperio", valor: 0.60),
+                    Modificador(id: "radicalismo_geral", valor: 0.35),
+                    Modificador(id: "aprovacao_militares", valor: -15.0),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 8. O CONCÍLIO VATICANO II E A RENOVAÇÃO DA IGREJA (1962-1965)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "concilio_vaticano_segundo",
+        titulo: "O Concílio Vaticano II e a Abertura Pastoral",
+        era: "era_coexistencia_1962",
+        descricao: "Convocado pelo Papa João XXIII e continuado por Paulo VI, o Concílio Vaticano II introduz o 'aggiornamento' (atualização) da Igreja Católica. Autoriza missas em vernáculo, abraça o ecumenismo, defende os direitos humanos universais e a liberdade religiosa. Na América Latina, catalisa a Teologia da Libertação e a 'opção preferencial pelos pobres'.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1962,
+            ano_limite_historico: 1965,
+            paises_envolvidos: ["VAT", "ITA", "BRA", "FRA", "ESP"],
+            condicoes_sistemicas: [
+                "pontificado_joao_xxiii_ou_paulo_vi",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "paz_social_conformidade", valor: 0.15),
+            Modificador(id: "radicalismo_populacao_religiosa", valor: -0.20),
+            Modificador(id: "legitimidade_base", valor: 15.0),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoOcidental",
+                modificadores: [
+                    Modificador(id: "aprovacao_clero", valor: 15.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 10.0),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "democrata_cristao",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "vaticano_acolher_aggiornamento",
+                texto: "Promulgar as reformas conciliares e apoiar o diálogo social progressista",
+                resultado_historico: "Revigora as ordens religiosas e afasta os setores católicos do apoio automático às ditaduras tradicionais.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 20.0),
+                    Modificador(id: "alfabetizacao_comunitaria_avanco", valor: 0.05),
+                    Modificador(id: "aprovacao_latifundiarios", valor: -15.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoDecisao(
+                id: "vaticano_resistencia_integrista",
+                texto: "Apoiar os bispos integristas e condenar as inovações como heresia modernista",
+                resultado_historico: "Provoca cismas tradicionalistas (lefebvrianos) e aliena as novas gerações urbanas instruídas.",
+                efeitos: [
+                    Modificador(id: "aprovacao_clero", valor: -10.0),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.20),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 9. MAIO DE 68 E A EXPLOSÃO DA NOVA ESQUERDA (1968)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "maio_de_68_e_contracultura",
+        titulo: "Maio de 68, a Contracultura e a Revolta Estudantil",
+        era: "era_coexistencia_1962",
+        descricao: "Barricadas no Quartier Latin em Paris desencadeiam a maior greve geral da história da França, paralisando 10 milhões de trabalhadores. A onda de protestos contra o autoritarismo, a Guerra do Vietnã e a sociedade de consumo espalha-se pela Europa, Estados Unidos e América Latina, desafiando tanto as burocracias stalinistas quanto as oligarquias capitalistas sob o lema 'É proibido proibir!'.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1968,
+            ano_limite_historico: 1969,
+            paises_envolvidos: ["FRA", "USA", "GER", "ITA", "MEX", "BRA"],
+            condicoes_sistemicas: [
+                "expansao_universitaria_pos_guerra",
+                "tensao_geracional_jovem",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "agitacao_estudantil_protestos", valor: 0.45),
+            Modificador(id: "radicalismo_trabalhadores", valor: 0.30),
+            Modificador(id: "greve_geral_probabilidade", valor: 0.35),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoOcidental",
+                modificadores: [
+                    Modificador(id: "aprovacao_intelectuais", valor: 25.0),
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: -15.0),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "ecologista_pacifista",
+            "eurocomunista",
+            "trotskista",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "maio68_ceder_reformas_salariais",
+                texto: "Assinar os Acordos de Grenelle, elevar os salários e reformar o ensino superior",
+                resultado_historico: "Desmobiliza os operários, restaura a ordem pública e assegura concessões históricas às liberdades individuais.",
+                efeitos: [
+                    Modificador(id: "paz_social_nas_fabricas", valor: 0.20),
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: -0.10),
+                    Modificador(id: "legitimidade_base", valor: 10.0),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoDecisao(
+                id: "maio68_repressao_brutal_tanques",
+                texto: "Declarar estado de sítio e empregar as tropas de choque sem reservas",
+                resultado_historico: "Incendeia as metrópoles, polariza radicalmente a sociedade e gera células guerrilheiras urbanas (Brigadas Vermelhas, RAF).",
+                efeitos: [
+                    Modificador(id: "radicalismo_geral", valor: 0.40),
+                    Modificador(id: "autoridade_estatal", valor: 0.25),
+                    Modificador(id: "legitimidade_base", valor: -25.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 10. A PRIMAVERA DE PRAGA E A DOUTRINA BREJNEV (1968)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "primavera_de_praga_brejnev",
+        titulo: "A Primavera de Praga e a Doutrina da Soberania Limitada",
+        era: "era_coexistencia_1962",
+        descricao: "Alexander Dubček assume o Partido Comunista da Tchecoslováquia e propõe o 'Socialismo com Rosto Humano', abolindo a censura e admitindo debates plurais. Temendo o contágio democrático no Leste Europeu, Leonid Brejnev aciona as tropas do Pacto de Varsóvia em agosto de 1968, ocupando Praga e proclamando a Doutrina Brejnev: nenhum país socialista tem o direito de abandonar a ortodoxia soviética.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1968,
+            ano_limite_historico: 1969,
+            paises_envolvidos: ["CZE", "SOV", "POL", "HUN", "ROM"],
+            condicoes_sistemicas: [
+                "dubcek_lideranca_tcheca",
+                "abertura_socialista_em_curso",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "tensao_guerra_fria", valor: 0.25),
+            Modificador(id: "conformidade_ideologica_total", valor: 0.30),
+            Modificador(id: "fuga_de_cerebros_imigracao", valor: 0.25),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoSovietico",
+                modificadores: [
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.40),
+                    Modificador(id: "aprovacao_intelectuais", valor: -30.0),
+                    Modificador(id: "disciplina_produtiva_estatal", valor: -0.10),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "eurocomunista",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "praga_invasao_pacto_varsovia",
+                texto: "Invadir a Tchecoslováquia com meio milhão de soldados do Pacto de Varsóvia",
+                resultado_historico: "Substitui Dubček por Gustáv Husák e impõe a 'Normalização', mas rompe definitivamente com os partidos comunistas ocidentais.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "aprovacao_militares", valor: 15.0),
+                    Modificador(id: "legitimidade_internacional", valor: -25.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoDecisao(
+                id: "praga_permitir_socialismo_humano",
+                texto: "Aceitar a experiência tchecoslovaca de socialismo democrático",
+                resultado_historico: "Permite a oxigenação do modelo socialista, mas arrisca desmantelar a liderança centralizada de Moscou.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: -0.20),
+                    Modificador(id: "aprovacao_intelectuais", valor: 30.0),
+                    Modificador(id: "risco_golpe_de_estado_militar", valor: 0.35),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 11. O PRIMEIRO CHOQUE DO PETRÓLEO E A ESTAGFLAÇÃO (1973)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "choque_do_petroleo_1973",
+        titulo: "O Primeiro Choque do Petróleo e a Crise do Modelo Keynesiano",
+        era: "era_crise_petroleo_1973",
+        descricao: "Em retaliação ao apoio ocidental a Israel na Guerra do Yom Kippur, a OPEP quadruplica o preço do barril de petróleo e decreta embargo seletivo. A economia mundial entra em colapso com a inédita combinação de recessão e inflação galopante ('Estagflação'). O consenso social-democrata keynesiano do pós-guerra esgota sua capacidade de resposta, pavimentando o caminho para o neoliberalismo.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1973,
+            ano_limite_historico: 1974,
+            paises_envolvidos: ["SAU", "IRN", "IRQ", "KWT", "USA", "GBR", "JAP"],
+            condicoes_sistemicas: [
+                "guerra_yom_kippur_ou_tensao_opep",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "custo_vida_urbano_reducao", valor: -0.30),
+            Modificador(id: "produtividade_industrial", valor: -0.15),
+            Modificador(id: "radicalismo_trabalhadores", valor: 0.25),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoOcidental",
+                modificadores: [
+                    Modificador(id: "investimento_privado_fator", valor: -0.20),
+                    Modificador(id: "legitimidade_base", valor: -15.0),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "neoliberal",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "petroleo_racionamento_austeridade",
+                texto: "Adotar racionamento energético, elevar os juros e conter a expansão monetária",
+                resultado_historico: "Desacelera a inflação ao custo de desemprego maciço e erosão dos direitos trabalhistas adquiridos.",
+                efeitos: [
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: 0.10),
+                    Modificador(id: "aprovacao_industriais", valor: 15.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -25.0),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoDecisao(
+                id: "petroleo_subsidio_estatal_total",
+                texto: "Subsidiar integralmente os combustíveis através de déficit fiscal e emissão",
+                resultado_historico: "Preserva a popularidade a curto prazo, mas desencadeia hiperinflação e colapso cambial.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 10.0),
+                    Modificador(id: "fuga_de_capitais_risco", valor: 0.40),
+                    Modificador(id: "eficiencia_tributaria_arrecadacao", valor: -0.20),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 12. A REVOLUÇÃO ISLÂMICA DO IRÃ (1979)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "revolucao_islamica_iraniana_1979",
+        titulo: "A Revolução Iraniana e a Emergência do Fundamentalismo Político",
+        era: "era_revolucao_iraniana_1979",
+        descricao: "Em janeiro de 1979, o Xá Mohammad Reza Pahlavi foge de Teerã perante levantes populares massivos. O aiatolá Ruhollah Khomeini regressa do exílio em Paris e proclama a República Islâmica do Irã, estabelecendo a teocracia dos juristas islâmicos. O sequestro de diplomatas na embaixada americana e o repúdio mútuo a Washington e Moscou inauguram a era do fundamentalismo geopolítico moderno.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1978,
+            ano_limite_historico: 1980,
+            paises_envolvidos: ["IRN", "USA", "SOV", "SAU", "IRQ"],
+            condicoes_sistemicas: [
+                "ira_sob_dinastia_pahlavi",
+                "protestos_religiosos_urbanos",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "tensao_guerra_fria", valor: 0.35),
+            Modificador(id: "agitacao_religiosa_protestos", valor: 0.40),
+            Modificador(id: "radicalismo_populacao_religiosa", valor: 0.35),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "NaoAlinhado",
+                modificadores: [
+                    Modificador(id: "aprovacao_clero", valor: 30.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: -20.0),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "teocrata",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "revolucao_proclamar_republica_islamica",
+                texto: "Aprovar em referendo a República Islâmica e expulsar a influência estrangeira",
+                resultado_historico: "Consolida a teocracia, resiste à invasão de Saddam Hussein e transforma o Irã no polo do islamismo militante.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 30.0),
+                    Modificador(id: "mobilizacao_revolucionaria_maxima", valor: 0.35),
+                    Modificador(id: "fuga_de_cerebros_imigracao", valor: 0.35),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoDecisao(
+                id: "revolucao_republica_laica_coalizao",
+                texto: "Pactuar com a Frente Nacional laica e estabelecer uma democracia parlamentar secular",
+                resultado_historico: "Desafia o controle dos clérigos, correndo risco imediato de insurreição religiosa armada nos bazares.",
+                efeitos: [
+                    Modificador(id: "garantias_constitucionais_amplas", valor: 0.20),
+                    Modificador(id: "radicalismo_populacao_religiosa", valor: 0.50),
+                    Modificador(id: "risco_golpe_de_estado_militar", valor: 0.30),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 13. A REVOLUÇÃO NEOLIBERAL: THATCHER E REAGAN (1979-1981)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "revolucao_neoliberal_thatcher_reagan",
+        titulo: "A Revolução Conservadora e Neoliberal (Thatcher e Reagan)",
+        era: "era_revolucao_iraniana_1979",
+        descricao: "A vitória de Margaret Thatcher na Grã-Bretanha (1979) e de Ronald Reagan nos EUA (1981) consolida a contraofensiva conservadora global. 'O governo não é a solução para o nosso problema; o governo é o problema'. Promovem cortes brutais de impostos corporativos, privatizações maciças de empresas estatais, derrota das greves dos mineiros e dos controladores de voo e uma cruzada intransigente contra o 'Império do Mal'.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1979,
+            ano_limite_historico: 1982,
+            paises_envolvidos: ["GBR", "USA"],
+            condicoes_sistemicas: [
+                "crise_estagflacao_anos_70",
+                "vitoria_conservadora_eleitoral",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "investimento_privado_fator", valor: 0.35),
+            Modificador(id: "tensao_guerra_fria", valor: 0.30),
+            Modificador(id: "custo_construcao_estatal", valor: -0.20),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoOcidental",
+                modificadores: [
+                    Modificador(id: "aprovacao_industriais", valor: 25.0),
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: 20.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -30.0),
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.25),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "neoliberal",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "neoliberal_privatizacao_e_desregulacao",
+                texto: "Privatizar as indústrias estatais, quebrar os sindicatos e reduzir os impostos sobre o capital",
+                resultado_historico: "Reanima os mercados financeiros e o dinamismo empresarial, aprofundando brutalmente a desigualdade social.",
+                efeitos: [
+                    Modificador(id: "investimento_privado_fator", valor: 0.30),
+                    Modificador(id: "produtividade_industrial", valor: 0.15),
+                    Modificador(id: "paz_social_nas_fabricas", valor: -0.25),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoDecisao(
+                id: "neoliberal_manter_pacto_keynesiano",
+                texto: "Resistir à onda monetarista e manter os gastos do Estado de Bem-Estar",
+                resultado_historico: "Protege os trabalhadores da pobreza súbita, mas enfrenta fuga de capitais para praças desregulamentadas.",
+                efeitos: [
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 20.0),
+                    Modificador(id: "fuga_de_capitais_risco", valor: 0.30),
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: -0.15),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 14. O SOLIDARIEDADE NA POLÔNIA (1980)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "surgimento_solidariedade_polonia_1980",
+        titulo: "O Surgimento do Solidarność e a Rebelião Operária na Polônia",
+        era: "era_revolucao_iraniana_1979",
+        descricao: "Nos estaleiros Lenin de Gdańsk, os operários entram em greve sob a liderança do eletricista Lech Wałęsa, fundando o 'Solidarność' (Solidariedade). Pela primeira vez num Estado comunista, um sindicato independente de massa é legalizado, congregando 10 milhões de membros e o apoio decisivo do Papa polonês João Paulo II, desafiando frontalmente o monopólio do Partido Operário Unificado.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1980,
+            ano_limite_historico: 1981,
+            paises_envolvidos: ["POL", "SOV", "VAT"],
+            condicoes_sistemicas: [
+                "crise_abastecimento_polonia",
+                "papa_joao_paulo_ii_eleito",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "paz_social_nas_fabricas", valor: -0.25),
+            Modificador(id: "greve_geral_probabilidade", valor: 0.40),
+            Modificador(id: "autoridade_estatal", valor: -0.20),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoSovietico",
+                modificadores: [
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.45),
+                    Modificador(id: "aprovacao_nomenklatura_partidaria", valor: -20.0),
+                    Modificador(id: "legitimidade_base", valor: -20.0),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "eurocomunista",
+            "social_democrata",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "solidariedade_decretar_lei_marcial",
+                texto: "Decretar a Lei Marcial sob o General Jaruzelski para evitar invasão soviética",
+                resultado_historico: "Prende a liderança sindical e congela a vida civil, adiando a derrocada comunista ao custo de asfixia total.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.30),
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.35),
+                    Modificador(id: "aprovacao_militares", valor: 20.0),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoDecisao(
+                id: "solidariedade_reconhecimento_pleno",
+                texto: "Legalizar permanentemente o Solidariedade e convocar eleições livres",
+                resultado_historico: "Provoca intervenção militar imediata dos tanques soviéticos ou colapso precoce do regime.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.40),
+                    Modificador(id: "risco_revolucao_armada_popular", valor: 0.40),
+                    Modificador(id: "hostilidade_eua_urss", valor: 0.30),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 15. GLASNOST E PERESTROIKA (1985)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "glasnost_e_perestroika_1985",
+        titulo: "Glasnost e Perestroika: As Reformas de Gorbachev",
+        era: "era_perestroika_1985",
+        descricao: "Mikhail Gorbachev assume como Secretário-Geral do PCUS aos 54 anos. Diagnosticando a estagnação econômica crônica, a corrupção da nomenklatura e o fardo militar insustentável, lança a 'Perestroika' (reestruturação econômica descentralizada) e a 'Glasnost' (transparência e liberdade de expressão), buscando revitalizar o socialismo, mas abrindo inadvertidamente a caixa de Pandora das nacionalidades.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1985,
+            ano_limite_historico: 1986,
+            paises_envolvidos: ["SOV", "USA"],
+            condicoes_sistemicas: [
+                "gorbachev_secretario_geral",
+                "estagnacao_economica_brejneviana",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "tensao_guerra_fria", valor: -0.40),
+            Modificador(id: "legitimidade_internacional", valor: 0.30),
+            Modificador(id: "liberdades_locais_garantia", valor: 0.35),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoSovietico",
+                modificadores: [
+                    Modificador(id: "aprovacao_intelectuais", valor: 35.0),
+                    Modificador(id: "aprovacao_nomenklatura_partidaria", valor: -25.0),
+                    Modificador(id: "autoridade_estatal", valor: -0.30),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "reformista_sovietico",
+            "social_democrata",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "perestroika_abertura_total",
+                texto: "Avançar a Glasnost sem tabus, permitir cooperativas privadas e assinar o tratado INF com Reagan",
+                resultado_historico: "Ganha admiração global frenética ('Gorbimania'), mas corrói o controle do partido sobre os movimentos nacionalistas.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: -0.35),
+                    Modificador(id: "aprovacao_intelectuais", valor: 30.0),
+                    Modificador(id: "disciplina_produtiva_estatal", valor: -0.20),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoDecisao(
+                id: "perestroika_reforma_economica_chinesa",
+                texto: "Imitar as reformas de mercado de Deng Xiaoping sem afrouxar a disciplina política e a censura",
+                resultado_historico: "Moderniza a economia através de investimentos estrangeiros sem abrir mão do controle autoritário do PCUS.",
+                efeitos: [
+                    Modificador(id: "produtividade_industrial", valor: 0.20),
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.25),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    // --------------------------------------------------------------------------
+    // 16. A QUEDA DO MURO DE BERLIM E A ONDA DEMOCRÁTICA (1989)
+    // --------------------------------------------------------------------------
+    MarcoDeEra(
+        id: "queda_do_muro_de_berlim_1989",
+        titulo: "A Queda do Muro de Berlim e o Fim das Ditaduras do Leste",
+        era: "era_perestroika_1985",
+        descricao: "Em 9 de novembro de 1989, após meses de protestos massivos na Alemanha Oriental e a abertura da fronteira húngara, o porta-voz Günter Schabowski anuncia por engano que as permissões de viagem são válidas 'imediatamente'. Milhares de cidadãos acorrem aos postos de controle; os guardas desistem de atirar e o Muro de Berlim é demolido por cidadãos eufóricos, simbolizando o colapso irrefreável da Cortina de Ferro.",
+        gatilho_sistemico: GatilhoMarco(
+            ano_minimo: 1989,
+            ano_limite_historico: 1990,
+            paises_envolvidos: ["GER", "SOV", "USA", "FRA", "GBR", "POL", "HUN", "CZE", "ROM", "BUL"],
+            condicoes_sistemicas: [
+                "doutrina_sinatra_renuncia_forca",
+                "protestos_em_massa_alemanha_oriental",
+            ],
+        ),
+        efeitos_globais: [
+            Modificador(id: "tensao_guerra_fria", valor: -0.60),
+            Modificador(id: "legitimidade_internacional", valor: 0.50),
+            Modificador(id: "mobilizacao_revolucionaria_maxima", valor: -0.30),
+        ],
+        efeitos_bloco: [
+            EfeitoBloco(
+                bloco: "BlocoSovietico",
+                modificadores: [
+                    Modificador(id: "autoridade_estatal", valor: -0.60),
+                    Modificador(id: "legitimidade_base", valor: -40.0),
+                ],
+            ),
+        ],
+        ideologias_desbloqueadas: [
+            "liberal_classico",
+            "social_democrata",
+            "neoliberal",
+        ],
+        opcoes_decisao: [
+            OpcaoDecisao(
+                id: "muro_aceitar_reunificacao_alema",
+                texto: "Aceitar a demolição pacífica do Muro e negociar o Tratado Dois Mais Quatro de Reunificação",
+                resultado_historico: "Garante uma transição democrática sem derramamento de sangue e a unificação da Alemanha dentro da OTAN.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.50),
+                    Modificador(id: "tensao_guerra_fria", valor: -0.40),
+                    Modificador(id: "entusiasmo_construcao_nacional", valor: 0.35),
+                ],
+                ia_peso: 90,
+            ),
+            OpcaoDecisao(
+                id: "muro_ordem_de_fogo_bloqueio",
+                texto: "Ordenar às tropas soviéticas e à Stasi que disparem contra as multidões no Muro",
+                resultado_historico: "Provoca banho de sangue catastrófico no coração da Europa, arriscando uma Terceira Guerra Mundial imediata.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: 0.80),
+                    Modificador(id: "radicalismo_geral", valor: 0.70),
+                    Modificador(id: "legitimidade_internacional", valor: -50.0),
+                ],
+                ia_peso: 10,
+            ),
+        ],
+    ),
+]

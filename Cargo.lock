@@ -2849,6 +2849,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "eventos"
+version = "0.1.0"
+dependencies = [
+ "ron",
+ "serde",
+ "simulacao",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3261,6 +3270,7 @@ dependencies = [
  "bevy",
  "bevy_egui",
  "egui_plot",
+ "eventos",
  "gf_mapa",
  "image",
  "ron",

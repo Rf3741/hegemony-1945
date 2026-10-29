@@ -16,6 +16,7 @@ use plugins::{
     map::MapPlugin,
     politics::PoliticsPlugin,
     time::TimePlugin,
+    eventos_ui::EventosPlugin,
     ui::UiPlugin,
     rotas_ponte::RotasPontePlugin,
     visual_construcoes::VisualConstrucoesPlugin,
@@ -71,5 +72,6 @@ fn main() {
             ..default()
         })
         .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, ConstrucaoUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, RotasPontePlugin, VisualConstrucoesPlugin, RotulosPaisPlugin))
+        .add_plugins(EventosPlugin)
         .run();
 }
