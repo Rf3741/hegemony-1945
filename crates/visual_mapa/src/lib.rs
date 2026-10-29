@@ -22,6 +22,7 @@ pub mod mapa;
 pub mod mapeamento;
 pub mod predio;
 pub mod projecao;
+pub mod rotas_maritimas;
 pub mod transporte;
 
 #[cfg(feature = "demo")]
