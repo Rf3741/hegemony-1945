@@ -1010,4 +1010,62 @@ mod tests {
             eprintln!("chl->usa canais: {:?} comp {}", p.rota.marcas, p.rota.comprimento());
         }
     }
+
+    #[test]
+    fn app_headless_gera_navios_avioes_e_relatorio() {
+        use bevy::asset::AssetPlugin;
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .init_asset::<Mesh>()
+            .init_asset::<ColorMaterial>()
+            .init_resource::<VisualMapaConfig>()
+            .init_resource::<EntradaVisual>()
+            .init_resource::<EntradaEconomiaVisual>()
+            .init_resource::<EstadoLod>()
+            .init_resource::<AnoVisual>()
+            .init_resource::<CamadaConstrucoesVisivel>()
+            .add_plugins(TrafegoPlugin);
+        {
+            let mut v = app.world_mut().resource_mut::<EntradaVisual>();
+            for c in carregar_cidades_cenario(Path::new(CIDADES_TERRITORIO_PADRAO)).into_iter().take(1500) {
+                v.cidades.push(crate::entrada::CidadeEntrada {
+                    id: c.id,
+                    pais_tag: c.pais_tag,
+                    posicao: c.posicao,
+                    populacao: c.populacao_urbana as u32,
+                    eh_porto: c.eh_porto,
+                    ..Default::default()
+                });
+            }
+        }
+        app.world_mut().resource_mut::<EstadoLod>().nivel_atual = NivelLod::Local;
+        app.world_mut().resource_mut::<AnoVisual>().0 = 1965.0;
+        let t0 = std::time::Instant::now();
+        loop {
+            app.update();
+            let n = app.world_mut().query::<&NavioVisual>().iter(app.world()).count();
+            if n > 0 || t0.elapsed().as_secs() > 60 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        let navios = app.world_mut().query::<&NavioVisual>().iter(app.world()).count();
+        assert!(navios > 20, "navios: {navios}");
+        for _ in 0..5 {
+            app.update();
+        }
+        let avioes = app.world_mut().query::<&AviaoVisual>().iter(app.world()).count();
+        assert_eq!(avioes, 160);
+        let jatos = app.world_mut().query::<&AviaoVisual>().iter(app.world()).filter(|a| a.jato).count();
+        assert!(jatos > 0, "sem jatos em 1965");
+        // avança navios artificialmente para forçar passagens
+        for _ in 0..4000 {
+            app.world_mut().resource_mut::<ConfigTrafego>().velocidade_navio = 4000.0;
+            std::thread::sleep(std::time::Duration::from_micros(200));
+            app.update();
+        }
+        let rel = app.world().resource::<RelatorioCanais>();
+        eprintln!("navios {navios} avioes {avioes} jatos {jatos} relatorio {:?}", rel.todos());
+        assert!(rel.todos().iter().any(|(_, p)| p.contagem > 0), "nenhuma passagem registrada");
+    }
 }
