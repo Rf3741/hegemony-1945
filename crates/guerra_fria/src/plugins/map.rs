@@ -52,6 +52,21 @@ struct ArrastoCamera {
 }
 
 const COR_OCEANO_RGBA: [u8; 4] = [28, 58, 96, 255];
+/// Oceano aberto (mais profundo) e brilho da costa.
+const COR_OCEANO_FUNDO: [u8; 4] = [16, 38, 70, 255];
+const COR_COSTA: [u8; 3] = [70, 130, 175];
+
+/// Relevo sombreado (cinza, mesmo tamanho do provinces.png), carregado de `assets/map/relevo.png`.
+static RELEVO: std::sync::OnceLock<Option<Vec<u8>>> = std::sync::OnceLock::new();
+
+fn relevo_para(w: u32, h: u32, base: Option<&std::path::Path>) -> Option<&'static [u8]> {
+    let r = RELEVO.get_or_init(|| {
+        let p = base?.parent()?.join("relevo.png");
+        let img = image::open(p).ok()?.to_luma8();
+        (img.dimensions() == (w, h)).then(|| img.into_raw())
+    });
+    r.as_deref().filter(|v| v.len() == (w * h) as usize)
+}
 
 pub struct MapPlugin;
 
@@ -130,6 +145,7 @@ pub fn gerar_mapa(ent: &EntradaMapa) -> Result<SaidaMapa, String> {
         .pixels()
         .map(|p| id_de_cor_provincia((p[0], p[1], p[2])).unwrap_or(0))
         .collect();
+    relevo_para(w, h, Some(&ent.caminho_png));
     let (pixels, caixas) = colorir(&ids, w, h, &ent.cor_prov, &ent.dono_prov);
     Ok(SaidaMapa { largura: w, altura: h, ids, pixels, caixas })
 }
@@ -144,6 +160,7 @@ pub fn colorir(
 ) -> (Vec<u8>, Vec<Option<[u32; 4]>>) {
     let (wu, hu) = (w as usize, h as usize);
     let dono = |id: u32| dono_prov.get(id as usize).copied().unwrap_or(0);
+    let relevo = RELEVO.get().and_then(|r| r.as_deref()).filter(|v| v.len() == wu * hu);
     let mut caixas: Vec<Option<[u32; 4]>> = vec![None; cor_prov.len()];
     let mut dados = vec![0u8; wu * hu * 4];
     let mut borda = vec![0u8; wu * hu];
@@ -151,7 +168,36 @@ pub fn colorir(
         for x in 0..wu {
             let i = y * wu + x;
             let id = ids[i];
-            let c = if id == 0 { COR_OCEANO_RGBA } else { cor_prov.get(id as usize).copied().unwrap_or(COR_OCEANO_RGBA) };
+            let mut c = if id == 0 { COR_OCEANO_FUNDO } else { cor_prov.get(id as usize).copied().unwrap_or(COR_OCEANO_RGBA) };
+            if id != 0 {
+                if let Some(r) = relevo {
+                    // 60% cor do país + 40% cor do país modulada pelo relevo sombreado.
+                    let k = (((r[i] as f32 - 185.0) / 45.0) + 1.0).clamp(0.3, 1.6);
+                    let f = 0.6 + 0.4 * k;
+                    for ch in c.iter_mut().take(3) {
+                        *ch = (*ch as f32 * f).clamp(0.0, 255.0) as u8;
+                    }
+                }
+            } else {
+                // Brilho suave na costa (1 a 3 px de terra).
+                let mut d = 0u8;
+                'costa: for r in 1..=3i32 {
+                    for (dx, dy) in [(r, 0), (-r, 0), (0, r), (0, -r)] {
+                        let nx = (x as i32 + dx).rem_euclid(wu as i32) as usize;
+                        let ny = y as i32 + dy;
+                        if ny >= 0 && (ny as usize) < hu && ids[ny as usize * wu + nx] != 0 {
+                            d = r as u8;
+                            break 'costa;
+                        }
+                    }
+                }
+                if d > 0 {
+                    let t = [0.40, 0.22, 0.10][d as usize - 1];
+                    for k in 0..3 {
+                        c[k] = (c[k] as f32 + (COR_COSTA[k] as f32 - c[k] as f32) * t) as u8;
+                    }
+                }
+            }
             if id != 0 {
                 if let Some(slot) = caixas.get_mut(id as usize) {
                     let (xu, yu) = (x as u32, y as u32);
@@ -216,10 +262,10 @@ fn aplicar_bordas(dados: &mut [u8], borda: &[u8], ids: &[u32], w: usize, h: usiz
             px.copy_from_slice(&COR_FRONTEIRA_PAIS);
         } else if borda[i] == 1 {
             for c in px.iter_mut().take(3) {
-                *c = (*c as f32 * 0.80) as u8;
+                *c = (*c as f32 * 0.90) as u8;
             }
         } else if anel[i] > 0 {
-            let f = if anel[i] == 1 { 0.30 } else { 0.14 };
+            let f = if anel[i] == 1 { 0.10 } else { 0.04 };
             for c in px.iter_mut().take(3) {
                 *c = (*c as f32 + (255.0 - *c as f32) * f) as u8;
             }
