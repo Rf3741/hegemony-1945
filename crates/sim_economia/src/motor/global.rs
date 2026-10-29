@@ -155,6 +155,11 @@ pub(crate) fn processar_comercio_mundial(
                     * bem.preco_base
                     * paises[lider].politica_fiscal.tarifa_importacao_bem(&bem.id)
                     * paises[lider].eficiencia_arrecadacao;
+            } else if falta < -1e-9 {
+                // Resto do mundo compra parte do excedente que sobrou (exportação residual a preço de mercado)
+                let vol = -falta * config.fracao_maxima_importacao_residual.clamp(0.0, 1.0) * abertura[m];
+                proxima_demanda[i] += vol;
+                importacoes_liquidas[i] -= vol;
             }
         }
     }

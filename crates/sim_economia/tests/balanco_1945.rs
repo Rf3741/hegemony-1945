@@ -28,6 +28,7 @@ fn relatorio(m: &MundoEconomico, rotulo: &str) {
 }
 
 #[test]
+#[ignore = "diagnóstico manual"]
 fn diagnostico_balanco() {
     let mut m = carregar();
     relatorio(&m, "d0");
@@ -38,6 +39,7 @@ fn diagnostico_balanco() {
 }
 
 #[test]
+#[ignore = "diagnóstico manual"]
 fn diagnostico_tipos() {
     let m = carregar();
     for id in ["bra", "usa", "sov", "gbr", "ind"] {
@@ -58,6 +60,7 @@ fn diagnostico_tipos() {
 }
 
 #[test]
+#[ignore = "diagnóstico manual"]
 fn diagnostico_dias() {
     let mut m = carregar();
     let id = std::env::var("PAIS").unwrap_or("bra".into());
@@ -77,6 +80,7 @@ fn diagnostico_dias() {
 }
 
 #[test]
+#[ignore = "diagnóstico manual"]
 fn diagnostico_predios() {
     let mut m = carregar();
     let id = std::env::var("PAIS").unwrap_or("bra".into());
@@ -94,6 +98,7 @@ fn diagnostico_predios() {
 }
 
 #[test]
+#[ignore = "diagnóstico manual"]
 fn diagnostico_infra() {
     let mut m = carregar();
     let id = std::env::var("PAIS").unwrap_or("bra".into());
@@ -111,6 +116,7 @@ fn diagnostico_infra() {
 }
 
 #[test]
+#[ignore = "diagnóstico manual"]
 fn diagnostico_mercado() {
     let mut m = carregar();
     let id = std::env::var("PAIS").unwrap_or("bra".into());
@@ -125,5 +131,36 @@ fn diagnostico_mercado() {
             let p = m.preco_atual(&mid, &bem.id).unwrap();
             if o + d > 0.0 { eprintln!("MERC {:26} oferta {:>12.0} demanda {:>12.0} preco/base {:.2}", bem.id, o, d, p / bem.preco_base); }
         }
+    }
+}
+
+const GRANDES: [&str; 10] = ["usa", "sov", "gbr", "fra", "ger", "jap", "ind", "chi", "bra", "ita"];
+
+#[test]
+fn balanco_1945_estavel_nos_paises_grandes() {
+    let mut m = carregar();
+    let pib0: Vec<f64> = GRANDES.iter().map(|id| m.obter_pais(id).unwrap().pib_diario * 365.0).collect();
+    for id in GRANDES {
+        let d = m.taxa_desemprego_media_pais(id).unwrap();
+        assert!((0.03..=0.15).contains(&d), "{id}: desemprego inicial {:.1}%", 100.0 * d);
+    }
+    // 1 ano de jogo: sem calote, desemprego plausível, PIB sem colapso, orçamento sem sangria
+    for dia in 1..=365 {
+        m.executar_tick_diario();
+        if dia % 30 == 0 {
+            for id in GRANDES {
+                assert!(!m.obter_pais(id).unwrap().orcamento.em_calote, "{id}: calote no dia {dia}");
+            }
+        }
+    }
+    for (i, id) in GRANDES.iter().enumerate() {
+        let p = m.obter_pais(id).unwrap();
+        let d = m.taxa_desemprego_media_pais(id).unwrap();
+        let pib = p.pib_diario * 365.0;
+        eprintln!("{id}: desemp {:.1}% PIB {:.1} bi (inicial {:.1}) saldo/dia {:.0}", 100.0 * d, pib / 1e9, pib0[i] / 1e9, p.orcamento.saldo_diario);
+        assert!(d <= 0.20, "{id}: desemprego {:.1}% após 1 ano", 100.0 * d);
+        assert!(pib >= 0.25 * pib0[i], "{id}: PIB colapsou ({:.1} bi)", pib / 1e9);
+        assert!(p.orcamento.saldo_diario > -0.02 * p.pib_diario, "{id}: déficit diário excessivo");
+        m.auditar_estabilidade().unwrap();
     }
 }

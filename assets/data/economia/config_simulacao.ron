@@ -1,8 +1,8 @@
 (
     formula_preco: VictoriaSuavizada,
     modo_cadencia: DiarioCompleto,
-    multiplicador_preco_minimo: 0.25,
-    multiplicador_preco_maximo: 1.75,
+    multiplicador_preco_minimo: 0.50,
+    multiplicador_preco_maximo: 1.50,
     volume_minimo_mercado: 5.0,
     fator_suavizacao_preco: 0.35,
     elasticidade_substituicao: 1.5,

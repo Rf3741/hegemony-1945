@@ -655,7 +655,7 @@ impl MundoEconomico {
         );
         if self.config.comercio_mundial_automatico {
             let abertura: Vec<f64> =
-                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m)).collect();
+                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m).max(0.35)).collect();
             global::processar_comercio_mundial(
                 &self.catalogo,
                 &self.config,
@@ -833,7 +833,7 @@ impl MundoEconomico {
         );
         if self.config.comercio_mundial_automatico {
             let abertura: Vec<f64> =
-                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m)).collect();
+                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m).max(0.35)).collect();
             global::processar_comercio_mundial(
                 &self.catalogo,
                 &self.config,
@@ -1324,6 +1324,11 @@ impl MundoEconomico {
         let mut desemp_total = 0.0;
         for &p_idx in &pais.provincias_indices {
             for pop in &self.provincias[p_idx].pops {
+                // Camponeses de subsistência são autônomos (produzem para si): não entram na força
+                // de trabalho assalariada, como no Victoria 3.
+                if self.catalogo.tipos_pop[pop.tipo_idx].subsistencia {
+                    continue;
+                }
                 pop_total += pop.populacao;
                 desemp_total += pop.desempregados();
             }
