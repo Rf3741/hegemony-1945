@@ -2,6 +2,7 @@
 use super::economia_sim::EconomiaSim;
 use super::economy::RecursoMundo;
 use super::comercio_ui::PainelComercio;
+use super::construcao_ui::{ConstrucaoUi, secao_construir_aqui};
 use super::mercado_ui::PainelMercado;
 use super::jogador::{PainelPais, PaisJogador, hud_pais, resumo_pais};
 use super::map::{ProvinciaSelecionada, RecursoCatalogo};
@@ -76,11 +77,12 @@ fn barra_hud(
     mut painel: ResMut<PainelPais>,
     mut mercado: ResMut<PainelMercado>,
     mut comercio: ResMut<PainelComercio>,
+    mut constr: ResMut<ConstrucaoUi>,
 ) -> Result {
     let Some(eco) = eco else { return Ok(()) };
     let Some(p) = jogador.and_then(|j| mundo.paises.get(&j.0)) else { return Ok(()) };
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
-    egui::Panel::top("barra_hud").show(&mut raiz, |ui| hud_pais(ui, p, &eco, &mut painel.aberto, &mut mercado.aberto, &mut comercio.aberto));
+    egui::Panel::top("barra_hud").show(&mut raiz, |ui| hud_pais(ui, p, &eco, &mut painel.aberto, &mut mercado.aberto, &mut comercio.aberto, &mut constr.aberta));
     Ok(())
 }
 
@@ -89,6 +91,8 @@ fn painel_provincia(
     selecionada: Res<ProvinciaSelecionada>,
     catalogo: Res<RecursoCatalogo>,
     mundo: Res<RecursoMundo>,
+    eco: Option<Res<EconomiaSim>>,
+    mut constr: ResMut<ConstrucaoUi>,
 ) -> Result {
     if selecionada.0 == 0 {
         return Ok(());
@@ -113,6 +117,9 @@ fn painel_provincia(
             ui.label(format!("População da província: {pop}"));
         }
         ui.label(format!("Vizinhas: {}", prov.vizinhos.len()));
+        if let Some(eco) = &eco {
+            egui::ScrollArea::vertical().id_salt("scroll_painel_prov").show(ui, |ui| secao_construir_aqui(ui, &eco.vista, &prov.adm1_code, &mut constr));
+        }
     });
     Ok(())
 }

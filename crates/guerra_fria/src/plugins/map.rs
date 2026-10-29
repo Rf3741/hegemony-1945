@@ -28,6 +28,17 @@ pub struct DadosMapa {
     pub ids: Vec<u32>,
 }
 
+/// Cores base por província e dono (índice = id), guardadas para repintar o mapa nos modos de mapa.
+#[derive(Resource)]
+pub struct CoresMapa {
+    pub cor_prov: Vec<[u8; 4]>,
+    pub dono_prov: Vec<u32>,
+}
+
+/// Imagem (textura) do mapa exibida.
+#[derive(Resource)]
+pub struct ImagemMapa(pub Handle<Image>);
+
 /// Província atualmente selecionada (0 = nenhuma).
 #[derive(Resource, Default)]
 pub struct ProvinciaSelecionada(pub u32);
@@ -204,6 +215,7 @@ fn iniciar_carga(mut commands: Commands, raiz: Res<RaizProjeto>, catalogo: Res<R
             dono_prov[prov.id as usize] = *indices.entry(tag.as_str()).or_insert(n);
         }
     }
+    commands.insert_resource(CoresMapa { cor_prov: cor_prov.clone(), dono_prov: dono_prov.clone() });
     let entrada = EntradaMapa { caminho_png: raiz.0.join("assets/map/provinces.png"), cor_prov, dono_prov };
     let tarefa = AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move { gerar_mapa(&entrada) });
     commands.insert_resource(TarefaMapa(tarefa));
@@ -239,6 +251,7 @@ fn aguardar_carga(
     );
     imagem.sampler = ImageSampler::nearest();
     let handle = imagens.add(imagem);
+    commands.insert_resource(ImagemMapa(handle.clone()));
     // Três cópias lado a lado para o wrap horizontal.
     for k in [-1.0f32, 0.0, 1.0] {
         commands.spawn((Sprite::from_image(handle.clone()), Transform::from_xyz(k * saida.largura as f32, 0.0, 0.0)));

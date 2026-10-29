@@ -10,6 +10,7 @@ use plugins::{
     economia_sim::EconomiaSimPlugin,
     economy::{EconomyPlugin, RecursoMundo},
     comercio_ui::ComercioUiPlugin,
+    construcao_ui::ConstrucaoUiPlugin,
     mercado_ui::MercadoUiPlugin,
     jogador::JogadorPlugin,
     map::MapPlugin,
@@ -67,6 +68,6 @@ fn main() {
             raiz_dados: raiz.join("crates/visual_mapa/assets/visual"),
             ..default()
         })
-        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, VisualConstrucoesPlugin))
+        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, ConstrucaoUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, VisualConstrucoesPlugin))
         .run();
 }

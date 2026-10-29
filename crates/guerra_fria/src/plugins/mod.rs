@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod comercio_ui;
+pub mod construcao_ui;
 pub mod economia_sim;
 pub mod economy;
 pub mod mercado_ui;

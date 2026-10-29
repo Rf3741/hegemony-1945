@@ -122,7 +122,7 @@ fn cor_saldo(v: f64) -> egui::Color32 {
 }
 
 /// Faixa do HUD com os indicadores do país do jogador (economia vinda do `sim_economia`).
-pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_aberto: &mut bool, mercado_aberto: &mut bool, comercio_aberto: &mut bool) {
+pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_aberto: &mut bool, mercado_aberto: &mut bool, comercio_aberto: &mut bool, construcao_aberta: &mut bool) {
     ui.horizontal_wrapped(|ui| {
         let (r, _) = ui.allocate_exact_size(egui::vec2(22.0, 14.0), egui::Sense::hover());
         ui.painter().rect_filled(r, 2.0, cor_pais(p));
@@ -154,6 +154,9 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
             ui.colored_label(egui::Color32::YELLOW, format!("Economia atrasada {} d", eco.atraso_dias()));
         }
         ui.separator();
+        if ui.add(egui::Button::new(egui::RichText::new("🏗 Construir (B)").strong().size(16.0)).fill(egui::Color32::from_rgb(40, 100, 60))).on_hover_text("Abre a tela de construção").clicked() {
+            *construcao_aberta = !*construcao_aberta;
+        }
         if ui.button("País (F1)").clicked() {
             *painel_aberto = !*painel_aberto;
         }
@@ -519,17 +522,17 @@ fn rotulo_slot(slot: SlotMetodo) -> &'static str {
     }
 }
 
-struct LucratividadeEsperada {
-    receita: f64,
-    custo_insumos: f64,
-    custo_folha: f64,
-    lucro_liquido: f64,
-    margem: f64,
-    vagas_totais: f64,
-    produtividade: f64,
+pub(crate) struct LucratividadeEsperada {
+    pub(crate) receita: f64,
+    pub(crate) custo_insumos: f64,
+    pub(crate) custo_folha: f64,
+    pub(crate) lucro_liquido: f64,
+    pub(crate) margem: f64,
+    pub(crate) vagas_totais: f64,
+    pub(crate) produtividade: f64,
 }
 
-fn calcular_lucratividade_esperada(
+pub(crate) fn calcular_lucratividade_esperada(
     cat: &CatalogoEconomia,
     tipo: &TipoPredio,
     metodos: &[String],
@@ -602,12 +605,12 @@ fn calcular_lucratividade_esperada(
     }
 }
 
-struct CustoMateriaisObra {
-    itens: Vec<(String, f64, f64, f64)>, // (nome_bem, qtd_total, preco_un, custo_total)
-    total_reais: f64,
+pub(crate) struct CustoMateriaisObra {
+    pub(crate) itens: Vec<(String, f64, f64, f64)>, // (nome_bem, qtd_total, preco_un, custo_total)
+    pub(crate) total_reais: f64,
 }
 
-fn calcular_custo_materiais_obra(
+pub(crate) fn calcular_custo_materiais_obra(
     cat: &CatalogoEconomia,
     tipo: &TipoPredio,
     bens: &[VistaBem],
