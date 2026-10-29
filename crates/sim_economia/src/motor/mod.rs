@@ -372,6 +372,13 @@ impl MundoEconomico {
         }
         governo::atualizar_terra_aravel_estados(&mut cenario.estados, &cenario.provincias);
         producao::atualizar_infraestrutura_estados(&catalogo, &mut cenario.estados, &cenario.provincias);
+        producao::calibrar_infraestrutura_inicial(
+            &catalogo,
+            &mut cenario.estados,
+            &mut cenario.provincias,
+            &mut scratch_emp,
+            &mut scratch_pop,
+        );
 
         // 5. Validar filas de construção iniciais dos países
         for pais in &mut cenario.paises {
