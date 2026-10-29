@@ -26,6 +26,8 @@ pub struct EstadoVisualConstrucoes {
     pub ultima_versao_construcao: u64,
     pub total_predios: usize,
     pub total_cidades: usize,
+    /// Instante (s, tempo real) da última extração; limita a no máximo 1 a cada 2 s.
+    pub ultima_extracao: f32,
 }
 
 pub struct VisualConstrucoesPlugin;
@@ -69,6 +71,7 @@ pub fn sincronizar_dados_construcoes_sistema(
     catalogo_mapa: Option<Res<RecursoCatalogo>>,
     mut entrada_eco: ResMut<EntradaEconomiaVisual>,
     mut entrada_vis: ResMut<EntradaVisual>,
+    tempo: Res<Time<Real>>,
 ) {
     let Some(ref nucleo) = eco.nucleo else { return };
 
@@ -124,7 +127,10 @@ pub fn sincronizar_dados_construcoes_sistema(
             "visual_construcoes: mapa vivo populado com {} construções e {} cidades da economia.",
             estado.total_predios, estado.total_cidades
         );
-    } else if eco.versao_construcao != estado.ultima_versao_construcao {
+    } else if eco.versao_construcao != estado.ultima_versao_construcao
+        && tempo.elapsed_secs() - estado.ultima_extracao >= 2.0
+    {
+        estado.ultima_extracao = tempo.elapsed_secs();
         estado.ultima_versao_construcao = eco.versao_construcao;
         atualizar_predios_de_mundo(&nucleo.mundo, &coords, &mut entrada_eco);
         estado.total_predios = entrada_eco.total_predios();

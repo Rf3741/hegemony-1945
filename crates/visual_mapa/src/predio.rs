@@ -116,8 +116,10 @@ pub fn sincronizar_economia_sistema(
     mut query_agregados: Query<&mut AgregadoEstadoVisual>,
     rec: Option<Res<RecursosPredios>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    estilo: Option<Res<crate::estilo::EstiloMapa>>,
 ) {
     let Some(rec) = rec else { return };
+    let max_tipos = estilo.map_or(3, |e| e.max_icones_por_estado.max(1));
     let era_global = indice_era_para_ano(ano.0);
     let primeira_carga = indice.predios.is_empty();
     let zoom_perto = estado_lod.as_ref().map_or(true, |lod| lod.nivel_atual == NivelLod::Local);
@@ -184,7 +186,8 @@ pub fn sincronizar_economia_sistema(
         let mut tipos_ordenados: Vec<_> = por_tipo.into_iter().collect();
         tipos_ordenados.sort_by(|a, b| b.1.0.cmp(&a.1.0).then_with(|| a.0.cmp(&b.0)));
 
-        for (k, (tipo, (soma_niveis, soma_prod, pais_tag, bloco, pos_tipo))) in tipos_ordenados.into_iter().enumerate() {
+        // Limite de entidades: só os N tipos mais fortes de cada estado ganham ícone.
+        for (k, (tipo, (soma_niveis, soma_prod, pais_tag, bloco, pos_tipo))) in tipos_ordenados.into_iter().take(max_tipos).enumerate() {
             let offset = calcular_offset_espiral(k, cfg.espacamento_predios);
             let pos_mundo = if let Some((lon, lat)) = pos_tipo {
                 cfg.projecao.geo_para_mundo(lon, lat) + offset * 0.4
