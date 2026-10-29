@@ -3,6 +3,7 @@ pub mod comercio_ui;
 pub mod construcao_ui;
 pub mod economia_sim;
 pub mod economy;
+pub mod eventos_ui;
 pub mod mercado_ui;
 pub mod jogador;
 pub mod map;

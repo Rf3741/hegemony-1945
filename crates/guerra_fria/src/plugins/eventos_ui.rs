@@ -1,0 +1,177 @@
+//! Eventos históricos: avaliação diária, pop-up estilo dossiê (pausa o jogo) e jornal.
+use super::economy::RecursoMundo;
+use super::jogador::PaisJogador;
+use super::time::{EventoTickDiario, RecursoRelogio};
+use bevy::prelude::*;
+use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
+use eventos::{CatalogoEventos, EstadoEventos, aplicar_opcao, avaliar_dia, descrever_efeito};
+
+#[derive(Resource)]
+pub struct CatalogoEv(pub CatalogoEventos);
+
+#[derive(Resource, Default)]
+pub struct EstadoEv {
+    pub estado: EstadoEventos,
+    /// O relógio estava rodando quando o pop-up abriu (retoma ao decidir).
+    retomar: bool,
+    jornal_aberto: bool,
+}
+
+pub struct EventosPlugin;
+
+impl Plugin for EventosPlugin {
+    fn build(&self, app: &mut App) {
+        let raiz = app
+            .world()
+            .get_resource::<super::map::RaizProjeto>()
+            .map(|r| r.0.clone())
+            .unwrap_or_else(|| std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."));
+        match CatalogoEventos::carregar(&raiz.join("assets/data/eventos")) {
+            Ok(c) => {
+                info!("eventos: {} carregados", c.eventos.len());
+                app.insert_resource(CatalogoEv(c));
+            }
+            Err(e) => error!("eventos: falha ao carregar: {e}"),
+        }
+        app.insert_resource(EstadoEv { jornal_aberto: true, ..default() })
+            .add_systems(Update, (tick_eventos, atalho_jornal).run_if(resource_exists::<CatalogoEv>).run_if(resource_exists::<PaisJogador>).run_if(crate::estado::em_partida))
+            .add_systems(
+                EguiPrimaryContextPass,
+                (popup_evento, jornal).run_if(resource_exists::<CatalogoEv>).run_if(resource_exists::<PaisJogador>).run_if(crate::estado::em_partida),
+            );
+    }
+}
+
+fn tick_eventos(
+    mut leitor: MessageReader<EventoTickDiario>,
+    cat: Res<CatalogoEv>,
+    pais: Res<PaisJogador>,
+    mut mundo: ResMut<RecursoMundo>,
+    mut ev: ResMut<EstadoEv>,
+    mut relogio: ResMut<RecursoRelogio>,
+) {
+    if leitor.read().count() > 0 {
+        let est = &mut ev.estado;
+        avaliar_dia(&cat.0, est, &mut mundo.0, &pais.0);
+    }
+    // Enquanto houver decisão pendente o tempo fica parado.
+    if !ev.estado.pendentes.is_empty() {
+        if !relogio.pausado {
+            ev.retomar = true;
+            relogio.pausado = true;
+        }
+    }
+}
+
+fn atalho_jornal(teclas: Res<ButtonInput<KeyCode>>, mut ev: ResMut<EstadoEv>) {
+    if teclas.just_pressed(KeyCode::KeyJ) {
+        ev.jornal_aberto = !ev.jornal_aberto;
+    }
+}
+
+const PAPEL: egui::Color32 = egui::Color32::from_rgb(0xd9, 0xcf, 0xb8);
+const TINTA: egui::Color32 = egui::Color32::from_rgb(0x23, 0x20, 0x1b);
+const TINTA_SUAVE: egui::Color32 = egui::Color32::from_rgb(0x59, 0x53, 0x47);
+const CARIMBO: egui::Color32 = egui::Color32::from_rgb(0xa3, 0x27, 0x22);
+const BORDA: egui::Color32 = egui::Color32::from_rgb(0x9e, 0x91, 0x76);
+
+fn popup_evento(
+    mut contextos: EguiContexts,
+    cat: Res<CatalogoEv>,
+    mut mundo: ResMut<RecursoMundo>,
+    mut ev: ResMut<EstadoEv>,
+    mut relogio: ResMut<RecursoRelogio>,
+) -> Result {
+    let Some(pend) = ev.estado.pendentes.first().cloned() else { return Ok(()) };
+    let Some(evento) = cat.0.por_id(&pend.evento_id) else {
+        ev.estado.pendentes.remove(0);
+        return Ok(());
+    };
+    relogio.pausado = true;
+    let data = format!("{:02}/{:02}/{}", evento.data.2, evento.data.1, evento.data.0);
+    let cor_pais = mundo.0.paises.get(&pend.pais).map(|p| egui::Color32::from_rgb(p.cor.0, p.cor.1, p.cor.2)).unwrap_or(CARIMBO);
+    let nome_pais = mundo.0.paises.get(&pend.pais).map(|p| p.nome.clone()).unwrap_or_default();
+    let mut escolhida: Option<usize> = None;
+    let faltam = ev.estado.pendentes.len() - 1;
+
+    egui::Window::new("evento_historico")
+        .title_bar(false)
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .fixed_size([620.0, 0.0])
+        .frame(egui::Frame::new().fill(PAPEL).stroke(egui::Stroke::new(2.0, BORDA)).inner_margin(0.0))
+        .show(contextos.ctx_mut()?, |ui| {
+            // Cabeçalho (faixa com a cor do país e carimbo).
+            egui::Frame::new().fill(cor_pais.gamma_multiply(0.55)).inner_margin(egui::Margin::symmetric(14, 10)).show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(nome_pais.to_uppercase()).color(egui::Color32::WHITE).strong());
+                    ui.label(egui::RichText::new(format!("• {data}")).color(egui::Color32::WHITE));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(egui::RichText::new("URGENTE • JOGO PAUSADO").color(CARIMBO).background_color(PAPEL).strong());
+                    });
+                });
+            });
+            egui::Frame::new().inner_margin(egui::Margin::symmetric(18, 12)).show(ui, |ui| {
+                ui.label(egui::RichText::new(&evento.titulo).color(TINTA).size(20.0).strong());
+                ui.add_space(6.0);
+                egui::ScrollArea::vertical().max_height(180.0).show(ui, |ui| {
+                    ui.label(egui::RichText::new(&evento.descricao).color(TINTA));
+                });
+                ui.add_space(10.0);
+                ui.separator();
+                for (i, op) in evento.opcoes.iter().enumerate() {
+                    let letra = (b'A' + (i as u8 % 26)) as char;
+                    let r = ui.add_sized([ui.available_width(), 34.0], egui::Button::new(egui::RichText::new(format!("{letra}. {}", op.texto)).color(TINTA)).fill(egui::Color32::from_rgb(0xcb, 0xbf, 0xa3)).wrap());
+                    let r = r.on_hover_ui(|ui| {
+                        ui.set_max_width(380.0);
+                        if !op.descricao_resultado.is_empty() {
+                            ui.label(&op.descricao_resultado);
+                            ui.separator();
+                        }
+                        for m in &op.efeitos {
+                            let bom = m.valor >= 0.0;
+                            ui.colored_label(if bom { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED }, descrever_efeito(m));
+                        }
+                    });
+                    if r.clicked() {
+                        escolhida = Some(i);
+                    }
+                    ui.add_space(2.0);
+                }
+                ui.add_space(4.0);
+                let rodape = if faltam > 0 { format!("Passe o mouse sobre uma opção para ver os efeitos. (+{faltam} na fila)") } else { "Passe o mouse sobre uma opção para ver os efeitos.".to_string() };
+                ui.label(egui::RichText::new(rodape).color(TINTA_SUAVE).small());
+            });
+        });
+
+    if let Some(i) = escolhida {
+        let evento = evento.clone();
+        let est = &mut ev.estado;
+        aplicar_opcao(&mut mundo.0, est, &evento, i, &pend.pais);
+        if ev.estado.pendentes.is_empty() && ev.retomar {
+            relogio.pausado = false;
+            ev.retomar = false;
+        }
+    }
+    Ok(())
+}
+
+fn jornal(mut contextos: EguiContexts, ev: Res<EstadoEv>) -> Result {
+    if !ev.jornal_aberto || ev.estado.jornal.is_empty() {
+        return Ok(());
+    }
+    egui::Window::new("Jornal (J)")
+        .anchor(egui::Align2::RIGHT_BOTTOM, [-10.0, -10.0])
+        .default_width(340.0)
+        .resizable(false)
+        .show(contextos.ctx_mut()?, |ui| {
+            for n in ev.estado.jornal.iter().rev().take(6) {
+                ui.label(egui::RichText::new(format!("{:02}/{:02}/{}", n.data.2, n.data.1, n.data.0)).small().weak());
+                ui.label(&n.texto);
+                ui.separator();
+            }
+        });
+    Ok(())
+}
