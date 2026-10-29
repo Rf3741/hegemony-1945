@@ -1,0 +1,11 @@
+[package]
+name = "sim_tecnologia"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Motor puro de tecnologia (pesquisa, difusao, desbloqueios) para Hegemony: 1945"
+
+[dependencies]
+ron.workspace = true
+serde.workspace = true
+thiserror.workspace = true
