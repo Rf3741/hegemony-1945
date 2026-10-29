@@ -16,6 +16,7 @@ use plugins::{
     politics::PoliticsPlugin,
     time::TimePlugin,
     ui::UiPlugin,
+    rotas_ponte::RotasPontePlugin,
     visual_construcoes::VisualConstrucoesPlugin,
 };
 use simulacao::mundo::MundoJogo;
@@ -67,6 +68,6 @@ fn main() {
             raiz_dados: raiz.join("crates/visual_mapa/assets/visual"),
             ..default()
         })
-        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, VisualConstrucoesPlugin))
+        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, RotasPontePlugin, VisualConstrucoesPlugin))
         .run();
 }

@@ -61,7 +61,7 @@ pub struct ConfigRotas {
 
 impl Default for ConfigRotas {
     fn default() -> Self {
-        Self { ativo: true, vizinhas: 3, dist_max: 380.0, largura_mapa: 5632.0, nivel_min_ferrovia: 4, ano_rodovias: 1950.0 }
+        Self { ativo: true, vizinhas: 3, dist_max: 380.0, largura_mapa: 5632.0, nivel_min_ferrovia: 3, ano_rodovias: 1950.0 }
     }
 }
 
@@ -430,5 +430,28 @@ mod tests {
         let g = construir_grafo(&nos, &cfg, None);
         let m = construir_malhas(&nos, &g, 1960.0, &cfg);
         assert!(!m.estradas.vazio() && !m.ferrovias.vazio());
+    }
+
+    #[test]
+    fn grafo_com_cidades_reais() {
+        let caminho = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/data/territorio/cidades.ron");
+        if !caminho.exists() {
+            return;
+        }
+        let proj = ProjecaoMapa::default();
+        let nos: Vec<NoRota> = crate::cenario::carregar_cidades_cenario(&caminho)
+            .iter()
+            .map(|c| NoRota {
+                pos: proj.geo_para_mundo(c.posicao.0, c.posicao.1),
+                nivel: crate::entrada::populacao_urbana_para_nivel(c.populacao_urbana),
+                pais: c.pais_tag.clone(),
+            })
+            .collect();
+        let t = std::time::Instant::now();
+        let cfg = ConfigRotas::default();
+        let g = construir_grafo(&nos, &cfg, None);
+        let m = construir_malhas(&nos, &g, 1945.0, &cfg);
+        eprintln!("{} cidades -> {} ligacoes, {} vertices de estrada, {} de ferrovia em {:?}", nos.len(), g.len(), m.estradas.vertices(), m.ferrovias.vertices(), t.elapsed());
+        assert!(g.len() > nos.len() / 2);
     }
 }

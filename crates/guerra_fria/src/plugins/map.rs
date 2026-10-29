@@ -135,11 +135,12 @@ pub fn colorir(
     let dono = |id: u32| dono_prov.get(id as usize).copied().unwrap_or(0);
     let mut caixas: Vec<Option<[u32; 4]>> = vec![None; cor_prov.len()];
     let mut dados = vec![0u8; wu * hu * 4];
+    let mut borda = vec![0u8; wu * hu];
     for y in 0..hu {
         for x in 0..wu {
             let i = y * wu + x;
             let id = ids[i];
-            let mut c = if id == 0 { COR_OCEANO_RGBA } else { cor_prov.get(id as usize).copied().unwrap_or(COR_OCEANO_RGBA) };
+            let c = if id == 0 { COR_OCEANO_RGBA } else { cor_prov.get(id as usize).copied().unwrap_or(COR_OCEANO_RGBA) };
             if id != 0 {
                 if let Some(slot) = caixas.get_mut(id as usize) {
                     let (xu, yu) = (x as u32, y as u32);
@@ -148,30 +149,71 @@ pub fn colorir(
                         Some([a, b, cc, d]) => [a.min(xu), b.min(yu), cc.max(xu), d.max(yu)],
                     });
                 }
-                let (mut borda_pais, mut borda_prov) = (false, false);
-                // Vizinhos à direita (com wrap horizontal) e abaixo.
+            }
+            {
+                // Vizinhos à direita (com wrap horizontal) e abaixo; marca os DOIS lados da borda
+                // (país = 2, província = 1) para a fronteira ficar com 2 px de espessura.
                 for (nx, ny) in [((x + 1) % wu, y), (x, y + 1)] {
                     if ny < hu {
-                        let v = ids[ny * wu + nx];
+                        let ni = ny * wu + nx;
+                        let v = ids[ni];
                         if v != id {
-                            if v == 0 || dono(v) != dono(id) {
-                                borda_pais = true;
-                            } else {
-                                borda_prov = true;
-                            }
+                            let tipo = if v == 0 || dono(v) != dono(id) { 2 } else { 1 };
+                            borda[i] = borda[i].max(tipo);
+                            borda[ni] = borda[ni].max(tipo);
                         }
                     }
-                }
-                if borda_pais {
-                    c = [15, 15, 15, 255];
-                } else if borda_prov {
-                    c = [(c[0] as f32 * 0.72) as u8, (c[1] as f32 * 0.72) as u8, (c[2] as f32 * 0.72) as u8, 255];
                 }
             }
             dados[i * 4..i * 4 + 4].copy_from_slice(&c);
         }
     }
+    aplicar_bordas(&mut dados, &borda, ids, wu, hu);
     (dados, caixas)
+}
+
+/// Cor da fronteira entre países (escura, quase preta).
+const COR_FRONTEIRA_PAIS: [u8; 4] = [15, 15, 15, 255];
+
+/// Pinta fronteiras: países = linha escura de 2 px com brilho (clareamento) de 2 px na cor do
+/// país por dentro; províncias/estados = linha sutil de 1 px (cor do país escurecida).
+fn aplicar_bordas(dados: &mut [u8], borda: &[u8], ids: &[u32], w: usize, h: usize) {
+    let viz = |i: usize| -> [Option<usize>; 4] {
+        let (x, y) = (i % w, i / w);
+        [
+            Some(y * w + (x + 1) % w),
+            Some(y * w + (x + w - 1) % w),
+            (y + 1 < h).then(|| (y + 1) * w + x),
+            (y > 0).then(|| (y - 1) * w + x),
+        ]
+    };
+    // Anel de brilho: 1 = adjacente à fronteira de país, 2 = a duas casas.
+    let mut anel = vec![0u8; w * h];
+    for i in 0..w * h {
+        if borda[i] != 2 && ids[i] != 0 && viz(i).iter().flatten().any(|&n| borda[n] == 2) {
+            anel[i] = 1;
+        }
+    }
+    for i in 0..w * h {
+        if borda[i] != 2 && anel[i] == 0 && ids[i] != 0 && viz(i).iter().flatten().any(|&n| anel[n] == 1) {
+            anel[i] = 2;
+        }
+    }
+    for i in 0..w * h {
+        let px = &mut dados[i * 4..i * 4 + 4];
+        if borda[i] == 2 {
+            px.copy_from_slice(&COR_FRONTEIRA_PAIS);
+        } else if borda[i] == 1 {
+            for c in px.iter_mut().take(3) {
+                *c = (*c as f32 * 0.80) as u8;
+            }
+        } else if anel[i] > 0 {
+            let f = if anel[i] == 1 { 0.30 } else { 0.14 };
+            for c in px.iter_mut().take(3) {
+                *c = (*c as f32 + (255.0 - *c as f32) * f) as u8;
+            }
+        }
+    }
 }
 
 /// RGBA do realce: branco translúcido apenas nos pixels da província dentro da caixa.
@@ -397,8 +439,10 @@ mod testes {
         assert_eq!(caixas[2], Some([2, 0, 2, 1]));
         // pixel (1,0) tem vizinho de outro país à direita: borda escura.
         assert_eq!(&px[4..8], &[15, 15, 15, 255]);
-        // pixel (0,0): vizinho à direita é a mesma província, abaixo também.
-        assert_eq!(&px[0..4], &[200, 0, 0, 255]);
+        // pixel (2,0) também é fronteira de país (2 px de espessura).
+        assert_eq!(&px[8..12], &[15, 15, 15, 255]);
+        // pixel (0,0): com o wrap horizontal encosta no oceano (pixel 3), então também é fronteira.
+        assert_eq!(&px[0..4], &[15, 15, 15, 255]);
     }
 
     #[test]

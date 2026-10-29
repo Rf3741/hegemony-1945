@@ -6,6 +6,7 @@ pub mod mercado_ui;
 pub mod jogador;
 pub mod map;
 pub mod politics;
+pub mod rotas_ponte;
 pub mod time;
 pub mod ui;
 pub mod visual_construcoes;
