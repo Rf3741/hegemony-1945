@@ -5,7 +5,7 @@ use crate::atlas::AtlasVisual;
 use crate::config::VisualMapaConfig;
 use crate::entrada::{AnoVisual, BlocoVisual, EntradaVisual};
 use crate::era::{GerenciadorEras, indice_era_para_ano};
-use crate::lod::{DetalheLod, MarcadorLod};
+use crate::lod::MarcadorLod;
 use bevy::prelude::*;
 use std::collections::HashMap;
 
@@ -29,6 +29,13 @@ pub struct CidadeVisual {
     pub eh_capital: bool,
     /// Temporizador da animação de pop ao subir de nível [0.0..=1.0].
     pub timer_animacao_nivel: f32,
+    /// Nome original (antes das trocas históricas); `nome` é o nome vigente no ano.
+    pub nome_base: String,
+    pub ano_fundacao: Option<u16>,
+    pub mudancas_nome: Vec<(u16, String)>,
+    pub eh_porto: bool,
+    /// `false` antes do ano de fundação (a cidade fica oculta).
+    pub existe: bool,
 }
 
 /// Índices id -> entidade, mantidos pelos sistemas de sincronia.
@@ -80,7 +87,7 @@ pub fn nivel_inteiro(nivel: f32) -> u8 {
 /// Tamanho do sprite (unidades de mundo) por nível.
 #[inline]
 pub fn tamanho_sprite_cidade(nivel: u8, escala: f32) -> f32 {
-    (10.0 + nivel as f32 * 3.5) * escala
+    (5.0 + nivel as f32 * 1.6) * escala
 }
 
 /// Gera deterministicamente a lista de prédios para uma dada cidade.
@@ -153,6 +160,8 @@ pub fn sincronizar_cidades_sistema(
     mut cidades: Query<&mut CidadeVisual>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    fonte: Option<Res<crate::cidade_v3::FonteRotulos>>,
+    ano: Res<AnoVisual>,
     mut recursos: Local<Option<RecursosCidade>>,
 ) {
     let rec = recursos.get_or_insert_with(|| RecursosCidade {
@@ -170,6 +179,7 @@ pub fn sincronizar_cidades_sistema(
                 v.populacao = c.populacao;
                 v.eh_capital = c.eh_capital;
                 v.era_local = c.era;
+                v.eh_porto = c.eh_porto;
             }
             continue;
         }
@@ -190,12 +200,18 @@ pub fn sincronizar_cidades_sistema(
             populacao: c.populacao,
             eh_capital: c.eh_capital,
             timer_animacao_nivel: 0.0,
+            nome_base: c.nome.clone(),
+            ano_fundacao: c.ano_fundacao,
+            mudancas_nome: c.mudancas_nome.clone(),
+            eh_porto: c.eh_porto,
+            existe: crate::cidade_v3::existe_no_ano(c.ano_fundacao, ano.0),
         };
+        let existe_agora = cidade.existe;
         let mat_lod = if c.eh_capital { rec.mat_capital.clone() } else { rec.mat_cidade.clone() };
         let mut ent = commands.spawn((
             cidade,
             Transform::from_translation(pos.extend(10.0)),
-            Visibility::default(),
+            if existe_agora { Visibility::Inherited } else { Visibility::Hidden },
         ));
         let id_ent = ent.id();
         ent.with_children(|p| {
@@ -205,40 +221,33 @@ pub fn sincronizar_cidades_sistema(
                 Transform::from_xyz(0.0, 0.0, 5.0),
                 MarcadorLod,
             ));
+            let fonte_h = fonte.as_ref().map(|f| f.0.clone());
+            let mk_fonte = || {
+                let mut tf = TextFont::from_font_size(crate::cidade_v3::FONTE_BASE_PX);
+                if let Some(h) = fonte_h.clone() {
+                    tf.font = h.into();
+                }
+                tf
+            };
+            // Os detalhes (prédios, luzes, fumaça, guindastes, tráfego) são criados sob demanda
+            // por `cidade_v3::materializar_detalhes_sistema`.
             p.spawn((
                 Text2d::new(c.nome.clone()),
-                TextFont::from_font_size(9.0),
-                TextColor(Color::srgba(0.92, 0.94, 0.96, 0.90)),
+                mk_fonte(),
+                TextColor(Color::srgba(0.96, 0.95, 0.90, 0.95)),
                 Transform::from_xyz(0.0, -8.0, 6.0),
                 Visibility::Hidden,
                 RotuloNomeCidade,
-            ));
-            if atlas.disponivel() {
-                let era = c.era.unwrap_or(0);
-                let sprite = atlas
-                    .carregado
-                    .as_ref()
-                    .and_then(|a| a.indice.indice_cidade(bloco.chave_atlas(), niv, era))
-                    .and_then(|i| atlas.sprite(i, tamanho_sprite_cidade(niv, cfg.escala_sprites)));
-                if let Some(sprite) = sprite {
-                    p.spawn((sprite, Transform::from_xyz(0.0, 0.0, 2.0), Visibility::Hidden, SpriteCidade, DetalheLod));
-                }
-            } else {
-                let maximo = c.nivel_maximo.unwrap_or(niv + 2).max(niv).min(8);
-                for pr in gerar_predios_cidade(&c.id, niv, maximo) {
-                    let off = pr.offset_local * cfg.escala_sprites;
-                    let esc = pr.escala_animada;
-                    p.spawn((
-                        Mesh2d(rec.mesh_predio.clone()),
-                        MeshMaterial2d(rec.mat_predio.clone()),
-                        Transform::from_translation(off.extend(1.0))
-                            .with_scale(Vec3::new(pr.tamanho.x * esc, pr.tamanho.y * esc, 1.0)),
-                        pr,
-                        DetalheLod,
-                        Visibility::Hidden,
-                    ));
-                }
-            }
+            ))
+            .with_children(|r| {
+                r.spawn((
+                    Text2d::new(c.nome.clone()),
+                    mk_fonte(),
+                    TextColor(Color::srgba(0.02, 0.03, 0.06, 0.85)),
+                    Transform::from_xyz(0.9, -0.9, -0.1),
+                    crate::cidade_v3::SombraRotulo,
+                ));
+            });
         });
         indice.cidades.insert(c.id.clone(), id_ent);
         novas += 1;
@@ -249,6 +258,7 @@ pub fn sincronizar_cidades_sistema(
 }
 
 /// Recursos compartilhados (batching) das cidades.
+#[allow(dead_code)]
 pub struct RecursosCidade {
     mesh_predio: Handle<Mesh>,
     mesh_marcador: Handle<Mesh>,

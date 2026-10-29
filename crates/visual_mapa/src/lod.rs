@@ -180,33 +180,7 @@ pub fn atualizar_lod_sistema(
         };
     }
 
-    // 3. Atualizar Rótulos de Nomes de Cidades:
-    // - Global: ocultos (mapa limpo)
-    // - Regional: visíveis para cidades maiores (nível >= nivel_min_nome_medio ou capitais)
-    // - Local: visíveis para cidades (nível >= 2 ou capitais)
-    for (mut v, child) in &mut rotulos {
-        if let Ok(cidade) = cidades.get(child.parent()) {
-            *v = match novo {
-                NivelLod::Global => Visibility::Hidden,
-                NivelLod::Regional => {
-                    if cidade.nivel_atual_inteiro >= lim.nivel_min_nome_medio || cidade.eh_capital {
-                        Visibility::Inherited
-                    } else {
-                        Visibility::Hidden
-                    }
-                }
-                NivelLod::Local => {
-                    if cidade.nivel_atual_inteiro >= 2 || cidade.eh_capital {
-                        Visibility::Inherited
-                    } else {
-                        Visibility::Hidden
-                    }
-                }
-            };
-        } else {
-            *v = Visibility::Hidden;
-        }
-    }
+    // 3. Rótulos: posicionamento, tamanho e colisão ficam em `cidade_v3::layout_rotulos_sistema`.
 }
 
 #[cfg(test)]

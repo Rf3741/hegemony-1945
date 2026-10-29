@@ -2,7 +2,7 @@
 use bevy::prelude::*;
 use visual_mapa::cidade::CidadeVisual;
 use visual_mapa::industria::InstalacaoIndustrial;
-use visual_mapa::lod::{DetalheLod, MarcadorLod};
+use visual_mapa::lod::MarcadorLod;
 use visual_mapa::transporte::LinhaTransporte;
 use visual_mapa::*;
 
@@ -48,8 +48,7 @@ fn cria_entidades_com_atlas() {
     assert_eq!(w.query::<&CidadeVisual>().iter(w).count(), 2);
     assert_eq!(w.query::<&InstalacaoIndustrial>().iter(w).count(), 1);
     assert_eq!(w.query::<&LinhaTransporte>().iter(w).count(), 1);
-    // um sprite de atlas por cidade
-    assert_eq!(w.query::<(&DetalheLod, &Sprite)>().iter(w).count(), 2);
+    // os detalhes das cidades (cidade_v3) são criados sob demanda no zoom próximo
     let era = w.query::<&CidadeVisual>().iter(w).next().unwrap().era_idx;
     assert_eq!(era, 2, "1970 = era 2");
 }
@@ -60,7 +59,6 @@ fn fallback_procedural_sem_atlas() {
     let w = a.world_mut();
     assert!(!w.resource::<AtlasVisual>().disponivel());
     assert_eq!(w.query::<&CidadeVisual>().iter(w).count(), 2);
-    assert!(w.query::<&DetalheLod>().iter(w).count() > 10, "predios procedurais");
     assert_eq!(w.query::<&MarcadorLod>().iter(w).count(), 2);
 }
 
@@ -91,4 +89,33 @@ fn posicao_usa_projecao_do_gf_mapa() {
     let w = a.world_mut();
     let c = w.query::<&CidadeVisual>().iter(w).find(|c| c.id == "a").unwrap();
     assert!((c.posicao_mundo - geo_para_mundo(-74.0, 40.7)).length() < 0.01);
+}
+
+#[test]
+fn fundacao_e_troca_de_nome_por_ano() {
+    let mut a = app(false);
+    *a.world_mut().resource_mut::<EntradaVisual>() = EntradaVisual {
+        cidades: vec![
+            CidadeEntrada { id: "bsb".into(), nome: "Brasília".into(), pais_tag: "BRA".into(), posicao: (-47.9, -15.8), nivel: 3.0, ano_fundacao: Some(1960), ..default() },
+            CidadeEntrada { id: "vol".into(), nome: "Stalingrado".into(), pais_tag: "SOV".into(), posicao: (44.5, 48.7), nivel: 4.0, mudancas_nome: vec![(1961, "Volgogrado".into())], ..default() },
+        ],
+        ..default()
+    };
+    a.world_mut().resource_mut::<AnoVisual>().0 = 1945.0;
+    for _ in 0..4 {
+        a.update();
+    }
+    let estado = |a: &mut App, id: &str| {
+        let w = a.world_mut();
+        let c = w.query::<&CidadeVisual>().iter(w).find(|c| c.id == id).unwrap();
+        (c.existe, c.nome.clone())
+    };
+    assert_eq!(estado(&mut a, "bsb"), (false, "Brasília".to_string()));
+    assert_eq!(estado(&mut a, "vol"), (true, "Stalingrado".to_string()));
+    a.world_mut().resource_mut::<AnoVisual>().0 = 1962.0;
+    for _ in 0..3 {
+        a.update();
+    }
+    assert_eq!(estado(&mut a, "bsb"), (true, "Brasília".to_string()));
+    assert_eq!(estado(&mut a, "vol"), (true, "Volgogrado".to_string()));
 }
