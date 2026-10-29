@@ -12,6 +12,7 @@
 pub mod atlas;
 pub mod cenario;
 pub mod cidade;
+pub mod cidade_v3;
 pub mod config;
 pub mod dados;
 pub mod entrada;
@@ -119,6 +120,28 @@ impl Plugin for VisualMapaPlugin {
                     predio::alternar_camada_construcoes_sistema,
                     lod::atualizar_lod_sistema,
                 )
+                    .in_set(VisualMapaSet::Animar)
+                    .after(VisualMapaSet::Sincronizar),
+            )
+            .add_systems(
+                Startup,
+                (cidade_v3::carregar_fonte_rotulos_sistema, cidade_v3::criar_texturas_janelas_sistema),
+            )
+            .add_systems(
+                Update,
+                (
+                    cidade_v3::fundacao_nome_sistema,
+                    cidade_v3::alternar_noite_sistema,
+                    cidade_v3::ajustar_marcadores_sistema,
+                    cidade_v3::layout_rotulos_sistema,
+                    cidade_v3::materializar_detalhes_sistema,
+                    cidade_v3::animar_predios_urbanos_sistema,
+                    cidade_v3::atualizar_noite_sistema,
+                    cidade_v3::emitir_fumaca_urbana_sistema,
+                    cidade_v3::atualizar_fumaca_urbana_sistema,
+                    cidade_v3::animar_porto_e_trafego_sistema,
+                )
+                    .after(lod::atualizar_lod_sistema)
                     .in_set(VisualMapaSet::Animar)
                     .after(VisualMapaSet::Sincronizar),
             );
