@@ -1,0 +1,47 @@
+// Calendário histórico dos canais interoceânicos. Datas (ano, mes, dia); `ate: None` = sem fim no período.
+// `fechamentos` são intervalos (inclusive) em que o canal não opera. Estreitos naturais (Gibraltar, Bósforo)
+// não têm pedágio e ficam fora desta lista.
+[
+    (
+        id: "suez", navios_por_dia: 55.0, nome: "Canal de Suez", pedagio_por_navio: 9000.0,
+        abertura: (1869, 11, 17),
+        donos: [
+            (pais: "gbr", desde: (1869, 11, 17)),
+            (pais: "egy", desde: (1956, 7, 26)),
+        ],
+        fechamentos: [
+            (de: (1956, 11, 1), ate: (1957, 4, 24)),
+            (de: (1967, 6, 5), ate: (1975, 6, 5)),
+        ],
+    ),
+    (
+        id: "panama", navios_por_dia: 18.0, nome: "Canal do Panamá", pedagio_por_navio: 12000.0,
+        abertura: (1914, 8, 15),
+        donos: [ (pais: "usa", desde: (1914, 8, 15)) ],
+        fechamentos: [],
+    ),
+    (
+        id: "kiel", navios_por_dia: 60.0, nome: "Canal de Kiel", pedagio_por_navio: 2500.0,
+        abertura: (1895, 6, 21),
+        donos: [ (pais: "ger", desde: (1895, 6, 21)) ],
+        fechamentos: [],
+    ),
+    (
+        id: "corinto", navios_por_dia: 8.0, nome: "Canal de Corinto", pedagio_por_navio: 800.0,
+        abertura: (1893, 10, 28),
+        donos: [ (pais: "gre", desde: (1893, 10, 28)) ],
+        fechamentos: [],
+    ),
+    (
+        id: "volga_don", navios_por_dia: 12.0, nome: "Canal Volga-Don", pedagio_por_navio: 1500.0,
+        abertura: (1952, 7, 27),
+        donos: [ (pais: "sov", desde: (1952, 7, 27)) ],
+        fechamentos: [],
+    ),
+    (
+        id: "sao_lourenco", navios_por_dia: 25.0, nome: "Via Marítima de São Lourenço", pedagio_por_navio: 3000.0,
+        abertura: (1959, 4, 25),
+        donos: [ (pais: "usa", desde: (1959, 4, 25)), (pais: "can", desde: (1959, 4, 25)) ],
+        fechamentos: [],
+    ),
+]

@@ -2,7 +2,10 @@
 //! economia de escala, acesso ao mercado e disponibilidade de insumos.
 
 use crate::catalogo::CatalogoEconomia;
-use crate::entidades::{ConfigSimulacao, Estado, Mercado, Pais, Provincia};
+use crate::entidades::{ConfigSimulacao, Estado, Mercado, Pais, Predio, PredioCompilado, Provincia};
+use crate::motor::governo::compilar_cache_predio;
+use crate::motor::trabalho::reconciliar_empregados_provincia;
+use std::collections::BTreeMap;
 use crate::tipos::{CategoriaBem, CategoriaPredio};
 
 /// Executa a produção física de todos os prédios e fazendas de subsistência em passagem única,
@@ -353,7 +356,9 @@ pub fn atualizar_infraestrutura_estados(
             }
 
             // Geração de capacidade por modais de infraestrutura
-            let infra_gerada = escala_inst * b.cache.infraestrutura_por_nivel;
+            // Infraestrutura física depende do nível construído, não da tripulação: estradas e trilhos
+            // continuam existindo mesmo com falta de operários (independente da ocupação).
+            let infra_gerada = (b.nivel as f64) * b.cache.infraestrutura_por_nivel;
             if def.id == "rede_ferroviaria" {
                 estados[e_idx].infraestrutura_ferrovias += infra_gerada;
             } else if def.id == "rodovia" {
@@ -400,4 +405,118 @@ pub fn atualizar_infraestrutura_estados(
             est.penalidade_infraestrutura = 1.0 - acesso;
         }
     }
+}
+
+/// Folga alvo de infraestrutura (uso / capacidade) conforme a riqueza do estado (padrão de vida
+/// médio): países ricos começam folgados, pobres e coloniais apertados (leve penalidade).
+pub fn utilizacao_alvo_infraestrutura(padrao_de_vida: f64) -> f64 {
+    match padrao_de_vida {
+        x if x >= 20.0 => 0.55,
+        x if x >= 14.0 => 0.70,
+        x if x >= 11.0 => 0.85,
+        x if x >= 8.0 => 0.97,
+        _ => 1.04,
+    }
+}
+
+/// Calibra a malha ferroviária e rodoviária inicial: o cenário de 1945 não traz esses prédios,
+/// então cada estado recebe níveis de `rede_ferroviaria` (60%) e `rodovia` (40%) suficientes para
+/// chegar à utilização alvo da sua faixa de riqueza. Só acrescenta; nunca remove.
+pub(crate) fn calibrar_infraestrutura_inicial(
+    catalogo: &CatalogoEconomia,
+    estados: &mut [Estado],
+    provincias: &mut [Provincia],
+    scratch_emp: &mut [f64],
+    scratch_pop: &mut [f64],
+) {
+    let (Some(&ferr_idx), Some(&rod_idx)) = (
+        catalogo.indice_tipos_predio.get("rede_ferroviaria"),
+        catalogo.indice_tipos_predio.get("rodovia"),
+    ) else {
+        return;
+    };
+    // Primeira passada: melhor província (mais operários livres) e padrão de vida por estado.
+    let n = estados.len();
+    let mut melhor: Vec<Option<(usize, f64)>> = vec![None; n];
+    let mut sol_soma = vec![0.0f64; n];
+    let mut sol_pop = vec![0.0f64; n];
+    for (p_idx, prov) in provincias.iter().enumerate() {
+        let e = prov.estado_idx;
+        if e >= n {
+            continue;
+        }
+        let mut op = 0.0;
+        for pop in &prov.pops {
+            sol_soma[e] += pop.populacao * pop.padrao_de_vida;
+            sol_pop[e] += pop.populacao;
+            if catalogo.tipos_pop[pop.tipo_idx].id == "operarios" {
+                op += pop.populacao;
+            }
+        }
+        let emp_op: f64 = prov
+            .predios
+            .iter()
+            .flat_map(|b| b.cache.vagas().iter())
+            .filter(|v| catalogo.tipos_pop[v.tipo_pop_idx as usize].id == "operarios")
+            .map(|v| v.empregados)
+            .sum();
+        let livres = op - emp_op;
+        if melhor[e].map_or(true, |(_, l)| livres > l) {
+            melhor[e] = Some((p_idx, livres));
+        }
+    }
+    for e in 0..n {
+        let Some((p_idx, _)) = melhor[e] else { continue };
+        let uso = estados[e].infraestrutura_uso;
+        let cap = estados[e].infraestrutura_capacidade;
+        let sol = if sol_pop[e] > 0.0 { sol_soma[e] / sol_pop[e] } else { 10.0 };
+        let alvo = uso / utilizacao_alvo_infraestrutura(sol);
+        if alvo <= cap {
+            continue;
+        }
+        let falta = alvo - cap;
+        for (tipo_idx, parte) in [(ferr_idx, 0.60), (rod_idx, 0.40)] {
+            let def = &catalogo.tipos_predio[tipo_idx];
+            let mut modelo = Predio {
+                tipo_predio_id: def.id.clone(),
+                nivel: 1,
+                metodos_ativos: def.metodos_padrao.clone(),
+                empregados_por_tipo: BTreeMap::new(),
+                salario_base: 4.0,
+                reservas_caixa: 500.0,
+                subsidiado: false,
+                receita_ultimo_tick: 0.0,
+                custo_insumos_ultimo_tick: 0.0,
+                folha_salarial_ultimo_tick: 0.0,
+                lucro_ultimo_tick: 0.0,
+                dividendos_ultimo_tick: 0.0,
+                cache: PredioCompilado::default(),
+            };
+            if compilar_cache_predio(catalogo, &mut modelo).is_none() {
+                continue;
+            }
+            let por_nivel = modelo.cache.infraestrutura_por_nivel;
+            if por_nivel <= 0.0 {
+                continue;
+            }
+            let niveis = ((falta * parte) / por_nivel).ceil().max(1.0) as u32;
+            modelo.nivel = niveis;
+            let _ = compilar_cache_predio(catalogo, &mut modelo);
+            for slot in modelo.cache.vagas_mut() {
+                slot.empregados = slot.vagas_por_nivel as f64 * niveis as f64;
+            }
+            let prov = &mut provincias[p_idx];
+            if let Some(b) = prov.predios.iter_mut().find(|b| b.cache.tipo_idx == tipo_idx) {
+                b.nivel += niveis;
+                let _ = compilar_cache_predio(catalogo, b);
+                for slot in b.cache.vagas_mut() {
+                    slot.empregados = slot.vagas_por_nivel as f64 * b.nivel as f64;
+                }
+            } else {
+                prov.predios.push(modelo);
+            }
+            reconciliar_empregados_provincia(prov, scratch_emp, scratch_pop);
+        }
+    }
+    atualizar_infraestrutura_estados(catalogo, estados, provincias);
 }

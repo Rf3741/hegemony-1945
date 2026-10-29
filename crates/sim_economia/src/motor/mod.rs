@@ -98,6 +98,8 @@ pub struct MundoEconomico {
     nomes_religioes: Vec<String>,
     bens_alimento_basico: Vec<usize>,
     buffers: BuffersTick,
+    /// Fator (população histórica de 1945 / população do cenário) só para exibição, por país.
+    fator_pop_exibicao: BTreeMap<String, f64>,
 }
 
 impl MundoEconomico {
@@ -372,6 +374,13 @@ impl MundoEconomico {
         }
         governo::atualizar_terra_aravel_estados(&mut cenario.estados, &cenario.provincias);
         producao::atualizar_infraestrutura_estados(&catalogo, &mut cenario.estados, &cenario.provincias);
+        producao::calibrar_infraestrutura_inicial(
+            &catalogo,
+            &mut cenario.estados,
+            &mut cenario.provincias,
+            &mut scratch_emp,
+            &mut scratch_pop,
+        );
 
         // 5. Validar filas de construção iniciais dos países
         for pais in &mut cenario.paises {
@@ -553,7 +562,28 @@ impl MundoEconomico {
             }
         }
 
+        // População histórica de 1945 (milhões) para exibição; o cenário usa contagens internas maiores.
+        const POP_REAL_1945_MI: [(&str, f64); 14] = [
+            ("usa", 140.0), ("sov", 170.0), ("chi", 500.0), ("ind", 400.0), ("bra", 46.0),
+            ("gbr", 48.0), ("ger", 65.0), ("jap", 72.0), ("fra", 40.0), ("ita", 45.0),
+            ("can", 12.0), ("arg", 15.0), ("pol", 24.0), ("tur", 19.0),
+        ];
+        let mut fator_pop_exibicao = BTreeMap::new();
+        for (id, mi) in POP_REAL_1945_MI {
+            if let Some(&pi) = indice_paises.get(id) {
+                let soma: f64 = cenario.paises[pi]
+                    .provincias_indices
+                    .iter()
+                    .map(|&i| cenario.provincias[i].populacao_total())
+                    .sum();
+                if soma > 0.0 {
+                    fator_pop_exibicao.insert(id.to_string(), mi * 1e6 / soma);
+                }
+            }
+        }
+
         Ok(Self {
+            fator_pop_exibicao,
             data_atual: cenario.data_inicial,
             dias_decorridos: 0,
             config: cenario.config,
@@ -573,6 +603,17 @@ impl MundoEconomico {
             bens_alimento_basico,
             buffers,
         })
+    }
+
+    /// Pedágio diário dos canais (calendário histórico): credita o tesouro do país dono.
+    fn cobrar_pedagios_canais(&mut self) {
+        for c in crate::canais::canais() {
+            if let Some((dono, valor)) = crate::canais::pedagio_diario(&c.id, self.data_atual)
+                && let Some(&i) = self.indice_paises.get(dono)
+            {
+                self.paises[i].orcamento.tesouro += valor;
+            }
+        }
     }
 
     /// Executa 1 tick diário completo do motor econômico, avançando o calendário em 1 dia.
@@ -648,7 +689,7 @@ impl MundoEconomico {
         );
         if self.config.comercio_mundial_automatico {
             let abertura: Vec<f64> =
-                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m)).collect();
+                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m).max(0.8)).collect();
             global::processar_comercio_mundial(
                 &self.catalogo,
                 &self.config,
@@ -735,6 +776,7 @@ impl MundoEconomico {
         );
 
         self.dias_decorridos = proximo_dia_num;
+        self.cobrar_pedagios_canais();
         self.data_atual.avancar_dia();
 
         let pib_mundial_diario = self.paises.iter().map(|p| p.pib_diario).sum();
@@ -826,7 +868,7 @@ impl MundoEconomico {
         );
         if self.config.comercio_mundial_automatico {
             let abertura: Vec<f64> =
-                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m)).collect();
+                (0..self.mercados.len()).map(|m| self.abertura_comercial_mercado(m).max(0.8)).collect();
             global::processar_comercio_mundial(
                 &self.catalogo,
                 &self.config,
@@ -917,6 +959,7 @@ impl MundoEconomico {
         t.governo_ms = i6.elapsed().as_secs_f64() * 1_000.0;
 
         self.dias_decorridos = proximo_dia_num;
+        self.cobrar_pedagios_canais();
         self.data_atual.avancar_dia();
 
         let pib_mundial_diario = self.paises.iter().map(|p| p.pib_diario).sum();
@@ -1292,6 +1335,13 @@ impl MundoEconomico {
         Some(soma)
     }
 
+    /// População para exibição na interface: ajustada à escala histórica de 1945 nos países
+    /// grandes (o cenário usa contagens internas maiores, p.ex. EUA 684 mi contra ~140 mi reais).
+    pub fn populacao_exibida_pais(&self, pais_id: &str) -> Option<f64> {
+        let bruta = self.populacao_total_pais(pais_id)?;
+        Some(bruta * self.fator_pop_exibicao.get(pais_id).copied().unwrap_or(1.0))
+    }
+
     /// Padrão de vida médio ponderado pela população nacional.
     pub fn padrao_de_vida_medio_pais(&self, pais_id: &str) -> Option<f64> {
         let pais = self.obter_pais(pais_id)?;
@@ -1317,6 +1367,11 @@ impl MundoEconomico {
         let mut desemp_total = 0.0;
         for &p_idx in &pais.provincias_indices {
             for pop in &self.provincias[p_idx].pops {
+                // Camponeses de subsistência são autônomos (produzem para si): não entram na força
+                // de trabalho assalariada, como no Victoria 3.
+                if self.catalogo.tipos_pop[pop.tipo_idx].subsistencia {
+                    continue;
+                }
                 pop_total += pop.populacao;
                 desemp_total += pop.desempregados();
             }

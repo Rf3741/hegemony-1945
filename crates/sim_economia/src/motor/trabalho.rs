@@ -213,10 +213,12 @@ pub(crate) fn executar_contratacao_e_demissao(
                     }
                 }
             } else if !b.cache.financiado_pelo_governo && !b.subsidiado && margem < -0.03 {
-                b.salario_base = (b.salario_base * (1.0 - 0.005 * fator_dias)).clamp(1.2, 40.0);
+                // Salário cede primeiro (proporcional ao prejuízo); só demite quando já está no piso.
+                let queda = ((0.01 + 0.05 * (-margem).min(1.0)) * fator_dias).min(0.5);
+                b.salario_base = (b.salario_base * (1.0 - queda)).clamp(1.2, 40.0);
 
                 let colchao_minimo = (b.nivel as f64) * 300.0;
-                if b.reservas_caixa < colchao_minimo && margem < -0.05 {
+                if b.reservas_caixa < colchao_minimo && margem < -0.05 && (b.salario_base < 1.6 || margem < -0.5) {
                     for slot in b.cache.vagas_mut() {
                         let demitidos = slot.empregados * taxa_demissao;
                         if demitidos > 0.0 {

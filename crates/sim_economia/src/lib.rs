@@ -17,6 +17,7 @@
 //!   8. Impostos (renda, dividendos, consumo, sobre a terra), eficiência burocrática, gastos públicos (burocracia, forças armadas, construção, subsídios), dívida soberana e juros;
 //!   9. Fila nacional de construção com pontos de construção estatais e privados.
 
+pub mod canais;
 pub mod catalogo;
 pub mod cenario;
 pub mod entidades;
@@ -29,6 +30,7 @@ pub use catalogo::{
     Bem, CatalogoEconomia, LeiEconomica, MetodoProducao, SubstituicaoNecessidade, TipoPop,
     TipoPredio, ler_arquivo_ron, ler_str_ron,
 };
+pub use canais::{CanalHistorico, canal_disponivel, canais, dono_canal, pedagio_diario};
 pub use cenario::CenarioEconomia;
 pub use entidades::{
     BlocoComercial, ConfigSimulacao, DetalheRotaComercial, Estado, ItemConstrucao, Mercado,
