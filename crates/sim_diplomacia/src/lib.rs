@@ -434,7 +434,7 @@ impl Diplomacia {
             },
         };
         let mut acordo = false;
-        let mut pacto = |s: &mut Self, t| s.pactos.push(Pacto { tipo: t, a: ator.into(), b: alvo.into() });
+        let pacto = |s: &mut Self, t| s.pactos.push(Pacto { tipo: t, a: ator.into(), b: alvo.into() });
         match acao {
             Acao::MelhorarRelacoes => self.mudar_relacao(ator, alvo, 10.0),
             Acao::AjudaEconomica => {

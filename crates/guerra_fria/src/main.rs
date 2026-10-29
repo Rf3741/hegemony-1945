@@ -10,6 +10,7 @@ use plugins::{
     economia_sim::EconomiaSimPlugin,
     economy::{EconomyPlugin, RecursoMundo},
     comercio_ui::ComercioUiPlugin,
+    diplomacia_ui::DiplomaciaUiPlugin,
     construcao_ui::ConstrucaoUiPlugin,
     mercado_ui::MercadoUiPlugin,
     jogador::JogadorPlugin,
@@ -71,5 +72,6 @@ fn main() {
             ..default()
         })
         .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, ConstrucaoUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, RotasPontePlugin, VisualConstrucoesPlugin, RotulosPaisPlugin))
+        .add_plugins(DiplomaciaUiPlugin)
         .run();
 }
