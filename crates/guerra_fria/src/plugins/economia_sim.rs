@@ -444,6 +444,10 @@ pub struct VistaEconomia {
     pub resumo_comercio: sim_economia::ResumoComercioPais,
     pub rotas_comerciais: Vec<sim_economia::DetalheRotaComercial>,
     pub parceiros_comerciais: Vec<sim_economia::OpcaoParceiroComercial>,
+    /// Prédios ainda travados por tecnologia: id -> nome da tecnologia que os libera.
+    pub bloqueio_predios: Arc<BTreeMap<String, String>>,
+    /// Métodos de produção travados por tecnologia: id -> nome da tecnologia.
+    pub bloqueio_metodos: Arc<BTreeMap<String, String>>,
 }
 
 impl VistaEconomia {
@@ -496,6 +500,16 @@ pub struct EconomiaSim {
 
 impl EconomiaSim {
     pub fn enviar(&mut self, c: Comando) {
+        // Bloqueio por tecnologia (a UI já desabilita, aqui é a garantia).
+        let travado = match &c {
+            Comando::Construir { tipo_id, .. } => self.vista.bloqueio_predios.get(tipo_id),
+            Comando::TrocarMetodo { metodo_id, .. } | Comando::TrocarMetodoTodos { metodo_id, .. } => self.vista.bloqueio_metodos.get(metodo_id),
+            _ => None,
+        };
+        if let Some(tec) = travado {
+            self.mensagens.push(format!("Requer a tecnologia: {tec}"));
+            return;
+        }
         self.comandos.push(c);
     }
     #[allow(dead_code)]

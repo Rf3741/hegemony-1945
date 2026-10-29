@@ -164,6 +164,7 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
         if ui.button("Comércio (F3)").clicked() {
             *comercio_aberto = !*comercio_aberto;
         }
+        ui.label("Tecnologia (F5)");
     });
 }
 
@@ -1282,10 +1283,15 @@ pub fn aba_construcao(
                                 m.nome.clone()
                             };
 
-                            let resp = ui.add_enabled(!esta_ativo, egui::Button::new(rotulo_btn))
+                            let trava = v.bloqueio_metodos.get(&m.id);
+                            let tooltip = match trava {
+                                Some(tec) => format!("Requer tecnologia: {tec}"),
+                                None => tooltip,
+                            };
+                            let resp = ui.add_enabled(!esta_ativo && trava.is_none(), egui::Button::new(rotulo_btn))
                                 .on_hover_text(tooltip);
 
-                            if resp.clicked() && !esta_ativo {
+                            if resp.clicked() && !esta_ativo && trava.is_none() {
                                 cmds.push(Comando::TrocarMetodoTodos {
                                     tipo_id: t.id.clone(),
                                     metodo_id: m.id.clone(),
@@ -1348,7 +1354,7 @@ pub fn aba_construcao(
                                     if let Some(m) = cat.metodos_producao.iter().find(|m| &m.id == mid) {
                                         let alternativas: Vec<&MetodoProducao> = t.metodos_permitidos.iter()
                                             .filter_map(|alt_id| cat.metodos_producao.iter().find(|alt| &alt.id == alt_id))
-                                            .filter(|alt| alt.slot == m.slot && alt.id != m.id)
+                                            .filter(|alt| alt.slot == m.slot && alt.id != m.id && !v.bloqueio_metodos.contains_key(&alt.id))
                                             .collect();
 
                                         if alternativas.is_empty() {

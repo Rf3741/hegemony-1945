@@ -19,3 +19,4 @@ eventos.workspace = true
 sim_diplomacia.workspace = true
 egui_plot.workspace = true
 sim_politica.workspace = true
+sim_tecnologia.workspace = true

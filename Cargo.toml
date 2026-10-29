@@ -14,6 +14,7 @@ members = [
     "crates/visual_mapa",
     "crates/eventos",
     "crates/sim_diplomacia",
+    "crates/sim_tecnologia",
 ]
 
 [workspace.package]
@@ -43,6 +44,7 @@ ui_refinada = { path = "crates/ui_refinada" }
 visual_mapa = { path = "crates/visual_mapa" }
 eventos = { path = "crates/eventos" }
 sim_diplomacia = { path = "crates/sim_diplomacia" }
+sim_tecnologia = { path = "crates/sim_tecnologia" }
 
 # Otimiza dependências no modo debug para manter 60 FPS no Bevy sem atrasar recompilações incrementais
 [profile.dev]

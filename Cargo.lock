@@ -3278,6 +3278,7 @@ dependencies = [
  "sim_diplomacia",
  "sim_economia",
  "sim_politica",
+ "sim_tecnologia",
  "simulacao",
  "visual_mapa",
 ]
@@ -5340,6 +5341,15 @@ dependencies = [
 
 [[package]]
 name = "sim_politica"
+version = "0.1.0"
+dependencies = [
+ "ron",
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "sim_tecnologia"
 version = "0.1.0"
 dependencies = [
  "ron",
