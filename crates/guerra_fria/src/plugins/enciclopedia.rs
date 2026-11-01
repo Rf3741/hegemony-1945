@@ -226,6 +226,9 @@ pub fn dica(r: egui::Response, tooltip_id: &str) -> egui::Response {
 
 /// Como [`dica`], com um detalhamento dinâmico (números do cálculo) no topo.
 pub fn dica_com(r: egui::Response, tooltip_id: &str, detalhe: impl FnOnce(&mut egui::Ui)) -> egui::Response {
+    if !super::config::tooltips_ativos() {
+        return r;
+    }
     let d = dados();
     let Some(t) = d.tooltips.get(tooltip_id) else { return r };
     let ligados = conceitos_do_tooltip(tooltip_id);

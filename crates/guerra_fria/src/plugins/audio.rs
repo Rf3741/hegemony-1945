@@ -8,9 +8,8 @@ use crate::estado::AppState;
 use bevy::audio::Volume;
 use bevy::prelude::*;
 use bevy_egui::input::EguiWantsInput;
-use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use serde::Deserialize;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Pasta (relativa a `assets/`) de onde vêm os arquivos de som.
@@ -213,7 +212,6 @@ impl Plugin for AudioPlugin {
             .init_resource::<CatalogoSons>()
             .init_resource::<MusicaEstado>()
             .init_resource::<AmbienteEstado>()
-            .init_resource::<JanelaAudio>()
             .init_resource::<EstadoSons>()
             .add_systems(Startup, carregar_config)
             .add_systems(OnEnter(AppState::Pausado), |mut e: MessageWriter<SomTocar>| {
@@ -225,8 +223,7 @@ impl Plugin for AudioPlugin {
             .add_systems(OnTransition { exited: AppState::Menu, entered: AppState::Jogando }, |mut e: MessageWriter<SomTocar>| {
                 e.write(SomTocar::novo("ui.botao.clique"));
             })
-            .add_systems(Update, (sons_do_relogio, som_selecao, sons_de_ui, sons_de_eventos, tocar_sons, musica_por_clima, ambiente_por_camera).chain())
-            .add_systems(EguiPrimaryContextPass, janela_audio);
+            .add_systems(Update, (sons_do_relogio, som_selecao, sons_de_ui, sons_de_eventos, tocar_sons, musica_por_clima, ambiente_por_camera).chain());
     }
 }
 
@@ -570,62 +567,6 @@ fn ambiente_por_camera(
             }
         }
     }
-}
-
-// ---------------------------------------------------------------- opções de áudio
-
-#[derive(Resource, Default)]
-struct JanelaAudio {
-    aberta: bool,
-}
-
-/// Janela "Áudio" (volumes por canal): botão no menu e na pausa; a tecla 9 alterna.
-fn janela_audio(
-    mut contextos: EguiContexts,
-    teclas: Res<ButtonInput<KeyCode>>,
-    estado: Option<Res<State<AppState>>>,
-    mut janela: ResMut<JanelaAudio>,
-    mut vols: ResMut<VolumesAudio>,
-) -> Result {
-    if teclas.just_pressed(KeyCode::Digit9) || teclas.just_pressed(KeyCode::Numpad9) {
-        janela.aberta = !janela.aberta;
-    }
-    let Some(estado) = estado else { return Ok(()) };
-    if !matches!(*estado.get(), AppState::Menu | AppState::Pausado) && !janela.aberta {
-        return Ok(());
-    }
-    let ctx = contextos.ctx_mut()?;
-    if !janela.aberta {
-        egui::Area::new(egui::Id::new("botao_audio")).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(ctx, |ui| {
-            if ui.button("Áudio (9)").clicked() {
-                janela.aberta = true;
-            }
-        });
-        return Ok(());
-    }
-    let mut aberta = true;
-    egui::Window::new("Áudio").open(&mut aberta).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).resizable(false).show(ctx, |ui| {
-        for (canal, nome) in [
-            (CanalAudio::Master, "Geral"),
-            (CanalAudio::Musica, "Música"),
-            (CanalAudio::Ui, "Interface"),
-            (CanalAudio::Sfx, "Efeitos"),
-            (CanalAudio::Ambiente, "Ambiente"),
-        ] {
-            ui.horizontal(|ui| {
-                let mut v = vols.volume(canal);
-                let mut mudo = vols.mutado(canal);
-                if ui.add(egui::Slider::new(&mut v, 0.0..=1.0).text(nome)).changed() {
-                    vols.definir(canal, v);
-                }
-                if ui.checkbox(&mut mudo, "mudo").changed() {
-                    vols.mutar(canal, mudo);
-                }
-            });
-        }
-    });
-    janela.aberta = aberta;
-    Ok(())
 }
 
 #[cfg(test)]

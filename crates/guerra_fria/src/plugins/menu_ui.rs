@@ -133,6 +133,7 @@ fn tela_menu_principal(
     mut escolha: Local<Option<String>>,
     mut sair: MessageWriter<AppExit>,
     mut janela_saves: ResMut<super::menu_saves::JanelaSaves>,
+    mut config_janela: ResMut<super::menu_pausa::JanelaConfig>,
 ) -> Result {
     let ctx = contextos.ctx_mut()?.clone();
     // Cliques no mapa escolhem o país, mas o fundo só aparece em Titulo/Paises/Opcoes.
@@ -155,7 +156,7 @@ fn tela_menu_principal(
                         janela_saves.abrir(true);
                     }
                     if ui.add_sized(tam, egui::Button::new(egui::RichText::new("Opções").size(22.0))).clicked() {
-                        *tela = TelaMenu::Opcoes;
+                        config_janela.abrir();
                     }
                     if ui.add_sized(tam, egui::Button::new(egui::RichText::new("Sair").size(22.0))).clicked() {
                         sair.write(AppExit::Success);
@@ -163,16 +164,8 @@ fn tela_menu_principal(
                 });
             });
         }
-        TelaMenu::Opcoes => {
-            egui::Window::new("Opções").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(&ctx, |ui| {
-                ui.label("Atalhos: 1 país, 2 mercado, 3 comércio, 4 diplomacia, 5 tecnologia, 6 guerra, 7 estatísticas, 8 enciclopédia, 9 áudio, B construção, J jornal, M modos de mapa.");
-                ui.label("Câmera: WASD/setas, roda do mouse e arrastar. Espaço pausa; + e − velocidade.");
-                ui.label("Salvar: Ctrl+S (rápido) ou menu de pausa; carregar: Ctrl+L ou pelo menu.");
-                if ui.button("Voltar").clicked() {
-                    *tela = TelaMenu::Titulo;
-                }
-            });
-        }
+        // As opções agora são a janela de Configurações (menu_pausa::JanelaConfig).
+        TelaMenu::Opcoes => *tela = TelaMenu::Titulo,
         TelaMenu::Paises => {
             // Ranking por PIB entre países habitados.
             let mut ranking: Vec<(&String, f64)> = mundo.paises.iter().filter(|(_, p)| p.populacao_total() > 0).map(|(t, p)| (t, p.pib_anual_estimado)).collect();

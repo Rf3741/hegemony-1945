@@ -49,13 +49,14 @@ fn tick_eventos(
     mut mundo: ResMut<RecursoMundo>,
     mut ev: ResMut<EstadoEv>,
     mut relogio: ResMut<RecursoRelogio>,
+    cfg: Res<super::config::ConfigJogo>,
 ) {
     if leitor.read().count() > 0 {
         let est = &mut ev.estado;
         avaliar_dia(&cat.0, est, &mut mundo.0, &pais.0);
     }
     // Enquanto houver decisão pendente o tempo fica parado.
-    if !ev.estado.pendentes.is_empty() {
+    if !ev.estado.pendentes.is_empty() && cfg.partida.pausar_em_eventos {
         if !relogio.pausado {
             ev.retomar = true;
             relogio.pausado = true;
@@ -81,6 +82,7 @@ fn popup_evento(
     mut mundo: ResMut<RecursoMundo>,
     mut ev: ResMut<EstadoEv>,
     mut relogio: ResMut<RecursoRelogio>,
+    cfg: Res<super::config::ConfigJogo>,
     elenco: Option<Res<super::personagens_sim::ElencoRes>>,
     mut retratos: Option<ResMut<super::personagens_ui::Retratos>>,
 ) -> Result {
@@ -89,7 +91,9 @@ fn popup_evento(
         ev.estado.pendentes.remove(0);
         return Ok(());
     };
-    relogio.pausado = true;
+    if cfg.partida.pausar_em_eventos {
+        relogio.pausado = true;
+    }
     let data = format!("{:02}/{:02}/{}", evento.data.2, evento.data.1, evento.data.0);
     let cor_pais = mundo.0.paises.get(&pend.pais).map(|p| egui::Color32::from_rgb(p.cor.0, p.cor.1, p.cor.2)).unwrap_or(CARIMBO);
     let nome_pais = mundo.0.paises.get(&pend.pais).map(|p| p.nome.clone()).unwrap_or_default();

@@ -225,6 +225,8 @@ pub enum AbaLedger {
     GraficosHistoricos,
     RankingsPotencias,
     TabelaPaises,
+    /// Rankings globais por categoria (Top 10 + tabela ordenável).
+    RankingsCategoria,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -256,6 +258,11 @@ pub struct RecursoLedger {
     pub filtro_bloco: Option<String>,
     /// Cache de rankings calculados no último tick
     pub rankings_cache: Vec<EntradaRankingPotencia>,
+    /// Rankings por categoria: categoria exibida no Top 10, ordenação da tabela e linhas calculadas.
+    pub cat_selecionada: Categoria,
+    pub cat_ordem: Categoria,
+    pub cat_desc: bool,
+    pub linhas_cat: Vec<LinhaCategoria>,
 }
 
 impl Default for RecursoLedger {
@@ -275,6 +282,10 @@ impl Default for RecursoLedger {
             ordenacao_decrescente: true,
             filtro_bloco: None,
             rankings_cache: Vec::new(),
+            cat_selecionada: Categoria::Pib,
+            cat_ordem: Categoria::Pib,
+            cat_desc: true,
+            linhas_cat: Vec::new(),
         }
     }
 }
@@ -325,10 +336,8 @@ impl Plugin for EstatisticasPlugin {
                     .chain()
                     .run_if(in_state(crate::estado::AppState::Jogando)),
             )
-            .add_systems(
-                EguiPrimaryContextPass,
-                desenhar_tela_ledger.run_if(in_state(crate::estado::AppState::Jogando)),
-            );
+            .add_systems(Update, (atualizar_rankings_categoria, tecla_7_na_pausa).run_if(crate::estado::em_partida))
+            .add_systems(EguiPrimaryContextPass, desenhar_tela_ledger.run_if(crate::estado::em_partida));
     }
 }
 
@@ -342,9 +351,6 @@ fn alternar_tecla_f7(
 ) {
     if teclas.just_pressed(KeyCode::Digit7) || teclas.just_pressed(KeyCode::Numpad7) {
         ledger.aberto = !ledger.aberto;
-    }
-    if ledger.aberto && teclas.just_pressed(KeyCode::Escape) {
-        ledger.aberto = false;
     }
 }
 
@@ -647,6 +653,9 @@ fn desenhar_tela_ledger(
                 if ui.selectable_label(ledger.aba_ativa == AbaLedger::TabelaPaises, "📋 Ledger de Países (Tabela)").clicked() {
                     ledger.aba_ativa = AbaLedger::TabelaPaises;
                 }
+                if ui.selectable_label(ledger.aba_ativa == AbaLedger::RankingsCategoria, "🏆 Rankings Globais").clicked() {
+                    ledger.aba_ativa = AbaLedger::RankingsCategoria;
+                }
             });
 
             ui.separator();
@@ -660,6 +669,9 @@ fn desenhar_tela_ledger(
                 }
                 AbaLedger::TabelaPaises => {
                     desenhar_aba_tabela(ui, &mut ledger, &id_jogador_eco);
+                }
+                AbaLedger::RankingsCategoria => {
+                    desenhar_aba_categorias(ui, &mut ledger, &tag_jogador);
                 }
             }
         });
@@ -1159,4 +1171,266 @@ fn desenhar_aba_tabela(
             ledger.ordenacao_decrescente = true;
         }
     }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Aba 4: Rankings globais por categoria
+// -------------------------------------------------------------------------------------------------
+
+/// Categorias de ranking (todas ordenadas do maior valor para o menor por padrão).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Categoria {
+    Exportacoes,
+    Importacoes,
+    SaldoComercial,
+    Populacao,
+    #[default]
+    Pib,
+    PibPerCapita,
+    Crescimento,
+    ForcaMilitar,
+    Industria,
+    Tecnologia,
+    PadraoVida,
+    Desemprego,
+    Divida,
+    Influencia,
+    Turismo,
+}
+
+impl Categoria {
+    pub const TODAS: [Categoria; 15] = [
+        Self::Pib,
+        Self::PibPerCapita,
+        Self::Crescimento,
+        Self::Populacao,
+        Self::Exportacoes,
+        Self::Importacoes,
+        Self::SaldoComercial,
+        Self::ForcaMilitar,
+        Self::Industria,
+        Self::Tecnologia,
+        Self::PadraoVida,
+        Self::Desemprego,
+        Self::Divida,
+        Self::Influencia,
+        Self::Turismo,
+    ];
+
+    pub fn nome(self) -> &'static str {
+        match self {
+            Self::Exportacoes => "Exportações",
+            Self::Importacoes => "Importações",
+            Self::SaldoComercial => "Saldo comercial",
+            Self::Populacao => "População",
+            Self::Pib => "PIB",
+            Self::PibPerCapita => "PIB per capita",
+            Self::Crescimento => "Crescimento",
+            Self::ForcaMilitar => "Força militar",
+            Self::Industria => "Produção industrial",
+            Self::Tecnologia => "Tecnologia",
+            Self::PadraoVida => "Padrão de vida",
+            Self::Desemprego => "Desemprego",
+            Self::Divida => "Dívida",
+            Self::Influencia => "Influência",
+            Self::Turismo => "Turismo",
+        }
+    }
+
+    pub fn formatar(self, v: f64) -> String {
+        match self {
+            Self::Populacao => fmt_pop(v.max(0.0) as u64),
+            Self::Exportacoes | Self::Importacoes | Self::SaldoComercial | Self::Pib | Self::Divida | Self::Turismo => format!("US$ {}", fmt_din(v)),
+            Self::PibPerCapita => format!("US$ {:.0}", v),
+            Self::Crescimento => format!("{:+.1}%", v),
+            Self::Desemprego => format!("{:.1}%", v),
+            Self::ForcaMilitar | Self::Industria | Self::Influencia => fmt_pop(v.max(0.0) as u64),
+            Self::Tecnologia => format!("{:.0} techs", v),
+            Self::PadraoVida => format!("{:.1}", v),
+        }
+    }
+}
+
+/// Valores de todas as categorias de um país (indexados por `Categoria as usize`).
+#[derive(Debug, Clone)]
+pub struct LinhaCategoria {
+    pub tag: String,
+    pub nome: String,
+    pub cor: egui::Color32,
+    pub valores: [f64; 15],
+}
+
+impl LinhaCategoria {
+    pub fn valor(&self, c: Categoria) -> f64 {
+        self.valores[c as usize]
+    }
+}
+
+fn tecla_7_na_pausa(teclas: Res<ButtonInput<KeyCode>>, estado: Res<State<crate::estado::AppState>>, mut ledger: ResMut<RecursoLedger>) {
+    // Em Jogando a tecla 7 já é tratada por `alternar_tecla_f7`; em Pausado precisa funcionar também.
+    if *estado.get() == crate::estado::AppState::Pausado && (teclas.just_pressed(KeyCode::Digit7) || teclas.just_pressed(KeyCode::Numpad7)) {
+        ledger.aberto = !ledger.aberto;
+    }
+}
+
+/// Recalcula as linhas dos rankings por categoria (no máximo 1x por segundo e só com a aba aberta).
+fn atualizar_rankings_categoria(
+    mut ledger: ResMut<RecursoLedger>,
+    eco: Option<Res<EconomiaSim>>,
+    tec: Option<Res<super::tecnologia_ui::TecnologiaSim>>,
+    mundo_geo: Res<RecursoMundo>,
+    tempo: Res<Time<Real>>,
+    mut acumulado: Local<f32>,
+) {
+    *acumulado += tempo.delta_secs();
+    if !ledger.aberto || ledger.aba_ativa != AbaLedger::RankingsCategoria {
+        *acumulado = 1.0; // recalcula assim que a aba abrir
+        return;
+    }
+    if *acumulado < 1.0 && !ledger.linhas_cat.is_empty() {
+        return;
+    }
+    *acumulado = 0.0;
+    let Some(eco) = eco else { return };
+    let mut linhas = Vec::with_capacity(eco.vista.ranking.len());
+    for p in &eco.vista.ranking {
+        if p.populacao <= 0.0 {
+            continue;
+        }
+        let cor = mundo_geo.paises.get(&p.tag).map(|g| egui::Color32::from_rgb(g.cor.0, g.cor.1, g.cor.2)).unwrap_or(egui::Color32::GRAY);
+        let crescimento = ledger
+            .historico_paises
+            .get(&p.id)
+            .filter(|h| h.pontos.len() >= 2)
+            .map(|h| {
+                let ult = h.pontos.last().map(|x| x.pib as f64).unwrap_or(0.0);
+                let ini = h.pontos[h.pontos.len().saturating_sub(13)].pib as f64;
+                if ini > 0.0 { (ult / ini - 1.0) * 100.0 } else { 0.0 }
+            })
+            .unwrap_or(0.0);
+        let techs = tec.as_ref().and_then(|t| t.mundo.paises.get(&p.id).or_else(|| t.mundo.paises.get(&p.tag))).map(|e| e.conhecidas.len()).unwrap_or(0);
+        let influencia = ledger.rankings_cache.iter().find(|e| e.tag == p.tag).map(|e| e.pontuacao_inf).unwrap_or(0.0);
+        let mut v = [0.0; 15];
+        v[Categoria::Exportacoes as usize] = p.exportacoes * 365.0;
+        v[Categoria::Importacoes as usize] = p.importacoes * 365.0;
+        v[Categoria::SaldoComercial as usize] = (p.exportacoes - p.importacoes) * 365.0;
+        v[Categoria::Populacao as usize] = p.populacao;
+        v[Categoria::Pib as usize] = p.pib_anual;
+        v[Categoria::PibPerCapita as usize] = p.pib_anual / p.populacao;
+        v[Categoria::Crescimento as usize] = crescimento;
+        v[Categoria::ForcaMilitar as usize] = p.forca_militar;
+        v[Categoria::Industria as usize] = p.producao_bens.iter().sum();
+        v[Categoria::Tecnologia as usize] = techs as f64;
+        v[Categoria::PadraoVida as usize] = p.padrao_vida;
+        v[Categoria::Desemprego as usize] = p.desemprego * 100.0;
+        v[Categoria::Divida as usize] = p.divida;
+        v[Categoria::Influencia as usize] = influencia;
+        v[Categoria::Turismo as usize] = p.turismo_receita_dia * 365.0;
+        linhas.push(LinhaCategoria { tag: p.tag.clone(), nome: p.nome.clone(), cor, valores: v });
+    }
+    ledger.linhas_cat = linhas;
+}
+
+fn bandeira_ou_cor(ui: &mut egui::Ui, l: &LinhaCategoria) {
+    if !super::bandeiras_ui::bandeira_ui(ui, &l.tag, 14.0) {
+        let (r, _) = ui.allocate_exact_size(egui::vec2(22.0, 14.0), egui::Sense::hover());
+        ui.painter().rect_filled(r, 2.0, l.cor);
+        ui.painter().rect_stroke(r, 2.0, egui::Stroke::new(1.0, egui::Color32::BLACK), egui::StrokeKind::Inside);
+    }
+}
+
+fn desenhar_aba_categorias(ui: &mut egui::Ui, ledger: &mut RecursoLedger, tag_jogador: &str) {
+    ui.horizontal(|ui| {
+        ui.heading("🏆 Rankings Globais");
+        ui.label("— escolha a categoria para ver o Top 10; clique no cabeçalho da tabela para ordenar.");
+    });
+    ui.horizontal_wrapped(|ui| {
+        for c in Categoria::TODAS {
+            if ui.selectable_label(ledger.cat_selecionada == c, c.nome()).clicked() {
+                ledger.cat_selecionada = c;
+                ledger.cat_ordem = c;
+                ledger.cat_desc = true;
+            }
+        }
+    });
+    ui.separator();
+    if ledger.linhas_cat.is_empty() {
+        ui.label("Calculando os rankings...");
+        return;
+    }
+    let cat = ledger.cat_selecionada;
+    let mut top: Vec<&LinhaCategoria> = ledger.linhas_cat.iter().collect();
+    top.sort_by(|a, b| b.valor(cat).total_cmp(&a.valor(cat)));
+    let maximo = top.first().map(|l| l.valor(cat).abs()).unwrap_or(1.0).max(1e-9);
+    let posicao_jogador = top.iter().position(|l| l.tag == tag_jogador);
+
+    ui.horizontal_top(|ui| {
+        ui.vertical(|ui| {
+            ui.set_width(380.0);
+            ui.strong(format!("Top 10 — {}", cat.nome()));
+            for (i, l) in top.iter().take(10).enumerate() {
+                ui.horizontal(|ui| {
+                    ui.add_sized([26.0, 18.0], egui::Label::new(egui::RichText::new(format!("{}º", i + 1)).monospace()));
+                    bandeira_ou_cor(ui, l);
+                    let nome = if l.tag == tag_jogador { egui::RichText::new(&l.nome).strong().color(egui::Color32::from_rgb(250, 200, 60)) } else { egui::RichText::new(&l.nome) };
+                    ui.add_sized([110.0, 18.0], egui::Label::new(nome).truncate());
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(70.0, 14.0), egui::Sense::hover());
+                    let frac = (l.valor(cat).abs() / maximo).clamp(0.0, 1.0) as f32;
+                    ui.painter().rect_filled(r, 2.0, egui::Color32::from_black_alpha(90));
+                    ui.painter().rect_filled(egui::Rect::from_min_size(r.min, egui::vec2(r.width() * frac, r.height())), 2.0, l.cor);
+                    ui.label(egui::RichText::new(cat.formatar(l.valor(cat))).monospace().size(12.0));
+                });
+            }
+            if let Some(p) = posicao_jogador
+                && p >= 10
+            {
+                ui.separator();
+                ui.label(format!("Seu país: {}º de {}  ({})", p + 1, top.len(), cat.formatar(top[p].valor(cat))));
+            }
+        });
+        ui.separator();
+        // Tabela completa, ordenável por qualquer categoria.
+        let ord = ledger.cat_ordem;
+        let desc = ledger.cat_desc;
+        let mut linhas: Vec<&LinhaCategoria> = ledger.linhas_cat.iter().collect();
+        linhas.sort_by(|a, b| {
+            let o = a.valor(ord).total_cmp(&b.valor(ord));
+            if desc { o.reverse() } else { o }
+        });
+        let mut nova_ord = None;
+        egui::ScrollArea::both().id_salt("scroll_rank_categorias").max_height(500.0).show(ui, |ui| {
+            egui::Grid::new("grid_rank_categorias").striped(true).spacing([10.0, 4.0]).show(ui, |ui| {
+                ui.strong("#");
+                ui.strong("País");
+                for c in Categoria::TODAS {
+                    let seta = if ord == c { if desc { " ▼" } else { " ▲" } } else { "" };
+                    if ui.button(format!("{}{}", c.nome(), seta)).clicked() {
+                        nova_ord = Some(c);
+                    }
+                }
+                ui.end_row();
+                for (i, l) in linhas.iter().enumerate() {
+                    ui.label(format!("{}", i + 1));
+                    ui.horizontal(|ui| {
+                        bandeira_ou_cor(ui, l);
+                        let t = if l.tag == tag_jogador { egui::RichText::new(&l.nome).strong().color(egui::Color32::from_rgb(250, 200, 60)) } else { egui::RichText::new(&l.nome) };
+                        ui.label(t);
+                    });
+                    for c in Categoria::TODAS {
+                        ui.label(egui::RichText::new(c.formatar(l.valor(c))).monospace().size(12.0));
+                    }
+                    ui.end_row();
+                }
+            });
+        });
+        if let Some(c) = nova_ord {
+            if ledger.cat_ordem == c {
+                ledger.cat_desc = !ledger.cat_desc;
+            } else {
+                ledger.cat_ordem = c;
+                ledger.cat_desc = true;
+            }
+            ledger.cat_selecionada = c;
+        }
+    });
 }
