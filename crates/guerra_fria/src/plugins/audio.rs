@@ -7,6 +7,8 @@ use super::time::RecursoRelogio;
 use crate::estado::AppState;
 use bevy::audio::Volume;
 use bevy::prelude::*;
+use bevy_egui::input::EguiWantsInput;
+use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use serde::Deserialize;
 use std::collections::{HashMap, VecDeque};
 use std::path::Path;
@@ -163,10 +165,6 @@ impl CatalogoSons {
     }
 }
 
-/// Fila de músicas (caminhos relativos a `assets/sons/`); vazia até haver arquivos.
-#[derive(Resource, Debug, Default)]
-pub struct FilaMusica(pub VecDeque<String>);
-
 /// Pedido de tocar um som (nome de evento ou id de efeito).
 #[derive(Message, Debug, Clone)]
 pub struct SomTocar(pub String);
@@ -179,9 +177,6 @@ impl SomTocar {
 
 #[derive(Component)]
 struct SomAtivo(String);
-
-#[derive(Component)]
-struct MusicaAtiva;
 
 #[derive(Resource, Default)]
 struct EstadoSons {
@@ -216,7 +211,9 @@ impl Plugin for AudioPlugin {
         app.add_message::<SomTocar>()
             .init_resource::<VolumesAudio>()
             .init_resource::<CatalogoSons>()
-            .init_resource::<FilaMusica>()
+            .init_resource::<MusicaEstado>()
+            .init_resource::<AmbienteEstado>()
+            .init_resource::<JanelaAudio>()
             .init_resource::<EstadoSons>()
             .add_systems(Startup, carregar_config)
             .add_systems(OnEnter(AppState::Pausado), |mut e: MessageWriter<SomTocar>| {
@@ -228,7 +225,8 @@ impl Plugin for AudioPlugin {
             .add_systems(OnTransition { exited: AppState::Menu, entered: AppState::Jogando }, |mut e: MessageWriter<SomTocar>| {
                 e.write(SomTocar::novo("ui.botao.clique"));
             })
-            .add_systems(Update, (sons_do_relogio, som_selecao, tocar_sons, tocar_musica, ajustar_volume_musica).chain());
+            .add_systems(Update, (sons_do_relogio, som_selecao, sons_de_ui, sons_de_eventos, tocar_sons, musica_por_clima, ambiente_por_camera).chain())
+            .add_systems(EguiPrimaryContextPass, janela_audio);
     }
 }
 
@@ -315,26 +313,315 @@ fn tocar_sons(
     }
 }
 
-/// Toca a próxima música da fila quando nenhuma está ativa (fila vazia = silêncio).
-fn tocar_musica(mut fila: ResMut<FilaMusica>, ativa: Query<(), With<MusicaAtiva>>, vols: Res<VolumesAudio>, servidor: Option<Res<AssetServer>>, mut commands: Commands) {
-    let Some(servidor) = servidor else { return };
-    if !ativa.is_empty() || fila.0.is_empty() {
+// ---------------------------------------------------------------- sons de interface e de eventos
+
+/// Clique em qualquer coisa do egui (botões, abas, itens) e atalhos que abrem/fecham painéis.
+fn sons_de_ui(
+    botoes: Res<ButtonInput<MouseButton>>,
+    teclas: Res<ButtonInput<KeyCode>>,
+    egui: Res<EguiWantsInput>,
+    estado: Option<Res<State<AppState>>>,
+    mut abertos: Local<Vec<KeyCode>>,
+    mut saida: MessageWriter<SomTocar>,
+) {
+    if botoes.just_pressed(MouseButton::Left) && egui.is_pointer_over_area() {
+        saida.write(SomTocar::novo("ui.botao.clique"));
+    }
+    if !matches!(estado.as_deref().map(|s| *s.get()), Some(AppState::Jogando | AppState::Pausado)) || egui.wants_keyboard_input() {
         return;
     }
-    let Some(arquivo) = fila.0.pop_front() else { return };
-    commands.spawn((
-        AudioPlayer::new(servidor.load(format!("{PASTA_SONS}/{arquivo}"))),
-        PlaybackSettings::DESPAWN.with_volume(Volume::Linear(vols.ganho(CanalAudio::Musica))),
-        MusicaAtiva,
-    ));
-}
-
-fn ajustar_volume_musica(vols: Res<VolumesAudio>, mut sinks: Query<&mut AudioSink, With<MusicaAtiva>>) {
-    if vols.is_changed() {
-        for mut s in &mut sinks {
-            s.set_volume(Volume::Linear(vols.ganho(CanalAudio::Musica)));
+    for tecla in [KeyCode::F1, KeyCode::F2, KeyCode::F3, KeyCode::F4, KeyCode::F5, KeyCode::KeyB, KeyCode::KeyJ] {
+        if teclas.just_pressed(tecla) {
+            if let Some(i) = abertos.iter().position(|t| *t == tecla) {
+                abertos.remove(i);
+                saida.write(SomTocar::novo("ui.painel.fechar"));
+            } else {
+                abertos.push(tecla);
+                saida.write(SomTocar::novo("ui.painel.abrir"));
+            }
         }
     }
+}
+
+/// Classifica o texto de uma notificação no evento sonoro correspondente.
+pub fn evento_da_notificacao(texto: &str) -> &'static str {
+    let t = texto.to_lowercase();
+    if t.contains("obra concluída") || t.contains("inaugura") {
+        "economia.construcao_finalizada"
+    } else if t.contains("eleiç") || t.contains("eleic") {
+        "politica.eleicao_concluida"
+    } else if t.contains("declar") && t.contains("guerra") {
+        "diplomacia.ultimato_enviado"
+    } else if t.contains("calote") || t.contains("endividando") {
+        "economia.falencia_fiscal"
+    } else if t.contains("lei ") && (t.contains("promulg") || t.contains("aprovad")) {
+        "politica.lei_promulgada"
+    } else {
+        "notificacao.informativa"
+    }
+}
+
+/// Pop-ups de evento (carimbo), notícias do Jornal, leis trocadas e notificações do país.
+#[allow(clippy::too_many_arguments)]
+fn sons_de_eventos(
+    ev: Option<Res<super::eventos_ui::EstadoEv>>,
+    pol: Option<Res<super::politica_sim::PoliticaSim>>,
+    notas: Option<ResMut<super::jogador::Notificacoes>>,
+    mut anterior: Local<Option<(usize, usize, usize)>>,
+    mut saida: MessageWriter<SomTocar>,
+) {
+    if let Some(mut n) = notas {
+        for texto in n.drenar_novas() {
+            saida.write(SomTocar::novo(evento_da_notificacao(&texto)));
+        }
+    }
+    let (Some(ev), Some(pol)) = (ev, pol) else { return };
+    let atual = (ev.estado.pendentes.len(), ev.estado.jornal.len(), pol.leis_trocadas.len());
+    if let Some((pend, jornal, leis)) = *anterior {
+        if atual.0 > pend {
+            saida.write(SomTocar::novo("burocracia.carimbo_aplicado"));
+        } else if atual.0 < pend {
+            saida.write(SomTocar::novo("burocracia.despacho_assinado"));
+        }
+        if atual.1 > jornal {
+            saida.write(SomTocar::novo("diplomacia.telegrama_recebido"));
+        }
+        if atual.2 > leis {
+            saida.write(SomTocar::novo("politica.lei_promulgada"));
+        }
+    }
+    *anterior = Some(atual);
+}
+
+// ---------------------------------------------------------------- música por clima
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Clima {
+    Menu,
+    Paz,
+    Tensao,
+    Crise,
+}
+
+impl Clima {
+    /// Faixa (relativa a `assets/`) do clima. Ver `assets/musica/CREDITOS.md`.
+    pub fn arquivo(self) -> &'static str {
+        match self {
+            Self::Menu | Self::Paz => "musica/menu_dvorak_largo.ogg",
+            Self::Tensao => "musica/tensao_grieg_mountain_king.ogg",
+            Self::Crise => "musica/crise_holst_mars.ogg",
+        }
+    }
+    /// Clima pela tensão mundial (0..100), com histerese de 5 pontos em torno dos limiares 40 e 75.
+    pub fn da_tensao(tensao: f32, atual: Option<Clima>) -> Clima {
+        let h = |limiar: f32, acima: bool| if acima { limiar - 5.0 } else { limiar };
+        let tensao_ou_mais = tensao >= h(40.0, matches!(atual, Some(Self::Tensao | Self::Crise)));
+        let crise = tensao >= h(75.0, atual == Some(Self::Crise));
+        if crise {
+            Self::Crise
+        } else if tensao_ou_mais {
+            Self::Tensao
+        } else {
+            Self::Paz
+        }
+    }
+}
+
+/// Segundos que dura o crossfade entre faixas.
+const SEGUNDOS_CROSSFADE: f32 = 3.0;
+
+#[derive(Component)]
+struct MusicaAtiva {
+    clima: Clima,
+    /// Ganho do fade (0..1).
+    fade: f32,
+    /// Vai a 1 na faixa atual e a 0 nas que estão saindo.
+    alvo: f32,
+}
+
+#[derive(Resource, Default)]
+struct MusicaEstado {
+    clima: Option<Clima>,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn musica_por_clima(
+    estado: Option<Res<State<AppState>>>,
+    diplo: Option<Res<super::diplomacia_ui::DiploSim>>,
+    vols: Res<VolumesAudio>,
+    time: Res<Time<Real>>,
+    servidor: Option<Res<AssetServer>>,
+    mut ms: ResMut<MusicaEstado>,
+    mut faixas: Query<(Entity, &mut MusicaAtiva, Option<&mut AudioSink>)>,
+    mut commands: Commands,
+) {
+    let Some(servidor) = servidor else { return };
+    let Some(estado) = estado else { return };
+    let desejado = match *estado.get() {
+        AppState::Carregando | AppState::Menu => Clima::Menu,
+        _ => Clima::da_tensao(diplo.map_or(0.0, |d| d.0.tensao), ms.clima.filter(|c| *c != Clima::Menu)),
+    };
+    if ms.clima != Some(desejado) {
+        // Menu e Paz usam o mesmo arquivo: não reinicia a faixa.
+        let mesma = faixas.iter().any(|(_, f, _)| f.alvo > 0.0 && f.clima.arquivo() == desejado.arquivo());
+        if mesma {
+            for (_, mut f, _) in &mut faixas {
+                if f.alvo > 0.0 {
+                    f.clima = desejado;
+                }
+            }
+        } else {
+            for (_, mut f, _) in &mut faixas {
+                f.alvo = 0.0;
+            }
+            commands.spawn((
+                AudioPlayer::new(servidor.load(desejado.arquivo())),
+                PlaybackSettings::LOOP.with_volume(Volume::SILENT),
+                MusicaAtiva { clima: desejado, fade: 0.0, alvo: 1.0 },
+            ));
+        }
+        ms.clima = Some(desejado);
+    }
+    let passo = time.delta_secs() / SEGUNDOS_CROSSFADE;
+    let ganho = vols.ganho(CanalAudio::Musica);
+    for (e, mut f, sink) in &mut faixas {
+        f.fade = if f.alvo > f.fade { (f.fade + passo).min(f.alvo) } else { (f.fade - passo).max(f.alvo) };
+        if f.alvo == 0.0 && f.fade <= 0.0 {
+            commands.entity(e).despawn();
+        } else if let Some(mut s) = sink {
+            s.set_volume(Volume::Linear(f.fade * ganho));
+        }
+    }
+}
+
+// ---------------------------------------------------------------- ambiente
+
+#[derive(Component)]
+struct AmbienteAtivo(&'static str);
+
+#[derive(Resource, Default)]
+struct AmbienteEstado {
+    mar: f32,
+    cidade: f32,
+}
+
+/// Mar quando a câmera está perto da costa; murmúrio de cidade com zoom bem próximo sobre terra.
+#[allow(clippy::too_many_arguments)]
+fn ambiente_por_camera(
+    estado: Option<Res<State<AppState>>>,
+    mapa: Option<Res<super::map::DadosMapa>>,
+    camera: Query<(&Transform, &Projection), With<Camera2d>>,
+    vols: Res<VolumesAudio>,
+    time: Res<Time<Real>>,
+    servidor: Option<Res<AssetServer>>,
+    mut est: ResMut<AmbienteEstado>,
+    mut sinks: Query<(&AmbienteAtivo, &mut AudioSink)>,
+    existentes: Query<&AmbienteAtivo>,
+    mut commands: Commands,
+) {
+    let (Some(servidor), Some(estado), Some(mapa)) = (servidor, estado, mapa) else { return };
+    if !matches!(*estado.get(), AppState::Jogando | AppState::Pausado) {
+        for (_, mut s) in &mut sinks {
+            s.set_volume(Volume::SILENT);
+        }
+        return;
+    }
+    let (alvo_mar, alvo_cid) = match camera.single() {
+        Ok((tf, Projection::Orthographic(o))) => {
+            let (cx, cy) = (tf.translation.x, tf.translation.y);
+            let raio = 40.0 * o.scale.max(0.2);
+            let mut oceano = 0;
+            let amostras = [(0.0, 0.0), (1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0), (0.7, 0.7), (-0.7, 0.7), (0.7, -0.7), (-0.7, -0.7)];
+            for (dx, dy) in amostras {
+                let id = super::map::pixel_do_mundo(Vec2::new(cx + dx * raio, cy + dy * raio), mapa.largura, mapa.altura)
+                    .map_or(0, |(px, py)| mapa.ids[py as usize * mapa.largura as usize + px as usize]);
+                if id == 0 {
+                    oceano += 1;
+                }
+            }
+            let frac = oceano as f32 / amostras.len() as f32;
+            let perto = ((1.6 - o.scale) / 1.2).clamp(0.0, 1.0);
+            // Mar: mais forte onde há costa (mistura de terra e oceano) ou mar aberto.
+            let costa = if frac > 0.0 { 0.6 + 0.4 * (1.0 - (frac - 0.5).abs() * 2.0) } else { 0.0 };
+            let cid = if frac < 0.2 { ((0.5 - o.scale) / 0.3).clamp(0.0, 1.0) } else { 0.0 };
+            (costa * perto, cid)
+        }
+        _ => (0.0, 0.0),
+    };
+    let k = (time.delta_secs() * 0.8).min(1.0);
+    est.mar += (alvo_mar - est.mar) * k;
+    est.cidade += (alvo_cid - est.cidade) * k;
+    let ganho = vols.ganho(CanalAudio::Ambiente);
+    for (nome, nivel) in [("mar", est.mar), ("cidade", est.cidade)] {
+        if !existentes.iter().any(|a| a.0 == nome) {
+            commands.spawn((
+                AudioPlayer::new(servidor.load(format!("{PASTA_SONS}/ambiente/{nome}.wav"))),
+                PlaybackSettings::LOOP.with_volume(Volume::SILENT),
+                AmbienteAtivo(if nome == "mar" { "mar" } else { "cidade" }),
+            ));
+        }
+        for (a, mut s) in &mut sinks {
+            if a.0 == nome {
+                s.set_volume(Volume::Linear(nivel * ganho * 0.6));
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------- opções de áudio
+
+#[derive(Resource, Default)]
+struct JanelaAudio {
+    aberta: bool,
+}
+
+/// Janela "Áudio" (volumes por canal): botão no menu e na pausa; F10 alterna.
+fn janela_audio(
+    mut contextos: EguiContexts,
+    teclas: Res<ButtonInput<KeyCode>>,
+    estado: Option<Res<State<AppState>>>,
+    mut janela: ResMut<JanelaAudio>,
+    mut vols: ResMut<VolumesAudio>,
+) -> Result {
+    if teclas.just_pressed(KeyCode::F10) {
+        janela.aberta = !janela.aberta;
+    }
+    let Some(estado) = estado else { return Ok(()) };
+    if !matches!(*estado.get(), AppState::Menu | AppState::Pausado) && !janela.aberta {
+        return Ok(());
+    }
+    let ctx = contextos.ctx_mut()?;
+    if !janela.aberta {
+        egui::Area::new(egui::Id::new("botao_audio")).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(ctx, |ui| {
+            if ui.button("Áudio (F10)").clicked() {
+                janela.aberta = true;
+            }
+        });
+        return Ok(());
+    }
+    let mut aberta = true;
+    egui::Window::new("Áudio").open(&mut aberta).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).resizable(false).show(ctx, |ui| {
+        for (canal, nome) in [
+            (CanalAudio::Master, "Geral"),
+            (CanalAudio::Musica, "Música"),
+            (CanalAudio::Ui, "Interface"),
+            (CanalAudio::Sfx, "Efeitos"),
+            (CanalAudio::Ambiente, "Ambiente"),
+        ] {
+            ui.horizontal(|ui| {
+                let mut v = vols.volume(canal);
+                let mut mudo = vols.mutado(canal);
+                if ui.add(egui::Slider::new(&mut v, 0.0..=1.0).text(nome)).changed() {
+                    vols.definir(canal, v);
+                }
+                if ui.checkbox(&mut mudo, "mudo").changed() {
+                    vols.mutar(canal, mudo);
+                }
+            });
+        }
+    });
+    janela.aberta = aberta;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -381,6 +668,37 @@ mod testes {
         assert!((volume_efeito(&clique, &v) - 0.80 * 0.85 * 0.5).abs() < 1e-5);
         v.mutar(CanalAudio::Ui, true);
         assert_eq!(volume_efeito(&clique, &v), 0.0);
+    }
+
+    #[test]
+    fn clima_pela_tensao() {
+        assert_eq!(Clima::da_tensao(10.0, None), Clima::Paz);
+        assert_eq!(Clima::da_tensao(50.0, None), Clima::Tensao);
+        assert_eq!(Clima::da_tensao(80.0, None), Clima::Crise);
+        // histerese: continua em crise até cair abaixo de 70
+        assert_eq!(Clima::da_tensao(72.0, Some(Clima::Crise)), Clima::Crise);
+        assert_eq!(Clima::da_tensao(72.0, Some(Clima::Tensao)), Clima::Tensao);
+        assert_eq!(Clima::da_tensao(37.0, Some(Clima::Tensao)), Clima::Tensao);
+    }
+
+    #[test]
+    fn arquivos_de_musica_e_ambiente_existem() {
+        let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        for c in [Clima::Menu, Clima::Paz, Clima::Tensao, Clima::Crise] {
+            assert!(assets.join(c.arquivo()).exists(), "{}", c.arquivo());
+        }
+        for n in ["mar", "cidade"] {
+            assert!(assets.join(PASTA_SONS).join(format!("ambiente/{n}.wav")).exists());
+        }
+    }
+
+    #[test]
+    fn notificacoes_viram_eventos_validos() {
+        let cfg = carregar();
+        let cat = CatalogoSons::novo(cfg);
+        for t in ["Obra concluída!", "Eleições realizadas", "Calote soberano", "Lei X promulgada", "Qualquer coisa", "Declararam guerra"] {
+            assert!(cat.resolver(evento_da_notificacao(t)).is_some(), "{t}");
+        }
     }
 
     #[test]

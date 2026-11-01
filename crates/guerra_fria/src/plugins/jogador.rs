@@ -44,11 +44,17 @@ pub struct PainelPais {
 
 /// Mensagens recentes (texto, instante em segundos de relógio real).
 #[derive(Resource, Default)]
-pub struct Notificacoes(Vec<(String, f64)>);
+pub struct Notificacoes(Vec<(String, f64)>, Vec<String>);
 
 impl Notificacoes {
+    /// Textos novos desde a última chamada (usado pelo áudio).
+    pub fn drenar_novas(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.1)
+    }
     pub fn push(&mut self, texto: impl Into<String>, agora: f64) {
-        self.0.push((texto.into(), agora));
+        let texto = texto.into();
+        self.1.push(texto.clone());
+        self.0.push((texto, agora));
         if self.0.len() > 40 {
             self.0.remove(0);
         }
