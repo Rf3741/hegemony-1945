@@ -646,12 +646,22 @@ fn repintar_mapa(
     catalogo: Res<RecursoCatalogo>,
     mut imagens: ResMut<Assets<Image>>,
     mut ultimo: Local<Option<(ModoMapa, usize, u64, String)>>,
+    tempo: Res<Time<Real>>,
+    mut ultima_pintura: Local<f32>,
 ) {
     let (Some(cores), Some(dados), Some(imagem)) = (cores, dados, imagem) else { return };
-    let chave = (c.modo_mapa, c.tipo_idx, eco.versao_construcao, eco.vista.pais_id.clone());
+    // No modo Normal as obras concluídas não mudam as cores: não repinta a textura inteira a cada obra.
+    let versao = if c.modo_mapa == ModoMapa::Normal { 0 } else { eco.versao_construcao };
+    let chave = (c.modo_mapa, c.tipo_idx, versao, eco.vista.pais_id.clone());
     if ultimo.as_ref() == Some(&chave) || eco.vista.catalogo.is_none() {
         return;
     }
+    // Mudança só de versão (obra concluída) nos outros modos: adia (debounce de 3 s) a repintura pesada.
+    let so_versao = ultimo.as_ref().is_some_and(|u| (u.0, u.1, &u.3) == (chave.0, chave.1, &chave.3));
+    if so_versao && tempo.elapsed_secs() - *ultima_pintura < 3.0 {
+        return;
+    }
+    *ultima_pintura = tempo.elapsed_secs();
     let primeira = ultimo.is_none();
     *ultimo = Some(chave);
     if primeira && c.modo_mapa == ModoMapa::Normal {
