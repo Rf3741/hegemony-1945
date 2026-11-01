@@ -2854,6 +2854,9 @@ version = "0.1.0"
 dependencies = [
  "ron",
  "serde",
+ "sim_diplomacia",
+ "sim_economia",
+ "sim_politica",
  "simulacao",
 ]
 

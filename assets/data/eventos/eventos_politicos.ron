@@ -1,0 +1,2883 @@
+// ==============================================================================
+// EVENTOS POLÍTICOS INTERNOS GENÉRICOS (1945-1991)
+// Módulo: evolucao_ideologica - Jogo de Grande Estratégia Guerra Fria (Estilo Victoria 3)
+// 80 Eventos Sistêmicos dinâmicos divididos em 10 categorias institucionais fundamentais.
+// Disparados por leis, poder dos Grupos de Interesse (Clout), radicalismo de Pops e SoL.
+// ==============================================================================
+
+[
+    // ==========================================================================
+    // 1. CRISES DE GABINETE E INSTABILIDADE GOVERNAMENTAL (Eventos 1 a 8)
+    // ==========================================================================
+
+    EventoPolitico(
+        id: "crise_mocao_de_desconfianca",
+        titulo: "Moção de Desconfiança Parlamentar",
+        categoria: "crise_governo",
+        descricao: "A fragilidade da coalizão governista no parlamento culmina numa votação de censura contra o gabinete ministerial. O primeiro-ministro enfrenta a iminência de dissolução das câmaras ou renúncia humilhante.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["republica_parlamentarista"],
+            leis_proibidas: ["estado_partido_unico", "sem_eleicoes"],
+            legitimidade_maxima: 40.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "mocao_ceder_renuncia_gabinete",
+                texto: "Aceitar a derrota e dissolver o gabinete para formar novo governo",
+                descricao_resultado: "Evita crise institucional aguda, mas transfere o controle ministerial para a oposição.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "tempo_passagem_leis", valor: 0.15),
+                    Modificador(id: "aprovacao_intelectuais", valor: 5.0),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "mocao_dissolver_parlamento_convocar_eleicoes",
+                texto: "Recomendar ao Chefe de Estado a dissolução imediata do Parlamento e novas eleições",
+                descricao_resultado: "Apela diretamente ao voto popular, polarizando a sociedade durante a campanha.",
+                efeitos: [
+                    Modificador(id: "radicalismo_geral", valor: 0.15),
+                    Modificador(id: "autoridade_estatal", valor: -0.10),
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: -10.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "crise_renuncia_primeiro_ministro",
+        titulo: "Renúncia Súbita do Chefe de Gabinete",
+        categoria: "crise_governo",
+        descricao: "Abalado por desgastes de saúde e intrigas palacianas, o primeiro-ministro anuncia sua renúncia irrevogável, abrindo vácuo de autoridade no topo do executivo.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["republica_parlamentarista"],
+            leis_proibidas: ["sem_eleicoes"],
+            legitimidade_maxima: 50.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "renuncia_empossar_vice_interino",
+                texto: "Designar rapidamente o ministro sênior como premiê de transição",
+                descricao_resultado: "Assegura continuidade burocrática temporária com legitimidade frágil.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: -10.0),
+                    Modificador(id: "paralisia_burocratica_governo", valor: 0.15),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "renuncia_recompor_coalizao_ampla",
+                texto: "Conceder pastas estratégicas a grupos dissidentes para selar novo pacto",
+                descricao_resultado: "Satisfaz os partidos parceiros, mas dispersa o foco do programa reformista.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 10.0),
+                    Modificador(id: "tempo_passagem_leis", valor: 0.20),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "crise_impasse_legislativo_orcamento",
+        titulo: "Paralisação Orçamentária e 'Shutdown' Institucional",
+        categoria: "crise_governo",
+        descricao: "O congresso rejeita a lei orçamentária anual devido a disputas fiscais irreconciliáveis. Salários de servidores atrasam e repartições públicas paralisam seus atendimentos.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["republica_presidencialista"],
+            leis_proibidas: ["estado_partido_unico"],
+            legitimidade_maxima: 45.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "shutdown_decreto_emergencial",
+                texto: "Governar por medida provisória orçamentária unilateral",
+                descricao_resultado: "Reabre os serviços públicos por decreto executivo, mas enfurece o legislativo.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.15),
+                    Modificador(id: "legitimidade_base", valor: -15.0),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.10),
+                ],
+                ia_peso: 50,
+            ),
+            OpcaoEventoPolitico(
+                id: "shutdown_ceder_cortes_oposicao",
+                texto: "Aceitar a pauta de cortes de despesas ditada pela oposição",
+                descricao_resultado: "Aprova o orçamento em detrimento dos investimentos públicos em andamento.",
+                efeitos: [
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: 0.05),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -15.0),
+                    Modificador(id: "aprovacao_industriais", valor: 10.0),
+                ],
+                ia_peso: 50,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "crise_racha_coalizao_ministerial",
+        titulo: "Ruptura na Coalizão de Governo",
+        categoria: "crise_governo",
+        descricao: "O principal partido aliado entrega seus cargos ministeriais em protesto contra a orientação econômica do governo, deixando o presidente minoritário no congresso.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["sufragio_universal"],
+            leis_proibidas: ["estado_partido_unico"],
+            legitimidade_maxima: 50.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "racha_governar_com_minoria",
+                texto: "Enfrentar o isolamento e governar com leais do partido próprio",
+                descricao_resultado: "Mantém pureza doutrinária ao preço de paralisia legislativa severa.",
+                efeitos: [
+                    Modificador(id: "tempo_passagem_leis", valor: 0.35),
+                    Modificador(id: "autoridade_estatal", valor: -0.10),
+                ],
+                ia_peso: 40,
+            ),
+            OpcaoEventoPolitico(
+                id: "racha_comprar_apoio_avulso",
+                texto: "Negociar verbas distritais e emendas individuais com deputados independentes",
+                descricao_resultado: "Garante votos pontuais, alimentando o descontentamento público com o fisiologismo.",
+                efeitos: [
+                    Modificador(id: "corrupcao_administrativa_fator", valor: 0.15),
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: -10.0),
+                    Modificador(id: "legitimidade_base", valor: -5.0),
+                ],
+                ia_peso: 60,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "crise_chantagem_gi_poderoso",
+        titulo: "Chantagem Corporativa de Grupo Influente",
+        categoria: "crise_governo",
+        descricao: "Um Grupo de Interesse de peso superior a 20% do Clout nacional ameaça paralisar as atividades ou retirar apoio vital se sua pauta legislativa não for tramitada com urgência.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 60.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "chantagem_capitular_demandas",
+                texto: "Ceder às exigências e enviar o projeto de lei de interesse do grupo",
+                descricao_resultado: "Restaura a aprovação do grupo poderoso às custas dos rivais.",
+                efeitos: [
+                    Modificador(id: "tempo_passagem_leis", valor: -0.15),
+                    Modificador(id: "legitimidade_base", valor: -10.0),
+                ],
+                ia_peso: 50,
+            ),
+            OpcaoEventoPolitico(
+                id: "chantagem_resistir_denunciar_pressao",
+                texto: "Denunciar publicamente a chantagem em cadeia nacional de rádio e imprensa",
+                descricao_resultado: "Ganha apoio da cidadania indignada, mas empurra o grupo para a oposição aberta.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.15),
+                    Modificador(id: "radicalismo_geral", valor: 0.10),
+                ],
+                ia_peso: 50,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "crise_vacuo_de_poder_executivo",
+        titulo: "Vácuo de Poder e Disputa de Tutela",
+        categoria: "crise_governo",
+        descricao: "Diante da fragilidade da chefia do Estado, cortes judiciais, generais e bancadas parlamentares disputam abertamente o direito de tutelar as decisões soberanas do país.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 25.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "vacuo_apoiar_tribunais_constitucionais",
+                texto: "Buscar amparo na Corte Suprema para manter a legalidade estrita",
+                descricao_resultado: "Fortalece a institucionalidade republicana contra o arbítrio das armas.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 10.0),
+                    Modificador(id: "aprovacao_militares", valor: -15.0),
+                ],
+                ia_peso: 55,
+            ),
+            OpcaoEventoPolitico(
+                id: "vacuo_convocar_conselho_seguranca",
+                texto: "Entregar a coordenação da segurança interna aos chefes de Estado-Maior",
+                descricao_resultado: "Evita o colapso da ordem urbana ao custo de abrir as portas para tutela militar.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "forca_militares", valor: 0.25),
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.15),
+                ],
+                ia_peso: 45,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "crise_obstrucao_parlamentar_sistematica",
+        titulo: "Obstrução Parlamentar Sistemática (Filibuster)",
+        categoria: "crise_governo",
+        descricao: "A oposição utiliza manobras regimentais ininterruptas para impedir a votação de reformas fundamentais, transformando as sessões legislativas em palanques estéreis.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["republica_parlamentarista"],
+            leis_proibidas: ["sem_eleicoes", "estado_partido_unico"],
+            legitimidade_maxima: 55.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "obstrucao_mudar_regimento_fechar_debate",
+                texto: "Impor a votação de encerramento do debate pela maioria simples",
+                descricao_resultado: "Destrava o projeto, mas aprofunda o rancor e as acusações de autoritarismo parlamentar.",
+                efeitos: [
+                    Modificador(id: "tempo_passagem_leis", valor: -0.20),
+                    Modificador(id: "aprovacao_intelectuais", valor: -10.0),
+                ],
+                ia_peso: 65,
+            ),
+            OpcaoEventoPolitico(
+                id: "obstrucao_retirar_artigos_polemicos",
+                texto: "Desidratar o projeto de lei para obter consenso unânime",
+                descricao_resultado: "Aprova uma versão branda e ineficaz da reforma para salvar as aparências.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 5.0),
+                    Modificador(id: "capacidade_institucional_governo", valor: -0.05),
+                ],
+                ia_peso: 35,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "crise_conflito_entre_poderes",
+        titulo: "Conflito Aberto entre o Executivo e o Judiciário",
+        categoria: "crise_governo",
+        descricao: "A Suprema Corte anula atos e decretos de emergência do governo, considerando-os flagrantemente inconstitucionais. O executivo cogita desobedecer formalmente a ordem judicial.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["garantias_constitucionais_amplas"],
+            leis_proibidas: ["supressao_total_direitos"],
+            legitimidade_maxima: 50.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "conflito_respeitar_acordao_judicial",
+                texto: "Acatar a decisão dos juízes e reenviar o tema ao congresso",
+                descricao_resultado: "Consagra o respeito à separação de poderes ao preço de humilhação política executiva.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "autoridade_estatal", valor: -0.15),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "conflito_desafiar_e_ampliar_corte",
+                texto: "Denunciar o ativismo judicial e propor a ampliação do número de juízes fiéis",
+                descricao_resultado: "Desencadeia uma crise constitucional aberta com protestos nas faculdades de direito.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.30),
+                    Modificador(id: "aprovacao_intelectuais", valor: -25.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    // ==========================================================================
+    // 2. ESCÂNDALOS DE CORRUPÇÃO E ESPIONAGEM (Eventos 9 a 16)
+    // ==========================================================================
+
+    EventoPolitico(
+        id: "escandalo_suborno_industriais_contratos",
+        titulo: "Escândalo de Propinas em Contratos Estatais",
+        categoria: "escandalo_corrupcao",
+        descricao: "Investigação da imprensa revela pagamento sistemático de propinas por conglomerados industriais privados a funcionários do ministério de obras e compras públicas.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["imprensa_livre"],
+            leis_proibidas: ["monopolio_estatal_imprensa"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "escandalo_demitir_ministro_auditoria",
+                texto: "Instaurar auditoria independente e demitir sumariamente os envolvidos",
+                descricao_resultado: "Demonstra rigor ético e estanca o sangramento de reputação do governo.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 10.0),
+                    Modificador(id: "corrupcao_administrativa_fator", valor: -0.15),
+                    Modificador(id: "aprovacao_industriais", valor: -15.0),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "escandalo_abafar_processo_sigiloso",
+                texto: "Classificar as apurações como segredo de Estado e proteger os aliados",
+                descricao_resultado: "Evita baixas no gabinete, mas alimenta rumores de impunidade descarada.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: -20.0),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.15),
+                    Modificador(id: "corrupcao_administrativa_fator", valor: 0.20),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "escandalo_espiao_duplo_alto_comando",
+        titulo: "Espião Duplo Infiltrado no Alto Comando",
+        categoria: "escandalo_corrupcao",
+        descricao: "Descobre-se que um oficial graduado do Estado-Maior transmitia planos operacionais e códigos secretos diretamente para a embaixada da superpotência rival há mais de cinco anos.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 90.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "espiao_julgamento_exemplar_militar",
+                texto: "Submeter o traidor a corte marcial pública e reformular as cifras de inteligência",
+                descricao_resultado: "Restaura a dignidade das Forças Armadas com rigor exemplar perante a nação.",
+                efeitos: [
+                    Modificador(id: "forca_defesa_nacional", valor: -0.05),
+                    Modificador(id: "autoridade_estatal", valor: 0.10),
+                    Modificador(id: "aprovacao_militares", valor: 10.0),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "espiao_troca_discreta_diplomatica",
+                texto: "Negociar a troca discreta do espião na ponte de Berlim por agentes próprios capturados",
+                descricao_resultado: "Recupera oficiais leais capturados pelo inimigo, gerando atrito com a opinião patriótica.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: -0.10),
+                    Modificador(id: "aprovacao_veteranos_guerra", valor: -15.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "escandalo_vazamento_arquivos_policia_politica",
+        titulo: "Vazamento dos Arquivos da Polícia Secreta",
+        categoria: "escandalo_corrupcao",
+        descricao: "Centenas de pastas sigilosas contendo grampos telefônicos, chantagens e monitoramentos ilegais de deputados, artistas e religiosos chegam às redações de jornais.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["policia_secreta_vigilancia"],
+            leis_proibidas: [],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "arquivos_desmantelar_aparelho_clandestino",
+                texto: "Afastar a chefia da inteligência e submeter a polícia política ao controle civil",
+                descricao_resultado: "Acalma os protestos indignados contra o Estado policial.",
+                efeitos: [
+                    Modificador(id: "garantias_constitucionais_amplas", valor: 0.15),
+                    Modificador(id: "aprovacao_intelectuais", valor: 20.0),
+                    Modificador(id: "autoridade_estatal", valor: -0.15),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "arquivos_censurar_publicacoes_repressao",
+                texto: "Apreender os exemplares e prender os jornalistas por revelar segredos de Estado",
+                descricao_resultado: "Estanca a circulação das revelações com mão de ferro contra a imprensa.",
+                efeitos: [
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.30),
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "legitimidade_base", valor: -20.0),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "escandalo_desvio_fundos_ajuda_externa",
+        titulo: "Desvio de Verbas de Ajuda Econômica Internacional",
+        categoria: "escandalo_corrupcao",
+        descricao: "Auditores internacionais descobrem que milhões de dólares concedidos para saneamento e combate à fome foram desviados para contas secretas na Suíça em nome de ministros.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 60.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "ajuda_repatriar_fundos_punir",
+                texto: "Bloquear as contas bancárias e cooperar plenamente com os doadores",
+                descricao_resultado: "Preserva as linhas de financiamento externas e condena a ganância venal.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional", valor: 15.0),
+                    Modificador(id: "capacidade_institucional_governo", valor: 0.10),
+                    Modificador(id: "corrupcao_administrativa_fator", valor: -0.10),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "ajuda_denunciar_ingerencia_estrangeira",
+                texto: "Classificar a auditoria como violação imperialista da soberania pátria",
+                descricao_resultado: "Mobiliza o orgulho nacionalista, mas fecha o crédito externo para novos projetos.",
+                efeitos: [
+                    Modificador(id: "coesao_nacional_patriotismo", valor: 0.15),
+                    Modificador(id: "fuga_de_capitais_risco", valor: 0.25),
+                    Modificador(id: "legitimidade_internacional", valor: -20.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "escandalo_financiamento_eleitoral_ilicito",
+        titulo: "Financiamento Clandestino de Campanha Eleitoral",
+        categoria: "escandalo_corrupcao",
+        descricao: "Documentos comprovam que o partido do governo recebeu remessas ocultas em moeda forte vindas de banqueiros de investimento ou de agências estrangeiras.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["sufragio_universal"],
+            leis_proibidas: ["estado_partido_unico", "sem_eleicoes"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "financiamento_aprovar_fundo_publico_estrito",
+                texto: "Proibir doações privadas e estabelecer financiamento público rigoroso",
+                descricao_resultado: "Sana o processo eleitoral, enfurecendo empresários habituados a comprar favores.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "aprovacao_industriais", valor: -15.0),
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: 10.0),
+                ],
+                ia_peso: 65,
+            ),
+            OpcaoEventoPolitico(
+                id: "financiamento_negar_tudo_campanha_difamacao",
+                texto: "Atribuir a denúncia a uma conspiração eleitoreira da oposição ressentida",
+                descricao_resultado: "Mantém a base militante coesa enquanto a dúvida persiste entre os eleitores neutros.",
+                efeitos: [
+                    Modificador(id: "radicalismo_geral", valor: 0.10),
+                    Modificador(id: "legitimidade_base", valor: -10.0),
+                ],
+                ia_peso: 35,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "escandalo_privilegios_nomenklatura_luxo",
+        titulo: "Banquete das Elites: O Luxo da Burocracia Partidária",
+        categoria: "escandalo_corrupcao",
+        descricao: "Enquanto a população enfrenta filas intermináveis para comprar pão e manteiga, fotos revelam armazéns exclusivos repletos de caviar, roupas francesas e carros de luxo para a liderança partidária.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["estado_partido_unico"],
+            leis_proibidas: ["sufragio_universal"],
+            legitimidade_maxima: 65.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "luxo_fechar_lojas_especiais_nomenklatura",
+                texto: "Abolir as lojas exclusivas e obrigar os quadros a partilhar da vida comum",
+                descricao_resultado: "Entusiasma os operários decepcionados ao custo de ressentimento entre os burocratas.",
+                efeitos: [
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 20.0),
+                    Modificador(id: "aprovacao_nomenklatura_partidaria", valor: -25.0),
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.15),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "luxo_justificar_como_necessidade_representacao",
+                texto: "Declarar os benefícios legítimos para manter o prestígio dos dignitários do Estado",
+                descricao_resultado: "Protege o conforto dos apparatchiks, aprofundando o cinismo dos cidadãos comuns.",
+                efeitos: [
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.25),
+                    Modificador(id: "disciplina_produtiva_estatal", valor: -0.15),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "escandalo_trafico_clandestino_armas",
+        titulo: "Tráfico Clandestino de Armamento Militar",
+        categoria: "escandalo_corrupcao",
+        descricao: "Fuzis e canhões dos arsenais nacionais foram interceptados em mãos de milícias rebeldes ou cartéis de contrabando no país vizinho, implicando generais do depósito central.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "armas_intervencao_arsenais_civil",
+                texto: "Nomear interventor civil para os depósitos de armas e desarticular a quadrilha",
+                descricao_resultado: "Cessa os desvios criminosos, provocando atritos com oficiais superiores.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.10),
+                    Modificador(id: "aprovacao_militares", valor: -15.0),
+                    Modificador(id: "legitimidade_internacional", valor: 10.0),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "armas_alegar_operacao_secreta_autorizada",
+                texto: "Classificar a remessa como operação clandestina autorizada pelo Estado",
+                descricao_resultado: "Escuda a cúpula militar das acusações perante a justiça comum.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: 0.15),
+                    Modificador(id: "aprovacao_militares", valor: 15.0),
+                    Modificador(id: "legitimidade_internacional", valor: -15.0),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "escandalo_nepotismo_alto_escalao",
+        titulo: "Nomeações de Parentes e Clientes no Serviço Público",
+        categoria: "escandalo_corrupcao",
+        descricao: "Filhos, irmãos e genros de ministros são nomeados para conselhos estatais remunerados com salários vultosos, gerando repúdio entre candidatos aprovados em concursos públicos.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "nepotismo_lei_concurso_obrigatorio",
+                texto: "Anular todas as nomeações familiares e instituir concurso público meritocrático",
+                descricao_resultado: "Eleva a moral da tecnocracia pública e afasta os bajuladores da corte.",
+                efeitos: [
+                    Modificador(id: "capacidade_institucional_governo", valor: 0.15),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                    Modificador(id: "aprovacao_burocracia_estatal", valor: 10.0),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "nepotismo_defender_cargos_de_confianca",
+                texto: "Defender as escolhas com base na estrita confiança pessoal necessária ao governo",
+                descricao_resultado: "Mantém a lealdade do círculo familiar íntimo, ao custo da indignação da classe média.",
+                efeitos: [
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: -15.0),
+                    Modificador(id: "legitimidade_base", valor: -10.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    // ==========================================================================
+    // 3. TENSÕES TRABALHISTAS E GREVES GERAIS (Eventos 17 a 24)
+    // ==========================================================================
+
+    EventoPolitico(
+        id: "greve_geral_nacional_setorial",
+        titulo: "Greve Geral Nacional por Reajuste Salarial",
+        categoria: "conflito_trabalhista",
+        descricao: "Centrais sindicais convocam paralisação nacional de 48 horas contra a carestia e o arrocho nos vencimentos. O transporte público, siderúrgicas e escolas cessam atividades.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["sindicatos_livres_regulamentados"],
+            leis_proibidas: ["sindicatos_proibidos"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "greve_atender_reajuste_inflacao",
+                texto: "Conceder a reposição inflacionária integral e fixar piso mínimo nacional",
+                descricao_resultado: "Restaura a paz fabril imediatamente, reduzindo as margens de lucro dos industriais.",
+                efeitos: [
+                    Modificador(id: "paz_social_nas_fabricas", valor: 0.25),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 25.0),
+                    Modificador(id: "aprovacao_industriais", valor: -20.0),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "greve_decretar_ilegalidade_multas",
+                texto: "Declarar a paralisação ilegal na justiça e bloquear os fundos sindicais",
+                descricao_resultado: "Quebra a coesão das lideranças sindicais, incitando ódio entre os operários.",
+                efeitos: [
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.30),
+                    Modificador(id: "aprovacao_industriais", valor: 20.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -30.0),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "greve_ferroviarios_e_portuarios",
+        titulo: "Bloqueio Ferroviário e Portuário de Cargas",
+        categoria: "conflito_trabalhista",
+        descricao: "Operários dos portos e maquinistas das ferrovias paralisam o escoamento de safras e carvão, ameaçando cortar o fornecimento de energia para as capitais industriais.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["trabalho_forcado_ou_servil"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "portos_negociar_acordo_emergencia",
+                texto: "Reunir as lideranças portuárias no palácio presidencial e fechar acordo emergencial",
+                descricao_resultado: "Garante o fluxo de cargas com concessão de aposentadorias precoces aos estivadores.",
+                efeitos: [
+                    Modificador(id: "produtividade_industrial", valor: 0.10),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 15.0),
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: -0.05),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "portos_militarizar_operacoes_fura_greve",
+                texto: "Mobilizar engenheiros do exército e fuzileiros para operar os guindastes",
+                descricao_resultado: "Mantém o porto ativo sob mira de baionetas, criando ressentimento indelével.",
+                efeitos: [
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.35),
+                    Modificador(id: "autoridade_estatal", valor: 0.15),
+                    Modificador(id: "aprovacao_militares", valor: 10.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "greve_ocupacao_operaria_fabricas",
+        titulo: "Ocupação Operária das Grandes Fábricas",
+        categoria: "conflito_trabalhista",
+        descricao: "Após o anúncio de demissões em massa pela gerência, os trabalhadores trancam os portões e instalam comitês de autogestão dentro dos complexos industriais.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["estado_partido_unico"],
+            legitimidade_maxima: 60.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "ocupacao_mediar_compra_cooperativa",
+                texto: "Apoiar a formação de cooperativa operária com financiamento do banco estatal",
+                descricao_resultado: "Transforma a fábrica em modelo cooperativo autônomo, assustando o patronato.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.20),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 25.0),
+                    Modificador(id: "aprovacao_industriais", valor: -30.0),
+                ],
+                ia_peso: 45,
+            ),
+            OpcaoEventoPolitico(
+                id: "ocupacao_reintegracao_posse_policial",
+                texto: "Emitir mandado de reintegração de posse e empregar a polícia de choque",
+                descricao_resultado: "Desocupa o galpão à força com dezenas de feridos e maquinário quebrado.",
+                efeitos: [
+                    Modificador(id: "investimento_privado_fator", valor: 0.15),
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.40),
+                    Modificador(id: "produtividade_industrial", valor: -0.15),
+                ],
+                ia_peso: 55,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "greve_repressao_violenta_piquete",
+        titulo: "Massacre do Piquete Operário",
+        categoria: "conflito_trabalhista",
+        descricao: "Durante confronto diante dos portões de uma mina, tropas policiais abrem fogo contra a multidão de grevistas, resultando em mortes de trabalhadores e comoção nacional.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["guarda_nacional_militarizada"],
+            leis_proibidas: [],
+            legitimidade_maxima: 65.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "massacre_prender_comandante_indenizar",
+                texto: "Afastar e processar o comandante do destacamento e indenizar as famílias",
+                descricao_resultado: "Repudia o massacre e evita greve insurrecional de vingança.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 10.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -10.0),
+                    Modificador(id: "aprovacao_militares", valor: -15.0),
+                ],
+                ia_peso: 65,
+            ),
+            OpcaoEventoPolitico(
+                id: "massacre_culpar_agitadores_comunistas",
+                texto: "Culpar infiltrados subversivos armados e decretar estado de emergência na comarca",
+                descricao_resultado: "Justifica o massacre perante a ala conservadora, incendiando o movimento operário.",
+                efeitos: [
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.50),
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "risco_revolucao_armada_popular", valor: 0.25),
+                ],
+                ia_peso: 35,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "greve_solidariedade_intersetorial",
+        titulo: "Greve de Solidariedade Intersetorial",
+        categoria: "conflito_trabalhista",
+        descricao: "Em solidariedade aos metalúrgicos em luta, sindicatos têxteis, de professores e da construção civil cruzam os braços em efeito dominó, exigindo garantias de negociação coletiva.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["sindicatos_livres_regulamentados"],
+            leis_proibidas: ["sindicatos_proibidos"],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "solidariedade_instituir_pacto_tripartite",
+                texto: "Convocar conselho tripartite nacional de governança salarial e trabalhista",
+                descricao_resultado: "Institucionaliza a concertação e encerra a paralisação por vias negociadas.",
+                efeitos: [
+                    Modificador(id: "paz_social_nas_fabricas", valor: 0.20),
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "tempo_passagem_leis", valor: -0.10),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "solidariedade_proibir_greves_politicas",
+                texto: "Propor projeto de lei que proíba greves de solidariedade sob pena de prisão",
+                descricao_resultado: "Tenta esmagar a unidade da classe operária, gerando indignação nos tribunais de trabalho.",
+                efeitos: [
+                    Modificador(id: "aprovacao_industriais", valor: 15.0),
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.35),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "greve_fome_condicoes_trabalho",
+        titulo: "Greve de Fome nas Galerias Subterrâneas de Carvão",
+        categoria: "conflito_trabalhista",
+        descricao: "Dezenas de mineiros recusam-se a subir à superfície e iniciam greve de fome coletiva a quinhentos metros de profundidade, protestando contra mortes em desabamentos e falta de ventilação.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "fome_regulamentar_seguranca_minas",
+                texto: "Promulgar código rigoroso de segurança no trabalho e inspeção estatal mandatória",
+                descricao_resultado: "Salva a vida dos mineiros e conquista a gratidão das comunidades operárias.",
+                efeitos: [
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 25.0),
+                    Modificador(id: "custo_construcao_estatal", valor: 0.10),
+                    Modificador(id: "legitimidade_base", valor: 10.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEventoPolitico(
+                id: "fome_ignorar_chantagem_subterranea",
+                texto: "Avisar que o governo não cederá a chantagens emocionais de grevistas ilegais",
+                descricao_resultado: "Resulta em tragédia humanitária e indignação popular sem precedentes.",
+                efeitos: [
+                    Modificador(id: "radicalismo_geral", valor: 0.30),
+                    Modificador(id: "legitimidade_base", valor: -25.0),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "greve_dissidencia_sindicato_oficial",
+        titulo: "Rebelião de Base contra o Sindicato Oficial",
+        categoria: "conflito_trabalhista",
+        descricao: "Trabalhadores fabris rebelam-se contra os pelegos sindicais nomeados pelo Ministério do Trabalho, criando uma comissão de fábrica autônoma para negociar por conta própria.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["sindicatos_estatais_atrelados"],
+            leis_proibidas: ["sindicatos_livres_regulamentados"],
+            legitimidade_maxima: 65.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "dissidencia_reconhecer_comissao_fabril",
+                texto: "Aceitar a comissão eleita pelos trabalhadores e reformar a estrutura sindical",
+                descricao_resultado: "Dá início ao desmantelamento pacífico da tutela corporativista do trabalho.",
+                efeitos: [
+                    Modificador(id: "aprovacao_trabalhadores_sindicalizados", valor: 25.0),
+                    Modificador(id: "aprovacao_burocracia_estatal", valor: -15.0),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "dissidencia_prender_lideres_rebeldes",
+                texto: "Prender os membros da comissão por usurpação da representação oficial",
+                descricao_resultado: "Reafirma a tutela do ministério, ao custo de sabotagens silenciosas na linha de produção.",
+                efeitos: [
+                    Modificador(id: "produtividade_industrial", valor: -0.20),
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.30),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "greve_locaute_patronal_reacao",
+        titulo: "Locaute Patronal e Fechamento de Portões",
+        categoria: "conflito_trabalhista",
+        descricao: "A federação patronal de indústrias decreta locaute coordenado, fechando as plantas fabris e suspendendo o pagamento de salários para dobrar o governo perante exigências fiscais.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["imposto_renda_progressivo"],
+            leis_proibidas: ["planificacao_central"],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "locaute_requisitar_fabricas_intervencao",
+                texto: "Decretar requisição administrativa das fábricas e nomear interventores",
+                descricao_resultado: "Garante a produção à força e aterroriza as entidades patronais com estatização.",
+                efeitos: [
+                    Modificador(id: "aprovacao_industriais", valor: -40.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 30.0),
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                ],
+                ia_peso: 50,
+            ),
+            OpcaoEventoPolitico(
+                id: "locaute_oferecer_isencoes_tributarias",
+                texto: "Oferecer isenções fiscais provisórias para reabrir imediatamente os postos de trabalho",
+                descricao_resultado: "Cede à chantagem patronal, irritando as bancadas de esquerda.",
+                efeitos: [
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: -0.15),
+                    Modificador(id: "aprovacao_industriais", valor: 25.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -20.0),
+                ],
+                ia_peso: 50,
+            ),
+        ],
+    ),
+
+    // ==========================================================================
+    // 4. CONFLITOS AGRÁRIOS E REFORMA DA TERRA (Eventos 25 a 32)
+    // ==========================================================================
+
+    EventoPolitico(
+        id: "agrario_invasao_terras_camponesas",
+        titulo: "Ocupação Massiva de Latifúndios Improdutivos",
+        categoria: "conflito_agrario",
+        descricao: "Milhares de famílias de camponeses sem-terra ocupam fazendas improdutivas em várias províncias rurais, erguendo acampamentos de lona e exigindo desapropriação imediata.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["latifundio_tradicional"],
+            leis_proibidas: ["coletivizacao_estatal"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "invasao_desapropriar_com_indenizacao",
+                texto: "Declarar as áreas de interesse social e desapropriar para reforma agrária familiar",
+                descricao_resultado: "Assenta as famílias e inicia a democratização da posse da terra no campo.",
+                efeitos: [
+                    Modificador(id: "aprovacao_camponeses", valor: 35.0),
+                    Modificador(id: "aprovacao_latifundiarios", valor: -45.0),
+                    Modificador(id: "estabilidade_rural_pacifica", valor: 0.15),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "invasao_despejo_violento_cavalaria",
+                texto: "Despachar a cavalaria da polícia para cumprir a reintegração de posse imediata",
+                descricao_resultado: "Destrói os acampamentos a fogo e ferro, preservando a propriedade intacta dos coronéis.",
+                efeitos: [
+                    Modificador(id: "insurreicao_camponesa_revolta", valor: 0.40),
+                    Modificador(id: "aprovacao_latifundiarios", valor: 30.0),
+                    Modificador(id: "radicalismo_geral", valor: 0.20),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "agrario_resistencia_armada_latifundiarios",
+        titulo: "Milícias Armadas dos Fazendeiros contra a Reforma",
+        categoria: "conflito_agrario",
+        descricao: "A federação ruralista financia a criação de bandos paramilitares de pistoleiros armados para emboscar ativistas camponeses e ameaçar juízes agrários que autorizam vistorias.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["reforma_agraria_distributiva"],
+            leis_proibidas: [],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "pistoleiros_desarmar_milicias_tropas_federais",
+                texto: "Enviar o exército para desarmar sumariamente as milícias dos fazendeiros",
+                descricao_resultado: "Impõe a autoridade da lei sobre os caudilhos locais e protege as comunidades rurais.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "aprovacao_latifundiarios", valor: -40.0),
+                    Modificador(id: "estabilidade_rural_pacifica", valor: 0.20),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "pistoleiros_congelar_desapropriacoes_dialogo",
+                texto: "Suspender provisoriamente novos decretos agrários para desarmar a tensão armada",
+                descricao_resultado: "Evita o derramamento de sangue imediato ao preço de capitular diante do terror dos coronéis.",
+                efeitos: [
+                    Modificador(id: "aprovacao_camponeses", valor: -30.0),
+                    Modificador(id: "legitimidade_base", valor: -15.0),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "agrario_desapropriacao_controversa",
+        titulo: "Desapropriação Controversa de Fazenda de Alto Rendimento",
+        categoria: "conflito_agrario",
+        descricao: "O órgão de colonização agrário desapropria por engano uma propriedade modelo de alta tecnologia produtiva, provocando indignação e acusações de perseguição ideológica.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["reforma_agraria_distributiva"],
+            leis_proibidas: [],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "controversa_revogar_decreto_indenizar",
+                texto: "Revogar o decreto, devolver a propriedade e punir os técnicos negligentes",
+                descricao_resultado: "Assegura segurança jurídica aos produtores eficientes e modernizadores.",
+                efeitos: [
+                    Modificador(id: "aprovacao_proprietarios_rurais", valor: 25.0),
+                    Modificador(id: "renda_agricola_nacional", valor: 0.10),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "controversa_manter_para_nao_demonstrar_fraqueza",
+                texto: "Manter a desapropriação para demonstrar determinação irredutível do Estado",
+                descricao_resultado: "Instaura clima de insegurança no setor agroexportador e retração de investimentos.",
+                efeitos: [
+                    Modificador(id: "renda_agricola_nacional", valor: -0.15),
+                    Modificador(id: "aprovacao_proprietarios_rurais", valor: -30.0),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "agrario_boicote_abastecimento_fazendeiros",
+        titulo: "Boicote Rural: Retenção de Grãos e Gado",
+        categoria: "conflito_agrario",
+        descricao: "Grandes produtores agropecuários recusam-se a vender cereais e carne aos entrepostos urbanos enquanto o governo mantiver o tabelamento de preços de alimentos básicos.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["intervencionismo"],
+            leis_proibidas: ["laissez_faire"],
+            legitimidade_maxima: 65.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "boicote_confiscar_silos_seguranca_alimentar",
+                texto: "Autorizar a requisição compulsória de silos sob a lei de segurança alimentar",
+                descricao_resultado: "Abastece as cidades e quebra o boicote patronal com vigor jacobino.",
+                efeitos: [
+                    Modificador(id: "oferta_alimentos_mercado_interno", valor: 0.25),
+                    Modificador(id: "aprovacao_latifundiarios", valor: -35.0),
+                    Modificador(id: "aprovacao_camponeses", valor: 15.0),
+                ],
+                ia_peso: 55,
+            ),
+            OpcaoEventoPolitico(
+                id: "boicote_liberar_precos_mercado",
+                texto: "Liberar os preços das commodities e conceder subsídios creditícios aos fazendeiros",
+                descricao_resultado: "Esvazia os armazéns rapidamente para o mercado, encarecendo a cesta básica operária.",
+                efeitos: [
+                    Modificador(id: "aprovacao_latifundiarios", valor: 25.0),
+                    Modificador(id: "custo_vida_urbano_reducao", valor: -0.20),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -20.0),
+                ],
+                ia_peso: 45,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "agrario_fracasso_safra_coletivizacao",
+        titulo: "Queda Brutal de Produtividade nas Fazendas Coletivas",
+        categoria: "conflito_agrario",
+        descricao: "A imposição burocrática de quotas e a expropriação forçada de ferramentas desmotivam os trabalhadores dos campos estatais. A colheita de trigo cai 40% perante a média histórica.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["coletivizacao_estatal"],
+            leis_proibidas: [],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "fracasso_autorizar_lotes_privados_camponeses",
+                texto: "Permitir pequenas hortas privadas familiares e livre comércio dos excedentes",
+                descricao_resultado: "Estimula o trabalho individual e reverte a fome aguda nas províncias.",
+                efeitos: [
+                    Modificador(id: "oferta_alimentos_mercado_interno", valor: 0.30),
+                    Modificador(id: "aprovacao_camponeses", valor: 25.0),
+                    Modificador(id: "aprovacao_partido_comunista", valor: -10.0),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "fracasso_intensificar_brigadas_disciplinares",
+                texto: "Enviar comissários do partido e brigadas de choque para punir a preguiça camponesa",
+                descricao_resultado: "Aumenta o terror punitivo e destrói o que restava da moral coletivista no campo.",
+                efeitos: [
+                    Modificador(id: "disciplina_produtiva_estatal", valor: 0.15),
+                    Modificador(id: "insurreicao_camponesa_revolta", valor: 0.35),
+                    Modificador(id: "aprovacao_camponeses", valor: -30.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "agrario_expulsao_posseiros_modernizacao",
+        titulo: "Expulsão Sangrenta de Posseiros Tradicionais",
+        categoria: "conflito_agrario",
+        descricao: "Grandes empresas agroindustriais utilizam tratores e cercas de arame farpado para expulsar centenas de famílias de posseiros e ribeirinhos que habitavam a terra há gerações.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["laissez_faire"],
+            leis_proibidas: ["reforma_agraria_distributiva"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "expulsao_regularizar_posse_tradicional",
+                texto: "Conceder títulos definitivos de posse às famílias e criar reservas extrativistas",
+                descricao_resultado: "Protege o tecido comunitário ancestral e detém o êxodo rural desordenado.",
+                efeitos: [
+                    Modificador(id: "aprovacao_camponeses", valor: 30.0),
+                    Modificador(id: "aprovacao_latifundiarios", valor: -25.0),
+                    Modificador(id: "estabilidade_rural_pacifica", valor: 0.15),
+                ],
+                ia_peso: 65,
+            ),
+            OpcaoEventoPolitico(
+                id: "expulsao_apoiar_empresa_modernizadora",
+                texto: "Garantir o direito da empresa titular do registro imobiliário com a polícia",
+                descricao_resultado: "Favorece a escala produtiva capitalista, empurrando milhares de camponeses sem teto para as favelas.",
+                efeitos: [
+                    Modificador(id: "produtividade_industrial", valor: 0.10),
+                    Modificador(id: "radicalismo_geral", valor: 0.20),
+                    Modificador(id: "aprovacao_camponeses", valor: -35.0),
+                ],
+                ia_peso: 35,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "agrario_crise_divida_pequenos_agricultores",
+        titulo: "Espiral de Endividamento dos Pequenos Produtores",
+        categoria: "conflito_agrario",
+        descricao: "Juros bancários abusivos e secas prolongadas deixam milhares de pequenos agricultores familiares à beira do leilão compulsório de suas pequenas glebas e tratores.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["propriedade_privada_familiar"],
+            leis_proibidas: [],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "divida_refinanciamento_juros_zero",
+                texto: "Securitizar as dívidas rurais em 20 anos com juros subsidiados pelo tesouro",
+                descricao_resultado: "Evita o colapso financeiro da agricultura familiar e preserva o abastecimento.",
+                efeitos: [
+                    Modificador(id: "aprovacao_proprietarios_rurais", valor: 25.0),
+                    Modificador(id: "aprovacao_camponeses", valor: 20.0),
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: -0.10),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "divida_executar_leiloes_mercado",
+                texto: "Deixar o mercado financeiro executar as hipotecas sem socorro estatal",
+                descricao_resultado: "Concentra a terra nas mãos de grandes grupos imobiliários e desencadeia protestos nas estradas.",
+                efeitos: [
+                    Modificador(id: "investimento_privado_fator", valor: 0.10),
+                    Modificador(id: "radicalismo_geral", valor: 0.25),
+                    Modificador(id: "aprovacao_proprietarios_rurais", valor: -30.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "agrario_demarcacao_terras_comunitarias",
+        titulo: "Demarcação de Terras Indígenas e Comunitárias",
+        categoria: "conflito_agrario",
+        descricao: "Comunidades tradicionais e povos originários reivindicam a homologação legal de suas terras ancestrais contra o avanço de madeireiros e pecuaristas.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["cidadania_civica_jus_soli"],
+            leis_proibidas: ["segregacao_apartheid"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "demarcacao_homologar_integralmente",
+                texto: "Homologar as reservas comunitárias e proibir atividades predatórias extrativas",
+                descricao_resultado: "Cumpre os compromissos de direitos humanos e preserva as matas nativas.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional_onu", valor: 0.25),
+                    Modificador(id: "aprovacao_intelectuais", valor: 20.0),
+                    Modificador(id: "aprovacao_latifundiarios", valor: -25.0),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "demarcacao_reduzir_areas_abrir_exploracao",
+                texto: "Reduzir as reservas ao mínimo e licenciar a exploração madeireira e mineral",
+                descricao_resultado: "Aquece as rendas extrativas de fronteira com pesadas críticas dos ambientalistas.",
+                efeitos: [
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: 0.10),
+                    Modificador(id: "aprovacao_industriais", valor: 15.0),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.20),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    // ==========================================================================
+    // 5. NACIONALIZAÇÕES, PRIVATIZAÇÕES E POLÍTICA ECONÔMICA (Eventos 33 a 40)
+    // ==========================================================================
+
+    EventoPolitico(
+        id: "economia_nacionalizacao_recursos_minerais",
+        titulo: "Nacionalização do Petróleo e Recursos Minerais",
+        categoria: "politica_economica",
+        descricao: "O clamor popular sob o lema 'O petróleo é nosso!' exige a criação de monopólio estatal e a revogação de concessões dadas a petroleiras multinacionais anglo-americanas.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["laissez_faire"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "nacionalizacao_criar_estatal_monopolio",
+                texto: "Instituir a empresa estatal monopolista e assumir todas as refinarias e poços",
+                descricao_resultado: "Assegura soberania sobre o ouro negro, arriscando boicotes comerciais das superpotências.",
+                efeitos: [
+                    Modificador(id: "entusiasmo_construcao_nacional", valor: 0.35),
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: 0.20),
+                    Modificador(id: "fuga_de_capitais_risco", valor: 0.30),
+                    Modificador(id: "aprovacao_industriais", valor: -25.0),
+                ],
+                ia_peso: 65,
+            ),
+            OpcaoEventoPolitico(
+                id: "nacionalizacao_apenas_elevar_royalties",
+                texto: "Manter as multinacionais operando e triplicar a alíquota de royalties e impostos",
+                descricao_resultado: "Aumenta a arrecadação sem romper relações amigáveis com o capital ocidental.",
+                efeitos: [
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: 0.15),
+                    Modificador(id: "investimento_privado_fator", valor: 0.05),
+                    Modificador(id: "aprovacao_intelectuais", valor: -10.0),
+                ],
+                ia_peso: 35,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "economia_estatizacao_concessionarias_servicos",
+        titulo: "Estatização de Ferrovias e Serviços de Energia",
+        categoria: "politica_economica",
+        descricao: "Tarifas extorsivas e apagões frequentes levam a opinião pública a exigir a encampação imediata das concessionárias estrangeiras de eletricidade e ferrovias.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["intervencionismo"],
+            leis_proibidas: ["laissez_faire"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "estatizacao_encampar_servicos_publicos",
+                texto: "Encampar as concessionárias e criar rede nacional unificada de serviços essenciais",
+                descricao_resultado: "Universaliza a eletrificação rural a preço de custo subsidiado pelo tesouro.",
+                efeitos: [
+                    Modificador(id: "produtividade_industrial", valor: 0.15),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 20.0),
+                    Modificador(id: "custo_construcao_estatal", valor: 0.15),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "estatizacao_oferecer_subsidios_tarifarios",
+                texto: "Subsidiar as tarifas diretamente do caixa do tesouro para não tocar nas empresas",
+                descricao_resultado: "Evita atritos diplomáticos às custas de sangria permanente do orçamento público.",
+                efeitos: [
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: -0.10),
+                    Modificador(id: "aprovacao_industriais", valor: 15.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "economia_retaliacao_estrangeira_estatizacao",
+        titulo: "Embargo e Retaliação Econômica Estrangeira",
+        categoria: "politica_economica",
+        descricao: "Em represália à desapropriação de suas subsidiárias, potências estrangeiras cortam créditos comerciais, congelam reservas no exterior e suspendem importações de manufaturados.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "retaliacao_reorientar_comercio_bloco_rival",
+                texto: "Diversificar parceiros e fechar acordos de troca direta com o bloco geopolítico rival",
+                descricao_resultado: "Contorna o bloqueio cambial com barter e apoio técnico de novas potências.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: 0.25),
+                    Modificador(id: "entusiasmo_construcao_nacional", valor: 0.20),
+                    Modificador(id: "hostilidade_bloco_ocidental", valor: 0.35),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "retaliacao_pagar_indenizacoes_plenas",
+                texto: "Aceitar a arbitragem do Banco Mundial e pagar indenizações de mercado parceladas",
+                descricao_resultado: "Restaura o acesso às praças financeiras com pesado custo aos cofres públicos.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional", valor: 20.0),
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: -0.15),
+                    Modificador(id: "aprovacao_movimento_anticolonial", valor: -20.0),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "economia_privatizacao_estatais_deficitarias",
+        titulo: "Programa de Privatização de Estatais Deficitárias",
+        categoria: "politica_economica",
+        descricao: "Afundadas em déficits e apadrinhamento político, empresas públicas de aço e navegação drenam o orçamento nacional. O ministério propõe sua alienação a leilão na bolsa de valores.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["economia_mista"],
+            leis_proibidas: ["planificacao_central"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "privatizacao_leiloar_capital_privado",
+                texto: "Vender as empresas deficitárias em leilão aberto para investidores nacionais e externos",
+                descricao_resultado: "Arrecada receita imediata e reduz gastos estatais sob fúria dos sindicatos.",
+                efeitos: [
+                    Modificador(id: "investimento_privado_fator", valor: 0.25),
+                    Modificador(id: "aprovacao_industriais", valor: 25.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -30.0),
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.20),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "privatizacao_reestruturar_com_gestao_tecnica",
+                texto: "Manter as estatais sob plano rigoroso de saneamento e gestão técnica autônoma",
+                descricao_resultado: "Preserva o controle público de setores estratégicos sem ceder aos oligopólios.",
+                efeitos: [
+                    Modificador(id: "capacidade_institucional_governo", valor: 0.10),
+                    Modificador(id: "aprovacao_burocracia_estatal", valor: 15.0),
+                    Modificador(id: "tempo_passagem_leis", valor: 0.10),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "economia_abertura_investimento_estrangeiro",
+        titulo: "Abertura Irrestrita ao Capital Multinacional",
+        categoria: "politica_economica",
+        descricao: "Para atrair dólares e tecnologia automobilística moderna, tecnocratas propõem facilidades cambiais e remessa desimpedida de lucros para multinacionais estrangeiras.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["autarquia_isolacionista", "monopolio_estatal_comercio"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "abertura_conceder_incentivos_multinacionais",
+                texto: "Aprovar o pacote de atração de capital com incentivos fiscais e zonas francas",
+                descricao_resultado: "Instala montadoras e indústrias modernas em ritmo acelerado na capital.",
+                efeitos: [
+                    Modificador(id: "produtividade_industrial", valor: 0.20),
+                    Modificador(id: "investimento_privado_fator", valor: 0.20),
+                    Modificador(id: "aprovacao_movimento_anticolonial", valor: -20.0),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "abertura_exigir_indice_nacionalizacao_pecas",
+                texto: "Exigir 70% de componentes nacionais e transferência mandatória de tecnologia",
+                descricao_resultado: "Protege a indústria de autopeças local, afastando os investidores apressados.",
+                efeitos: [
+                    Modificador(id: "inovacao_tecnologica_fator", valor: 0.15),
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: 15.0),
+                    Modificador(id: "investimento_privado_fator", valor: -0.10),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "economia_liquidacao_ativos_publicos_protestos",
+        titulo: "Protestos Violentos contra a 'Privataria'",
+        categoria: "politica_economica",
+        descricao: "Centenas de manifestantes e estudantes cercam o prédio da Bolsa de Valores para impedir o leilão de venda da companhia telefônica estatal, denunciando subavaliação criminosa de preço.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["laissez_faire"],
+            leis_proibidas: [],
+            legitimidade_maxima: 60.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "liquidacao_bater_martelo_repressao",
+                texto: "Bater o martelo da venda sob escolta de cavalaria e gás lacrimogêneo",
+                descricao_resultado: "Conclui a privatização em clima de conflagração urbana no centro financeiro.",
+                efeitos: [
+                    Modificador(id: "investimento_privado_fator", valor: 0.25),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.30),
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.25),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "liquidacao_suspender_leilao_plebiscito",
+                texto: "Suspender o leilão e submeter a venda a um plebiscito popular soberano",
+                descricao_resultado: "Desarma o tumulto imediatamente, transferindo a decisão final aos cidadãos.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.25),
+                    Modificador(id: "aprovacao_industriais", valor: -25.0),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "economia_conglomerado_estatal_estrategico",
+        titulo: "Criação de Conglomerado Estatal de Alta Tecnologia",
+        categoria: "politica_economica",
+        descricao: "Cientistas e generais propõem a fundação de uma empresa estatal aeroespacial e de comunicações para reduzir a dependência tecnológica de superpotências durante a corrida armamentista.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["laissez_faire"],
+            legitimidade_maxima: 85.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "conglomerado_financiar_projeto_nacional",
+                texto: "Alocar 1% do PIB para o conglomerado aeroespacial e o instituto de pesquisa",
+                descricao_resultado: "Estimula o desenvolvimento de aeronaves civis e foguetes de fabricação própria.",
+                efeitos: [
+                    Modificador(id: "velocidade_pesquisa", valor: 0.20),
+                    Modificador(id: "inovacao_tecnologica_fator", valor: 0.20),
+                    Modificador(id: "aprovacao_militares", valor: 15.0),
+                    Modificador(id: "custo_construcao_estatal", valor: 0.10),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "conglomerado_comprar_licencas_prontas",
+                texto: "Comprar aeronaves e licenças prontas no mercado internacional para economizar",
+                descricao_resultado: "Evita o risco de pesquisa dispendiosa, perpetuando a dependência tecnológica externa.",
+                efeitos: [
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: 0.05),
+                    Modificador(id: "aprovacao_intelectuais", valor: -15.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "economia_quebra_monopolio_estatal",
+        titulo: "Quebra do Monopólio Estatal e Liberdade Tarifária",
+        categoria: "politica_economica",
+        descricao: "Bancadas liberais apresentam emenda constitucional para quebrar o monopólio estatal sobre petróleo, telecomunicações e gás, abrindo o mercado à livre concorrência.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["intervencionismo"],
+            leis_proibidas: ["planificacao_central"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "monopolio_aprovar_quebra_concorrencia",
+                texto: "Aprovar a abertura à concorrência privada regulada por agência independente",
+                descricao_resultado: "Estimula investimentos privados em infraestrutura sem desmantelar as estatais existentes.",
+                efeitos: [
+                    Modificador(id: "investimento_privado_fator", valor: 0.20),
+                    Modificador(id: "aprovacao_industriais", valor: 20.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -15.0),
+                ],
+                ia_peso: 65,
+            ),
+            OpcaoEventoPolitico(
+                id: "monopolio_blindar_monopolio_estrategico",
+                texto: "Rejeitar a quebra e manter as riquezas do subsolo sob controle exclusivo do povo",
+                descricao_resultado: "Garante o controle soberano dos recursos vitais ao preço de investimentos mais lentos.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.15),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 20.0),
+                    Modificador(id: "aprovacao_industriais", valor: -20.0),
+                ],
+                ia_peso: 35,
+            ),
+        ],
+    ),
+
+    // ==========================================================================
+    // 6. MILITARES, CONSPIRAÇÕES E GOLPES DE ESTADO (Eventos 41 a 48)
+    // ==========================================================================
+
+    EventoPolitico(
+        id: "militar_ultimato_estado_maior",
+        titulo: "O Ultimato dos Generais ao Poder Civil",
+        categoria: "conspiracao_militar",
+        descricao: "O Estado-Maior das Forças Armadas convoca o presidente civil ao Ministério da Guerra para exigir o cancelamento de reformas distributivas e o expurgo imediato de esquerdistas do gabinete.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["oligarquia_militar"],
+            legitimidade_maxima: 45.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "ultimato_demitir_ministros_ceder",
+                texto: "Submeter-se às exigências militares e demitir a ala reformista do governo",
+                descricao_resultado: "Evita o golpe de Estado no curto prazo, convertendo o presidente em marionete tutelada.",
+                efeitos: [
+                    Modificador(id: "forca_militares", valor: 0.30),
+                    Modificador(id: "legitimidade_base", valor: -20.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -30.0),
+                ],
+                ia_peso: 50,
+            ),
+            OpcaoEventoPolitico(
+                id: "ultimato_chamar_povo_resistir_quarteladas",
+                texto: "Convocar a população às praças e destituir sumariamente os generais golpistas",
+                descricao_resultado: "Desencadeia uma crise de vida ou morte: o fracasso resultará em deposição imediata.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.30),
+                    Modificador(id: "risco_golpe_de_estado_militar", valor: 0.40),
+                    Modificador(id: "radicalismo_geral", valor: 0.25),
+                ],
+                ia_peso: 50,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "militar_intentona_golpista_frustrada",
+        titulo: "Intentona Golpista Frustrada na Madrugada",
+        categoria: "conspiracao_militar",
+        descricao: "Regimentos blindados rebeldes saem dos quartéis para cercar o palácio presidencial, mas são contidos pela guarda leal e por manifestantes que bloqueiam os tanques com os próprios corpos.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["oligarquia_militar"],
+            legitimidade_maxima: 55.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "intentona_expurgar_conspiradores_prisao",
+                texto: "Degredar os líderes da insurreição e expurgar todos os oficiais cúmplices",
+                descricao_resultado: "Fortalece a cadeia de comando leal à Constituição republicana.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "legitimidade_base", valor: 25.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 20.0),
+                    Modificador(id: "forca_militares", valor: -0.20),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEventoPolitico(
+                id: "intentona_anistiar_para_apaziguar_tropa",
+                texto: "Conceder anistia discreta aos rebeldes para evitar revolta generalizada na corporação",
+                descricao_resultado: "Evita novo motim a curto prazo, sinalizando fraqueza fatal perante futuras quarteladas.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: -15.0),
+                    Modificador(id: "risco_golpe_de_estado_militar", valor: 0.25),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "militar_golpe_institucional_consumado",
+        titulo: "Pronunciamento Militar e Deposição Presidencial",
+        categoria: "conspiracao_militar",
+        descricao: "Tropas em todo o território nacional aderem ao manifesto do Estado-Maior. O presidente é deposto e parte para o exílio em avião militar. Uma Junta Militar de Salvação Nacional assume o governo.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["oligarquia_militar"],
+            legitimidade_maxima: 20.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "golpe_proclamar_junta_ordem",
+                texto: "Consolidar a Junta Militar, suspender o congresso e expurgar os 'agitadores'",
+                descricao_resultado: "Institui a ditadura militar e restaura a ordem sob censura e toques de recolher.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.35),
+                    Modificador(id: "forca_militares", valor: 0.45),
+                    Modificador(id: "aprovacao_industriais", valor: 20.0),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.40),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "golpe_prometer_eleicoes_rapidas",
+                texto: "Designar general reformista e prometer eleições civis em no máximo doze meses",
+                descricao_resultado: "Mitiga a condenação internacional e busca transição civil pacífica.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional", valor: 15.0),
+                    Modificador(id: "tempo_passagem_leis", valor: 0.25),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "militar_motim_sargentos_subalternos",
+        titulo: "Rebelião de Marinheiros e Sargentos",
+        categoria: "conspiracao_militar",
+        descricao: "Praças e suboficiais da marinha e do exército amotinam-se nas fortalezas costeiras, reivindicando direitos políticos, voto para praças e o fim dos castigos humilhantes nos quartéis.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["oligarquia_militar"],
+            legitimidade_maxima: 60.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "sargentos_anistiar_reconhecer_direitos",
+                texto: "Conceder anistia ampla e reformar os regulamentos disciplinares em favor dos praças",
+                descricao_resultado: "Ganha a lealdade eterna das bases militares, enfurecendo a cúpula dos generais.",
+                efeitos: [
+                    Modificador(id: "desobediencia_hierarquica_tropas", valor: 0.20),
+                    Modificador(id: "aprovacao_militares", valor: -30.0),
+                    Modificador(id: "aprovacao_trabalhadores_sindicalizados", valor: 20.0),
+                ],
+                ia_peso: 50,
+            ),
+            OpcaoEventoPolitico(
+                id: "sargentos_sufocar_motim_disciplina_ferrea",
+                texto: "Invadir as fortalezas rebeldes com os oficiais leais e aplicar o código de guerra",
+                descricao_resultado: "Restaura a hierarquia militar com execuções e prisões perpétuas para os amotinados.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.15),
+                    Modificador(id: "aprovacao_militares", valor: 25.0),
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.25),
+                ],
+                ia_peso: 50,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "militar_insubordinacao_guarnicao_regional",
+        titulo: "Insubordinação de Guarnição Regional Estratégica",
+        categoria: "conspiracao_militar",
+        descricao: "O comandante militar de uma província rica recusa-se a acatar ordens de transferência vindas da capital, proclamando sua base autônoma até que o presidente seja substituído.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 50.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "guarnicao_cercar_com_tropas_fieis",
+                texto: "Bloquear as estradas da província e forçar a rendição incondicional do general rebelde",
+                descricao_resultado: "Impõe a soberania central sem negociação com militares rebeldes.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "coesao_nacional_patriotismo", valor: 0.15),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "guarnicao_negociar_concessoes_regionais",
+                texto: "Nomear o militar comandante para um ministério e conceder autonomia provincial",
+                descricao_resultado: "Evita o combate civil ao custo de consagrar o coronelismo militar regional.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: -15.0),
+                    Modificador(id: "autoridade_estatal", valor: -0.15),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "militar_expansao_arbitraria_orcamento_defesa",
+        titulo: "Exigência de Salto Bélico e Corrida Armamentista",
+        categoria: "conspiracao_militar",
+        descricao: "Apontando manobras da superpotência rival na fronteira, os chefes de Estado-Maior exigem um salto de 50% nas verbas militares para aquisição de jatos supersônicos e tanques pesados.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "belico_aprovar_compras_estrategicas",
+                texto: "Aprovar os créditos suplementares e modernizar o arsenal das forças armadas",
+                descricao_resultado: "Eleva o poder dissuasório da nação, subtraindo verbas da educação e saúde pública.",
+                efeitos: [
+                    Modificador(id: "forca_defesa_nacional", valor: 0.25),
+                    Modificador(id: "aprovacao_militares", valor: 25.0),
+                    Modificador(id: "custo_manutencao_exercito", valor: 0.20),
+                    Modificador(id: "aprovacao_intelectuais", valor: -15.0),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "belico_rejeitar_priorizar_escolas",
+                texto: "Rejeitar os gastos e canalizar as verbas para escolas técnicas e hospitais",
+                descricao_resultado: "Prioriza as necessidades sociais, criando forte atrito nos clubes militares.",
+                efeitos: [
+                    Modificador(id: "taxa_alfabetizacao_anual", valor: 0.02),
+                    Modificador(id: "aprovacao_intelectuais", valor: 20.0),
+                    Modificador(id: "aprovacao_militares", valor: -25.0),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "militar_expurgo_oficiais_esquerdistas",
+        titulo: "Expurgo de Oficiais Nacionalistas e Constitucionalistas",
+        categoria: "conspiracao_militar",
+        descricao: "Uma ala ultraconservadora no comando do exército força a aposentadoria compulsória de coronéis que defendem reformas agrárias ou se opõem ao alinhamento servil aos EUA.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["estado_partido_unico"],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "expurgo_militar_vetar_manter_constitucionais",
+                texto: "Vetar as aposentadorias arbitrárias e proteger os oficiais legalistas",
+                descricao_resultado: "Garante o pluralismo nas Forças Armadas com oposição dos generais de linha dura.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "aprovacao_militares", valor: -20.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 15.0),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "expurgo_militar_homologar_depuracao",
+                texto: "Homologar as reformas para garantir que o exército permaneça politicamente coeso",
+                descricao_resultado: "Entrega as forças armadas integralmente à facção anticomunista militante.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.15),
+                    Modificador(id: "aprovacao_militares", valor: 20.0),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.20),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "militar_complo_apoiado_embaixada_estrangeira",
+        titulo: "Complô Militar Financiado por Embaixada Estrangeira",
+        categoria: "conspiracao_militar",
+        descricao: "Contrainteligência intercepta reuniões noturnas entre o embaixador de uma superpotência e generais golpistas em um clube militar, tramando desestabilização institucional.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 60.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "complo_expulsar_diplomata_denunciar_onu",
+                texto: "Declarar o embaixador 'persona non grata', expulsá-lo e levar as provas à ONU",
+                descricao_resultado: "Exalta o orgulho anti-imperialista e desarma a conspiração em curso.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.35),
+                    Modificador(id: "tensao_guerra_fria", valor: 0.20),
+                    Modificador(id: "aprovacao_movimento_anticolonial", valor: 30.0),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "complo_engavetar_para_evitar_represalias",
+                texto: "Fingir ignorar as reuniões para não arriscar sanções econômicas devastadoras",
+                descricao_resultado: "Evita o choque diplomático, permitindo que a conspiração continue nas sombras.",
+                efeitos: [
+                    Modificador(id: "risco_golpe_de_estado_militar", valor: 0.30),
+                    Modificador(id: "legitimidade_base", valor: -15.0),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    // ==========================================================================
+    // 7. EXPURGOS, VIGILÂNCIA E REPRESSÃO POLÍTICA (Eventos 49 a 56)
+    // ==========================================================================
+
+    EventoPolitico(
+        id: "repressao_grande_expurgo_partidario",
+        titulo: "Grande Depuração de Quadros no Partido Dirigente",
+        categoria: "repressao_vigilancia",
+        descricao: "A comissão central de controle lança uma campanha implacável contra 'desvios burgueses, revisionistas e oportunistas' dentro das fileiras do partido governante.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["estado_partido_unico"],
+            leis_proibidas: ["sufragio_universal"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "expurgo_expulsar_e_submeter_a_trabalho_corretivo",
+                texto: "Expulsar milhares de membros suspeitos e enviá-los para colônias agrícolas de reeducação",
+                descricao_resultado: "Assegura a disciplina monolítica do partido sob um clima de medo paralisante.",
+                efeitos: [
+                    Modificador(id: "conformidade_ideologica_total", valor: 0.30),
+                    Modificador(id: "autoridade_estatal", valor: 0.25),
+                    Modificador(id: "inovacao_tecnologica_fator", valor: -0.15),
+                    Modificador(id: "aprovacao_intelectuais", valor: -25.0),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "expurgo_restringir_a_critica_e_autocritica",
+                texto: "Limitar as punições a sessões de autocrítica oral sem cassações de funções",
+                descricao_resultado: "Mantém os quadros técnicos experientes em seus postos de planejamento.",
+                efeitos: [
+                    Modificador(id: "capacidade_institucional_governo", valor: 0.10),
+                    Modificador(id: "aprovacao_burocracia_estatal", valor: 15.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "repressao_caca_bruxas_funcionalismo",
+        titulo: "Comitê de Lealdade e a 'Caça às Bruxas'",
+        categoria: "repressao_vigilancia",
+        descricao: "Uma comissão parlamentar convoca diplomatas, atores e professores a prestar depoimentos juramentados para provar que nunca tiveram contato com organizações de esquerda.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["liberdades_restringidas"],
+            leis_proibidas: ["estado_partido_unico"],
+            legitimidade_maxima: 85.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "bruxas_expandir_listas_negras",
+                texto: "Endossar o comitê, demitir os acusados e criar listas negras no meio cultural",
+                descricao_resultado: "Extingue focos esquerdistas nas repartições públicas ao preço de sufocar a cultura.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.15),
+                    Modificador(id: "aprovacao_veteranos_guerra", valor: 20.0),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.35),
+                    Modificador(id: "velocidade_pesquisa", valor: -0.15),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "bruxas_extinguir_comissao_inquisitorial",
+                texto: "Censurar as práticas inquisitoriais e restabelecer o direito à liberdade de opinião",
+                descricao_resultado: "Restaura o prestígio da democracia perante a comunidade intelectual do mundo.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 25.0),
+                    Modificador(id: "aprovacao_veteranos_guerra", valor: -15.0),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "repressao_processo_espetaculo_televisionado",
+        titulo: "Processo-Espetáculo contra 'Sabotadores Econômicos'",
+        categoria: "repressao_vigilancia",
+        descricao: "Antigos diretores industriais e generais comparecem ao tribunal estatal televisionado para confessar publicamente crimes de sabotagem e conluio com os imperialistas.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["legalidade_socialista"],
+            leis_proibidas: ["imprensa_livre"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "espetaculo_condenar_com_pena_capital",
+                texto: "Sentenciar sumariamente os réus e transmitir as confissões em todos os canais",
+                descricao_resultado: "Atribui as falhas do plano quinquenal aos bodes expiatórios traidores.",
+                efeitos: [
+                    Modificador(id: "disciplina_produtiva_estatal", valor: 0.20),
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "legitimidade_internacional", valor: -25.0),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "espetaculo_converter_em_julgamento_tecnico",
+                texto: "Transferir o caso para auditoria técnica sem exibição teatral de confissões",
+                descricao_resultado: "Evita o constrangimento diplomático internacional diante da farsa judicial.",
+                efeitos: [
+                    Modificador(id: "capacidade_institucional_governo", valor: 0.10),
+                    Modificador(id: "aprovacao_intelectuais", valor: 10.0),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "repressao_julgamento_sumarissimo_traicao",
+        titulo: "Tribunal de Exceção contra Conspiradores",
+        categoria: "repressao_vigilancia",
+        descricao: "Acusados de conspirar contra a segurança da pátria são encaminhados a tribunais militares sumários sem direito a advogados de defesa ou recursos superiores.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["supressao_total_direitos"],
+            leis_proibidas: ["garantias_constitucionais_amplas"],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "sumarissimo_executar_sem_demora",
+                texto: "Executar as penas capitais ao amanhecer para aterrorizar qualquer nova insurreição",
+                descricao_resultado: "Esmaga a conspiração no berço através da intimidação draconiana máxima.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.30),
+                    Modificador(id: "radicalismo_geral", valor: 0.30),
+                    Modificador(id: "legitimidade_internacional", valor: -30.0),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "sumarissimo_comutar_para_prisao_perpetua",
+                texto: "Comutar as sentenças em prisão perpétua em fortaleza isolada",
+                descricao_resultado: "Neutraliza os inimigos sem criar mártires de execução pública.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 10.0),
+                    Modificador(id: "aprovacao_clero", valor: 15.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "repressao_infiltracao_policial_universidades",
+        titulo: "Agentes Infiltrados nos Diretórios Estudantis",
+        categoria: "repressao_vigilancia",
+        descricao: "Estudantes descobrem gravadores e fichas policiais pertencentes a um colega de sala, revelando que a polícia política infiltrou informantes em todas as assembleias universitárias.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["policia_secreta_vigilancia"],
+            leis_proibidas: [],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "infiltracao_manter_vigilancia_campus",
+                texto: "Defender a vigilância preventiva contra a propagação de ideologias terroristas",
+                descricao_resultado: "Mantém os grampos e a espionagem nos centros acadêmicos.",
+                efeitos: [
+                    Modificador(id: "agitacao_estudantil_protestos", valor: 0.35),
+                    Modificador(id: "aprovacao_intelectuais", valor: -25.0),
+                    Modificador(id: "autoridade_estatal", valor: 0.10),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "infiltracao_proibir_policia_na_universidade",
+                texto: "Consagrar a autonomia universitária e proibir a atuação policial nos campi",
+                descricao_resultado: "Conquista os estudantes e encerra o clima de suspeição generalizada nas salas de aula.",
+                efeitos: [
+                    Modificador(id: "aprovacao_intelectuais", valor: 30.0),
+                    Modificador(id: "agitacao_estudantil_protestos", valor: -0.20),
+                    Modificador(id: "autoridade_estatal", valor: -0.10),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "repressao_demissao_professores_subversivos",
+        titulo: "Censura Ideológica e Demissão de Catedráticos",
+        categoria: "repressao_vigilancia",
+        descricao: "Ministério da Educação cassa as cátedras de renomados professores de sociologia e física quântica por ensinarem teorias tidas como contrárias à moral oficial do Estado.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["censura_editorial_seguranca"],
+            leis_proibidas: ["imprensa_livre"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "professores_confirmar_demissoes_lealdade",
+                texto: "Exigir juramento de conformidade doutrinária para todos os docentes em exercício",
+                descricao_resultado: "Assegura fidelidade ideológica nas salas de aula ao custo de grave fuga de cérebros.",
+                efeitos: [
+                    Modificador(id: "fuga_de_cerebros_imigracao", valor: 0.35),
+                    Modificador(id: "velocidade_pesquisa", valor: -0.25),
+                    Modificador(id: "aprovacao_intelectuais", valor: -30.0),
+                ],
+                ia_peso: 55,
+            ),
+            OpcaoEventoPolitico(
+                id: "professores_readmitir_garantir_pesquisa",
+                texto: "Readmitir os cientistas nos laboratórios sob compromisso de foco estrito na técnica",
+                descricao_resultado: "Salva os programas de pesquisa aplicada e desenvolvimento tecnológico da nação.",
+                efeitos: [
+                    Modificador(id: "velocidade_pesquisa", valor: 0.15),
+                    Modificador(id: "aprovacao_intelectuais", valor: 20.0),
+                ],
+                ia_peso: 45,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "repressao_dossies_comprometedores_policia_secreta",
+        titulo: "Dossiês de Chantagem contra a Oposição Parlamentar",
+        categoria: "repressao_vigilancia",
+        descricao: "A polícia secreta apresenta ao presidente pastas com filmagens e documentos comprometedores de líderes opositores, sugerindo seu uso para liquidar suas carreiras públicas.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["policia_secreta_vigilancia"],
+            leis_proibidas: [],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "dossies_vazar_imprensa_destruir_oposicao",
+                texto: "Vazar seletivamente o material na imprensa chapa-branca para destruir os rivais",
+                descricao_resultado: "Desmoraliza a liderança da oposição com métodos de guerra suja.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: -10.0),
+                    Modificador(id: "tempo_passagem_leis", valor: -0.15),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.20),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "dossies_queimar_proibir_chantagem",
+                texto: "Destruir os dossiês e punir os agentes por produzir material ilegal contra deputados",
+                descricao_resultado: "Demonstra postura honrada e respeito às regras da convivência democrática.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "repressao_campos_reeducacao_dissidentes",
+        titulo: "Inspeção aos Campos de Trabalho e Reeducação",
+        categoria: "repressao_vigilancia",
+        descricao: "Relatórios de saúde alertam para taxas alarmantes de mortalidade e desnutrição nos campos de trabalho remoto onde dissidentes políticos cumprem penas de reeducação forçada.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["trabalho_forcado_ou_servil"],
+            leis_proibidas: [],
+            legitimidade_maxima: 60.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "campos_melhorar_racoes_reduzir_trabalho",
+                texto: "Elevar as rações alimentares e abolir a jornada desumana nos canteiros da taiga",
+                descricao_resultado: "Evita escândalo humanitário global e recupera mão de obra técnica prisioneira.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional", valor: 15.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                    Modificador(id: "custo_construcao_estatal", valor: 0.10),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "campos_intensificar_extracao_sem_piegas",
+                texto: "Exigir o cumprimento integral das metas de extração mineral a qualquer custo",
+                descricao_resultado: "Maximiza a produção de ouro e urânio com métodos de trabalho escravo implacáveis.",
+                efeitos: [
+                    Modificador(id: "apropriacao_excedente_estatal", valor: 0.20),
+                    Modificador(id: "radicalismo_geral", valor: 0.25),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    // ==========================================================================
+    // 8. DEGELO, ANISTIA E DISSIDÊNCIA INTELECTUAL (Eventos 57 a 64)
+    // ==========================================================================
+
+    EventoPolitico(
+        id: "degelo_manifesto_intelectuais_samizdat",
+        titulo: "Circulação Clandestina de Samizdat e Protesto Intelectual",
+        categoria: "dissidencia_intelectual",
+        descricao: "Cópias mimeografadas de ensaios e poesias proibidas circulam de mão em mão nas capitais, criticando o conformismo burocrático e exigindo liberdade de expressão artística.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["monopolio_estatal_imprensa"],
+            leis_proibidas: ["imprensa_livre"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "samizdat_tolerar_abertura_literaria",
+                texto: "Tolerar a circulação em pequena escala e permitir revistas literárias mais ousadas",
+                descricao_resultado: "Inaugura a primavera das letras e atrai a simpatia dos poetas e filósofos.",
+                efeitos: [
+                    Modificador(id: "aprovacao_intelectuais", valor: 25.0),
+                    Modificador(id: "conformidade_ideologica_total", valor: -0.20),
+                    Modificador(id: "tensao_guerra_fria", valor: -0.10),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "samizdat_apreender_mimeografos_processar",
+                texto: "Apreender os mimeógrafos e enviar os impressores clandestinos a julgamento",
+                descricao_resultado: "Reafirma a censura estrita, empurrando os dissidentes para apelos ao Ocidente.",
+                efeitos: [
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.30),
+                    Modificador(id: "legitimidade_internacional", valor: -15.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "degelo_anistia_ampla_presos_politicos",
+        titulo: "Lei de Anistia Geral e Irrestrita",
+        categoria: "dissidencia_intelectual",
+        descricao: "Movimentos cívicos e mães de presos lotam as praças clamando por anistia aos perseguidos pelas leis de segurança, libertação de exilados e anulação de sentenças políticas.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 65.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "anistia_promulgar_ampla_geral",
+                texto: "Aprovar a anistia plena, libertar prisioneiros e acolher os exilados que regressam",
+                descricao_resultado: "Sela a pacificação nacional e reconstrói as bases de uma sociedade aberta.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 25.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 30.0),
+                    Modificador(id: "aprovacao_militares", valor: -20.0),
+                    Modificador(id: "fuga_de_cerebros_imigracao", valor: -0.25),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "anistia_restringir_a_penas_leves",
+                texto: "Conceder perdão apenas a infrações menores, mantendo os líderes opositores encarcerados",
+                descricao_resultado: "Descontenta tanto a base militar intransigente quanto as famílias das vítimas.",
+                efeitos: [
+                    Modificador(id: "radicalismo_geral", valor: 0.15),
+                    Modificador(id: "legitimidade_base", valor: -5.0),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "degelo_afrouxamento_censura_imprensa",
+        titulo: "Fim da Censura Prévia nas Redações",
+        categoria: "dissidencia_intelectual",
+        descricao: "Editores de grandes periódicos recusam-se a submeter provas de páginas aos censores de gabinete, desafiando a lei de censura com espaços em branco e receitas de bolo nas manchetes.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["censura_editorial_seguranca"],
+            leis_proibidas: ["imprensa_livre"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "censura_abolir_previa_consagrar_liberdade",
+                texto: "Abolir formalmente a censura prévia e consagrar a liberdade editorial da imprensa",
+                descricao_resultado: "Floresce o debate público desimpedido e o jornalismo de investigação independente.",
+                efeitos: [
+                    Modificador(id: "garantias_constitucionais_amplas", valor: 0.20),
+                    Modificador(id: "aprovacao_intelectuais", valor: 30.0),
+                    Modificador(id: "autoridade_estatal", valor: -0.15),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "censura_empastelar_jornais_rebeldes",
+                texto: "Mandar a polícia empastelar as gráficas rebeldes e suspender a circulação",
+                descricao_resultado: "Impõe o silêncio perante o clamor popular, desgastando a reputação do regime.",
+                efeitos: [
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.35),
+                    Modificador(id: "legitimidade_internacional", valor: -20.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "degelo_reabilitacao_postuma_expurgados",
+        titulo: "Reabilitação Solene de Vítimas de Julgamentos Passados",
+        categoria: "dissidencia_intelectual",
+        descricao: "Tribunal Supremo analisa processos de antigos heróis da revolução fuzilados ou aprisionados em décadas anteriores, declarando que todas as acusações de traição foram forjadas sob tortura.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "reabilitacao_restituir_honra_publica",
+                texto: "Restituir a honra dos mártires, erguer monumentos memoriais e indenizar suas famílias",
+                descricao_resultado: "Cura feridas históricas profundas e restaura a dignidade moral do Estado.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 20.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 25.0),
+                    Modificador(id: "aprovacao_nomenklatura_partidaria", valor: -15.0),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "reabilitacao_manter_silencio_historico",
+                texto: "Arquivar o relatório e proibir reaberturas que dividam o partido e o povo",
+                descricao_resultado: "Evita rever o passado incômodo ao preço de perpetuar a infâmia oficial.",
+                efeitos: [
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.20),
+                    Modificador(id: "conformidade_ideologica_total", valor: 0.15),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "degelo_asilo_cientista_renomado_exterior",
+        titulo: "Deserção e Pedido de Asilo de Físico Nuclear",
+        categoria: "dissidencia_intelectual",
+        descricao: "Durante um congresso em Genebra, o cientista mais condecorado do programa atômico nacional solicita asilo diplomático, acusando o regime de militarismo cego e opressão policial.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["imprensa_livre"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "asilo_propor_anistia_retorno_sem_punicao",
+                texto: "Oferecer anistia e liderança do instituto civil de energia se o cientista retornar",
+                descricao_resultado: "Tenta resgatar o gênio científico com diálogo conciliador respeitoso.",
+                efeitos: [
+                    Modificador(id: "velocidade_pesquisa", valor: 0.10),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                ],
+                ia_peso: 40,
+            ),
+            OpcaoEventoPolitico(
+                id: "asilo_denunciar_traicao_cancelar_honrarias",
+                texto: "Denunciar o acadêmico como traidor vendido ao imperialismo e confiscar seus bens",
+                descricao_resultado: "Demonstra intransigência moral ao custo de humilhação perante a comunidade acadêmica mundial.",
+                efeitos: [
+                    Modificador(id: "fuga_de_cerebros_imigracao", valor: 0.30),
+                    Modificador(id: "legitimidade_internacional", valor: -20.0),
+                    Modificador(id: "autoridade_estatal", valor: 0.10),
+                ],
+                ia_peso: 60,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "degelo_protesto_silencioso_praca_central",
+        titulo: "Protesto Silencioso com Velas na Praça Central",
+        categoria: "dissidencia_intelectual",
+        descricao: "Mães, viúvas e estudantes reúnem-se silenciosamente ao anoitecer com velas acesas em torno do memorial aos mortos pela repressão, sem empunhar cartazes nem palavras de ordem.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "velas_proibir_dispersao_acolher_dor",
+                texto: "Proibir qualquer interferência policial e enviar representantes para dialogar",
+                descricao_resultado: "Desperta respeito cívico e desarma qualquer pretexto para explosão de revolta.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 20.0),
+                    Modificador(id: "paz_social_conformidade", valor: 0.15),
+                    Modificador(id: "aprovacao_clero", valor: 15.0),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "velas_dispersar_jatos_de_agua",
+                texto: "Dispersar a multidão com caminhões de jato d'água sob pretexto de reunião ilegal",
+                descricao_resultado: "Provoca indignação profunda entre os cidadãos com imagens revoltantes de idosas feridas.",
+                efeitos: [
+                    Modificador(id: "radicalismo_geral", valor: 0.35),
+                    Modificador(id: "legitimidade_base", valor: -25.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "degelo_publicacao_obra_literaria_proibida",
+        titulo: "Autorização para Publicação de Romance Crítico",
+        categoria: "dissidencia_intelectual",
+        descricao: "Um consagrado romancista entrega ao comitê de censura um livro autobiográfico sobre o sofrimento humano nas prisões do interior, solicitando autorização para publicação nacional.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["imprensa_livre"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "romance_autorizar_impressao_em_massa",
+                texto: "Autorizar a publicação oficial em tiragem de quinhentos mil exemplares",
+                descricao_resultado: "Cria um marco histórico de catarse e honestidade cultural nacional.",
+                efeitos: [
+                    Modificador(id: "aprovacao_intelectuais", valor: 35.0),
+                    Modificador(id: "legitimidade_internacional", valor: 25.0),
+                    Modificador(id: "conformidade_ideologica_total", valor: -0.25),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "romance_vetar_manuscrito_admoestar_autor",
+                texto: "Vetar o livro e ameaçar o autor com expulsão do Sindicato dos Escritores",
+                descricao_resultado: "O manuscrito vaza para editoras ocidentais e ganha o Prêmio Nobel no exterior.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional", valor: -20.0),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.20),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "degelo_comite_defesa_direitos_humanos",
+        titulo: "Fundação de Comitê Cívico de Direitos Humanos",
+        categoria: "dissidencia_intelectual",
+        descricao: "Cientistas, advogados e sacerdotes fundam uma associação cívica independente para monitorar o cumprimento dos tratados internacionais de direitos humanos ratificados pelo país.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["supressao_total_direitos"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "comite_reconhecer_interlocutor_legitimo",
+                texto: "Reconhecer formalmente a entidade e abrir canais de diálogo com o ministério",
+                descricao_resultado: "Institucionaliza a defesa dos direitos individuais sem hostilidade estatal.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional_onu", valor: 0.30),
+                    Modificador(id: "aprovacao_intelectuais", valor: 25.0),
+                    Modificador(id: "autoridade_estatal", valor: -0.10),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "comite_declarar_organizacao_subversiva",
+                texto: "Declarar a entidade fachada subversiva do imperialismo e confiscar seus arquivos",
+                descricao_resultado: "Criminaliza os ativistas cívicos sob denúncia unânime das cortes internacionais.",
+                efeitos: [
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.35),
+                    Modificador(id: "legitimidade_internacional", valor: -30.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    // ==========================================================================
+    // 9. CISÕES PARTIDÁRIAS E CONFLITOS IDEOLÓGICOS (Eventos 65 a 72)
+    // ==========================================================================
+
+    EventoPolitico(
+        id: "partido_racha_moderados_e_radicais",
+        titulo: "Racha Fratricida entre Moderados e Radicais",
+        categoria: "cisao_partidaria",
+        descricao: "A convenção nacional do partido governista explode em confronto aberto entre a ala pragmática que prega conciliação e os jovens radicais que exigem avanços revolucionários.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 70.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "racha_arbitrar_equidistante_pacto",
+                texto: "Arbitrar um manifesto de compromisso mantendo as duas alas na executiva",
+                descricao_resultado: "Preserva a integridade da legenda partidária com acomodação difícil.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 10.0),
+                    Modificador(id: "tempo_passagem_leis", valor: 0.10),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "racha_apoiar_radicalizacao_doutrinaria",
+                texto: "Endossar os radicais e purgar os conciliadores mornos da comissão diretora",
+                descricao_resultado: "Acelera o ímpeto militante ao preço da cisão e perda do eleitorado moderado.",
+                efeitos: [
+                    Modificador(id: "mobilizacao_revolucionaria_maxima", valor: 0.25),
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: -20.0),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "partido_bancada_dissidente_independente",
+        titulo: "Formação de Bancada Parlamentar Dissidente",
+        categoria: "cisao_partidaria",
+        descricao: "Vinte deputados da situação rompem com a disciplina partidária e anunciam a criação de uma bancada independente no parlamento, passando a votar contra as medidas do executivo.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["republica_parlamentarista"],
+            leis_proibidas: ["estado_partido_unico"],
+            legitimidade_maxima: 60.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "bancada_abrir_negociacoes_emendas",
+                texto: "Negociar emendas e rever o ritmo das reformas para reatar com os dissidentes",
+                descricao_resultado: "Reconstrói a maioria parlamentar através de cedências orçamentárias.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 10.0),
+                    Modificador(id: "tempo_passagem_leis", valor: 0.15),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "bancada_expulsar_cassar_mandatos",
+                texto: "Expulsar sumariamente os infiéis e tentar cassar seus mandatos por traição",
+                descricao_resultado: "Abre guerra jurídica parlamentar e consolida a oposição independente.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: -0.15),
+                    Modificador(id: "tempo_passagem_leis", valor: 0.30),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "partido_ala_jovem_rebelia_geracional",
+        titulo: "Rebelião da Juventude Partidária contra a Gerontocracia",
+        categoria: "cisao_partidaria",
+        descricao: "As juventudes partidárias ocupam a sede do diretório contra a hegemonia dos velhos apparatchiks de mais de setenta anos, exigindo renovação nas listas eleitorais e cotas para jovens.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "jovens_abrir_espaco_listas_eleitorais",
+                texto: "Garantir 40% das vagas na executiva e nas chapas para líderes jovens",
+                descricao_resultado: "Injeta dinamismo e modernidade na sigla, entusiasmando as universidades.",
+                efeitos: [
+                    Modificador(id: "aprovacao_intelectuais", valor: 20.0),
+                    Modificador(id: "inovacao_tecnologica_fator", valor: 0.10),
+                    Modificador(id: "aprovacao_burocracia_estatal", valor: -15.0),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "jovens_dissolver_juventude_partidaria",
+                texto: "Dissolver o diretório jovem e punir os rebeldes por indisciplina infantil",
+                descricao_resultado: "Preserva os privilégios dos velhos caciques, afastando as novas gerações.",
+                efeitos: [
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.25),
+                    Modificador(id: "capacidade_institucional_governo", valor: -0.10),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "partido_expulsao_faccao_derrotada",
+        titulo: "Expulsão em Massa da Facção Minoritária",
+        categoria: "cisao_partidaria",
+        descricao: "Após votação tensa na conferência, a facção vitoriosa aprova a exclusão definitiva de todos os integrantes da corrente derrotada, acusando-os de sabotagem interna.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 65.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "expulsao_partido_manter_unidade_monolitica",
+                texto: "Consolidar a unidade monolítica e purgar os derrotados dos cargos executivos",
+                descricao_resultado: "Garante homogeneidade doutrinária ao preço de empobrecer os debates.",
+                efeitos: [
+                    Modificador(id: "disciplina_produtiva_estatal", valor: 0.15),
+                    Modificador(id: "legitimidade_base", valor: -10.0),
+                ],
+                ia_peso: 50,
+            ),
+            OpcaoEventoPolitico(
+                id: "expulsao_partido_autorizar_tendencias_internas",
+                texto: "Vetar a expulsão e regulamentar o direito de existência de tendências internas",
+                descricao_resultado: "Transforma o partido em uma federação democrática de correntes plurais.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                    Modificador(id: "tempo_passagem_leis", valor: 0.15),
+                ],
+                ia_peso: 50,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "partido_unificacao_frente_ampla_esquerda",
+        titulo: "Formação da Frente Popular e Unidade das Esquerdas",
+        categoria: "cisao_partidaria",
+        descricao: "Partidos socialistas, comunistas, sindicalistas e ambientalistas assinam um histórico Programa Comum de Governo para disputar as eleições com candidatura presidencial unitária.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["sufragio_universal"],
+            leis_proibidas: ["estado_partido_unico", "sem_eleicoes"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "frente_ampla_apoiar_programa_unitario",
+                texto: "Celebrar a Frente Popular e mobilizar as bases operárias para a campanha",
+                descricao_resultado: "Cria uma onda massiva de esperança popular entre trabalhadores e estudantes.",
+                efeitos: [
+                    Modificador(id: "mobilizacao_revolucionaria_maxima", valor: 0.30),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: 30.0),
+                    Modificador(id: "aprovacao_industriais", valor: -30.0),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "frente_ampla_rejeitar_hegemonia_comunista",
+                texto: "Romper a frente alegando que a hegemonia comunista assusta a classe média",
+                descricao_resultado: "Divide o campo progressista, facilitando a vitória eleitoral dos conservadores.",
+                efeitos: [
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: 15.0),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -20.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "partido_alianca_centro_direita_pragmatica",
+        titulo: "Pacto de Centro-Direita e Estabilidade Institucional",
+        categoria: "cisao_partidaria",
+        descricao: "Lideranças liberais, conservadoras e democratas-cristãs reúnem-se para formar uma sólida coalizão de ordem contra o que qualificam de 'aventuras coletivistas e desordem social'.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["sufragio_universal"],
+            leis_proibidas: ["estado_partido_unico"],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "alianca_centro_promulgar_acordo_estabilidade",
+                texto: "Assinar o pacto de governabilidade e garantir a maioria moderada no congresso",
+                descricao_resultado: "Garante estabilidade política duradoura e tranquiliza os mercados financeiros.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 20.0),
+                    Modificador(id: "investimento_privado_fator", valor: 0.15),
+                    Modificador(id: "aprovacao_sindicatos_operarios", valor: -15.0),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "alianca_centro_recusar_coligacao_com_reacionarios",
+                texto: "Recusar a aliança com os setores mais atrasados para manter a identidade liberal",
+                descricao_resultado: "Preserva a postura de independência de centro, mantendo o parlamento fragmentado.",
+                efeitos: [
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                    Modificador(id: "tempo_passagem_leis", valor: 0.15),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "partido_fusao_siglas_eleitorais",
+        titulo: "Fusão de Partidos e Nova Sigla Partidária",
+        categoria: "cisao_partidaria",
+        descricao: "Pequenos partidos de centro e da pequena burguesia resolvem fundir suas estruturas sob uma única agremiação de massa para superar a cláusula de barreira eleitoral.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["sufragio_universal"],
+            leis_proibidas: ["estado_partido_unico"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "fusao_aprovar_registro_nova_legenda",
+                texto: "Homologar o novo partido e acomodar sua representação nas comissões temáticas",
+                descricao_resultado: "Reduz a fragmentação partidária no parlamento e simplifica as votações.",
+                efeitos: [
+                    Modificador(id: "tempo_passagem_leis", valor: -0.15),
+                    Modificador(id: "capacidade_institucional_governo", valor: 0.10),
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: 15.0),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "fusao_dificultar_registro_pelo_tribunal",
+                texto: "Usar manobras cartoriais no tribunal eleitoral para retardar o registro",
+                descricao_resultado: "Prejudica os novos concorrentes ao custo de suspeição sobre a justiça eleitoral.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: -10.0),
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: -20.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "partido_desercao_massa_filiados_oposicao",
+        titulo: "Deserção em Massa de Filiados para a Oposição",
+        categoria: "cisao_partidaria",
+        descricao: "Desiludidos com sucessivos escândalos e quebra de promessas de campanha, prefeitos, vereadores e milhares de militantes rasgam suas carteirinhas e filiam-se ao partido oposicionista.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["sufragio_universal"],
+            leis_proibidas: ["estado_partido_unico"],
+            legitimidade_maxima: 40.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "desercao_convocar_congresso_emergencia",
+                texto: "Convocar congresso partidário extraordinário e mudar toda a direção nacional",
+                descricao_resultado: "Inicia dolorosa autocrítica pública para tentar estancar o colapso eleitoral.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 10.0),
+                    Modificador(id: "autoridade_estatal", valor: -0.10),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "desercao_atacar_desertores_como_oportunistas",
+                texto: "Publicar manifesto chamando os dissidentes de traidores oportunistas",
+                descricao_resultado: "Isola ainda mais o núcleo leal, enquanto a debandada se generaliza pelo país.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: -20.0),
+                    Modificador(id: "radicalismo_geral", valor: 0.15),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+
+    // ==========================================================================
+    // 10. RADICALISMO SOCIAL, TUMULTOS E MOVIMENTOS CÍVICOS (Eventos 73 a 80)
+    // ==========================================================================
+
+    EventoPolitico(
+        id: "social_marcha_direitos_civis_igualdade",
+        titulo: "Marcha Histórica pelos Direitos Civis e Fim da Segregação",
+        categoria: "movimento_social",
+        descricao: "Centenas de milhares de cidadãos marcham pacificamente até a esplanada dos ministérios exigindo o fim irrestrito da segregação racial, das discriminações de voto e a igualdade plena perante a lei.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["segregacao_apartheid"],
+            leis_proibidas: [],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "direitos_promulgar_lei_igualdade_racial",
+                texto: "Promulgar a Lei de Direitos Civis e punir com cadeia a discriminação racial",
+                descricao_resultado: "Abole séculos de opróbrio e segregação, conquistando o respeito da humanidade.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.40),
+                    Modificador(id: "atracao_imigracao", valor: 0.30),
+                    Modificador(id: "aprovacao_intelectuais", valor: 30.0),
+                    Modificador(id: "aprovacao_latifundiarios", valor: -40.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEventoPolitico(
+                id: "direitos_usar_tropas_manter_segregacao",
+                texto: "Acionar os canhões de água e a guarda nacional para dispersar a marcha",
+                descricao_resultado: "Choca o mundo com imagens de repressão brutal, incendiando as cidades com motins raciais.",
+                efeitos: [
+                    Modificador(id: "radicalismo_grupos_discriminados", valor: 0.60),
+                    Modificador(id: "legitimidade_internacional", valor: -40.0),
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "social_revolta_carestia_precos_alimentos",
+        titulo: "Revolta Popular contra a Carestia e o Custo de Vida",
+        categoria: "movimento_social",
+        descricao: "A disparada nos preços do pão, arroz e botijões de gás deflagra saques a armazéns e panelaços estrondosos nas periferias das grandes cidades. Multidões enfurecidas tomam os centros comerciais.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 50.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "carestia_distribuir_cestas_tabelar_basicos",
+                texto: "Distribuir cestas básicas estatais de emergência e subsidiar os alimentos populares",
+                descricao_resultado: "Acalma os lares famintos imediatamente com recursos do tesouro nacional.",
+                efeitos: [
+                    Modificador(id: "paz_social_conformidade", valor: 0.20),
+                    Modificador(id: "aprovacao_camponeses", valor: 15.0),
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: -0.15),
+                ],
+                ia_peso: 70,
+            ),
+            OpcaoEventoPolitico(
+                id: "carestia_reprimir_saques_toque_recolher",
+                texto: "Decretar toque de recolher e atirar em flagrantes de saque a comércios",
+                descricao_resultado: "Protege os estabelecimentos burgueses, deixando um rastro de sangue e ódio nas favelas.",
+                efeitos: [
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.40),
+                    Modificador(id: "autoridade_estatal", valor: 0.20),
+                    Modificador(id: "legitimidade_base", valor: -20.0),
+                ],
+                ia_peso: 30,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "social_choque_estudantes_tropa_de_choque",
+        titulo: "Confronto Sangrento entre Estudantes e Cavalaria",
+        categoria: "movimento_social",
+        descricao: "Manifestação pacífica contra o aumento das tarifas de ônibus é recebida com bombas de efeito moral e cavalaria na avenida principal, transformando o centro num campo de batalha urbano.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 65.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "choque_congelar_tarifas_punir_excesso",
+                texto: "Congelar as passagens de transporte e afastar os policiais que cometeram excessos",
+                descricao_resultado: "Restitui a serenidade às ruas e atende à justa queixa da juventude trabalhadora.",
+                efeitos: [
+                    Modificador(id: "aprovacao_intelectuais", valor: 20.0),
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "arrecadacao_tributaria_comercial", valor: -0.05),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "choque_culpar_vandalismo_endossar_tropa",
+                texto: "Qualificar o protesto como vandalismo premeditado e elogiar a firmeza dos agentes",
+                descricao_resultado: "Ganha apoio da pequena burguesia alarmada, alienando a totalidade dos universitários.",
+                efeitos: [
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: 15.0),
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.35),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "social_mobilizacao_sufragio_feminino_pleno",
+        titulo: "Mobilização Nacional pelo Sufrágio Feminino Irrestrito",
+        categoria: "movimento_social",
+        descricao: "Movimentos de mulheres operárias e intelectuais reúnem milhões de assinaturas e realizam piquetes diante do palácio do governo exigindo igualdade de voto e equiparação salarial.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: ["sufragio_masculino"],
+            leis_proibidas: ["sufragio_universal"],
+            legitimidade_maxima: 80.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "mulheres_promulgar_sufragio_universal",
+                texto: "Enviar emenda constitucional instituindo o sufrágio universal pleno para homens e mulheres",
+                descricao_resultado: "Duplica o eleitorado ativo da nação e consagra um avanço civilizatório monumental.",
+                efeitos: [
+                    Modificador(id: "legitimidade_soberania_popular", valor: 0.35),
+                    Modificador(id: "legitimidade_base", valor: 25.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 25.0),
+                ],
+                ia_peso: 85,
+            ),
+            OpcaoEventoPolitico(
+                id: "mulheres_adiar_para_comissao_futura",
+                texto: "Adiar a tramitação para uma comissão de juristas e manter o sufrágio masculino",
+                descricao_resultado: "Causa indignação generalizada entre as trabalhadoras que mantêm as fábricas operando.",
+                efeitos: [
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.25),
+                    Modificador(id: "legitimidade_base", valor: -15.0),
+                ],
+                ia_peso: 15,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "social_protesto_anti_intervencao_imperial",
+        titulo: "Manifestações Massivas contra Guerra Imperialista",
+        categoria: "movimento_social",
+        descricao: "Milhares de jovens recusam a conscrição militar e queimam convocações militares diante das embaixadas em protesto contra a intervenção militar externa do país além-mar.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 60.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "guerra_anunciar_retirada_gradual",
+                texto: "Anunciar a retirada progressiva das tropas e cessar os bombardeios externos",
+                descricao_resultado: "Desarma o movimento de desobediência civil e cura a fratura moral da nação.",
+                efeitos: [
+                    Modificador(id: "tensao_guerra_fria", valor: -0.25),
+                    Modificador(id: "aprovacao_intelectuais", valor: 30.0),
+                    Modificador(id: "aprovacao_militares", valor: -25.0),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "guerra_prender_desertores_intensificar",
+                texto: "Prender os ativistas anti-guerra e intensificar o recrutamento compulsório",
+                descricao_resultado: "Alimenta os contingentes do front ao preço de paralisar as universidades do país.",
+                efeitos: [
+                    Modificador(id: "radicalismo_intelectuais", valor: 0.40),
+                    Modificador(id: "legitimidade_base", valor: -25.0),
+                    Modificador(id: "forca_militares", valor: 0.15),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "social_boicote_empresas_discriminatorias",
+        titulo: "Campanha Nacional de Boicote a Empresas Segregacionistas",
+        categoria: "movimento_social",
+        descricao: "Cidadãos organizam boicote sistemático a linhas de ônibus e cadeias de lanchonetes que mantêm balcões separados ou recusam atendimento a minorias discriminadas.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 75.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "boicote_cassar_alvaras_discriminadores",
+                texto: "Cassar o alvará de funcionamento de estabelecimentos que mantenham segregação",
+                descricao_resultado: "Dobra os comerciantes racistas e consolida a vitória do movimento cívico.",
+                efeitos: [
+                    Modificador(id: "garantias_constitucionais_amplas", valor: 0.20),
+                    Modificador(id: "aprovacao_intelectuais", valor: 20.0),
+                    Modificador(id: "aprovacao_pequena_burguesia", valor: -15.0),
+                ],
+                ia_peso: 80,
+            ),
+            OpcaoEventoPolitico(
+                id: "boicote_proibir_piquetes_de_consumidores",
+                texto: "Declarar os piquetes de boicote violação da liberdade comercial e dispersá-los",
+                descricao_resultado: "Protege o faturamento dos empresários retrógrados com denúncias de cumplicidade.",
+                efeitos: [
+                    Modificador(id: "radicalismo_grupos_discriminados", valor: 0.35),
+                    Modificador(id: "legitimidade_base", valor: -15.0),
+                ],
+                ia_peso: 20,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "social_motim_penitenciario_direitos",
+        titulo: "Revolta e Motim em Presídios Superlotados",
+        categoria: "movimento_social",
+        descricao: "Presos amotinam-se no maior complexo prisional da nação, fazendo reféns e denunciando torturas sistemáticas, superlotação desumana e falta de assistência médica.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: [],
+            legitimidade_maxima: 65.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "motim_negociar_com_mediacao_cruz_vermelha",
+                texto: "Aceitar a mediação da OAB e da Cruz Vermelha e reformar o sistema penal",
+                descricao_resultado: "Liberta os reféns ilesos e inicia a modernização do sistema penitenciário.",
+                efeitos: [
+                    Modificador(id: "legitimidade_base", valor: 15.0),
+                    Modificador(id: "aprovacao_intelectuais", valor: 15.0),
+                    Modificador(id: "custo_construcao_estatal", valor: 0.05),
+                ],
+                ia_peso: 75,
+            ),
+            OpcaoEventoPolitico(
+                id: "motim_invasao_sangrenta_tropa_choque",
+                texto: "Ordenar a invasão tática pelas tropas de choque sem concessões a prisioneiros",
+                descricao_resultado: "Retoma a cadeia em banho de sangue catastrófico que choca a opinião pública mundial.",
+                efeitos: [
+                    Modificador(id: "legitimidade_internacional", valor: -25.0),
+                    Modificador(id: "radicalismo_geral", valor: 0.25),
+                    Modificador(id: "autoridade_estatal", valor: 0.15),
+                ],
+                ia_peso: 25,
+            ),
+        ],
+    ),
+
+    EventoPolitico(
+        id: "social_paramilitares_autodefesa_comunitaria",
+        titulo: "Formação de Grupos de Autodefesa Comunitária Armada",
+        categoria: "movimento_social",
+        descricao: "Abandonadas pela polícia local e assediadas pelo crime e por milícias ruralistas, comunidades periféricas organizam brigadas populares de autodefesa com rondas armadas.",
+        condicoes: CondicoesEvento(
+            leis_obrigatorias: [],
+            leis_proibidas: ["milicia_popular_comunitaria"],
+            legitimidade_maxima: 60.0,
+        ),
+        opcoes: [
+            OpcaoEventoPolitico(
+                id: "autodefesa_institucionalizar_guarda_comunitaria",
+                texto: "Integrar as brigadas comunitárias à estrutura oficial de policiamento civil",
+                descricao_resultado: "Canaliza a autodefesa para a legalidade republicana sob supervisão comunitária.",
+                efeitos: [
+                    Modificador(id: "estabilidade_urbana_ordem", valor: 0.20),
+                    Modificador(id: "aprovacao_trabalhadores_sindicalizados", valor: 20.0),
+                    Modificador(id: "aprovacao_militares", valor: -15.0),
+                ],
+                ia_peso: 60,
+            ),
+            OpcaoEventoPolitico(
+                id: "autodefesa_desarmar_prender_membros",
+                texto: "Enviar tropas especiais para desarmar e prender as lideranças das brigadas",
+                descricao_resultado: "Impõe o monopólio da violência estatal, deixando os bairros desprotegidos perante criminosos.",
+                efeitos: [
+                    Modificador(id: "autoridade_estatal", valor: 0.15),
+                    Modificador(id: "radicalismo_trabalhadores", valor: 0.25),
+                ],
+                ia_peso: 40,
+            ),
+        ],
+    ),
+]

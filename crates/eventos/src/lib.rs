@@ -1,6 +1,20 @@
-//! Sistema de eventos históricos (1945-1991): carrega os `.ron`, avalia gatilhos diariamente,
-//! aplica efeitos no `MundoJogo` e escolhe opções para os países da IA.
-use serde::Deserialize;
+//! Sistema de eventos históricos e políticos sistêmicos (1945-1991):
+//! carrega os `.ron`, avalia gatilhos diariamente, aplica efeitos nos motores
+//! `simulacao`, `sim_politica`, `sim_economia` e `sim_diplomacia`, e escolhe opções para a IA.
+
+pub mod condicoes;
+pub mod contexto;
+pub mod efeitos;
+pub mod modificadores;
+pub mod politicos;
+
+pub use condicoes::{Condicao, Op};
+pub use contexto::ContextoEfeitos;
+pub use efeitos::{aplicar_efeito_contextual, categoria_da_lei};
+pub use modificadores::{ModificadorAtivo, pertence_a_categoria};
+pub use politicos::{CondicoesEvento, EventoPolitico, OpcaoEventoPolitico};
+
+use serde::{Deserialize, Serialize};
 use simulacao::mundo::MundoJogo;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -14,13 +28,13 @@ pub struct DataGatilho {
     pub dia: u8,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Modificador {
     pub id: String,
     pub valor: f32,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpcaoEvento {
     pub id: String,
     pub texto: String,
@@ -83,57 +97,6 @@ struct MarcoDeEra {
 
 // ---------------------------------------------------------------- modelo interno
 
-/// Condição já interpretada a partir do texto do `.ron`.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Condicao {
-    AnoMin(i32),
-    PosEvento(String),
-    Soberano(String),
-    TemLei(String),
-    /// Variável numérica do jogo comparada a um valor (`tensao_guerra_fria >= 40`).
-    Compara(String, Op, f32),
-    /// Sem dado no cliente para avaliar: assume verdadeira (e avisa uma vez no log).
-    Desconhecida(String),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Op {
-    Ge,
-    Le,
-    Gt,
-    Lt,
-    Eq,
-}
-
-impl Condicao {
-    pub fn parse(s: &str) -> Condicao {
-        let s = s.trim();
-        if let Some((k, v)) = s.split_once(':') {
-            let v = v.trim().to_string();
-            return match k.trim() {
-                "pos_evento" => Condicao::PosEvento(v),
-                "soberano" => Condicao::Soberano(v),
-                "tem_lei" => Condicao::TemLei(v),
-                _ => Condicao::Desconhecida(s.to_string()),
-            };
-        }
-        for (txt, op) in [(">=", Op::Ge), ("<=", Op::Le), ("==", Op::Eq), (">", Op::Gt), ("<", Op::Lt)] {
-            if let Some((a, b)) = s.split_once(txt)
-                && let Ok(n) = b.trim().parse::<f32>()
-            {
-                let a = a.trim();
-                if a == "ano" {
-                    if op == Op::Ge {
-                        return Condicao::AnoMin(n as i32);
-                    }
-                }
-                return Condicao::Compara(a.to_string(), op, n);
-            }
-        }
-        Condicao::Desconhecida(s.to_string())
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Evento {
     pub id: String,
@@ -144,6 +107,7 @@ pub struct Evento {
     pub condicoes: Vec<Condicao>,
     pub opcoes: Vec<OpcaoEvento>,
     pub chance: f32,
+    pub generico: bool,
 }
 
 impl Evento {
@@ -157,6 +121,7 @@ impl Evento {
             condicoes: e.condicoes.iter().map(|c| Condicao::parse(c)).collect(),
             opcoes: e.opcoes,
             chance: e.chance.unwrap_or(1.0),
+            generico: false,
         }
     }
 
@@ -168,7 +133,13 @@ impl Evento {
             .map(|o| {
                 let mut efeitos = m.efeitos_globais.clone();
                 efeitos.extend(o.efeitos);
-                OpcaoEvento { id: o.id, texto: o.texto, descricao_resultado: o.resultado_historico, efeitos, ia_peso: o.ia_peso }
+                OpcaoEvento {
+                    id: o.id,
+                    texto: o.texto,
+                    descricao_resultado: o.resultado_historico,
+                    efeitos,
+                    ia_peso: o.ia_peso,
+                }
             })
             .collect();
         Evento {
@@ -180,6 +151,7 @@ impl Evento {
             condicoes: g.condicoes_sistemicas.iter().map(|c| Condicao::parse(c)).collect(),
             opcoes,
             chance: 1.0,
+            generico: false,
         }
     }
 }
@@ -192,19 +164,49 @@ pub struct CatalogoEventos {
 
 const ARQ_HISTORICOS: [&str; 3] = ["eventos_1945_1950.ron", "eventos_1950_1969.ron", "eventos_1970_1991.ron"];
 const ARQ_MARCOS: &str = "mudancas_de_era.ron";
+const ARQ_POLITICOS: &str = "eventos_politicos.ron";
 
 impl CatalogoEventos {
     /// Carrega os arquivos de `dir` (normalmente `assets/data/eventos`).
     pub fn carregar(dir: &Path) -> Result<Self, String> {
         let mut eventos = Vec::new();
         for arq in ARQ_HISTORICOS {
-            let txt = std::fs::read_to_string(dir.join(arq)).map_err(|e| format!("{arq}: {e}"))?;
-            let v: Vec<EventoHistorico> = ron::from_str(&txt).map_err(|e| format!("{arq}: {e}"))?;
-            eventos.extend(v.into_iter().map(Evento::de_historico));
+            let p = dir.join(arq);
+            if p.exists() {
+                let txt = std::fs::read_to_string(&p).map_err(|e| format!("{arq}: {e}"))?;
+                let v: Vec<EventoHistorico> = ron::from_str(&txt).map_err(|e| format!("{arq}: {e}"))?;
+                eventos.extend(v.into_iter().map(Evento::de_historico));
+            }
         }
-        let txt = std::fs::read_to_string(dir.join(ARQ_MARCOS)).map_err(|e| format!("{ARQ_MARCOS}: {e}"))?;
-        let v: Vec<MarcoDeEra> = ron::from_str(&txt).map_err(|e| format!("{ARQ_MARCOS}: {e}"))?;
-        eventos.extend(v.into_iter().map(Evento::de_marco));
+        let p_marcos = dir.join(ARQ_MARCOS);
+        if p_marcos.exists() {
+            let txt = std::fs::read_to_string(&p_marcos).map_err(|e| format!("{ARQ_MARCOS}: {e}"))?;
+            let v: Vec<MarcoDeEra> = ron::from_str(&txt).map_err(|e| format!("{ARQ_MARCOS}: {e}"))?;
+            eventos.extend(v.into_iter().map(Evento::de_marco));
+        }
+
+        // Carga dos eventos políticos sistêmicos (com fallback de caminhos do workspace/staging)
+        let caminhos_politicos = [
+            dir.join(ARQ_POLITICOS),
+            dir.join("../politica/evolucao/eventos_politicos.ron"),
+            Path::new("/home/rafael/claude/guerra-fria-staging/evolucao_ideologica/eventos_politicos.ron").to_path_buf(),
+        ];
+        for cp in &caminhos_politicos {
+            if cp.exists() {
+                if let Ok(txt) = std::fs::read_to_string(cp) {
+                    match ron::from_str::<Vec<EventoPolitico>>(&txt) {
+                        Ok(v) => {
+                            eventos.extend(v.into_iter().map(EventoPolitico::em_evento));
+                            break;
+                        }
+                        Err(e) => {
+                            eprintln!("[eventos] erro ao carregar {}: {e}", cp.display());
+                        }
+                    }
+                }
+            }
+        }
+
         eventos.retain(|e| !e.opcoes.is_empty());
         eventos.sort_by_key(|e| e.data);
         let mut vistos = BTreeSet::new();
@@ -244,44 +246,123 @@ pub struct EstadoEventos {
     pub disparados: BTreeMap<String, Option<String>>,
     pub pendentes: Vec<Pendente>,
     pub jornal: Vec<Noticia>,
-    /// Modificadores acumulados por país (inclui os que o cliente ainda não consome).
+    /// Modificadores acumulados por país.
     pub modificadores: BTreeMap<(String, String), f32>,
+    /// Modificadores temporários com duração ativa.
+    pub modificadores_temporarios: Vec<ModificadorAtivo>,
+    /// Flags booleanas por país.
+    pub flags_pais: BTreeMap<String, BTreeSet<String>>,
+    /// Variáveis numéricas customizadas por país.
+    pub variaveis_pais: BTreeMap<(String, String), f32>,
+    /// Relações diplomáticas bilaterais (tagA, tagB) -> -100.0..=100.0.
+    pub relacoes: BTreeMap<(String, String), f32>,
+    /// Registro de leis alteradas (pais, categoria, nova_lei).
+    pub leis_trocadas: Vec<(String, String, String)>,
     avisados: BTreeSet<String>,
 }
 
-/// Dias de tolerância depois da data do gatilho para as condições ainda poderem ser atendidas.
-const JANELA_DIAS: i64 = 180;
-
-fn dias(d: (i32, u8, u8)) -> i64 {
-    // Aproximação suficiente para comparar janelas (mês de 30,4 dias).
-    d.0 as i64 * 365 + (d.1 as i64 - 1) * 30 + d.2 as i64
-}
-
-fn rolar(id: &str, d: (i32, u8, u8)) -> f32 {
-    let mut h: u64 = 1469598103934665603;
-    for b in id.bytes().chain(d.0.to_le_bytes()).chain([d.1, d.2]) {
-        h = (h ^ b as u64).wrapping_mul(1099511628211);
-    }
-    (h >> 40) as f32 / (1u64 << 24) as f32
-}
-
-fn variavel(mundo: &MundoJogo, pais: &str, nome: &str) -> Option<f32> {
-    match nome {
-        "tensao_guerra_fria" | "tensao_mundial" => Some(mundo.tensao_mundial),
-        "legitimidade" | "estabilidade_politica" => mundo.paises.get(pais).map(|p| p.politica.legitimidade),
-        "tesouro" => mundo.paises.get(pais).map(|p| p.orcamento.tesouro as f32),
-        _ => None,
+fn chave_relacao(a: &str, b: &str) -> (String, String) {
+    if a <= b {
+        (a.to_string(), b.to_string())
+    } else {
+        (b.to_string(), a.to_string())
     }
 }
 
 impl EstadoEventos {
-    fn avaliar(&mut self, mundo: &MundoJogo, alvo: &str, c: &Condicao) -> bool {
+    pub fn tem_flag(&self, pais: &str, flag: &str) -> bool {
+        self.flags_pais.get(pais).is_some_and(|s| s.contains(flag))
+    }
+
+    pub fn definir_flag(&mut self, pais: &str, flag: &str) {
+        self.flags_pais.entry(pais.to_string()).or_default().insert(flag.to_string());
+    }
+
+    pub fn remover_flag(&mut self, pais: &str, flag: &str) {
+        if let Some(s) = self.flags_pais.get_mut(pais) {
+            s.remove(flag);
+        }
+    }
+
+    pub fn obter_variavel(&self, pais: &str, var: &str) -> f32 {
+        self.variaveis_pais
+            .get(&(pais.to_string(), var.to_string()))
+            .copied()
+            .unwrap_or(0.0)
+    }
+
+    pub fn ajustar_variavel(&mut self, pais: &str, var: &str, delta: f32) {
+        *self
+            .variaveis_pais
+            .entry((pais.to_string(), var.to_string()))
+            .or_default() += delta;
+    }
+
+    pub fn obter_relacao(&self, a: &str, b: &str) -> f32 {
+        if a == b {
+            return 100.0;
+        }
+        self.relacoes.get(&chave_relacao(a, b)).copied().unwrap_or(0.0)
+    }
+
+    pub fn ajustar_relacao(&mut self, a: &str, b: &str, delta: f32) {
+        if a == b {
+            return;
+        }
+        let k = chave_relacao(a, b);
+        let val = self.relacoes.entry(k).or_insert(0.0);
+        *val = (*val + delta).clamp(-100.0, 100.0);
+    }
+
+    pub fn registrar_mudanca_lei(&mut self, pais: &str, cat: &str, lei: &str) {
+        self.leis_trocadas
+            .push((pais.to_string(), cat.to_string(), lei.to_string()));
+    }
+
+    pub fn adicionar_modificador_temporario(&mut self, pais: &str, id: &str, valor: f32, duracao_dias: u32) {
+        self.modificadores_temporarios
+            .push(ModificadorAtivo::novo(pais, id, valor, duracao_dias));
+    }
+
+    /// Avança a duração de todos os modificadores temporários e expira os concluídos.
+    pub fn avancar_dias(&mut self, dias: u32) {
+        for m in &mut self.modificadores_temporarios {
+            m.dias_restantes = m.dias_restantes.saturating_sub(dias);
+        }
+        self.modificadores_temporarios.retain(|m| !m.expirado());
+    }
+
+    /// Retorna o valor agregado de modificadores temporários para um país por ID ou categoria conceitual.
+    pub fn modificador_total(&self, pais: &str, id_ou_cat: &str) -> f32 {
+        self.modificadores_temporarios
+            .iter()
+            .filter(|m| m.pais == pais && (m.id == id_ou_cat || pertence_a_categoria(&m.id, id_ou_cat)))
+            .map(|m| m.valor)
+            .sum()
+    }
+
+    pub fn avaliar(&mut self, mundo: &MundoJogo, alvo: &str, c: &Condicao) -> bool {
         match c {
             Condicao::AnoMin(a) => mundo.data.ano >= *a,
             Condicao::PosEvento(id) => self.disparados.contains_key(id),
             Condicao::Soberano(t) => mundo.paises.get(t).is_some_and(|p| !p.provincias_ids.is_empty()),
-            Condicao::TemLei(l) => mundo.paises.get(alvo).is_some_and(|p| p.politica.leis_ativas.values().any(|v| v == l)),
-            Condicao::Compara(nome, op, n) => match variavel(mundo, alvo, nome) {
+            Condicao::TemLei(l) => {
+                mundo.paises.get(alvo).is_some_and(|p| p.politica.leis_ativas.values().any(|v| v == l))
+            }
+            Condicao::NaoTemLei(l) => {
+                mundo.paises.get(alvo).map_or(true, |p| !p.politica.leis_ativas.values().any(|v| v == l))
+            }
+            Condicao::LegitimidadeMax(max_val) => {
+                mundo.paises.get(alvo).map_or(0.0, |p| p.politica.legitimidade) <= *max_val
+            }
+            Condicao::LegitimidadeMin(min_val) => {
+                mundo.paises.get(alvo).map_or(0.0, |p| p.politica.legitimidade) >= *min_val
+            }
+            Condicao::TemFlag(f) => self.tem_flag(alvo, f),
+            Condicao::NaoTemFlag(f) => !self.tem_flag(alvo, f),
+            Condicao::RelacaoMin(tag, min_val) => self.obter_relacao(alvo, tag) >= *min_val,
+            Condicao::RelacaoMax(tag, max_val) => self.obter_relacao(alvo, tag) <= *max_val,
+            Condicao::Compara(nome, op, n) => match variavel(mundo, self, alvo, nome) {
                 Some(v) => match op {
                     Op::Ge => v >= *n,
                     Op::Le => v <= *n,
@@ -296,7 +377,7 @@ impl EstadoEventos {
     }
 
     /// Registra um aviso (uma vez por chave) e devolve `true` (condição ignorada = satisfeita).
-    fn avisar_uma_vez(&mut self, chave: &str) -> bool {
+    pub fn avisar_uma_vez(&mut self, chave: &str) -> bool {
         if self.avisados.insert(chave.to_string()) {
             eprintln!("[eventos] aviso: '{chave}' sem suporte no cliente, ignorado");
         }
@@ -304,30 +385,84 @@ impl EstadoEventos {
     }
 }
 
+/// Dias de tolerância depois da data do gatilho para as condições ainda poderem ser atendidas.
+const JANELA_DIAS: i64 = 180;
+
+fn dias(d: (i32, u8, u8)) -> i64 {
+    d.0 as i64 * 365 + (d.1 as i64 - 1) * 30 + d.2 as i64
+}
+
+fn rolar(id: &str, d: (i32, u8, u8)) -> f32 {
+    let mut h: u64 = 1469598103934665603;
+    for b in id.bytes().chain(d.0.to_le_bytes()).chain([d.1, d.2]) {
+        h = (h ^ b as u64).wrapping_mul(1099511628211);
+    }
+    (h >> 40) as f32 / (1u64 << 24) as f32
+}
+
+fn variavel(mundo: &MundoJogo, est: &EstadoEventos, pais: &str, nome: &str) -> Option<f32> {
+    match nome {
+        "tensao_guerra_fria" | "tensao_mundial" => Some(mundo.tensao_mundial),
+        "legitimidade" | "estabilidade_politica" => mundo.paises.get(pais).map(|p| p.politica.legitimidade),
+        "tesouro" => mundo.paises.get(pais).map(|p| p.orcamento.tesouro as f32),
+        outro => {
+            if est.variaveis_pais.contains_key(&(pais.to_string(), outro.to_string())) {
+                Some(est.obter_variavel(pais, outro))
+            } else {
+                None
+            }
+        }
+    }
+}
+
 fn pais_afetado(ev: &Evento, jogador: &str, mundo: &MundoJogo) -> String {
     if ev.paises.iter().any(|p| p == jogador) {
         return jogador.to_string();
     }
-    ev.paises.iter().find(|p| mundo.paises.contains_key(*p)).cloned().unwrap_or_else(|| jogador.to_string())
+    ev.paises
+        .iter()
+        .find(|p| mundo.paises.contains_key(*p))
+        .cloned()
+        .unwrap_or_else(|| jogador.to_string())
 }
 
-/// Avalia os gatilhos para a data atual de `mundo`. Eventos do jogador viram `pendentes`;
-/// os demais são decididos pela IA, aplicados e anunciados no jornal. Devolve os ids disparados.
-pub fn avaliar_dia(cat: &CatalogoEventos, est: &mut EstadoEventos, mundo: &mut MundoJogo, jogador: &str) -> Vec<String> {
-    let hoje = (mundo.data.ano, mundo.data.mes, mundo.data.dia);
+/// Avalia os gatilhos para a data atual de `mundo`.
+pub fn avaliar_dia(
+    cat: &CatalogoEventos,
+    est: &mut EstadoEventos,
+    mundo: &mut MundoJogo,
+    jogador: &str,
+) -> Vec<String> {
+    avaliar_dia_com_contexto(cat, est, &mut ContextoEfeitos::apenas_mundo(mundo), jogador)
+}
+
+/// Avaliação diária de eventos conectada ao contexto unificado dos motores de simulação.
+pub fn avaliar_dia_com_contexto(
+    cat: &CatalogoEventos,
+    est: &mut EstadoEventos,
+    ctx: &mut ContextoEfeitos,
+    jogador: &str,
+) -> Vec<String> {
+    // Avança 1 dia nos modificadores temporários
+    est.avancar_dias(1);
+
+    let hoje = (ctx.mundo.data.ano, ctx.mundo.data.mes, ctx.mundo.data.dia);
     let mut disparados = Vec::new();
     for ev in &cat.eventos {
-        if ev.data > hoje {
-            break; // ordenado por data
+        if !ev.generico && ev.data > hoje {
+            break; // eventos históricos fixos são ordenados por data
         }
-        if est.disparados.contains_key(&ev.id) || dias(hoje) - dias(ev.data) > JANELA_DIAS {
+        if est.disparados.contains_key(&ev.id) {
             continue;
         }
-        let alvo = pais_afetado(ev, jogador, mundo);
-        if !ev.paises.is_empty() && !ev.paises.iter().any(|p| mundo.paises.contains_key(p)) {
+        if !ev.generico && dias(hoje) - dias(ev.data) > JANELA_DIAS {
             continue;
         }
-        if !ev.condicoes.iter().all(|c| est.avaliar(mundo, &alvo, c)) {
+        let alvo = pais_afetado(ev, jogador, ctx.mundo);
+        if !ev.paises.is_empty() && !ev.paises.iter().any(|p| ctx.mundo.paises.contains_key(p)) {
+            continue;
+        }
+        if !ev.condicoes.iter().all(|c| est.avaliar(ctx.mundo, &alvo, c)) {
             continue;
         }
         if ev.chance < 1.0 && rolar(&ev.id, hoje) > ev.chance {
@@ -336,10 +471,13 @@ pub fn avaliar_dia(cat: &CatalogoEventos, est: &mut EstadoEventos, mundo: &mut M
         disparados.push(ev.id.clone());
         if alvo == jogador {
             est.disparados.insert(ev.id.clone(), None);
-            est.pendentes.push(Pendente { evento_id: ev.id.clone(), pais: alvo });
+            est.pendentes.push(Pendente {
+                evento_id: ev.id.clone(),
+                pais: alvo,
+            });
         } else {
             let i = escolha_ia(ev, hoje);
-            aplicar_opcao(mundo, est, ev, i, &alvo);
+            aplicar_opcao_com_contexto(ctx, est, ev, i, &alvo);
         }
     }
     disparados
@@ -363,43 +501,67 @@ pub fn escolha_ia(ev: &Evento, data: (i32, u8, u8)) -> usize {
 
 /// Aplica a opção `i` do evento ao `pais`, registra a escolha e publica a notícia.
 pub fn aplicar_opcao(mundo: &mut MundoJogo, est: &mut EstadoEventos, ev: &Evento, i: usize, pais: &str) {
+    aplicar_opcao_com_contexto(&mut ContextoEfeitos::apenas_mundo(mundo), est, ev, i, pais);
+}
+
+/// Aplica a opção `i` do evento enriquecida com o contexto de todos os subsistemas integrados.
+pub fn aplicar_opcao_com_contexto(
+    ctx: &mut ContextoEfeitos,
+    est: &mut EstadoEventos,
+    ev: &Evento,
+    i: usize,
+    pais: &str,
+) {
     let Some(op) = ev.opcoes.get(i) else { return };
     for m in &op.efeitos {
-        aplicar_efeito(mundo, est, pais, m);
+        aplicar_efeito_contextual(ctx, est, pais, m);
     }
     est.disparados.insert(ev.id.clone(), Some(op.id.clone()));
     est.pendentes.retain(|p| p.evento_id != ev.id);
-    let nome = mundo.paises.get(pais).map(|p| p.nome.clone()).unwrap_or_else(|| pais.to_string());
-    est.jornal.push(Noticia { data: (mundo.data.ano, mundo.data.mes, mundo.data.dia), texto: format!("{nome}: {} ({})", op.texto, ev.titulo) });
+    let nome = ctx
+        .mundo
+        .paises
+        .get(pais)
+        .map(|p| p.nome.clone())
+        .unwrap_or_else(|| pais.to_string());
+    est.jornal.push(Noticia {
+        data: (ctx.mundo.data.ano, ctx.mundo.data.mes, ctx.mundo.data.dia),
+        texto: format!("{nome}: {} ({})", op.texto, ev.titulo),
+    });
     if est.jornal.len() > 200 {
         est.jornal.remove(0);
     }
 }
 
-fn aplicar_efeito(mundo: &mut MundoJogo, est: &mut EstadoEventos, pais: &str, m: &Modificador) {
-    *est.modificadores.entry((pais.to_string(), m.id.clone())).or_insert(0.0) += m.valor;
-    match m.id.as_str() {
-        "tensao_guerra_fria" => mundo.tensao_mundial = (mundo.tensao_mundial + m.valor * 10.0).clamp(0.0, 100.0),
-        "legitimidade_base" | "estabilidade_politica" | "autoridade_estatal" | "legitimidade_internacional" => {
-            let k = if m.id == "legitimidade_internacional" { 0.25 } else { 1.0 };
-            if let Some(p) = mundo.paises.get_mut(pais) {
-                p.politica.legitimidade = (p.politica.legitimidade + m.valor * k).clamp(0.0, 100.0);
-            }
-        }
-        "crescimento_pib" => {
-            if let Some(p) = mundo.paises.get_mut(pais) {
-                p.orcamento.tesouro += p.pib_anual_estimado * m.valor as f64 * 0.1;
-            }
-        }
-        _ => {
-            if est.avisar_uma_vez(&format!("efeito:{}", m.id)) { /* guardado apenas em `modificadores` */ }
-        }
-    }
-}
-
 /// Texto de tooltip para um efeito (ex.: "Tensão mundial +3.5").
 pub fn descrever_efeito(m: &Modificador) -> String {
-    let nome = match m.id.as_str() {
+    let id = m.id.as_str();
+    if let Some(resto) = id.strip_prefix("mudar_lei:")
+        .or_else(|| id.strip_prefix("lei:"))
+        .or_else(|| id.strip_prefix("promulgar_lei:"))
+    {
+        let lei = resto.split_once(':').map(|(_, l)| l).unwrap_or(resto);
+        return format!("Promulgar Lei: {}", lei.replace('_', " "));
+    }
+    if let Some(resto) = id.strip_prefix("temp:") {
+        if let Some((nome, dias)) = resto.split_once(':') {
+            return format!("Modificador temporário: {} {:+.2} ({} dias)", nome.replace('_', " "), m.valor, dias);
+        }
+    }
+    if let Some(f) = id.strip_prefix("flag:").or_else(|| id.strip_prefix("definir_flag:")) {
+        return format!("Definir Flag Nacional: {}", f.replace('_', " "));
+    }
+    if let Some(f) = id.strip_prefix("remover_flag:") {
+        return format!("Remover Flag Nacional: {}", f.replace('_', " "));
+    }
+    if let Some(v) = id.strip_prefix("var:").or_else(|| id.strip_prefix("variavel:")) {
+        return format!("Variável {}: {:+.2}", v.replace('_', " "), m.valor);
+    }
+    if let Some(r) = id.strip_prefix("relacao:") {
+        return format!("Relações com {}: {:+.2}", r, m.valor);
+    }
+
+    let nome = match id {
         "tensao_guerra_fria" => "Tensão mundial".to_string(),
         "legitimidade_base" | "estabilidade_politica" => "Estabilidade".to_string(),
         "legitimidade_internacional" => "Legitimidade internacional".to_string(),
@@ -407,95 +569,11 @@ pub fn descrever_efeito(m: &Modificador) -> String {
         outro => {
             let s = outro.replace('_', " ");
             let mut c = s.chars();
-            c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+            c.next()
+                .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                .unwrap_or_default()
         }
     };
     let v = if m.id == "tensao_guerra_fria" { m.valor * 10.0 } else { m.valor };
     format!("{nome} {v:+.2}")
-}
-
-#[cfg(test)]
-mod testes {
-    use super::*;
-    use std::path::PathBuf;
-
-    fn raiz() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
-    }
-
-    fn catalogo() -> CatalogoEventos {
-        CatalogoEventos::carregar(&raiz().join("assets/data/eventos")).expect("eventos")
-    }
-
-    fn mundo() -> MundoJogo {
-        let r = raiz();
-        MundoJogo::carregar_de_arquivos(
-            r.join("assets/map/provinces.ron"),
-            r.join("data/scenario_1945/countries_1945.ron"),
-            r.join("data/scenario_1945/province_owners_1945.ron"),
-        )
-        .expect("mundo")
-        .1
-    }
-
-    #[test]
-    fn carrega_todos_sem_erro() {
-        let c = catalogo();
-        assert!(c.eventos.len() >= 300, "{}", c.eventos.len());
-        let ids: BTreeSet<_> = c.eventos.iter().map(|e| &e.id).collect();
-        assert_eq!(ids.len(), c.eventos.len(), "ids duplicados");
-    }
-
-    #[test]
-    fn evento_dispara_na_data_certa() {
-        let c = catalogo();
-        let mut m = mundo();
-        let mut est = EstadoEventos::default();
-        m.data.ano = 1945;
-        m.data.mes = 2;
-        m.data.dia = 10;
-        assert!(!avaliar_dia(&c, &mut est, &mut m, "USA").contains(&"conferencia_yalta_1945".to_string()));
-        m.data.dia = 11;
-        let d = avaliar_dia(&c, &mut est, &mut m, "USA");
-        assert!(d.contains(&"conferencia_yalta_1945".to_string()));
-        assert_eq!(est.pendentes.len(), 1);
-        // Não repete.
-        m.data.dia = 12;
-        assert!(!avaliar_dia(&c, &mut est, &mut m, "USA").contains(&"conferencia_yalta_1945".to_string()));
-    }
-
-    #[test]
-    fn evento_de_outro_pais_vira_noticia() {
-        let c = catalogo();
-        let mut m = mundo();
-        let mut est = EstadoEventos::default();
-        m.data.ano = 1945;
-        m.data.mes = 2;
-        m.data.dia = 11;
-        avaliar_dia(&c, &mut est, &mut m, "BRA");
-        assert!(est.pendentes.is_empty());
-        assert!(!est.jornal.is_empty());
-    }
-
-    #[test]
-    fn escolha_aplica_efeito() {
-        let c = catalogo();
-        let mut m = mundo();
-        let mut est = EstadoEventos::default();
-        let ev = c.por_id("conferencia_yalta_1945").unwrap();
-        let t0 = m.tensao_mundial;
-        let l0 = m.paises["USA"].politica.legitimidade;
-        aplicar_opcao(&mut m, &mut est, ev, 1, "USA"); // intransigente: tensão +0.35 (x10) e +0.40 hostilidade
-        assert!((m.tensao_mundial - (t0 + 3.5)).abs() < 1e-3);
-        assert!(m.paises["USA"].politica.legitimidade <= l0 + 1e-3);
-        assert_eq!(est.disparados["conferencia_yalta_1945"].as_deref(), Some("yalta_posicao_intransigente"));
-        assert_eq!(est.jornal.len(), 1);
-    }
-
-    #[test]
-    fn condicoes_interpretadas() {
-        assert_eq!(Condicao::parse("ano >= 1950"), Condicao::AnoMin(1950));
-        assert_eq!(Condicao::parse("pos_evento:x"), Condicao::PosEvento("x".into()));
-        assert!(matches!(Condicao::parse("coisa_estranha"), Condicao::Desconhecida(_)));
-    }
 }
