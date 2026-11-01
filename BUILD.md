@@ -208,11 +208,13 @@ Disparado a cada `push` ou `pull_request` nos branches `main`, `master` e `devel
 ### 6.2. Publicação de Releases (`.github/workflows/release.yml`)
 Disparado ao criar uma tag iniciada com `v*` (exemplo: `v0.1.0`):
 - **Job `build-release`**:
-  - Compila `guerra_fria` e `gerador_mapa` em modo release para Linux (`x86_64-unknown-linux-gnu`) e Windows (`x86_64-pc-windows-msvc`).
-  - Inclui automaticamente a pasta `assets`, `data/`, executáveis (`guerra_fria` e `gerador_mapa`) e arquivos `README.md` / `BUILD.md`.
+  - Compila `guerra_fria` e `gerador_mapa` em modo release para Linux (`x86_64-unknown-linux-gnu`), Windows (`x86_64-pc-windows-msvc`) e macOS (`aarch64-apple-darwin` e `x86_64-apple-darwin`).
+  - Inclui automaticamente a pasta `assets`, `data/`, executáveis (`Hegemony-1945-<tag>` e `gerador_mapa`) e arquivos `README.md` / `BUILD.md`.
   - Gera os arquivos compactados com a tag/versão explícita no nome:
-    - `guerra-fria-v0.1.0-linux-x86_64.tar.gz`
-    - `guerra-fria-v0.1.0-windows-x86_64.zip`
+    - `hegemony-1945-v0.1.0-linux-x86_64.tar.gz`
+    - `hegemony-1945-v0.1.0-windows-x86_64.zip`
+    - `hegemony-1945-v0.1.0-macos-aarch64.tar.gz`
+    - `hegemony-1945-v0.1.0-macos-x86_64.tar.gz`
 - **Job `publish-release`**:
   - Baixa os artefatos de ambas as plataformas.
   - Cria um **GitHub Release** oficial utilizando `softprops/action-gh-release@v2`.
@@ -225,8 +227,8 @@ Disparado ao criar uma tag iniciada com `v*` (exemplo: `v0.1.0`):
 Os arquivos compactados finais gerados para os usuários possuem a seguinte estrutura interna:
 
 ```
-guerra-fria-v0.1.0-linux-x86_64.tar.gz (ou .zip no Windows)
-├── guerra_fria (ou guerra_fria.exe)
+hegemony-1945-v0.1.0-linux-x86_64.tar.gz (ou .zip no Windows / .tar.gz no macOS)
+├── Hegemony-1945-v0.1.0 (ou Hegemony-1945-v0.1.0.exe)
 ├── gerador_mapa (ou gerador_mapa.exe)
 ├── assets/
 │   ├── map/

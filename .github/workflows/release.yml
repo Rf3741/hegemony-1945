@@ -37,6 +37,14 @@ jobs:
             target: x86_64-pc-windows-msvc
             artifact_name: hegemony-1945-${{ github.ref_name }}-windows-x86_64.zip
             bin_ext: ".exe"
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: hegemony-1945-${{ github.ref_name }}-macos-aarch64.tar.gz
+            bin_ext: ""
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: hegemony-1945-${{ github.ref_name }}-macos-x86_64.tar.gz
+            bin_ext: ""
 
     steps:
       - name: Checkout do repositório
@@ -69,6 +77,18 @@ jobs:
       # Empacotamento no Linux (tar.gz)
       - name: Empacotar Release no Linux (.tar.gz com assets)
         if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist/hegemony-1945
+          cp "target/${{ matrix.target }}/release/guerra_fria" "dist/hegemony-1945/Hegemony-1945-${{ github.ref_name }}"
+          cp "target/${{ matrix.target }}/release/gerador_mapa" dist/hegemony-1945/
+          cp -r assets data dist/hegemony-1945/
+          test -f README.md && cp README.md dist/hegemony-1945/ || true
+          test -f BUILD.md && cp BUILD.md dist/hegemony-1945/ || true
+          tar -czvf "${{ matrix.artifact_name }}" -C dist/hegemony-1945 .
+
+      # Empacotamento no macOS (.tar.gz com assets)
+      - name: Empacotar Release no macOS (.tar.gz com assets)
+        if: runner.os == 'macOS'
         run: |
           mkdir -p dist/hegemony-1945
           cp "target/${{ matrix.target }}/release/guerra_fria" "dist/hegemony-1945/Hegemony-1945-${{ github.ref_name }}"

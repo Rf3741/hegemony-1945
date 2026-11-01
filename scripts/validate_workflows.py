@@ -90,9 +90,13 @@ def validar_release_yml(caminho):
     # Gatilho de tags v*
     assert "v*" in texto, "release.yml deve ser acionado em tags v*"
 
-    # Validação de artefatos Windows (.zip) e Linux (.tar.gz)
-    assert ".tar.gz" in texto, "release.yml deve gerar arquivo .tar.gz para Linux"
+    # Validação de artefatos Windows (.zip), Linux (.tar.gz) e macOS (.tar.gz)
+    assert ".tar.gz" in texto, "release.yml deve gerar arquivo .tar.gz para Linux e macOS"
     assert ".zip" in texto, "release.yml deve gerar arquivo .zip para Windows"
+    assert "macos-latest" in texto, "release.yml deve incluir o runner macos-latest"
+    assert "aarch64-apple-darwin" in texto, "release.yml deve incluir target aarch64-apple-darwin"
+    assert "x86_64-apple-darwin" in texto, "release.yml deve incluir target x86_64-apple-darwin"
+    assert "runner.os == 'macOS'" in texto, "release.yml deve incluir etapa de empacotamento para macOS"
 
     # Validação de inclusão da pasta assets
     assert "assets" in texto, "release.yml deve incluir a pasta 'assets' nos pacotes"
