@@ -77,5 +77,6 @@ fn main() {
         .add_plugins(EventosPlugin)
         .add_plugins(DiplomaciaUiPlugin)
         .add_plugins(TecnologiaUiPlugin)
+        .add_plugins(plugins::menu_ui::MenuUiPlugin)
         .run();
 }
