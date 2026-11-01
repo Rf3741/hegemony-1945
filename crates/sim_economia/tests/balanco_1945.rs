@@ -264,7 +264,9 @@ fn cinco_anos_desemprego_e_pib_dos_grandes_estaveis() {
 fn populacao_exibida_na_escala_historica() {
     let m = carregar();
     for (id, mi) in [("usa", 140.0), ("sov", 170.0), ("chi", 500.0), ("ind", 400.0), ("bra", 46.0)] {
-        let p = m.populacao_exibida_pais(id).unwrap() / 1e6;
-        assert!((p - mi).abs() < 0.5, "{id}: {p:.1} mi (esperado {mi})");
+        let p_tot = m.populacao_total_pais(id).unwrap() / 1e6;
+        assert!((p_tot - mi).abs() < 0.5, "{id}: total {p_tot:.1} mi (esperado {mi})");
+        let p_ex = m.populacao_exibida_pais(id).unwrap() / 1e6;
+        assert!((p_ex - mi).abs() < 0.5, "{id}: exibida {p_ex:.1} mi (esperado {mi})");
     }
 }

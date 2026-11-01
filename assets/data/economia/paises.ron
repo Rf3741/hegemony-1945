@@ -25,9 +25,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 100975978805.0,
-            divida: 141366370327.0,
-            limite_credito: 727027097396.0,
+            tesouro: 20654059428.1,
+            divida: 28915683199.4,
+            limite_credito: 148709238109.7,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -36,8 +36,8 @@
         fila_construcao: [
             (provincia_id: "usa_3559", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 48468469826.0,
-        pib_diario: 4039039152.2,
+        fundo_investimento_privado: 9913948525.4,
+        pib_diario: 826162377.1,
     ),
     (
         id: "sov",
@@ -65,9 +65,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 23493180485.0,
-            divida: 32890452679.0,
-            limite_credito: 169150949492.0,
+            tesouro: 13390386518.0,
+            divida: 18746541125.2,
+            limite_credito: 96410811428.1,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -76,8 +76,8 @@
         fila_construcao: [
             (provincia_id: "rus_2365", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 11276726633.0,
-        pib_diario: 939727219.4,
+        fundo_investimento_privado: 6427385528.8,
+        pib_diario: 535615460.7,
     ),
     (
         id: "gbr",
@@ -105,9 +105,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 22695096146.0,
-            divida: 31773134605.0,
-            limite_credito: 163404742253.0,
+            tesouro: 5042844230.2,
+            divida: 7059981922.4,
+            limite_credito: 36308489567.8,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -116,8 +116,8 @@
         fila_construcao: [
             (provincia_id: "gbr_2080", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 10893646150.0,
-        pib_diario: 907803845.85,
+        fundo_investimento_privado: 2420565230.5,
+        pib_diario: 201713769.2,
     ),
     (
         id: "fra",
@@ -145,9 +145,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 6917774975.0,
-            divida: 9684884965.0,
-            limite_credito: 49808029820.0,
+            tesouro: 3422387261.1,
+            divida: 4791342165.5,
+            limite_credito: 24641213015.8,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -156,8 +156,8 @@
         fila_construcao: [
             (provincia_id: "fra_5333", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 3320531988.0,
-        pib_diario: 276710999.0,
+        fundo_investimento_privado: 1642745885.3,
+        pib_diario: 136895490.4,
     ),
     (
         id: "chi",
@@ -185,9 +185,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 9452040750.0,
-            divida: 13232857050.0,
-            limite_credito: 68054743400.0,
+            tesouro: 12695104497.5,
+            divida: 17773146296.6,
+            limite_credito: 91404819537.7,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -196,8 +196,8 @@
         fila_construcao: [
             (provincia_id: "chn_1814", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 4536979560.0,
-        pib_diario: 378081630.0,
+        fundo_investimento_privado: 6093650158.8,
+        pib_diario: 507804179.9,
     ),
     (
         id: "ger",
@@ -225,9 +225,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 10890448225.0,
-            divida: 15246627515.0,
-            limite_credito: 78411277220.0,
+            tesouro: 7087888864.2,
+            divida: 9923044409.9,
+            limite_credito: 51032832364.3,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -236,8 +236,8 @@
         fila_construcao: [
             (provincia_id: "deu_1572", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 5227415148.0,
-        pib_diario: 435617929.0,
+        fundo_investimento_privado: 3402186654.8,
+        pib_diario: 283515554.6,
     ),
     (
         id: "jap",
@@ -265,9 +265,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 7534280500.0,
-            divida: 10547992700.0,
-            limite_credito: 54246869600.0,
+            tesouro: 5422525508.4,
+            divida: 7591535711.7,
+            limite_credito: 39042219645.9,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -276,8 +276,8 @@
         fila_construcao: [
             (provincia_id: "jpn_1860", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 3616454640.0,
-        pib_diario: 301371220.0,
+        fundo_investimento_privado: 2602812244.0,
+        pib_diario: 216901020.3,
     ),
     (
         id: "rsi",
@@ -305,9 +305,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 1917788125.0,
-            divida: 2684903375.0,
-            limite_credito: 13808124500.0,
+            tesouro: 1243906595.1,
+            divida: 1741469233.2,
+            limite_credito: 8956159915.7,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -316,8 +316,8 @@
         fila_construcao: [
             (provincia_id: "ita_5450", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 920538300.0,
-        pib_diario: 76711525.0,
+        fundo_investimento_privado: 597075165.7,
+        pib_diario: 49756263.8,
     ),
     (
         id: "man",
@@ -465,9 +465,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 650655100.0,
-            divida: 910917140.0,
-            limite_credito: 4684766720.0,
+            tesouro: 511723075.4,
+            divida: 716412305.5,
+            limite_credito: 3684445466.3,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -476,8 +476,8 @@
         fila_construcao: [
             (provincia_id: "hun_3160", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 312314448.0,
-        pib_diario: 26026204.0,
+        fundo_investimento_privado: 245627076.2,
+        pib_diario: 20468923.0,
     ),
     (
         id: "sia",
@@ -585,9 +585,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 5479461070.0,
-            divida: 7671245498.0,
-            limite_credito: 39452169704.0,
+            tesouro: 1474261955.1,
+            divida: 2063966737.2,
+            limite_credito: 10614699529.5,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -596,8 +596,8 @@
         fila_construcao: [
             (provincia_id: "can_682", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 2630141314.0,
-        pib_diario: 219178442.8,
+        fundo_investimento_privado: 707645738.6,
+        pib_diario: 58970478.2,
     ),
     (
         id: "bel",
@@ -625,9 +625,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 2191804000.0,
-            divida: 3068525600.0,
-            limite_credito: 15781038800.0,
+            tesouro: 890661256.0,
+            divida: 1246925758.4,
+            limite_credito: 6412781361.3,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -636,8 +636,8 @@
         fila_construcao: [
             (provincia_id: "bel_3474", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 1052065920.0,
-        pib_diario: 87672160.0,
+        fundo_investimento_privado: 427517402.9,
+        pib_diario: 35626450.2,
     ),
     (
         id: "nld",
@@ -665,9 +665,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 1232877225.0,
-            divida: 1726028115.0,
-            limite_credito: 8876766020.0,
+            tesouro: 757002308.1,
+            divida: 1059803231.4,
+            limite_credito: 5450447319.2,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -676,8 +676,8 @@
         fila_construcao: [
             (provincia_id: "nld_3485", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 591781068.0,
-        pib_diario: 49315089.0,
+        fundo_investimento_privado: 363361107.9,
+        pib_diario: 30280092.3,
     ),
     (
         id: "lux",
@@ -745,9 +745,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 534286938.0,
-            divida: 748001712.0,
-            limite_credito: 3846915950.0,
+            tesouro: 226667600.7,
+            divida: 317334640.5,
+            limite_credito: 1632027935.9,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -756,8 +756,8 @@
         fila_construcao: [
             (provincia_id: "irl_5575", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 256457730.0,
-        pib_diario: 21371477.5,
+        fundo_investimento_privado: 108800448.3,
+        pib_diario: 9066704.0,
     ),
     (
         id: "isl",
@@ -825,9 +825,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 1849270375.0,
-            divida: 2588978525.0,
-            limite_credito: 13314796700.0,
+            tesouro: 516659441.0,
+            divida: 723323217.4,
+            limite_credito: 3719961944.7,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -836,8 +836,8 @@
         fila_construcao: [
             (provincia_id: "che_176", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 887649780.0,
-        pib_diario: 73970815.0,
+        fundo_investimento_privado: 247996531.7,
+        pib_diario: 20666377.6,
     ),
     (
         id: "lie",
@@ -905,9 +905,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 2328752338.0,
-            divida: 3260253272.0,
-            limite_credito: 16767066830.0,
+            tesouro: 636070805.9,
+            divida: 890499127.9,
+            limite_credito: 4579723458.4,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -916,8 +916,8 @@
         fila_construcao: [
             (provincia_id: "swe_194", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 1117801122.0,
-        pib_diario: 93150093.5,
+        fundo_investimento_privado: 305313986.8,
+        pib_diario: 25442832.2,
     ),
     (
         id: "nor",
@@ -945,9 +945,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 787713675.0,
-            divida: 1102799145.0,
-            limite_credito: 5671588460.0,
+            tesouro: 272613834.8,
+            divida: 381659368.7,
+            limite_credito: 1962836914.8,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -956,8 +956,8 @@
         fila_construcao: [
             (provincia_id: "nor_921", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 378102564.0,
-        pib_diario: 31508547.0,
+        fundo_investimento_privado: 130854640.7,
+        pib_diario: 10904553.4,
     ),
     (
         id: "den",
@@ -985,9 +985,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 1027410025.0,
-            divida: 1438374035.0,
-            limite_credito: 7397402180.0,
+            tesouro: 382739649.5,
+            divida: 535835509.4,
+            limite_credito: 2755744103.2,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -996,8 +996,8 @@
         fila_construcao: [
             (provincia_id: "dnk_3419", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 493156812.0,
-        pib_diario: 41096401.0,
+        fundo_investimento_privado: 183715031.8,
+        pib_diario: 15309586.0,
     ),
     (
         id: "fin",
@@ -1025,9 +1025,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 821904500.0,
-            divida: 1150666300.0,
-            limite_credito: 5917762400.0,
+            tesouro: 312176403.3,
+            divida: 437046964.6,
+            limite_credito: 2247689094.9,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1036,8 +1036,8 @@
         fila_construcao: [
             (provincia_id: "fin_3193", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 394514160.0,
-        pib_diario: 32876180.0,
+        fundo_investimento_privado: 149844673.6,
+        pib_diario: 12487056.1,
     ),
     (
         id: "ita",
@@ -1105,9 +1105,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 2054815950.0,
-            divida: 2876742330.0,
-            limite_credito: 14794724840.0,
+            tesouro: 1644076570.4,
+            divida: 2301707198.5,
+            limite_credito: 11837391312.0,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1116,8 +1116,8 @@
         fila_construcao: [
             (provincia_id: "esp_5833", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 986311656.0,
-        pib_diario: 82192638.0,
+        fundo_investimento_privado: 789156753.8,
+        pib_diario: 65763062.8,
     ),
     (
         id: "por",
@@ -1145,9 +1145,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 719159375.0,
-            divida: 1006823125.0,
-            limite_credito: 5177997500.0,
+            tesouro: 488073928.5,
+            divida: 683303499.9,
+            limite_credito: 3514166218.7,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1156,8 +1156,8 @@
         fila_construcao: [
             (provincia_id: "prt_746", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 345196500.0,
-        pib_diario: 28766375.0,
+        fundo_investimento_privado: 234275485.7,
+        pib_diario: 19522957.1,
     ),
     (
         id: "gre",
@@ -1185,9 +1185,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 376700625.0,
-            divida: 527380875.0,
-            limite_credito: 2712294500.0,
+            tesouro: 327738015.6,
+            divida: 458833221.8,
+            limite_credito: 2359757213.4,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1196,8 +1196,8 @@
         fila_construcao: [
             (provincia_id: "grc_2884", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 180816300.0,
-        pib_diario: 15068025.0,
+        fundo_investimento_privado: 157314247.5,
+        pib_diario: 13109520.6,
     ),
     (
         id: "smr",
@@ -1465,9 +1465,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 1712360825.0,
-            divida: 2397305155.0,
-            limite_credito: 12329047940.0,
+            tesouro: 1504071402.0,
+            divida: 2105699962.9,
+            limite_credito: 10829358012.8,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1476,8 +1476,8 @@
         fila_construcao: [
             (provincia_id: "pol_3146", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 821933196.0,
-        pib_diario: 68494433.0,
+        fundo_investimento_privado: 721954273.0,
+        pib_diario: 60162856.1,
     ),
     (
         id: "cze",
@@ -1505,9 +1505,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 1301336025.0,
-            divida: 1821870435.0,
-            limite_credito: 9369669380.0,
+            tesouro: 845171459.4,
+            divida: 1183240043.2,
+            limite_credito: 6085266981.1,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1516,8 +1516,8 @@
         fila_construcao: [
             (provincia_id: "cze_1595", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 624641292.0,
-        pib_diario: 52053441.0,
+        fundo_investimento_privado: 405682300.5,
+        pib_diario: 33806858.4,
     ),
     (
         id: "yug",
@@ -1545,9 +1545,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 821891275.0,
-            divida: 1150647785.0,
-            limite_credito: 5917667180.0,
+            tesouro: 666246050.5,
+            divida: 932744470.7,
+            limite_credito: 4797012094.9,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1556,8 +1556,8 @@
         fila_construcao: [
             (provincia_id: "srb_836", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 394507812.0,
-        pib_diario: 32875651.0,
+        fundo_investimento_privado: 319798104.2,
+        pib_diario: 26649842.0,
     ),
     (
         id: "alb",
@@ -1585,9 +1585,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 61674350.0,
-            divida: 86344090.0,
-            limite_credito: 444105320.0,
+            tesouro: 54332616.4,
+            divida: 76065663.0,
+            limite_credito: 391238886.1,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1596,8 +1596,8 @@
         fila_construcao: [
             (provincia_id: "alb_1494", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 29603688.0,
-        pib_diario: 2466974.0,
+        fundo_investimento_privado: 26079655.9,
+        pib_diario: 2173304.7,
     ),
     (
         id: "rom",
@@ -1625,9 +1625,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 958878550.0,
-            divida: 1342429970.0,
-            limite_credito: 6903975560.0,
+            tesouro: 900895287.2,
+            divida: 1261253402.1,
+            limite_credito: 6486493044.2,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1636,8 +1636,8 @@
         fila_construcao: [
             (provincia_id: "rou_128", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 460261704.0,
-        pib_diario: 38355142.0,
+        fundo_investimento_privado: 432429737.8,
+        pib_diario: 36035811.5,
     ),
     (
         id: "bul",
@@ -1665,9 +1665,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 465756000.0,
-            divida: 652058400.0,
-            limite_credito: 3353493200.0,
+            tesouro: 386488207.3,
+            divida: 541083490.2,
+            limite_credito: 2782756583.0,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1676,8 +1676,8 @@
         fila_construcao: [
             (provincia_id: "bgr_2243", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 223562880.0,
-        pib_diario: 18630240.0,
+        fundo_investimento_privado: 185514339.5,
+        pib_diario: 15459528.3,
     ),
     (
         id: "tur",
@@ -1705,9 +1705,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 1335643050.0,
-            divida: 1869900270.0,
-            limite_credito: 9616679960.0,
+            tesouro: 1141853621.1,
+            divida: 1598595069.6,
+            limite_credito: 8221388817.5,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1716,8 +1716,8 @@
         fila_construcao: [
             (provincia_id: "tur_2265", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 641108664.0,
-        pib_diario: 53425722.0,
+        fundo_investimento_privado: 548089738.1,
+        pib_diario: 45674144.8,
     ),
     (
         id: "irn",
@@ -1905,9 +1905,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 150688550.0,
-            divida: 210963970.0,
-            limite_credito: 1085007560.0,
+            tesouro: 137878068.8,
+            divida: 193029296.4,
+            limite_credito: 992767844.9,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1916,8 +1916,8 @@
         fila_construcao: [
             (provincia_id: "syr_4843", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 72330504.0,
-        pib_diario: 6027542.0,
+        fundo_investimento_privado: 66181473.0,
+        pib_diario: 5515122.8,
     ),
     (
         id: "leb",
@@ -1945,9 +1945,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 75328012.0,
-            divida: 105459218.0,
-            limite_credito: 542411690.0,
+            tesouro: 62983548.6,
+            divida: 88176969.1,
+            limite_credito: 453523359.4,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -1956,8 +1956,8 @@
         fila_construcao: [
             (provincia_id: "lbn_3024", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 36157446.0,
-        pib_diario: 3013120.5,
+        fundo_investimento_privado: 30232103.6,
+        pib_diario: 2519342.0,
     ),
     (
         id: "jor",
@@ -2025,9 +2025,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 164409962.0,
-            divida: 230173948.0,
-            limite_credito: 1183801730.0,
+            tesouro: 133612832.4,
+            divida: 187057966.4,
+            limite_credito: 962053030.6,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -2036,8 +2036,8 @@
         fila_construcao: [
             (provincia_id: "isr_3058", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 78916782.0,
-        pib_diario: 6576398.5,
+        fundo_investimento_privado: 64134159.8,
+        pib_diario: 5344513.3,
     ),
     (
         id: "kwt",
@@ -2305,9 +2305,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 17123290925.0,
-            divida: 23972607295.0,
-            limite_credito: 123287744660.0,
+            tesouro: 16064141882.3,
+            divida: 22489798635.2,
+            limite_credito: 115661868459.9,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -2316,8 +2316,8 @@
         fila_construcao: [
             (provincia_id: "ind_2447", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 8219179644.0,
-        pib_diario: 684931637.0,
+        fundo_investimento_privado: 7710788103.5,
+        pib_diario: 642565675.3,
     ),
     (
         id: "cey",
@@ -2345,9 +2345,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 308211400.0,
-            divida: 431495960.0,
-            limite_credito: 2219172080.0,
+            tesouro: 263213297.0,
+            divida: 368498615.8,
+            limite_credito: 1895178438.7,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -2356,8 +2356,8 @@
         fila_construcao: [
             (provincia_id: "lka_2470", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 147941472.0,
-        pib_diario: 12328456.0,
+        fundo_investimento_privado: 126342382.6,
+        pib_diario: 10528531.9,
     ),
     (
         id: "nep",
@@ -2505,9 +2505,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 1027391350.0,
-            divida: 1438347890.0,
-            limite_credito: 7397267720.0,
+            tesouro: 962421862.9,
+            divida: 1347390608.1,
+            limite_credito: 6929484251.3,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -2516,8 +2516,8 @@
         fila_construcao: [
             (provincia_id: "kor_2497", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 493147848.0,
-        pib_diario: 41095654.0,
+        fundo_investimento_privado: 461962494.2,
+        pib_diario: 38496874.5,
     ),
     (
         id: "mon",
@@ -2545,9 +2545,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 47920362.0,
-            divida: 67088508.0,
-            limite_credito: 345076610.0,
+            tesouro: 43600431.3,
+            divida: 61040604.9,
+            limite_credito: 313968601.0,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -2556,8 +2556,8 @@
         fila_construcao: [
             (provincia_id: "mng_3331", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 23001774.0,
-        pib_diario: 1916814.5,
+        fundo_investimento_privado: 20928207.2,
+        pib_diario: 1744017.3,
     ),
     (
         id: "tib",
@@ -2625,9 +2625,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 61658425.0,
-            divida: 86321795.0,
-            limite_credito: 443990660.0,
+            tesouro: 41528384.9,
+            divida: 58139738.8,
+            limite_credito: 299038047.1,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -2636,8 +2636,8 @@
         fila_construcao: [
             (provincia_id: "hkg_5157", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 29596044.0,
-        pib_diario: 2466337.0,
+        fundo_investimento_privado: 19933624.7,
+        pib_diario: 1661135.4,
     ),
     (
         id: "mac",
@@ -2785,9 +2785,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 328736950.0,
-            divida: 460231730.0,
-            limite_credito: 2366956040.0,
+            tesouro: 274259811.3,
+            divida: 383963735.8,
+            limite_credito: 1974712355.2,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -2796,8 +2796,8 @@
         fila_construcao: [
             (provincia_id: "mys_1139", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 157793736.0,
-        pib_diario: 13149478.0,
+        fundo_investimento_privado: 131644709.4,
+        pib_diario: 10970392.5,
     ),
     (
         id: "phi",
@@ -2825,9 +2825,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 650682075.0,
-            divida: 910954905.0,
-            limite_credito: 4684960940.0,
+            tesouro: 558455114.2,
+            divida: 781837159.8,
+            limite_credito: 4020919735.0,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -2836,8 +2836,8 @@
         fila_construcao: [
             (provincia_id: "phl_5543", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 312327396.0,
-        pib_diario: 26027283.0,
+        fundo_investimento_privado: 268058454.8,
+        pib_diario: 22338204.6,
     ),
     (
         id: "bru",
@@ -3025,9 +3025,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 2410928525.0,
-            divida: 3375299935.0,
-            limite_credito: 17358735380.0,
+            tesouro: 2253294292.1,
+            divida: 3154612008.9,
+            limite_credito: 16223765633.8,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3036,8 +3036,8 @@
         fila_construcao: [
             (provincia_id: "bra_1311", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 1157245692.0,
-        pib_diario: 96437141.0,
+        fundo_investimento_privado: 1081581260.2,
+        pib_diario: 90131771.7,
     ),
     (
         id: "arg",
@@ -3065,9 +3065,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 3287715475.0,
-            divida: 4602801665.0,
-            limite_credito: 23671601420.0,
+            tesouro: 1483125744.9,
+            divida: 2076376042.8,
+            limite_credito: 10678527918.7,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3076,8 +3076,8 @@
         fila_construcao: [
             (provincia_id: "arg_5493", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 1578103428.0,
-        pib_diario: 131508619.0,
+        fundo_investimento_privado: 711900357.5,
+        pib_diario: 59325029.8,
     ),
     (
         id: "chl",
@@ -3105,9 +3105,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 958907800.0,
-            divida: 1342470920.0,
-            limite_credito: 6904186160.0,
+            tesouro: 550966324.1,
+            divida: 771352853.7,
+            limite_credito: 3966986262.0,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3116,8 +3116,8 @@
         fila_construcao: [
             (provincia_id: "chl_2698", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 460275744.0,
-        pib_diario: 38356312.0,
+        fundo_investimento_privado: 264463835.5,
+        pib_diario: 22038653.0,
     ),
     (
         id: "col",
@@ -3145,9 +3145,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 856165550.0,
-            divida: 1198631770.0,
-            limite_credito: 6164441960.0,
+            tesouro: 683926029.2,
+            divida: 957496440.8,
+            limite_credito: 4924307351.2,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3156,8 +3156,8 @@
         fila_construcao: [
             (provincia_id: "col_1399", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 410959464.0,
-        pib_diario: 34246622.0,
+        fundo_investimento_privado: 328284494.0,
+        pib_diario: 27357041.2,
     ),
     (
         id: "ven",
@@ -3185,9 +3185,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 808252300.0,
-            divida: 1131553220.0,
-            limite_credito: 5819466560.0,
+            tesouro: 450252736.6,
+            divida: 630353831.3,
+            limite_credito: 3241847557.1,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3196,8 +3196,8 @@
         fila_construcao: [
             (provincia_id: "ven_43", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 387961104.0,
-        pib_diario: 32330092.0,
+        fundo_investimento_privado: 216121313.6,
+        pib_diario: 18010109.5,
     ),
     (
         id: "per",
@@ -3225,9 +3225,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 609576800.0,
-            divida: 853407520.0,
-            limite_credito: 4389002960.0,
+            tesouro: 482858953.9,
+            divida: 676002535.5,
+            limite_credito: 3476624074.5,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3236,8 +3236,8 @@
         fila_construcao: [
             (provincia_id: "per_591", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 292596864.0,
-        pib_diario: 24383072.0,
+        fundo_investimento_privado: 231772297.9,
+        pib_diario: 19314358.2,
     ),
     (
         id: "bol",
@@ -3265,9 +3265,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 219164475.0,
-            divida: 306830265.0,
-            limite_credito: 1578034220.0,
+            tesouro: 198821199.6,
+            divida: 278349679.4,
+            limite_credito: 1431557995.7,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3276,8 +3276,8 @@
         fila_construcao: [
             (provincia_id: "bol_1936", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 105198948.0,
-        pib_diario: 8766579.0,
+        fundo_investimento_privado: 95434175.8,
+        pib_diario: 7952848.0,
     ),
     (
         id: "par",
@@ -3305,9 +3305,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 102763775.0,
-            divida: 143869285.0,
-            limite_credito: 739949180.0,
+            tesouro: 75783707.8,
+            divida: 106097190.9,
+            limite_credito: 545679568.6,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3316,8 +3316,8 @@
         fila_construcao: [
             (provincia_id: "pry_4837", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 49326612.0,
-        pib_diario: 4110551.0,
+        fundo_investimento_privado: 36376179.7,
+        pib_diario: 3031348.3,
     ),
     (
         id: "uru",
@@ -3345,9 +3345,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 561678900.0,
-            divida: 786350460.0,
-            limite_credito: 4044138080.0,
+            tesouro: 199961405.6,
+            divida: 279945967.9,
+            limite_credito: 1439739921.0,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3356,8 +3356,8 @@
         fila_construcao: [
             (provincia_id: "ury_21", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 269605872.0,
-        pib_diario: 22467156.0,
+        fundo_investimento_privado: 95981474.7,
+        pib_diario: 7998456.2,
     ),
     (
         id: "ecu",
@@ -3385,9 +3385,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 212300850.0,
-            divida: 297221190.0,
-            limite_credito: 1528616120.0,
+            tesouro: 176300073.6,
+            divida: 246820103.0,
+            limite_credito: 1269402050.9,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3396,8 +3396,8 @@
         fila_construcao: [
             (provincia_id: "ecu_1287", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 101904408.0,
-        pib_diario: 8492034.0,
+        fundo_investimento_privado: 84624035.3,
+        pib_diario: 7052002.9,
     ),
     (
         id: "guy",
@@ -3545,9 +3545,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 2294494375.0,
-            divida: 3212292125.0,
-            limite_credito: 16520409500.0,
+            tesouro: 1943418716.4,
+            divida: 2720786202.9,
+            limite_credito: 13992657107.5,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3556,8 +3556,8 @@
         fila_construcao: [
             (provincia_id: "mex_2727", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 1101357300.0,
-        pib_diario: 91779775.0,
+        fundo_investimento_privado: 932840983.9,
+        pib_diario: 77736748.7,
     ),
     (
         id: "gua",
@@ -3585,9 +3585,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 164383525.0,
-            divida: 230136935.0,
-            limite_credito: 1183611380.0,
+            tesouro: 143473766.0,
+            divida: 200863272.3,
+            limite_credito: 1033054754.8,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3596,8 +3596,8 @@
         fila_construcao: [
             (provincia_id: "gtm_1951", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 78904092.0,
-        pib_diario: 6575341.0,
+        fundo_investimento_privado: 68867407.7,
+        pib_diario: 5738950.6,
     ),
     (
         id: "slv",
@@ -3625,9 +3625,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 123307250.0,
-            divida: 172630150.0,
-            limite_credito: 887862200.0,
+            tesouro: 104888986.8,
+            divida: 146844581.5,
+            limite_credito: 755243236.6,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3636,8 +3636,8 @@
         fila_construcao: [
             (provincia_id: "slv_1349", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 59187480.0,
-        pib_diario: 4932290.0,
+        fundo_investimento_privado: 50346713.7,
+        pib_diario: 4195559.5,
     ),
     (
         id: "hon",
@@ -3665,9 +3665,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 75376762.0,
-            divida: 105527468.0,
-            limite_credito: 542762690.0,
+            tesouro: 62362278.4,
+            divida: 87307190.7,
+            limite_credito: 449049774.2,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3676,8 +3676,8 @@
         fila_construcao: [
             (provincia_id: "hnd_639", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 36180846.0,
-        pib_diario: 3015070.5,
+        fundo_investimento_privado: 29933893.8,
+        pib_diario: 2494491.2,
     ),
     (
         id: "nic",
@@ -3705,9 +3705,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 61649088.0,
-            divida: 86308722.0,
-            limite_credito: 443923430.0,
+            tesouro: 55185479.9,
+            divida: 77259670.9,
+            limite_credito: 397380210.1,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3716,8 +3716,8 @@
         fila_construcao: [
             (provincia_id: "nic_659", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 29591562.0,
-        pib_diario: 2465963.5,
+        fundo_investimento_privado: 26489030.2,
+        pib_diario: 2207419.2,
     ),
     (
         id: "cri",
@@ -3745,9 +3745,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 82208875.0,
-            divida: 115092425.0,
-            limite_credito: 591953900.0,
+            tesouro: 57825990.8,
+            divida: 80956387.2,
+            limite_credito: 416382304.2,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3756,8 +3756,8 @@
         fila_construcao: [
             (provincia_id: "cri_1331", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 39460260.0,
-        pib_diario: 3288355.0,
+        fundo_investimento_privado: 27756475.6,
+        pib_diario: 2313039.6,
     ),
     (
         id: "pan",
@@ -3785,9 +3785,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 89059525.0,
-            divida: 124683335.0,
-            limite_credito: 641278580.0,
+            tesouro: 51313971.7,
+            divida: 71839560.4,
+            limite_credito: 369489405.1,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3796,8 +3796,8 @@
         fila_construcao: [
             (provincia_id: "pan_1340", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 42748572.0,
-        pib_diario: 3562381.0,
+        fundo_investimento_privado: 24630706.4,
+        pib_diario: 2052558.9,
     ),
     (
         id: "cub",
@@ -3825,9 +3825,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 445230000.0,
-            divida: 623322000.0,
-            limite_credito: 3205706000.0,
+            tesouro: 350238629.2,
+            divida: 490334080.9,
+            limite_credito: 2521757462.7,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3836,8 +3836,8 @@
         fila_construcao: [
             (provincia_id: "cub_1428", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 213710400.0,
-        pib_diario: 17809200.0,
+        fundo_investimento_privado: 168114542.0,
+        pib_diario: 14009545.2,
     ),
     (
         id: "hai",
@@ -3905,9 +3905,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 109619062.0,
-            divida: 153466688.0,
-            limite_credito: 789307250.0,
+            tesouro: 96963926.3,
+            divida: 135749497.9,
+            limite_credito: 698184500.3,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -3916,8 +3916,8 @@
         fila_construcao: [
             (provincia_id: "dom_1390", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 52617150.0,
-        pib_diario: 4384762.5,
+        fundo_investimento_privado: 46542684.8,
+        pib_diario: 3878557.1,
     ),
     (
         id: "new",
@@ -4025,9 +4025,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 260241550.0,
-            divida: 364338170.0,
-            limite_credito: 1873789160.0,
+            tesouro: 154880488.1,
+            divida: 216832683.3,
+            limite_credito: 1115169271.2,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -4036,8 +4036,8 @@
         fila_construcao: [
             (provincia_id: "jam_1377", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 124915944.0,
-        pib_diario: 10409662.0,
+        fundo_investimento_privado: 74342634.3,
+        pib_diario: 6195219.5,
     ),
     (
         id: "blz",
@@ -4145,9 +4145,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 856193625.0,
-            divida: 1198671075.0,
-            limite_credito: 6164644100.0,
+            tesouro: 803089293.4,
+            divida: 1124325010.7,
+            limite_credito: 5782289811.2,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -4156,8 +4156,8 @@
         fila_construcao: [
             (provincia_id: "egy_1533", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 410972940.0,
-        pib_diario: 34247745.0,
+        fundo_investimento_privado: 385482860.8,
+        pib_diario: 32123571.7,
     ),
     (
         id: "sud",
@@ -4225,9 +4225,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 424631700.0,
-            divida: 594484380.0,
-            limite_credito: 3057398240.0,
+            tesouro: 380700042.9,
+            divida: 532980060.0,
+            limite_credito: 2741085135.8,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -4236,8 +4236,8 @@
         fila_construcao: [
             (provincia_id: "dza_2195", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 203823216.0,
-        pib_diario: 16985268.0,
+        fundo_investimento_privado: 182736020.6,
+        pib_diario: 15228001.7,
     ),
     (
         id: "mor",
@@ -4305,9 +4305,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 164379600.0,
-            divida: 230131440.0,
-            limite_credito: 1183583120.0,
+            tesouro: 146789552.3,
+            divida: 205505373.2,
+            limite_credito: 1056929425.8,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -4316,8 +4316,8 @@
         fila_construcao: [
             (provincia_id: "tun_108", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 78902208.0,
-        pib_diario: 6575184.0,
+        fundo_investimento_privado: 70458985.1,
+        pib_diario: 5871582.1,
     ),
     (
         id: "lby",
@@ -4345,9 +4345,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 54773125.0,
-            divida: 76682375.0,
-            limite_credito: 394416500.0,
+            tesouro: 49530288.4,
+            divida: 69342403.7,
+            limite_credito: 356663290.4,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -4356,8 +4356,8 @@
         fila_construcao: [
             (provincia_id: "lby_2978", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 26291100.0,
-        pib_diario: 2190925.0,
+        fundo_investimento_privado: 23774538.4,
+        pib_diario: 1981211.5,
     ),
     (
         id: "smo",
@@ -4505,9 +4505,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 44500138.0,
-            divida: 62300192.0,
-            limite_credito: 320450990.0,
+            tesouro: 38084256.0,
+            divida: 53317957.4,
+            limite_credito: 274249431.5,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -4516,8 +4516,8 @@
         fila_construcao: [
             (provincia_id: "lbr_788", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 21360066.0,
-        pib_diario: 1780005.5,
+        fundo_investimento_privado: 18280442.7,
+        pib_diario: 1523370.2,
     ),
     (
         id: "saf",
@@ -4545,9 +4545,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 1986299850.0,
-            divida: 2780819790.0,
-            limite_credito: 14301408920.0,
+            tesouro: 1074531472.2,
+            divida: 1504344061.0,
+            limite_credito: 7736653648.2,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -4556,8 +4556,8 @@
         fila_construcao: [
             (provincia_id: "zaf_1208", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 953423928.0,
-        pib_diario: 79451994.0,
+        fundo_investimento_privado: 515775106.6,
+        pib_diario: 42981258.9,
     ),
     (
         id: "nga",
@@ -5425,9 +5425,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 16428406.0,
-            divida: 22999769.0,
-            limite_credito: 118334525.0,
+            tesouro: 15294752.9,
+            divida: 21412654.6,
+            limite_credito: 110168772.4,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -5436,8 +5436,8 @@
         fila_construcao: [
             (provincia_id: "gnb_769", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 7885635.0,
-        pib_diario: 657136.25,
+        fundo_investimento_privado: 7341481.5,
+        pib_diario: 611790.1,
     ),
     (
         id: "cpv",
@@ -5625,9 +5625,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 102721038.0,
-            divida: 143809452.0,
-            limite_credito: 739641470.0,
+            tesouro: 92246860.7,
+            divida: 129145603.9,
+            limite_credito: 664222295.6,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -5636,8 +5636,8 @@
         fila_construcao: [
             (provincia_id: "zwe_525", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 49306098.0,
-        pib_diario: 4108841.5,
+        fundo_investimento_privado: 44278492.9,
+        pib_diario: 3689874.4,
     ),
     (
         id: "nya",
@@ -5865,9 +5865,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 3082223838.0,
-            divida: 4315113372.0,
-            limite_credito: 22192061630.0,
+            tesouro: 794473484.9,
+            divida: 1112262878.5,
+            limite_credito: 5720221978.0,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -5876,8 +5876,8 @@
         fila_construcao: [
             (provincia_id: "aus_2654", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 1479467442.0,
-        pib_diario: 123288953.5,
+        fundo_investimento_privado: 381347272.7,
+        pib_diario: 31778939.4,
     ),
     (
         id: "nzl",
@@ -5905,9 +5905,9 @@
             multiplicador_salario_militar: 1.0,
         ),
         orcamento: (
-            tesouro: 856135925.0,
-            divida: 1198590295.0,
-            limite_credito: 6164228660.0,
+            tesouro: 169851587.0,
+            divida: 237792221.8,
+            limite_credito: 1222941345.9,
             taxa_juros_anual_base: 0.035,
             taxa_juros_efetiva_anual: 0.035,
             em_calote: false,
@@ -5916,8 +5916,8 @@
         fila_construcao: [
             (provincia_id: "nzl_3398", tipo_predio_id: "fabrica_textil", progresso_pontos: 0.0, custo_total_pontos: 250.0, privado: false),
         ],
-        fundo_investimento_privado: 410945244.0,
-        pib_diario: 34245437.0,
+        fundo_investimento_privado: 81528761.7,
+        pib_diario: 6794063.5,
     ),
     (
         id: "png",
