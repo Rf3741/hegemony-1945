@@ -9,6 +9,7 @@ pub mod governo;
 pub mod mercado;
 pub mod producao;
 pub mod trabalho;
+pub mod turismo;
 
 use crate::catalogo::CatalogoEconomia;
 use crate::cenario::CenarioEconomia;
@@ -98,8 +99,8 @@ pub struct MundoEconomico {
     nomes_religioes: Vec<String>,
     bens_alimento_basico: Vec<usize>,
     buffers: BuffersTick,
-    /// Fator (população histórica de 1945 / população do cenário) só para exibição, por país.
-    fator_pop_exibicao: BTreeMap<String, f64>,
+    /// Turismo e hotelaria (demanda internacional, atratividade, risco).
+    pub(crate) turismo: turismo::EstadoTurismo,
 }
 
 impl MundoEconomico {
@@ -562,28 +563,8 @@ impl MundoEconomico {
             }
         }
 
-        // População histórica de 1945 (milhões) para exibição; o cenário usa contagens internas maiores.
-        const POP_REAL_1945_MI: [(&str, f64); 14] = [
-            ("usa", 140.0), ("sov", 170.0), ("chi", 500.0), ("ind", 400.0), ("bra", 46.0),
-            ("gbr", 48.0), ("ger", 65.0), ("jap", 72.0), ("fra", 40.0), ("ita", 45.0),
-            ("can", 12.0), ("arg", 15.0), ("pol", 24.0), ("tur", 19.0),
-        ];
-        let mut fator_pop_exibicao = BTreeMap::new();
-        for (id, mi) in POP_REAL_1945_MI {
-            if let Some(&pi) = indice_paises.get(id) {
-                let soma: f64 = cenario.paises[pi]
-                    .provincias_indices
-                    .iter()
-                    .map(|&i| cenario.provincias[i].populacao_total())
-                    .sum();
-                if soma > 0.0 {
-                    fator_pop_exibicao.insert(id.to_string(), mi * 1e6 / soma);
-                }
-            }
-        }
-
         Ok(Self {
-            fator_pop_exibicao,
+            turismo: Default::default(),
             data_atual: cenario.data_inicial,
             dias_decorridos: 0,
             config: cenario.config,
@@ -777,6 +758,7 @@ impl MundoEconomico {
 
         self.dias_decorridos = proximo_dia_num;
         self.cobrar_pedagios_canais();
+        self.aplicar_turismo_diario();
         self.data_atual.avancar_dia();
 
         let pib_mundial_diario = self.paises.iter().map(|p| p.pib_diario).sum();
@@ -960,6 +942,7 @@ impl MundoEconomico {
 
         self.dias_decorridos = proximo_dia_num;
         self.cobrar_pedagios_canais();
+        self.aplicar_turismo_diario();
         self.data_atual.avancar_dia();
 
         let pib_mundial_diario = self.paises.iter().map(|p| p.pib_diario).sum();
@@ -1335,11 +1318,9 @@ impl MundoEconomico {
         Some(soma)
     }
 
-    /// População para exibição na interface: ajustada à escala histórica de 1945 nos países
-    /// grandes (o cenário usa contagens internas maiores, p.ex. EUA 684 mi contra ~140 mi reais).
+    /// População para exibição na interface: igual à população total do país (escala histórica real de 1945).
     pub fn populacao_exibida_pais(&self, pais_id: &str) -> Option<f64> {
-        let bruta = self.populacao_total_pais(pais_id)?;
-        Some(bruta * self.fator_pop_exibicao.get(pais_id).copied().unwrap_or(1.0))
+        self.populacao_total_pais(pais_id)
     }
 
     /// Padrão de vida médio ponderado pela população nacional.

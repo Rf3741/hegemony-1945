@@ -319,6 +319,7 @@ fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPai
                 linha_fluxo(ui, "Imposto sobre a terra", o.receita_imposto_terra);
                 linha_fluxo(ui, "Empresas estatais", o.receita_dividendos_estatais);
                 linha_fluxo(ui, "Tarifas de importação", o.receita_tarifas);
+                linha_fluxo(ui, "Turismo e hotelaria", o.receita_turismo);
             });
             egui::Grid::new("despesas").num_columns(2).show(&mut cols[1], |ui| {
                 ui.strong("Despesas");
