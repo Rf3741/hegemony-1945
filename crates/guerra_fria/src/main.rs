@@ -23,6 +23,7 @@ use plugins::{
     visual_construcoes::VisualConstrucoesPlugin,
     rotulos_pais::RotulosPaisPlugin,
     tecnologia_ui::TecnologiaUiPlugin,
+    estatisticas::EstatisticasPlugin,
 };
 use simulacao::mundo::MundoJogo;
 use std::path::PathBuf;
@@ -77,5 +78,6 @@ fn main() {
         .add_plugins(EventosPlugin)
         .add_plugins(DiplomaciaUiPlugin)
         .add_plugins(TecnologiaUiPlugin)
+        .add_plugins(EstatisticasPlugin)
         .run();
 }

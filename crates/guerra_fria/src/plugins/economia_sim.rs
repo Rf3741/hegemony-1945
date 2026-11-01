@@ -270,14 +270,52 @@ impl Nucleo {
         let m_idx = mundo.indice_mercado_do_pais(pais_id);
         let mut v = VistaEconomia { pais_id: pais_id.to_string(), catalogo: Some(self.catalogo.clone()), dias: mundo.dias_decorridos(), ..Default::default() };
 
+        // Desemprego e produção de bens por país calculados das províncias
+        let mut desemp_por_pais: BTreeMap<String, (f64, f64)> = BTreeMap::new();
+        let mut prod_bens_por_pais: BTreeMap<String, Vec<f64>> = BTreeMap::new();
+        let num_bens = cat.bens.len();
+
+        for pr in mundo.provincias() {
+            let entry_pop = desemp_por_pais.entry(pr.pais_id.clone()).or_insert((0.0, 0.0));
+            for pop in &pr.pops {
+                let tp = cat.tipos_pop.iter().find(|t| t.id == pop.tipo_pop_id);
+                if !tp.is_some_and(|t| t.subsistencia) {
+                    entry_pop.0 += pop.desempregados();
+                    entry_pop.1 += pop.populacao;
+                }
+            }
+            let entry_prod = prod_bens_por_pais.entry(pr.pais_id.clone()).or_insert_with(|| vec![0.0; num_bens]);
+            for pred in &pr.predios {
+                let escala = pred.escala_efetiva();
+                if escala > 0.0 {
+                    for &(b_idx, qtd) in pred.produtos_por_nivel() {
+                        if (b_idx as usize) < num_bens {
+                            entry_prod[b_idx as usize] += escala * qtd;
+                        }
+                    }
+                }
+            }
+        }
+
         // Ranking de todos os países
         for p in mundo.paises() {
+            let (desemp_qtd, pop_trab) = desemp_por_pais.get(&p.id).copied().unwrap_or((0.0, 0.0));
+            let taxa_desemp = if pop_trab > 0.0 { desemp_qtd / pop_trab } else { 0.0 };
+            let prod_bens = prod_bens_por_pais.remove(&p.id).unwrap_or_else(|| vec![0.0; num_bens]);
+            let tag = p.tag.clone().unwrap_or_else(|| p.id.to_uppercase());
+
             v.ranking.push(ResumoPaisEco {
                 id: p.id.clone(),
+                tag,
                 nome: p.nome.clone(),
                 pib_anual: p.pib_diario * 365.0,
                 populacao: mundo.populacao_total_pais(&p.id).unwrap_or(0.0),
                 padrao_vida: mundo.padrao_de_vida_medio_pais(&p.id).unwrap_or(0.0),
+                desemprego: taxa_desemp,
+                forca_militar: p.forca_militar_total,
+                tesouro: p.orcamento.tesouro,
+                divida: p.orcamento.divida,
+                producao_bens: prod_bens,
             });
         }
         v.pib_mundial_anual = v.ranking.iter().map(|r| r.pib_anual).sum();
@@ -418,10 +456,16 @@ pub struct VistaBem {
 #[derive(Debug, Clone, Default)]
 pub struct ResumoPaisEco {
     pub id: String,
+    pub tag: String,
     pub nome: String,
     pub pib_anual: f64,
     pub populacao: f64,
     pub padrao_vida: f64,
+    pub desemprego: f64,
+    pub forca_militar: f64,
+    pub tesouro: f64,
+    pub divida: f64,
+    pub producao_bens: Vec<f64>,
 }
 
 #[derive(Debug, Clone, Default)]

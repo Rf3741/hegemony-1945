@@ -1,0 +1,1162 @@
+//! Estatísticas e Ledger Nacional (estilo Victoria 3) - Tecla F7
+//!
+//! - Gráficos históricos com `egui_plot`: PIB, PIB per capita, população, desemprego,
+//!   padrão de vida, dívida, tesouro e produção por bem, comparando múltiplos países.
+//! - Rankings de potência com as "Grandes Potências" (Top 8) no estilo Victoria 3,
+//!   divididos em Potência Econômica, Militar e de Influência / Geopolítica.
+//! - Ledger geral com tabela completa de todos os países ordenável por qualquer coluna.
+//! - Histórico compactado mensalmente em memória (4 bytes por valor escalar).
+
+use super::economia_sim::EconomiaSim;
+use super::economy::RecursoMundo;
+use super::jogador::{PaisJogador, fmt_din, fmt_pop};
+use super::time::RecursoRelogio;
+use bevy::prelude::*;
+use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
+use egui_plot::{Corner, Legend, Line, Plot, PlotPoints};
+use std::collections::{BTreeMap, BTreeSet};
+
+// -------------------------------------------------------------------------------------------------
+// Tipos de dados e histórico compacto
+// -------------------------------------------------------------------------------------------------
+
+/// Métrica selecionada para visualização nos gráficos temporais.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MetricaGrafico {
+    #[default]
+    Pib,
+    PibPerCapita,
+    Populacao,
+    Desemprego,
+    PadraoVida,
+    Divida,
+    Tesouro,
+    ProducaoBem,
+}
+
+impl MetricaGrafico {
+    pub const TODAS: [Self; 8] = [
+        Self::Pib,
+        Self::PibPerCapita,
+        Self::Populacao,
+        Self::Desemprego,
+        Self::PadraoVida,
+        Self::Divida,
+        Self::Tesouro,
+        Self::ProducaoBem,
+    ];
+
+    pub fn titulo(self) -> &'static str {
+        match self {
+            Self::Pib => "PIB Anual",
+            Self::PibPerCapita => "PIB Per Capita",
+            Self::Populacao => "População Total",
+            Self::Desemprego => "Taxa de Desemprego",
+            Self::PadraoVida => "Padrão de Vida (SoL)",
+            Self::Divida => "Dívida Soberana",
+            Self::Tesouro => "Tesouro Nacional",
+            Self::ProducaoBem => "Produção por Bem",
+        }
+    }
+
+    pub fn unidade(self) -> &'static str {
+        match self {
+            Self::Pib | Self::Divida | Self::Tesouro => "US$",
+            Self::PibPerCapita => "US$/hab",
+            Self::Populacao => "habitantes",
+            Self::Desemprego => "%",
+            Self::PadraoVida => "nível SoL (1 a 50)",
+            Self::ProducaoBem => "unidades/dia",
+        }
+    }
+
+    pub fn formatar_valor(self, v: f64) -> String {
+        match self {
+            Self::Pib | Self::Divida | Self::Tesouro => fmt_din(v),
+            Self::PibPerCapita => format!("${:.1}", v),
+            Self::Populacao => fmt_pop(v.max(0.0) as u64),
+            Self::Desemprego => format!("{:.1}%", v * 100.0),
+            Self::PadraoVida => format!("{:.1}", v),
+            Self::ProducaoBem => format!("{:.1}", v),
+        }
+    }
+}
+
+/// Registro compacto de um ponto mensal para um país (4 bytes por campo escalar).
+#[derive(Debug, Clone, Default)]
+pub struct PontoHistoricoPais {
+    pub pib: f32,
+    pub pib_per_capita: f32,
+    pub populacao: f32,
+    pub desemprego: f32,
+    pub padrao_vida: f32,
+    pub divida: f32,
+    pub tesouro: f32,
+    /// Produção por índice do bem no catálogo
+    pub producao_bens: Vec<f32>,
+}
+
+/// Série histórica de um país com identificação e pontos mensais.
+#[derive(Debug, Clone, Default)]
+pub struct HistoricoPais {
+    pub id: String,
+    pub tag: String,
+    pub nome: String,
+    pub cor: egui::Color32,
+    pub pontos: Vec<PontoHistoricoPais>,
+}
+
+/// Mês e ano do calendário da simulação.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MesSimulado {
+    pub ano: i32,
+    pub mes: u8,
+}
+
+impl MesSimulado {
+    pub fn formatar_curto(self) -> String {
+        let mes_str = match self.mes {
+            1 => "Jan",
+            2 => "Fev",
+            3 => "Mar",
+            4 => "Abr",
+            5 => "Mai",
+            6 => "Jun",
+            7 => "Jul",
+            8 => "Ago",
+            9 => "Set",
+            10 => "Out",
+            11 => "Nov",
+            12 => "Dez",
+            _ => "Mês",
+        };
+        format!("{}/{}", mes_str, self.ano)
+    }
+}
+
+/// Item descritivo de um bem econômico do catálogo para seleção no gráfico.
+#[derive(Debug, Clone)]
+pub struct DescricaoBem {
+    pub idx: usize,
+    pub id: String,
+    pub nome: String,
+}
+
+/// Categoria geopolítica de classificação estilo Victoria 3.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum GrauPotencia {
+    GrandePotencia, // Ranks 1-8
+    PotenciaMaior,  // Ranks 9-20
+    PotenciaMenor,  // Ranks 21+
+}
+
+impl GrauPotencia {
+    pub fn rotulo(self) -> &'static str {
+        match self {
+            Self::GrandePotencia => "Grande Potência",
+            Self::PotenciaMaior => "Potência Maior",
+            Self::PotenciaMenor => "Potência Menor",
+        }
+    }
+
+    pub fn badge_cor(self) -> egui::Color32 {
+        match self {
+            Self::GrandePotencia => egui::Color32::from_rgb(255, 215, 0), // Dourado
+            Self::PotenciaMaior => egui::Color32::from_rgb(180, 200, 240), // Prateado-azulado
+            Self::PotenciaMenor => egui::Color32::from_rgb(160, 160, 160), // Cinza
+        }
+    }
+
+    pub fn icone(self) -> &'static str {
+        match self {
+            Self::GrandePotencia => "👑",
+            Self::PotenciaMaior => "⭐",
+            Self::PotenciaMenor => "🔹",
+        }
+    }
+}
+
+/// Avaliação de potência e prestígio de um país.
+#[derive(Debug, Clone)]
+pub struct EntradaRankingPotencia {
+    pub rank_geral: usize,
+    pub grau: GrauPotencia,
+    pub id: String,
+    pub tag: String,
+    pub nome: String,
+    pub cor: egui::Color32,
+    pub pontuacao_total: f64,
+    pub pontuacao_eco: f64,
+    pub pontuacao_mil: f64,
+    pub pontuacao_inf: f64,
+    pub pib_anual: f64,
+    pub populacao: f64,
+    pub padrao_vida: f64,
+    pub desemprego: f64,
+    pub forca_militar: f64,
+    pub tesouro: f64,
+    pub divida: f64,
+    pub esfera: &'static str,
+}
+
+/// Colunas da tabela geral ordenável do Ledger.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColunaLedger {
+    #[default]
+    RankGeral,
+    Nome,
+    PontuacaoTotal,
+    PontuacaoEco,
+    Pib,
+    PontuacaoMil,
+    ForcaMil,
+    PontuacaoInf,
+    Populacao,
+    PadraoVida,
+    Desemprego,
+    Tesouro,
+    Divida,
+}
+
+/// Abas principais da interface de Estatísticas e Ledger (F7).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AbaLedger {
+    #[default]
+    GraficosHistoricos,
+    RankingsPotencias,
+    TabelaPaises,
+}
+
+// -------------------------------------------------------------------------------------------------
+// Recurso de histórico e estado do Ledger
+// -------------------------------------------------------------------------------------------------
+
+/// Recurso ECS que mantém o histórico temporal compacto e as preferências de visualização.
+#[derive(Resource)]
+pub struct RecursoLedger {
+    pub aberto: bool,
+    pub aba_ativa: AbaLedger,
+    pub metrica_grafico: MetricaGrafico,
+    pub bem_selecionado_idx: usize,
+    pub catalogo_bens: Vec<DescricaoBem>,
+    /// Meses registrados no histórico
+    pub meses: Vec<MesSimulado>,
+    /// Histórico compactado por país: id -> HistoricoPais
+    pub historico_paises: BTreeMap<String, HistoricoPais>,
+    /// Países marcados para comparação no gráfico
+    pub paises_selecionados: BTreeSet<String>,
+    /// Filtro de texto para pesquisar países nos gráficos e no ledger
+    pub filtro_busca: String,
+    /// Último mês em que o snapshot foi gravado
+    pub ultimo_mes_gravado: Option<MesSimulado>,
+    /// Ordenação da tabela
+    pub coluna_ordenacao: ColunaLedger,
+    pub ordenacao_decrescente: bool,
+    /// Filtro de esfera/bloco na tabela
+    pub filtro_bloco: Option<String>,
+    /// Cache de rankings calculados no último tick
+    pub rankings_cache: Vec<EntradaRankingPotencia>,
+}
+
+impl Default for RecursoLedger {
+    fn default() -> Self {
+        Self {
+            aberto: false,
+            aba_ativa: AbaLedger::GraficosHistoricos,
+            metrica_grafico: MetricaGrafico::Pib,
+            bem_selecionado_idx: 0,
+            catalogo_bens: Vec::new(),
+            meses: Vec::new(),
+            historico_paises: BTreeMap::new(),
+            paises_selecionados: BTreeSet::new(),
+            filtro_busca: String::new(),
+            ultimo_mes_gravado: None,
+            coluna_ordenacao: ColunaLedger::PontuacaoTotal,
+            ordenacao_decrescente: true,
+            filtro_bloco: None,
+            rankings_cache: Vec::new(),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Paleta de cores para gráficos
+// -------------------------------------------------------------------------------------------------
+
+const PALETA_CORES_GRAFICO: [egui::Color32; 16] = [
+    egui::Color32::from_rgb(80, 160, 240),  // Azul claro
+    egui::Color32::from_rgb(240, 80, 80),   // Vermelho vívido
+    egui::Color32::from_rgb(80, 220, 120),  // Verde esmeralda
+    egui::Color32::from_rgb(250, 200, 60),  // Dourado / Amarelo
+    egui::Color32::from_rgb(190, 100, 240), // Roxo / Violeta
+    egui::Color32::from_rgb(250, 140, 60),  // Laranja
+    egui::Color32::from_rgb(60, 230, 230),  // Ciano
+    egui::Color32::from_rgb(255, 120, 180), // Rosa
+    egui::Color32::from_rgb(160, 230, 80),  // Lima
+    egui::Color32::from_rgb(140, 180, 255), // Azul céu
+    egui::Color32::from_rgb(255, 180, 120), // Pêssego
+    egui::Color32::from_rgb(180, 220, 200), // Menta
+    egui::Color32::from_rgb(220, 160, 255), // Lavanda
+    egui::Color32::from_rgb(255, 230, 140), // Creme
+    egui::Color32::from_rgb(140, 210, 240), // Turquesa
+    egui::Color32::from_rgb(230, 130, 130), // Coral
+];
+
+fn cor_para_indice(idx: usize) -> egui::Color32 {
+    PALETA_CORES_GRAFICO[idx % PALETA_CORES_GRAFICO.len()]
+}
+
+// -------------------------------------------------------------------------------------------------
+// Plugin Bevy
+// -------------------------------------------------------------------------------------------------
+
+pub struct EstatisticasPlugin;
+
+impl Plugin for EstatisticasPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<RecursoLedger>()
+            .add_systems(
+                Update,
+                (
+                    alternar_tecla_f7,
+                    coletar_historico_mensal,
+                    atualizar_rankings_sistema,
+                )
+                    .chain()
+                    .run_if(in_state(crate::estado::AppState::Jogando)),
+            )
+            .add_systems(
+                EguiPrimaryContextPass,
+                desenhar_tela_ledger.run_if(in_state(crate::estado::AppState::Jogando)),
+            );
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Sistemas de atualização e coleta
+// -------------------------------------------------------------------------------------------------
+
+fn alternar_tecla_f7(
+    teclas: Res<ButtonInput<KeyCode>>,
+    mut ledger: ResMut<RecursoLedger>,
+) {
+    if teclas.just_pressed(KeyCode::F7) {
+        ledger.aberto = !ledger.aberto;
+    }
+    if ledger.aberto && teclas.just_pressed(KeyCode::Escape) {
+        ledger.aberto = false;
+    }
+}
+
+/// Coleta e armazena os dados mensais de forma compacta.
+fn coletar_historico_mensal(
+    mut ledger: ResMut<RecursoLedger>,
+    relogio: Res<RecursoRelogio>,
+    eco: Option<Res<EconomiaSim>>,
+    mundo_geo: Res<RecursoMundo>,
+    jogador: Option<Res<PaisJogador>>,
+) {
+    let Some(eco) = eco else { return };
+    if eco.vista.ranking.is_empty() {
+        return;
+    }
+
+    // Inicializa catálogo de bens caso esteja vazio
+    if ledger.catalogo_bens.is_empty() {
+        if let Some(cat) = &eco.vista.catalogo {
+            ledger.catalogo_bens = cat
+                .bens
+                .iter()
+                .enumerate()
+                .map(|(i, b)| DescricaoBem {
+                    idx: i,
+                    id: b.id.clone(),
+                    nome: b.nome.clone(),
+                })
+                .collect();
+        } else if !eco.vista.bens.is_empty() {
+            ledger.catalogo_bens = eco
+                .vista
+                .bens
+                .iter()
+                .enumerate()
+                .map(|(i, b)| DescricaoBem {
+                    idx: i,
+                    id: b.id.clone(),
+                    nome: b.nome.clone(),
+                })
+                .collect();
+        }
+    }
+
+    // Garante que o país do jogador esteja selecionado por padrão na primeira carga
+    if ledger.paises_selecionados.is_empty() {
+        if let Some(j) = &jogador {
+            let id_eco = eco.id_pais(&j.0).unwrap_or_else(|| j.0.to_lowercase());
+            ledger.paises_selecionados.insert(id_eco);
+        }
+    }
+
+    let mes_atual = MesSimulado {
+        ano: relogio.data.ano,
+        mes: relogio.data.mes,
+    };
+
+    // Só grava uma vez por mês
+    if ledger.ultimo_mes_gravado == Some(mes_atual) {
+        return;
+    }
+
+    // Grava o snapshot do mês
+    ledger.meses.push(mes_atual);
+    ledger.ultimo_mes_gravado = Some(mes_atual);
+
+    let num_bens = ledger.catalogo_bens.len();
+
+    for p in &eco.vista.ranking {
+        let tag = if p.tag.is_empty() { p.id.to_uppercase() } else { p.tag.clone() };
+        let cor_geo = mundo_geo
+            .paises
+            .get(&tag)
+            .map(|gp| egui::Color32::from_rgb(gp.cor.0, gp.cor.1, gp.cor.2))
+            .unwrap_or_else(|| egui::Color32::from_rgb(180, 180, 180));
+
+        let hist = ledger.historico_paises.entry(p.id.clone()).or_insert_with(|| {
+            HistoricoPais {
+                id: p.id.clone(),
+                tag: tag.clone(),
+                nome: p.nome.clone(),
+                cor: cor_geo,
+                pontos: Vec::new(),
+            }
+        });
+
+        hist.nome = p.nome.clone();
+        hist.tag = tag;
+        hist.cor = cor_geo;
+
+        let pib_capita = if p.populacao > 0.0 {
+            (p.pib_anual / p.populacao) as f32
+        } else {
+            0.0
+        };
+
+        let mut prod_bens_f32 = vec![0.0_f32; num_bens];
+        for (i, &qtd) in p.producao_bens.iter().enumerate() {
+            if i < num_bens {
+                prod_bens_f32[i] = qtd as f32;
+            }
+        }
+
+        hist.pontos.push(PontoHistoricoPais {
+            pib: p.pib_anual as f32,
+            pib_per_capita: pib_capita,
+            populacao: p.populacao as f32,
+            desemprego: p.desemprego as f32,
+            padrao_vida: p.padrao_vida as f32,
+            divida: p.divida as f32,
+            tesouro: p.tesouro as f32,
+            producao_bens: prod_bens_f32,
+        });
+    }
+}
+
+/// Atualiza o cálculo dos rankings de potência estilo Victoria 3.
+fn atualizar_rankings_sistema(
+    mut ledger: ResMut<RecursoLedger>,
+    eco: Option<Res<EconomiaSim>>,
+    mundo_geo: Res<RecursoMundo>,
+    diplo: Option<Res<super::diplomacia_ui::DiploSim>>,
+) {
+    let Some(eco) = eco else { return };
+    if eco.vista.ranking.is_empty() {
+        return;
+    }
+
+    // Calcula os maiores valores para normalização relativa
+    let mut max_pib = 1.0_f64;
+    let mut max_mil = 1.0_f64;
+
+    for p in &eco.vista.ranking {
+        if p.pib_anual > max_pib {
+            max_pib = p.pib_anual;
+        }
+        if p.forca_militar > max_mil {
+            max_mil = p.forca_militar;
+        }
+    }
+
+    let mut entradas: Vec<EntradaRankingPotencia> = Vec::new();
+
+    for p in &eco.vista.ranking {
+        let tag = if p.tag.is_empty() { p.id.to_uppercase() } else { p.tag.clone() };
+        let cor_geo = mundo_geo
+            .paises
+            .get(&tag)
+            .map(|gp| egui::Color32::from_rgb(gp.cor.0, gp.cor.1, gp.cor.2))
+            .unwrap_or_else(|| egui::Color32::from_rgb(180, 180, 180));
+
+        // 1. Potência Econômica (escala até 1000 pts)
+        // Combina PIB relativo (80%) com Padrão de Vida e População (20%)
+        let ratio_pib = (p.pib_anual / max_pib).clamp(0.0, 1.0);
+        let sol_bonus = (p.padrao_vida / 25.0).clamp(0.0, 1.5);
+        let pont_eco = ratio_pib * 850.0 + sol_bonus * 150.0;
+
+        // 2. Potência Militar (escala até 1000 pts)
+        let ratio_mil = (p.forca_militar / max_mil).clamp(0.0, 1.0);
+        let gasto_mil_est = if let Some(gp) = mundo_geo.paises.get(&tag) {
+            gp.orcamento.despesa_militar_diaria * 365.0
+        } else {
+            0.0
+        };
+        let bonus_gasto = (gasto_mil_est / (max_pib * 0.10).max(1.0)).clamp(0.0, 1.0);
+        let pont_mil = ratio_mil * 850.0 + bonus_gasto * 150.0;
+
+        // 3. Potência de Influência / Geopolítica (escala até 1000 pts)
+        // Baseada em esfera de influência, liderança de blocos e Conselho de Segurança ONU
+        let mut pont_inf = 50.0; // Base soberana
+
+        // Membros Permanentes do Conselho de Segurança da ONU ganham prestígio de Grande Potência
+        let eh_membro_onu_p5 = matches!(tag.as_str(), "USA" | "SOV" | "GBR" | "FRA" | "CHI");
+        if eh_membro_onu_p5 {
+            pont_inf += 350.0;
+        }
+
+        // Bônus de esferas e alianças de sim_diplomacia
+        let esfera_nome = if let Some(d) = &diplo {
+            match d.0.esfera(&tag) {
+                sim_diplomacia::Esfera::Eua => "Bloco Ocidental",
+                sim_diplomacia::Esfera::Urss => "Bloco Soviético",
+                sim_diplomacia::Esfera::Disputada => "Disputada",
+                sim_diplomacia::Esfera::NaoAlinhado => "Não Alinhado",
+            }
+        } else if let Some(gp) = mundo_geo.paises.get(&tag) {
+            match gp.alinhamento_inicial {
+                simulacao::mapa::AlinhamentoGeopolitico::BlocoOcidental => "Bloco Ocidental",
+                simulacao::mapa::AlinhamentoGeopolitico::BlocoSovietico => "Bloco Soviético",
+                _ => "Não Alinhado",
+            }
+        } else {
+            "Neutro"
+        };
+
+        if let Some(d) = &diplo {
+            if tag == "USA" || tag == "SOV" {
+                // As duas superpotências recebem pontos proporcionais à soma da influência que projetam
+                let mut soma_inf = 0.0_f64;
+                for p_alvo in &d.0.paises {
+                    let (u, s) = d.0.influencia(&p_alvo.tag);
+                    soma_inf += if tag == "USA" { u as f64 } else { s as f64 };
+                }
+                pont_inf += (soma_inf * 0.15).clamp(0.0, 450.0);
+            } else {
+                let pactos = d.0.pactos.iter().filter(|pac| pac.a == tag || pac.b == tag).count();
+                pont_inf += (pactos as f64 * 40.0).clamp(0.0, 200.0);
+            }
+        }
+
+        // Bônus colonial/suserano: potências com súditos/colônias
+        let num_suditos = mundo_geo
+            .paises
+            .values()
+            .filter(|outro| outro.suserano.as_deref() == Some(&tag))
+            .count();
+        pont_inf += (num_suditos as f64 * 35.0).clamp(0.0, 250.0);
+
+        let pont_total = pont_eco * 0.40 + pont_mil * 0.35 + pont_inf * 0.25;
+
+        entradas.push(EntradaRankingPotencia {
+            rank_geral: 0,
+            grau: GrauPotencia::PotenciaMenor,
+            id: p.id.clone(),
+            tag,
+            nome: p.nome.clone(),
+            cor: cor_geo,
+            pontuacao_total: pont_total,
+            pontuacao_eco: pont_eco,
+            pontuacao_mil: pont_mil,
+            pontuacao_inf: pont_inf,
+            pib_anual: p.pib_anual,
+            populacao: p.populacao,
+            padrao_vida: p.padrao_vida,
+            desemprego: p.desemprego,
+            forca_militar: p.forca_militar,
+            tesouro: p.tesouro,
+            divida: p.divida,
+            esfera: esfera_nome,
+        });
+    }
+
+    // Ordena do maior para o menor
+    entradas.sort_by(|a, b| b.pontuacao_total.total_cmp(&a.pontuacao_total));
+
+    // Atribui os ranks e os graus estilo Victoria 3
+    for (i, e) in entradas.iter_mut().enumerate() {
+        let pos = i + 1;
+        e.rank_geral = pos;
+        e.grau = if pos <= 8 {
+            GrauPotencia::GrandePotencia
+        } else if pos <= 20 {
+            GrauPotencia::PotenciaMaior
+        } else {
+            GrauPotencia::PotenciaMenor
+        };
+    }
+
+    ledger.rankings_cache = entradas;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Interface Gráfica egui (F7)
+// -------------------------------------------------------------------------------------------------
+
+fn desenhar_tela_ledger(
+    mut contextos: EguiContexts,
+    mut ledger: ResMut<RecursoLedger>,
+    jogador: Option<Res<PaisJogador>>,
+    eco: Option<Res<EconomiaSim>>,
+) -> Result {
+    if !ledger.aberto {
+        return Ok(());
+    }
+
+    let ctx = contextos.ctx_mut()?;
+    let tag_jogador = jogador.map(|j| j.0.clone()).unwrap_or_default();
+    let id_jogador_eco = eco.as_ref().and_then(|e| e.id_pais(&tag_jogador)).unwrap_or_else(|| tag_jogador.to_lowercase());
+
+    let mut aberto = ledger.aberto;
+
+    egui::Window::new("📊 Estatísticas & Ledger Geral (F7)")
+        .open(&mut aberto)
+        .default_width(1200.0)
+        .default_height(720.0)
+        .min_width(900.0)
+        .min_height(550.0)
+        .resizable(true)
+        .show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.heading("ESTATÍSTICAS & LEDGER MUNDIAL");
+                ui.separator();
+                let rotulo_aba1 = format!("📈 Gráficos Históricos ({})", ledger.metrica_grafico.titulo());
+                if ui.selectable_label(ledger.aba_ativa == AbaLedger::GraficosHistoricos, rotulo_aba1).clicked() {
+                    ledger.aba_ativa = AbaLedger::GraficosHistoricos;
+                }
+                if ui.selectable_label(ledger.aba_ativa == AbaLedger::RankingsPotencias, "👑 Grandes Potências (Top 8)").clicked() {
+                    ledger.aba_ativa = AbaLedger::RankingsPotencias;
+                }
+                if ui.selectable_label(ledger.aba_ativa == AbaLedger::TabelaPaises, "📋 Ledger de Países (Tabela)").clicked() {
+                    ledger.aba_ativa = AbaLedger::TabelaPaises;
+                }
+            });
+
+            ui.separator();
+
+            match ledger.aba_ativa {
+                AbaLedger::GraficosHistoricos => {
+                    desenhar_aba_graficos(ui, &mut ledger, &id_jogador_eco);
+                }
+                AbaLedger::RankingsPotencias => {
+                    desenhar_aba_potencias(ui, &ledger, &id_jogador_eco);
+                }
+                AbaLedger::TabelaPaises => {
+                    desenhar_aba_tabela(ui, &mut ledger, &id_jogador_eco);
+                }
+            }
+        });
+
+    ledger.aberto = aberto;
+    Ok(())
+}
+
+// -------------------------------------------------------------------------------------------------
+// Aba 1: Gráficos Históricos (egui_plot)
+// -------------------------------------------------------------------------------------------------
+
+fn desenhar_aba_graficos(
+    ui: &mut egui::Ui,
+    ledger: &mut RecursoLedger,
+    id_jogador: &str,
+) {
+    ui.horizontal(|ui| {
+        ui.strong("Métrica:");
+        for metrica in MetricaGrafico::TODAS {
+            let ativa = ledger.metrica_grafico == metrica;
+            if ui.selectable_label(ativa, metrica.titulo()).clicked() {
+                ledger.metrica_grafico = metrica;
+            }
+        }
+    });
+
+    if ledger.metrica_grafico == MetricaGrafico::ProducaoBem {
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.strong("Bem de Produção:");
+            let nome_atual = ledger
+                .catalogo_bens
+                .get(ledger.bem_selecionado_idx)
+                .map(|b| b.nome.as_str())
+                .unwrap_or("Selecione um bem");
+
+            egui::ComboBox::from_id_salt("cb_bem_estatisticas")
+                .selected_text(nome_atual)
+                .width(260.0)
+                .show_ui(ui, |ui| {
+                    for b in &ledger.catalogo_bens {
+                        ui.selectable_value(&mut ledger.bem_selecionado_idx, b.idx, &b.nome);
+                    }
+                });
+        });
+    }
+
+    ui.add_space(4.0);
+    ui.separator();
+
+    // Layout em 2 colunas: Esquerda (Seleção de Países) e Direita (Gráfico egui_plot)
+    ui.columns(2, |cols| {
+        // Coluna 1: Painel de Seleção de Países (largura fixa ~280px)
+        cols[0].vertical(|ui| {
+            ui.strong("Países para Comparação:");
+            ui.horizontal(|ui| {
+                if ui.button("Meu País").on_hover_text("Seleciona apenas o seu país").clicked() {
+                    ledger.paises_selecionados.clear();
+                    ledger.paises_selecionados.insert(id_jogador.to_string());
+                }
+                if ui.button("Top 8").on_hover_text("Seleciona as 8 Grandes Potências").clicked() {
+                    ledger.paises_selecionados.clear();
+                    for e in ledger.rankings_cache.iter().take(8) {
+                        ledger.paises_selecionados.insert(e.id.clone());
+                    }
+                }
+                if ui.button("Limpar").clicked() {
+                    ledger.paises_selecionados.clear();
+                }
+            });
+
+            ui.add_space(2.0);
+            ui.horizontal(|ui| {
+                ui.label("🔍");
+                ui.text_edit_singleline(&mut ledger.filtro_busca);
+            });
+
+            ui.add_space(4.0);
+            let termo = ledger.filtro_busca.trim().to_lowercase();
+
+            egui::ScrollArea::vertical()
+                .id_salt("scroll_paises_grafico")
+                .max_height(480.0)
+                .show(ui, |ui| {
+                    let mut paises_lista: Vec<_> = ledger.historico_paises.values().collect();
+                    paises_lista.sort_by(|a, b| a.nome.cmp(&b.nome));
+
+                    for (idx, p) in paises_lista.iter().enumerate() {
+                        if !termo.is_empty()
+                            && !p.nome.to_lowercase().contains(&termo)
+                            && !p.tag.to_lowercase().contains(&termo)
+                        {
+                            continue;
+                        }
+
+                        let marcado = ledger.paises_selecionados.contains(&p.id);
+                        let eh_jogador = p.id == id_jogador;
+                        let cor_item = cor_para_indice(idx);
+
+                        ui.horizontal(|ui| {
+                            let (rect, _) = ui.allocate_exact_size(egui::vec2(12.0, 12.0), egui::Sense::hover());
+                            ui.painter().rect_filled(rect, 2.0, cor_item);
+
+                            let mut checked = marcado;
+                            let rotulo = if eh_jogador {
+                                format!("{} (Você)", p.nome)
+                            } else {
+                                format!("{} ({})", p.nome, p.tag)
+                            };
+
+                            if ui.checkbox(&mut checked, rotulo).changed() {
+                                if checked {
+                                    ledger.paises_selecionados.insert(p.id.clone());
+                                } else {
+                                    ledger.paises_selecionados.remove(&p.id);
+                                }
+                            }
+                        });
+                    }
+                });
+        });
+
+        // Coluna 2: Gráfico Histórico Interativo com egui_plot
+        cols[1].vertical(|ui| {
+            let metrica = ledger.metrica_grafico;
+            let bem_idx = ledger.bem_selecionado_idx;
+            let nome_metrica = if metrica == MetricaGrafico::ProducaoBem {
+                let nome_bem = ledger.catalogo_bens.get(bem_idx).map(|b| b.nome.as_str()).unwrap_or("Bem");
+                format!("Produção: {}", nome_bem)
+            } else {
+                metrica.titulo().to_string()
+            };
+
+            ui.horizontal(|ui| {
+                ui.heading(&nome_metrica);
+                ui.label(format!("(em {})", metrica.unidade()));
+                ui.label(format!("— {} meses simulados", ledger.meses.len()));
+            });
+
+            if ledger.meses.is_empty() {
+                ui.label("Aguardando o primeiro fechamento mensal da simulação econômica...");
+                return;
+            }
+
+            if ledger.paises_selecionados.is_empty() {
+                ui.label("Nenhum país selecionado para visualização. Marque ao menos um país na lista ao lado.");
+                return;
+            }
+
+            let meses_nomes: Vec<String> = ledger.meses.iter().map(|m| m.formatar_curto()).collect();
+
+            // Monta as linhas para cada país selecionado
+            let mut linhas: Vec<(String, egui::Color32, PlotPoints<'static>)> = Vec::new();
+
+            for (idx, p_id) in ledger.paises_selecionados.iter().enumerate() {
+                if let Some(hist) = ledger.historico_paises.get(p_id) {
+                    let cor = cor_para_indice(idx);
+                    let rotulo = format!("{} ({})", hist.nome, hist.tag);
+
+                    let pontos: PlotPoints<'static> = hist
+                        .pontos
+                        .iter()
+                        .enumerate()
+                        .map(|(mes_i, pt)| {
+                            let val: f64 = match metrica {
+                                MetricaGrafico::Pib => pt.pib as f64,
+                                MetricaGrafico::PibPerCapita => pt.pib_per_capita as f64,
+                                MetricaGrafico::Populacao => pt.populacao as f64,
+                                MetricaGrafico::Desemprego => (pt.desemprego * 100.0) as f64,
+                                MetricaGrafico::PadraoVida => pt.padrao_vida as f64,
+                                MetricaGrafico::Divida => pt.divida as f64,
+                                MetricaGrafico::Tesouro => pt.tesouro as f64,
+                                MetricaGrafico::ProducaoBem => {
+                                    pt.producao_bens.get(bem_idx).copied().unwrap_or(0.0) as f64
+                                }
+                            };
+                            [mes_i as f64, val]
+                        })
+                        .collect();
+
+                    linhas.push((rotulo, cor, pontos));
+                }
+            }
+
+            let num_meses = ledger.meses.len();
+
+            Plot::new("plot_historico_ledger")
+                .height(480.0)
+                .legend(Legend::default().position(Corner::RightTop))
+                .x_axis_label("mês da simulação")
+                .allow_scroll(true)
+                .allow_zoom(true)
+                .allow_drag(true)
+                .show(ui, |plot_ui| {
+                    for (rotulo, cor, pts) in linhas {
+                        plot_ui.line(
+                            Line::new(rotulo, pts)
+                                .color(cor)
+                                .width(2.5),
+                        );
+                    }
+                });
+
+            ui.horizontal(|ui| {
+                if let Some(primeiro) = meses_nomes.first() {
+                    ui.label(format!("Início: {}", primeiro));
+                }
+                if let Some(ultimo) = meses_nomes.last() {
+                    ui.label(format!("| Data atual: {} (mês {})", ultimo, num_meses));
+                }
+                ui.label("| Dica: use roda do mouse para zoom e arraste com botão esquerdo para navegar");
+            });
+        });
+    });
+}
+
+// -------------------------------------------------------------------------------------------------
+// Aba 2: Rankings de Potência Estilo Victoria 3 (Top 8 Grandes Potências)
+// -------------------------------------------------------------------------------------------------
+
+fn desenhar_aba_potencias(
+    ui: &mut egui::Ui,
+    ledger: &RecursoLedger,
+    id_jogador: &str,
+) {
+    ui.horizontal(|ui| {
+        ui.heading("👑 Grandes Potências de 1945");
+        ui.label("— Classificação geopolítica oficial estilo Victoria 3 (Top 8)");
+    });
+    ui.label("A pontuação de potência combina poder econômico (PIB e SoL), poder militar (forças armadas e gastos) e projeção de influência global.");
+
+    ui.add_space(8.0);
+
+    // Grid dos 8 primeiros colocados em cartões luxuosos estilo Victoria 3
+    egui::ScrollArea::vertical()
+        .id_salt("scroll_potencias")
+        .show(ui, |ui| {
+            ui.columns(4, |cols| {
+                for (i, p) in ledger.rankings_cache.iter().take(8).enumerate() {
+                    let col_idx = i % 4;
+                    cols[col_idx].group(|ui| {
+                        let eh_jogador = p.id == id_jogador;
+                        let moldura_cor = if eh_jogador {
+                            egui::Color32::from_rgb(255, 215, 0)
+                        } else {
+                            p.grau.badge_cor()
+                        };
+
+                        ui.horizontal(|ui| {
+                            ui.colored_label(moldura_cor, egui::RichText::new(format!("#{}: {}", p.rank_geral, p.grau.icone())).strong().size(18.0));
+                            let (r, _) = ui.allocate_exact_size(egui::vec2(16.0, 12.0), egui::Sense::hover());
+                            ui.painter().rect_filled(r, 2.0, p.cor);
+                            ui.strong(&p.nome);
+                        });
+
+                        if eh_jogador {
+                            ui.colored_label(egui::Color32::LIGHT_GREEN, "★ SEU PAÍS ★");
+                        }
+
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            ui.label("Pontuação Total:");
+                            ui.colored_label(egui::Color32::from_rgb(255, 230, 100), egui::RichText::new(format!("{:.0} pts", p.pontuacao_total)).strong());
+                        });
+
+                        ui.add_space(4.0);
+                        ui.label(format!("• Economia: {:.0} pts ({})", p.pontuacao_eco, fmt_din(p.pib_anual)));
+                        ui.label(format!("• Força Militar: {:.0} pts", p.pontuacao_mil));
+                        ui.label(format!("• Influência: {:.0} pts ({})", p.pontuacao_inf, p.esfera));
+                        ui.label(format!("• População: {}", fmt_pop(p.populacao as u64)));
+                        ui.label(format!("• Padrão de Vida: {:.1}", p.padrao_vida));
+                    });
+                    cols[col_idx].add_space(8.0);
+                }
+            });
+
+            ui.add_space(16.0);
+            ui.separator();
+            ui.heading("Pilares Comparativos de Potência (Top 10 por Dimensão)");
+
+            ui.columns(3, |cols| {
+                // Coluna 1: Maiores Potências Econômicas
+                cols[0].group(|ui| {
+                    ui.strong("📈 Potência Econômica (PIB)");
+                    let mut lista = ledger.rankings_cache.clone();
+                    lista.sort_by(|a, b| b.pib_anual.total_cmp(&a.pib_anual));
+                    for (i, p) in lista.iter().take(10).enumerate() {
+                        let eh_jog = p.id == id_jogador;
+                        let txt = format!("{}. {} — {}", i + 1, p.nome, fmt_din(p.pib_anual));
+                        if eh_jog {
+                            ui.colored_label(egui::Color32::LIGHT_GREEN, egui::RichText::new(txt).strong());
+                        } else {
+                            ui.label(txt);
+                        }
+                    }
+                });
+
+                // Coluna 2: Maiores Potências Militares
+                cols[1].group(|ui| {
+                    ui.strong("⚔️ Potência Militar (Força Armada)");
+                    let mut lista = ledger.rankings_cache.clone();
+                    lista.sort_by(|a, b| b.pontuacao_mil.total_cmp(&a.pontuacao_mil));
+                    for (i, p) in lista.iter().take(10).enumerate() {
+                        let eh_jog = p.id == id_jogador;
+                        let txt = format!("{}. {} — {:.0} pts", i + 1, p.nome, p.pontuacao_mil);
+                        if eh_jog {
+                            ui.colored_label(egui::Color32::LIGHT_GREEN, egui::RichText::new(txt).strong());
+                        } else {
+                            ui.label(txt);
+                        }
+                    }
+                });
+
+                // Coluna 3: Maior Influência & Geopolítica
+                cols[2].group(|ui| {
+                    ui.strong("🌐 Projeção de Influência");
+                    let mut lista = ledger.rankings_cache.clone();
+                    lista.sort_by(|a, b| b.pontuacao_inf.total_cmp(&a.pontuacao_inf));
+                    for (i, p) in lista.iter().take(10).enumerate() {
+                        let eh_jog = p.id == id_jogador;
+                        let txt = format!("{}. {} — {:.0} pts ({})", i + 1, p.nome, p.pontuacao_inf, p.esfera);
+                        if eh_jog {
+                            ui.colored_label(egui::Color32::LIGHT_GREEN, egui::RichText::new(txt).strong());
+                        } else {
+                            ui.label(txt);
+                        }
+                    }
+                });
+            });
+        });
+}
+
+// -------------------------------------------------------------------------------------------------
+// Aba 3: Ledger Geral (Tabela Ordenável de Todos os Países)
+// -------------------------------------------------------------------------------------------------
+
+fn desenhar_aba_tabela(
+    ui: &mut egui::Ui,
+    ledger: &mut RecursoLedger,
+    id_jogador: &str,
+) {
+    ui.horizontal(|ui| {
+        ui.strong("Filtro:");
+        ui.text_edit_singleline(&mut ledger.filtro_busca);
+        if ui.button("Limpar").clicked() {
+            ledger.filtro_busca.clear();
+        }
+
+        ui.separator();
+        ui.label("Bloco Geopolítico:");
+        if ui.selectable_label(ledger.filtro_bloco.is_none(), "Todos").clicked() {
+            ledger.filtro_bloco = None;
+        }
+        for bloco in &["Bloco Ocidental", "Bloco Soviético", "Não Alinhado"] {
+            let sel = ledger.filtro_bloco.as_deref() == Some(*bloco);
+            if ui.selectable_label(sel, *bloco).clicked() {
+                ledger.filtro_bloco = Some(bloco.to_string());
+            }
+        }
+    });
+
+    ui.add_space(4.0);
+
+    let mut lista = ledger.rankings_cache.clone();
+
+    // Filtra busca e bloco
+    let termo = ledger.filtro_busca.trim().to_lowercase();
+    if !termo.is_empty() {
+        lista.retain(|p| p.nome.to_lowercase().contains(&termo) || p.tag.to_lowercase().contains(&termo));
+    }
+    if let Some(b) = &ledger.filtro_bloco {
+        lista.retain(|p| p.esfera == b.as_str());
+    }
+
+    // Ordenação
+    let col = ledger.coluna_ordenacao;
+    let desc = ledger.ordenacao_decrescente;
+
+    lista.sort_by(|a, b| {
+        let cmp = match col {
+            ColunaLedger::RankGeral => a.rank_geral.cmp(&b.rank_geral),
+            ColunaLedger::Nome => a.nome.cmp(&b.nome),
+            ColunaLedger::PontuacaoTotal => a.pontuacao_total.total_cmp(&b.pontuacao_total),
+            ColunaLedger::PontuacaoEco => a.pontuacao_eco.total_cmp(&b.pontuacao_eco),
+            ColunaLedger::Pib => a.pib_anual.total_cmp(&b.pib_anual),
+            ColunaLedger::PontuacaoMil => a.pontuacao_mil.total_cmp(&b.pontuacao_mil),
+            ColunaLedger::ForcaMil => a.forca_militar.total_cmp(&b.forca_militar),
+            ColunaLedger::PontuacaoInf => a.pontuacao_inf.total_cmp(&b.pontuacao_inf),
+            ColunaLedger::Populacao => a.populacao.total_cmp(&b.populacao),
+            ColunaLedger::PadraoVida => a.padrao_vida.total_cmp(&b.padrao_vida),
+            ColunaLedger::Desemprego => a.desemprego.total_cmp(&b.desemprego),
+            ColunaLedger::Tesouro => a.tesouro.total_cmp(&b.tesouro),
+            ColunaLedger::Divida => a.divida.total_cmp(&b.divida),
+        };
+        if desc { cmp.reverse() } else { cmp }
+    });
+
+    let col_ord = ledger.coluna_ordenacao;
+    let desc_ord = ledger.ordenacao_decrescente;
+    let mut nova_col_ord = None;
+
+    let rotulo_cabecalho = |col_target: ColunaLedger, nome: &str| -> String {
+        if col_ord == col_target {
+            let seta = if desc_ord { " ▼" } else { " ▲" };
+            format!("{}{}", nome, seta)
+        } else {
+            nome.to_string()
+        }
+    };
+
+    egui::ScrollArea::vertical()
+        .id_salt("scroll_tabela_ledger")
+        .max_height(580.0)
+        .show(ui, |ui| {
+            egui::Grid::new("grid_ledger_paises")
+                .striped(true)
+                .min_col_width(70.0)
+                .spacing([12.0, 6.0])
+                .show(ui, |ui| {
+                    // Cabeçalho da tabela
+                    if ui.button(rotulo_cabecalho(ColunaLedger::RankGeral, "Rank")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::RankGeral);
+                    }
+                    if ui.button(rotulo_cabecalho(ColunaLedger::Nome, "País")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::Nome);
+                    }
+                    ui.strong("Grau");
+                    if ui.button(rotulo_cabecalho(ColunaLedger::PontuacaoTotal, "Pontos")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::PontuacaoTotal);
+                    }
+                    if ui.button(rotulo_cabecalho(ColunaLedger::Pib, "PIB Anual")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::Pib);
+                    }
+                    if ui.button(rotulo_cabecalho(ColunaLedger::PontuacaoMil, "Militar")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::PontuacaoMil);
+                    }
+                    if ui.button(rotulo_cabecalho(ColunaLedger::PontuacaoInf, "Influência")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::PontuacaoInf);
+                    }
+                    if ui.button(rotulo_cabecalho(ColunaLedger::Populacao, "População")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::Populacao);
+                    }
+                    if ui.button(rotulo_cabecalho(ColunaLedger::PadraoVida, "SoL")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::PadraoVida);
+                    }
+                    if ui.button(rotulo_cabecalho(ColunaLedger::Desemprego, "Desemp.")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::Desemprego);
+                    }
+                    if ui.button(rotulo_cabecalho(ColunaLedger::Tesouro, "Tesouro")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::Tesouro);
+                    }
+                    if ui.button(rotulo_cabecalho(ColunaLedger::Divida, "Dívida")).clicked() {
+                        nova_col_ord = Some(ColunaLedger::Divida);
+                    }
+                    ui.strong("Esfera");
+                    ui.end_row();
+
+                    // Linhas dos países
+                    for p in &lista {
+                        let eh_jogador = p.id == id_jogador;
+                        let cor_destaque = if eh_jogador { egui::Color32::LIGHT_GREEN } else { egui::Color32::WHITE };
+
+                        ui.colored_label(cor_destaque, format!("#{}", p.rank_geral));
+
+                        ui.horizontal(|ui| {
+                            let (r, _) = ui.allocate_exact_size(egui::vec2(14.0, 10.0), egui::Sense::hover());
+                            ui.painter().rect_filled(r, 1.5, p.cor);
+                            if eh_jogador {
+                                ui.colored_label(cor_destaque, egui::RichText::new(format!("{} ({}) ★", p.nome, p.tag)).strong());
+                            } else {
+                                ui.colored_label(cor_destaque, format!("{} ({})", p.nome, p.tag));
+                            }
+                        });
+
+                        ui.colored_label(p.grau.badge_cor(), format!("{} {}", p.grau.icone(), p.grau.rotulo()));
+                        ui.colored_label(egui::Color32::from_rgb(250, 220, 90), format!("{:.0}", p.pontuacao_total));
+                        ui.label(fmt_din(p.pib_anual));
+                        ui.label(format!("{:.0}", p.pontuacao_mil));
+                        ui.label(format!("{:.0}", p.pontuacao_inf));
+                        ui.label(fmt_pop(p.populacao as u64));
+                        ui.label(format!("{:.1}", p.padrao_vida));
+                        ui.label(format!("{:.1}%", p.desemprego * 100.0));
+                        ui.label(fmt_din(p.tesouro));
+                        ui.label(fmt_din(p.divida));
+                        ui.label(p.esfera);
+                        ui.end_row();
+                    }
+                });
+        });
+
+    if let Some(nova_col) = nova_col_ord {
+        if ledger.coluna_ordenacao == nova_col {
+            ledger.ordenacao_decrescente = !ledger.ordenacao_decrescente;
+        } else {
+            ledger.coluna_ordenacao = nova_col;
+            ledger.ordenacao_decrescente = true;
+        }
+    }
+}
