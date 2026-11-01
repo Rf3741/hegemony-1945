@@ -24,6 +24,7 @@ use plugins::{
     rotulos_pais::RotulosPaisPlugin,
     tecnologia_ui::TecnologiaUiPlugin,
     estatisticas::EstatisticasPlugin,
+    enciclopedia::EnciclopediaPlugin,
 };
 use simulacao::mundo::MundoJogo;
 use std::path::PathBuf;
@@ -79,5 +80,6 @@ fn main() {
         .add_plugins(DiplomaciaUiPlugin)
         .add_plugins(TecnologiaUiPlugin)
         .add_plugins(EstatisticasPlugin)
+        .add_plugins(EnciclopediaPlugin)
         .run();
 }

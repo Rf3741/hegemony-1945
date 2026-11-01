@@ -1,0 +1,495 @@
+// ==============================================================================
+// TOOLTIPS - GUERRA FRIA: 1945 (Textos de Ajuda da Interface e HUD)
+// Dicionário Estruturado de Dicas e Métricas para HUD, Menus e Painéis
+// ==============================================================================
+
+[
+    // --------------------------------------------------------------------------
+    // TOP BAR: BLOCO 1 - IDENTIDADE NACIONAL E GABINETE
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_topbar_bandeira",
+        alvo_ui: "topbar_bandeira_nacional",
+        titulo: "Identidade e Soberania Nacional",
+        descricao: "Bandeira oficial e insígnia de Estado da sua nação.",
+        formula_ou_origem: "Definida pelo arquivo histórico de nações (paises.ron) e alterada por mudanças de regime político.",
+        efeito_ou_acao: "Clique esquerdo abre o Dossiê Geral da Nação com resumo de demografia, leis vigentes e prestígio internacional.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_topbar_lider",
+        alvo_ui: "topbar_chefe_de_governo",
+        titulo: "Chefe de Estado e de Governo",
+        descricao: "Nome e cargo do líder executivo soberano (ex.: Presidente Harry S. Truman, Getúlio Vargas ou Joseph Stalin).",
+        formula_ou_origem: "Determinado pelo regime de governo (Monarquia, Presidencialismo, Ditadura ou Secretaria-Geral do Partido).",
+        efeito_ou_acao: "Clique esquerdo abre o Gabinete Ministerial para inspecionar traços de liderança, popularidade e alinhamento ideológico.",
+        atalho_teclado: None,
+    ),
+
+    // --------------------------------------------------------------------------
+    // TOP BAR: BLOCO 2 - MÉTRICAS ECONÔMICAS E MONETÁRIAS
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_topbar_tesouro",
+        alvo_ui: "topbar_reservas_tesouro",
+        titulo: "Reservas do Tesouro Nacional",
+        descricao: "Volume acumulado de moeda conversível e barras de ouro nos cofres do Banco Central (medido em milhões de US$ de 1945).",
+        formula_ou_origem: "Saldo Anterior + Balanço Fiscal Diário. Possui limite máximo baseado no PIB Nacional (Teto do Tesouro).",
+        efeito_ou_acao: "Clique esquerdo abre o Livro-Razão Fiscal. Se as reservas zerarem, o país entra no cheque especial contraindo dívida pública.",
+        atalho_teclado: Some("TAB"),
+    ),
+    Tooltip(
+        id: "tooltip_topbar_balanco_diario",
+        alvo_ui: "topbar_balanco_diario",
+        titulo: "Balanço Fiscal Diário",
+        descricao: "Diferença líquida entre todas as receitas e despesas que entram e saem dos cofres públicos a cada dia da simulação.",
+        formula_ou_origem: "(Receitas Tributárias + Tarifas + Dividendos de Estatais) - (Soldos Militares + Burocracia + Obras + Subsídios + Juros da Dívida).",
+        efeito_ou_acao: "Valores verdes indicam superávit diário acumulado nas reservas. Valores vermelhos indicam déficit coberto pelas reservas ou endividamento.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_topbar_padrao_ouro",
+        alvo_ui: "topbar_lastro_cambial",
+        titulo: "Padrão Cambial e Bretton Woods",
+        descricao: "Mecanismo de conversibilidade da moeda nacional (dólar lastreado a US$ 35/oz, rublo soviético ouro ou controle cambial estrito).",
+        formula_ou_origem: "Determinado pelos acordos monetários multilaterais de 1944 e pelas reservas físicas de ouro custodiadas.",
+        efeito_ou_acao: "Garante taxa de câmbio estável para importações essenciais. A perda de lastro deflagra desvalorização cambial.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_topbar_inflacao",
+        alvo_ui: "topbar_inflacao_anual",
+        titulo: "Taxa Anual de Inflação",
+        descricao: "Ritmo de desvalorização do poder de compra e encarecimento generalizado dos bens no mercado interno.",
+        formula_ou_origem: "Variação do Índice Geral de Preços ao Consumidor (IPC) ponderado pela cesta de consumo dos estratos sociais.",
+        efeito_ou_acao: "Inflação acima de 5,0% a.a. corrói o Padrão de Vida das Pops e gera Radicais; acima de 15,0% paralisa investimentos privados.",
+        atalho_teclado: None,
+    ),
+
+    // --------------------------------------------------------------------------
+    // TOP BAR: BLOCO 3 - POLÍTICA, PRESTÍGIO E TENSÃO GLOBAL
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_topbar_legitimidade",
+        alvo_ui: "topbar_legitimidade_governamental",
+        titulo: "Legitimidade Governamental",
+        descricao: "Percentual de aceitação e sustentação política da coalizão de ministros atualmente empossada no gabinete executivo.",
+        formula_ou_origem: "Soma ponderada da Força Política (Clout) dos Grupos de Interesse no Governo menos penalidades de incoerência ideológica.",
+        efeito_ou_acao: "Valores acima de 75% aceleram a tramitação de leis no parlamento. Abaixo de 50% reduzem aprovação e abaixo de 25% travam o Estado.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_topbar_estabilidade",
+        alvo_ui: "topbar_estabilidade_nacional",
+        titulo: "Estabilidade e Coesão Nacional",
+        descricao: "Nível geral de ordem pública, segurança interna e coesão institucional do território.",
+        formula_ou_origem: "100% - (% de Radicais na população * fator de peso) + (Bônus de Aparato Policial e Leis de Segurança).",
+        efeito_ou_acao: "Estabilidade baixa (<40%) aumenta o risco de revoltas provinciais, motins militares e tentativas de golpe de Estado.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_topbar_prestigio",
+        alvo_ui: "topbar_prestigio_internacional",
+        titulo: "Prestígio Internacional (Soft Power)",
+        descricao: "Reputação e peso diplomático da nação perante a comunidade de estados soberanos (escala de 0 a 1000).",
+        formula_ou_origem: "Pontos de PIB Econômico + Poder Naval/Militar + Nível de Alfabetização + Liderança Científica e Vitórias em Crises.",
+        efeito_ou_acao: "Define a prioridade em conferências multilaterais, o peso de influência no Conselho da ONU e atratividade imigratória.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_topbar_doomsday_clock",
+        alvo_ui: "topbar_relogio_doomsday",
+        titulo: "Relógio do Juízo Final (Doomsday Clock)",
+        descricao: "Termômetro da crise global atômica, exibido em minutos para a meia-noite ou percentual de tensão (0% a 100%).",
+        formula_ou_origem: "Índice global alimentado por corridas armamentistas, testes atômicos, ultimatos militares e guerras por procuração ativas.",
+        efeito_ou_acao: "Se atingir 100% (Meia-Noite), o mundo entra em DEFCON 1 e a Terceira Guerra Mundial nuclear tem início imediato.",
+        atalho_teclado: None,
+    ),
+
+    // --------------------------------------------------------------------------
+    // TOP BAR: BLOCO 4 - TEMPO, VELOCIDADE E ALERTAS
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_topbar_data",
+        alvo_ui: "topbar_data_simulacao",
+        titulo: "Calendário Oficial da Simulação",
+        descricao: "Data corrente no mundo simulado. A partida tem início histórico em 1º de janeiro de 1945.",
+        formula_ou_origem: "Avança diariamente a cada ciclo de ticks do motor do jogo em função da velocidade selecionada.",
+        efeito_ou_acao: "Marca o agendamento de eventos históricos periódicos, pagamentos mensais de salários e colheitas anuais.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_topbar_botao_pausar",
+        alvo_ui: "topbar_botao_pausa",
+        titulo: "Pausar / Retomar Simulação",
+        descricao: "Interrompe momentaneamente o fluxo dos dias para permitir deliberações de gabinete sem pressão de tempo.",
+        formula_ou_origem: "Alterna o estado interno do motor de simulação de tempo entre Pausado e Ativo.",
+        efeito_ou_acao: "Permite emitir ordens de construção, alterar métodos fabris e tramitar leis antes de deixar o tempo correr.",
+        atalho_teclado: Some("Espaço"),
+    ),
+    Tooltip(
+        id: "tooltip_topbar_velocidade_1",
+        alvo_ui: "topbar_vel_1",
+        titulo: "Velocidade 1x (Cadência Tática)",
+        descricao: "Avança a simulação em velocidade mínima (1 dia a cada 2,0 segundos reais).",
+        formula_ou_origem: "Ideal para microgestão de crises de fronteira, remanejamento naval e votações parlamentares tensas.",
+        efeito_ou_acao: "Ajusta a taxa de atualização do motor para o ritmo mais seguro de acompanhamento.",
+        atalho_teclado: Some("1"),
+    ),
+    Tooltip(
+        id: "tooltip_topbar_velocidade_2",
+        alvo_ui: "topbar_vel_2",
+        titulo: "Velocidade 2x (Cadência Operacional)",
+        descricao: "Avança a simulação em velocidade moderada (1 dia a cada 1,0 segundo real).",
+        formula_ou_origem: "Recomendado para administração rotineira e acompanhamento de inflação.",
+        efeito_ou_acao: "Ajusta a cadência de processamento dos sistemas de Bevy.",
+        atalho_teclado: Some("2"),
+    ),
+    Tooltip(
+        id: "tooltip_topbar_velocidade_3",
+        alvo_ui: "topbar_vel_3",
+        titulo: "Velocidade 3x (Cadência Padrão)",
+        descricao: "Avança a simulação no ritmo padrão de gameplay (1 dia a cada 0,5 segundo real).",
+        formula_ou_origem: "Equilíbrio recomendado entre velocidade de passagem de meses e tempo de reação a despachos.",
+        efeito_ou_acao: "Velocidade média de cruzeiro para tempos de paz.",
+        atalho_teclado: Some("3"),
+    ),
+    Tooltip(
+        id: "tooltip_topbar_velocidade_4",
+        alvo_ui: "topbar_vel_4",
+        titulo: "Velocidade 4x (Cadência Acelerada)",
+        descricao: "Avança o tempo em ritmo rápido (1 dia a cada 0,25 segundo real).",
+        formula_ou_origem: "Acelera o cumprimento de ciclos orçamentários e pesquisas tecnológicas.",
+        efeito_ou_acao: "Utilize quando não houver reformas urgentes ou desequilíbrios graves no mercado.",
+        atalho_teclado: Some("4"),
+    ),
+    Tooltip(
+        id: "tooltip_topbar_velocidade_5",
+        alvo_ui: "topbar_vel_5",
+        titulo: "Velocidade 5x (Velocidade Máxima)",
+        descricao: "Executa os cálculos da simulação na velocidade máxima permitida pelo processador.",
+        formula_ou_origem: "Sem limitação artificial de delay entre dias do calendário.",
+        efeito_ou_acao: "Ideal para atravessar longos períodos de maturação de obras pesadas. O jogo pausa automaticamente em alertas críticos.",
+        atalho_teclado: Some("5"),
+    ),
+    Tooltip(
+        id: "tooltip_alerta_critico",
+        alvo_ui: "topbar_alerta_critico_gaveta",
+        titulo: "Alerta Crítico de Emergência",
+        descricao: "Notificação de altíssima prioridade (borda vermelha pulsante), exigindo intervenção imediata.",
+        formula_ou_origem: "Disparado por invasões territoriais, ultimatos bélicos, risco iminente de bancarrota ou eclosão de revolta civil.",
+        efeito_ou_acao: "Clique esquerdo abre o documento de crise e foca na província afetada. Clique direito descarta o aviso.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_alerta_importante",
+        alvo_ui: "topbar_alerta_importante_gaveta",
+        titulo: "Alerta Político / Econômico Importante",
+        descricao: "Despacho relevante (borda âmbar) sobre acontecimentos institucionais ou desequilíbrios.",
+        formula_ou_origem: "Disparado por votações legislativas concluídas, vetos na ONU, déficit em bens estratégicos ou queda de legitimidade.",
+        efeito_ou_acao: "Clique esquerdo abre o relatório analítico no centro da viewport.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_alerta_oportunidade",
+        alvo_ui: "topbar_alerta_oportunidade_gaveta",
+        titulo: "Oportunidade Diplomática / Tecnológica",
+        descricao: "Aviso de conjuntura favorável (borda verde) disponível para aproveitamento pelo jogador.",
+        formula_ou_origem: "Disparado quando um tratado comercial está pronto para homologação ou nova linha de montagem foi liberada.",
+        efeito_ou_acao: "Clique esquerdo abre o painel correspondente para assinar o decreto ou acordo.",
+        atalho_teclado: None,
+    ),
+
+    // --------------------------------------------------------------------------
+    // MINIMAPA E CONTROLES DE CÂMERA
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_minimapa_radar",
+        alvo_ui: "minimapa_radar_globo",
+        titulo: "Radar Cartográfico Global",
+        descricao: "Projeção sinóptica do globo terrestre com retângulo delimitador da visão atual da câmera.",
+        formula_ou_origem: "Mapeamento em tempo real da posição do observador sobre as coordenadas geográficas do planeta.",
+        efeito_ou_acao: "Clique com o botão esquerdo sobre qualquer ponto do minimapa para teleportar a câmera principal até lá.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_camera_zoom_in",
+        alvo_ui: "botao_camera_zoom_in",
+        titulo: "Aproximar Câmera (Zoom In)",
+        descricao: "Aproxima o plano de visão das províncias, exibindo detalhes de prédios e relevo.",
+        formula_ou_origem: "Reduz a altitude da câmera ortográfica / perspectiva do Bevy.",
+        efeito_ou_acao: "Facilita a inspeção de fronteiras provinciais e ferrovias.",
+        atalho_teclado: Some("Roda Cima / +"),
+    ),
+    Tooltip(
+        id: "tooltip_camera_zoom_out",
+        alvo_ui: "botao_camera_zoom_out",
+        titulo: "Afastar Câmera (Zoom Out)",
+        descricao: "Eleva o plano de visão para uma perspectiva macrocontinental ou planetária.",
+        formula_ou_origem: "Aumenta a altitude da câmera da simulação.",
+        efeito_ou_acao: "Permite observar o tabuleiro geopolítico global e blocos de alianças.",
+        atalho_teclado: Some("Roda Baixo / -"),
+    ),
+    Tooltip(
+        id: "tooltip_camera_capital",
+        alvo_ui: "botao_camera_capital",
+        titulo: "Centralizar na Capital Nacional",
+        descricao: "Desloca instantaneamente a visão da câmera para a província que abriga a sede do governo.",
+        formula_ou_origem: "Coordenadas geográficas da capital fixadas em paises.ron (ex: Rio de Janeiro para BRA, Washington para USA).",
+        efeito_ou_acao: "Útil para retornar rapidamente ao centro do país após examinar frentes estrangeiras.",
+        atalho_teclado: Some("C / Home"),
+    ),
+    Tooltip(
+        id: "tooltip_camera_norte",
+        alvo_ui: "botao_camera_redefinir_norte",
+        titulo: "Redefinir Orientação para o Norte",
+        descricao: "Restaura o azimute da visão para o Norte geográfico clássico (topo da tela).",
+        formula_ou_origem: "Zera as rotações angulares da matriz de transformação de visão da câmera.",
+        efeito_ou_acao: "Desfaz giros acidentais durante a exploração do mapa.",
+        atalho_teclado: Some("N"),
+    ),
+
+    // --------------------------------------------------------------------------
+    // SELETOR DE MODOS DE MAPA
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_mapmode_politico",
+        alvo_ui: "modo_mapa_politico",
+        titulo: "Modo de Mapa Político",
+        descricao: "Colore cada território com a tonalidade oficial da sua nação soberana ou potência colonial.",
+        formula_ou_origem: "Destaque para fronteiras estatais reconhecidas, colônias ultramarinas e zonas militares de ocupação.",
+        efeito_ou_acao: "Exibe capitais nacionais e limites territoriais soberanos.",
+        atalho_teclado: Some("Q"),
+    ),
+    Tooltip(
+        id: "tooltip_mapmode_ideologico",
+        alvo_ui: "modo_mapa_ideologico",
+        titulo: "Modo de Mapa Ideológico (Guerra Fria)",
+        descricao: "Exibe a polarização do mundo: Azul (Bloco Ocidental), Vermelho (Bloco Socialista) e Oliva (Não-Alinhados).",
+        formula_ou_origem: "Mapeia as leis de sistema econômico e acordos diplomáticos de cada Estado.",
+        efeito_ou_acao: "Permite enxergar a linha de fratura ideológica global e a expansão de doutrinas.",
+        atalho_teclado: Some("W"),
+    ),
+    Tooltip(
+        id: "tooltip_mapmode_economico",
+        alvo_ui: "modo_mapa_economico",
+        titulo: "Modo de Mapa Econômico",
+        descricao: "Gradiente térmico de densidade de PIB provincial, riqueza per capita e presença de polos manufatureiros.",
+        formula_ou_origem: "Soma do valor bruto da produção mercantil das fábricas e lavouras provinciais.",
+        efeito_ou_acao: "Destaca onde se concentram as bacias industriais e quais regiões vivem na penúria agrária.",
+        atalho_teclado: Some("E"),
+    ),
+    Tooltip(
+        id: "tooltip_mapmode_esferas",
+        alvo_ui: "modo_mapa_esferas",
+        titulo: "Modo de Mapa de Esferas de Influência",
+        descricao: "Evidencia as alianças multilaterais de segurança (TIAR, OTAN emergente), pactos comerciais e estados clientes.",
+        formula_ou_origem: "Pontos de investimento diplomático aplicados por cada superpotência sobre países terceiros.",
+        efeito_ou_acao: "Permite antecipar disputas de satélites e vulnerabilidades geopolíticas.",
+        atalho_teclado: Some("R"),
+    ),
+    Tooltip(
+        id: "tooltip_mapmode_tensao",
+        alvo_ui: "modo_mapa_tensao",
+        titulo: "Modo de Mapa de Tensão e Insurreição",
+        descricao: "Mapa de calor com focos de conflagração civil, guerrilhas, greves gerais e instabilidade armada.",
+        formula_ou_origem: "Índice de radicalismo provincial e força de movimentos rebeldes clandestinos.",
+        efeito_ou_acao: "Identifica onde forças de segurança pública ou reformas de emergência são mais urgentes.",
+        atalho_teclado: Some("T"),
+    ),
+    Tooltip(
+        id: "tooltip_mapmode_recursos",
+        alvo_ui: "modo_mapa_recursos",
+        titulo: "Modo de Mapa de Recursos Estratégicos",
+        descricao: "Localização geográfica de depósitos minerais finitos: Petróleo, Minério de Ferro, Carvão, Urânio e Borracha.",
+        formula_ou_origem: "Potencial geológico nativo das províncias cadastrado na inicialização do cenário de 1945.",
+        efeito_ou_acao: "Orienta as conquistas coloniais, rotas comerciais vitais e a expansão de indústrias pesadas.",
+        atalho_teclado: Some("Y"),
+    ),
+
+    // --------------------------------------------------------------------------
+    // FEED DE TELEGRAMAS E NOTIFICAÇÕES
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_feed_telegramas",
+        alvo_ui: "feed_telegramas_despachos",
+        titulo: "Feed de Telegramas Diplomáticos",
+        descricao: "Fita de teletipo que registra cronologicamente as últimas notícias, tratados assinados e ocorrências mundiais.",
+        formula_ou_origem: "Eventos gerados pelo motor de simulação histórica e pelas decisões dos agentes de IA dos demais países.",
+        efeito_ou_acao: "Clique sobre uma linha datilografada para expandir o dossiê detalhado do despacho.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_feed_botao_recolher",
+        alvo_ui: "botao_minimizar_feed_telegramas",
+        titulo: "Minimizar / Expandir Feed",
+        descricao: "Recolhe a gaveta de telegramas para liberar área de visão do mapa provincial no canto inferior esquerdo.",
+        formula_ou_origem: "Controle de interface de layout do bevy_egui.",
+        efeito_ou_acao: "Alterna a altura da gaveta entre o modo compacto (24px) e o modo expandido (180px).",
+        atalho_teclado: None,
+    ),
+
+    // --------------------------------------------------------------------------
+    // PAINEL DE ORÇAMENTO E LIVRO-RAZÃO
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_orcamento_aliquota_renda",
+        alvo_ui: "seletor_aliquota_imposto_renda",
+        titulo: "Alíquota do Imposto de Renda",
+        descricao: "Nível de tributação direta aplicado sobre os salários dos operários e rendimentos do capital.",
+        formula_ou_origem: "Ajustável em cinco patamares: Muito Baixo, Baixo, Médio, Alto e Muito Alto.",
+        efeito_ou_acao: "Elevar alíquotas aumenta a arrecadação diária, mas reduz o Padrão de Vida e a atratividade imigratória.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_orcamento_gastos_militares",
+        alvo_ui: "seletor_manutencao_militar",
+        titulo: "Orçamento de Manutenção Militar",
+        descricao: "Recursos destinados ao abastecimento, soldos, treinamento e reposição de material do Exército e Marinha.",
+        formula_ou_origem: "Multiplicador de soldos * número de divisões e frotas mobilizadas.",
+        efeito_ou_acao: "Cortar gastos reduz o consumo de fundos, mas gera descontentamento severo no Grupo dos Militares.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_orcamento_salarios_burocracia",
+        alvo_ui: "seletor_salarios_burocratas",
+        titulo: "Salários do Funcionalismo Público",
+        descricao: "Remuneração paga aos servidores civis, magistrados, fiscais e administradores de ministérios.",
+        formula_ou_origem: "Multiplicador salarial sobre o número de funcionários administrativos do Estado.",
+        efeito_ou_acao: "Salários altos elevam a capacidade de arrecadação fiscal e reduzem o contrabando de mercadorias.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_orcamento_tarifas",
+        alvo_ui: "seletor_tarifas_comercio",
+        titulo: "Tarifas sobre Comércio Exterior",
+        descricao: "Taxa percentual aplicada nas alfândegas sobre mercadorias importadas ou exportadas.",
+        formula_ou_origem: "Percentual cobrado sobre o valor de desembaraço aduaneiro das rotas mercantis ativas.",
+        efeito_ou_acao: "Tarifas altas de importação protegem empresas nacionais mas encarecem bens de consumo para a população.",
+        atalho_teclado: None,
+    ),
+
+    // --------------------------------------------------------------------------
+    // PAINEL DE MERCADO E BENS
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_mercado_balanco_bem",
+        alvo_ui: "indicador_balanco_mercadoria",
+        titulo: "Balanço Oferta vs Demanda do Bem",
+        descricao: "Confronto direto entre a produção total acrescida das importações e o consumo interno mais exportações.",
+        formula_ou_origem: "Saldo = (Produção Doméstica + Importações) - (Consumo Industrial + Consumo das Pops + Exportações).",
+        efeito_ou_acao: "Déficits geram subida no Preço de Mercado (até +75%); excedentes barateiam a mercadoria (até -75%).",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_mercado_botao_importar",
+        alvo_ui: "botao_criar_rota_importacao",
+        titulo: "Estabelecer Rota de Importação",
+        descricao: "Negocia a compra contínua do bem a partir de um mercado estrangeiro com excedentes de produção.",
+        formula_ou_origem: "Consome Pontos de Burocracia e Comboios Navais para transporte da carga.",
+        efeito_ou_acao: "Reduz o preço doméstico do bem e supre gargalos nas fábricas nacionais.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_mercado_botao_exportar",
+        alvo_ui: "botao_criar_rota_exportacao",
+        titulo: "Estabelecer Rota de Exportação",
+        descricao: "Vende excedentes de produção doméstica para um mercado exterior ávido por aquele bem.",
+        formula_ou_origem: "Gera divisas para as empresas exportadoras e receita tarifária aduaneira para o Tesouro.",
+        efeito_ou_acao: "Eleva o preço interno do produto e engorda a margem de lucro dos capitalistas ou cafeicultores.",
+        atalho_teclado: None,
+    ),
+
+    // --------------------------------------------------------------------------
+    // PAINEL DE CONSTRUÇÃO E OBRAS
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_construcao_pontos_ativos",
+        alvo_ui: "indicador_pontos_construcao",
+        titulo: "Capacidade Ativa de Construção",
+        descricao: "Número de Pontos de Construção alocados atualmente nas obras em andamento pelo país.",
+        formula_ou_origem: "Soma dos pontos providos pelos Prédios do Setor de Construção ativos em todas as províncias.",
+        efeito_ou_acao: "Quanto mais pontos alocados, mais rápido as usinas e ferrovias são inauguradas.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_construcao_pausar_fila",
+        alvo_ui: "botao_pausar_obras_fila",
+        titulo: "Suspender Fila de Obras Públicas",
+        descricao: "Interrompe temporariamente o trabalho em todas as construções públicas financiadas pelo Estado.",
+        formula_ou_origem: "Zera o consumo de verbas do tesouro com cimento, ferro e madeira do setor estatal de edificação.",
+        efeito_ou_acao: "Mecanismo imediato de socorro para estancar déficits fiscais sem precisar demolir prédios.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_construcao_priorizar_topo",
+        alvo_ui: "botao_priorizar_obra",
+        titulo: "Promover Obra para o Topo da Fila",
+        descricao: "Move o projeto selecionado para a primeira posição da lista nacional de edificação.",
+        formula_ou_origem: "Altera a ordem de despacho no agendador de construção.",
+        efeito_ou_acao: "Concentra o esforço dos construtores prioritariamente nesta usina ou ferrovia.",
+        atalho_teclado: None,
+    ),
+
+    // --------------------------------------------------------------------------
+    // PAINEL POLÍTICO E REFORMAS LEGAIS
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_politica_reformar_gabinete",
+        alvo_ui: "botao_reformar_gabinete",
+        titulo: "Reorganizar Composição do Governo",
+        descricao: "Abre a mesa de negociação política para convidar ou exonerar Grupos de Interesse do Gabinete Ministerial.",
+        formula_ou_origem: "Recalcula a Legitimidade Governamental com base na nova coalizão resultante.",
+        efeito_ou_acao: "Permite acomodar forças em ascensão ou expurgar facções desleais antes de votar leis cruciais.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_politica_progresso_lei",
+        alvo_ui: "barra_progresso_tramitacao_lei",
+        titulo: "Progresso da Tramitação Legislativa",
+        descricao: "Acompanhamento da votação do projeto de lei em tramitação no Congresso ou Conselho de Estado.",
+        formula_ou_origem: "A cada intervalo de dias (60-90), ocorre uma rolagem com base no apoio parlamentar ponderado.",
+        efeito_ou_acao: "Pode resultar em Avanço (passagem de leitura), Debate (emendas) ou Rejeição definitiva da matéria.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_politica_cancelar_lei",
+        alvo_ui: "botao_abortar_tramitacao_lei",
+        titulo: "Retirar Projeto de Pauta",
+        descricao: "Cancela imediatamente a tramitação da lei em debate no parlamento.",
+        formula_ou_origem: "Encerra o processo legislativo e impõe penalidade de 1 ano para reapresentar a mesma proposta.",
+        efeito_ou_acao: "Evita que grupos opositores armados deflagrem uma guerra civil caso o risco de revolta esteja crítico.",
+        atalho_teclado: None,
+    ),
+
+    // --------------------------------------------------------------------------
+    // PAINEL PROVINCIAL E DEMOGRÁFICO
+    // --------------------------------------------------------------------------
+    Tooltip(
+        id: "tooltip_provincia_acesso_mercado",
+        alvo_ui: "indicador_acesso_mercado_provincial",
+        titulo: "Acesso ao Mercado Provincial",
+        descricao: "Percentual de integração comercial da província com o restante do território nacional.",
+        formula_ou_origem: "Mínimo(100%, Infraestrutura Existente / Infraestrutura Demandada pelas Lavouras e Usinas).",
+        efeito_ou_acao: "Abaixo de 100%, os preços locais descolam do mercado nacional, arruinando a lucratividade dos negócios locais.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_provincia_terra_subsistencia",
+        alvo_ui: "indicador_camponeses_subsistencia",
+        titulo: "Campesinato de Subsistência",
+        descricao: "Número de famílias que sobrevivem do cultivo tradicional rudimentar nas terras aráveis livres.",
+        formula_ou_origem: "Pops alocadas em fazendas de subsistência na fração de terra arável não industrializada.",
+        efeito_ou_acao: "Representa a reserva primária de mão de obra para ser contratada quando novas fábricas forem fundadas.",
+        atalho_teclado: None,
+    ),
+    Tooltip(
+        id: "tooltip_provincia_expandir_transporte",
+        alvo_ui: "botao_expandir_ferrovia_local",
+        titulo: "Expandir Malha de Transporte Local",
+        descricao: "Envia ordem de construção de novas ferrovias ou rodovias pavimentadas na província.",
+        formula_ou_origem: "Adiciona um nível de Prédio Ferroviário à fila de construção estadual.",
+        efeito_ou_acao: "Garante infraestrutura para sustentar novas minas de carvão e siderúrgicas de grande porte.",
+        atalho_teclado: None,
+    ),
+]

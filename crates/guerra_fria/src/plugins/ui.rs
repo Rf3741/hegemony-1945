@@ -8,6 +8,7 @@ use super::jogador::{PainelPais, PaisJogador, hud_pais, resumo_pais};
 use super::map::{ProvinciaSelecionada, RecursoCatalogo};
 use super::time::RecursoRelogio;
 use bevy::prelude::*;
+use super::enciclopedia::dica;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 
 fn ui_raiz(ctx: &egui::Context) -> egui::Ui {
@@ -42,15 +43,16 @@ fn barra_superior(
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
     egui::Panel::top("barra_superior").show(&mut raiz, |ui| {
         ui.horizontal(|ui| {
-            ui.heading(relogio.data.formatar_pt_br());
+            dica(ui.heading(relogio.data.formatar_pt_br()), "tooltip_topbar_data");
             ui.separator();
             let rotulo = if relogio.pausado { "Continuar" } else { "Pausar" };
-            if ui.button(rotulo).clicked() {
+            if dica(ui.button(rotulo), "tooltip_topbar_botao_pausar").clicked() {
                 relogio.alternar_pausa();
             }
             for v in VelocidadeJogo::TODAS {
                 let ativa = !relogio.pausado && relogio.velocidade == v;
-                if ui.selectable_label(ativa, v.nivel().to_string()).clicked() {
+                let id_dica = format!("tooltip_topbar_velocidade_{}", v.nivel());
+                if dica(ui.selectable_label(ativa, v.nivel().to_string()), &id_dica).clicked() {
                     relogio.definir_velocidade(v);
                 }
             }
@@ -63,7 +65,7 @@ fn barra_superior(
                 ui.label(texto);
                 ui.separator();
             }
-            ui.label("Espaço: pausa | 1-5: vel | WASD: mover | scroll: zoom | V: construções");
+            ui.label("Espaço: pausa | 1-5: vel | WASD: mover | scroll: zoom | V: construções | F9: enciclopédia");
         });
     });
     Ok(())

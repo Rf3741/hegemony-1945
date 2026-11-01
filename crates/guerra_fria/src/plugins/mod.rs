@@ -18,3 +18,4 @@ pub mod ui;
 pub mod visual_construcoes;
 pub mod tecnologia_ui;
 pub mod estatisticas;
+pub mod enciclopedia;
