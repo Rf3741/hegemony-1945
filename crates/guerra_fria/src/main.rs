@@ -3,7 +3,6 @@ mod estado;
 mod plugins;
 
 use bevy::prelude::*;
-use bevy::window::WindowResolution;
 use bevy_egui::EguiPlugin;
 use plugins::{
     audio::AudioPlugin,
@@ -64,11 +63,7 @@ fn main() {
 
     App::new()
         .add_plugins(DefaultPlugins.set(AssetPlugin { file_path: raiz.join("assets").to_string_lossy().into_owned(), ..default() }).set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Hegemony: 1945".into(),
-                resolution: WindowResolution::new(1600, 900),
-                ..default()
-            }),
+            primary_window: Some(plugins::config::ConfigJogo::carregar().janela()),
             ..default()
         }))
         .add_plugins(EguiPlugin::default())
@@ -89,6 +84,8 @@ fn main() {
         .add_plugins(EnciclopediaPlugin)
         .add_plugins(PersonagensPlugin)
         .add_plugins((GuerraSimPlugin, GuerraUiPlugin, GuerraIaPlugin))
+        .add_plugins(plugins::config::ConfigPlugin)
+        .add_plugins(plugins::menu_pausa::MenuPausaPlugin)
         .add_plugins(plugins::menu_ui::MenuUiPlugin)
         .add_plugins(plugins::saveload::SaveLoadPlugin)
         .add_plugins(plugins::menu_saves::MenuSavesPlugin)
