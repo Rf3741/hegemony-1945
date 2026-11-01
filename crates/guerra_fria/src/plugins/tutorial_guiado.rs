@@ -430,10 +430,10 @@ impl Paineis<'_> {
 
 #[derive(SystemParam)]
 struct Entradas<'w, 's> {
-    camera: Query<'w, 's, (&'static Transform, &'static Projection), With<Camera2d>>,
+    camera: Query<'w, 's, (&'static Camera, &'static GlobalTransform, &'static mut Transform, &'static mut Projection), With<Camera2d>>,
     selecionada: Res<'w, ProvinciaSelecionada>,
     mundo: Res<'w, RecursoMundo>,
-    relogio: Res<'w, RecursoRelogio>,
+    relogio: ResMut<'w, RecursoRelogio>,
     modo: Option<Res<'w, super::hud_mapas::ModoTematico>>,
     pol: Option<Res<'w, PoliticaSim>>,
     diplo_sim: Option<Res<'w, DiploSim>>,
@@ -441,7 +441,7 @@ struct Entradas<'w, 's> {
 }
 
 fn coletar(e: &mut Entradas, p: &Paineis, t: &mut TutorialGuiado) -> Fatos {
-    let camera = e.camera.single().map_or((0, 0, 0), |(tf, pr)| {
+    let camera = e.camera.single().map_or((0, 0, 0), |(_, _, tf, pr)| {
         let esc = if let Projection::Orthographic(o) = pr { o.scale } else { 1.0 };
         (tf.translation.x as i32 / 8, tf.translation.y as i32 / 8, (esc * 20.0) as i32)
     });
@@ -468,12 +468,12 @@ fn coletar(e: &mut Entradas, p: &Paineis, t: &mut TutorialGuiado) -> Fatos {
 }
 
 /// Primeiro quadro em Jogando: pausa o relógio e cria a máquina.
-fn iniciar_partida(mut t: ResMut<TutorialGuiado>, mut relogio: ResMut<RecursoRelogio>, mut e: Entradas, mut p: Paineis) {
+fn iniciar_partida(mut t: ResMut<TutorialGuiado>, mut e: Entradas, mut p: Paineis) {
     if !t.pendente {
         return;
     }
     t.pendente = false;
-    relogio.pausado = true;
+    e.relogio.pausado = true; // via Entradas: pedir RecursoRelogio de novo aqui conflitava (B0002)
     p.fechar_todos();
     let f = coletar(&mut e, &p, &mut t);
     t.maquina = Some(Maquina::nova(&f));
@@ -537,11 +537,9 @@ fn desenhar(
     mut p: Paineis,
     cat: Option<Res<RecursoCatalogo>>,
     dados: Option<Res<DadosMapa>>,
-    mut camera: Query<(&Camera, &GlobalTransform, &mut Transform, &mut Projection), With<Camera2d>>,
     mut prox: ResMut<NextState<AppState>>,
     mut menu: ResMut<super::menu_ui::TelaMenu>,
     jogador: Option<Res<PaisJogador>>,
-    mut ligado_relogio: ResMut<RecursoRelogio>,
 ) -> Result {
     let ctx = contextos.ctx_mut()?.clone();
     if t.maquina.is_none() {
@@ -563,7 +561,7 @@ fn desenhar(
     };
     if t.aplicado != Some(m.passo) {
         t.aplicado = Some(m.passo);
-        if let (Some(pp), Ok((_, _, mut tf, mut proj))) = (pos_prov, camera.single_mut()) {
+        if let (Some(pp), Ok((_, _, mut tf, mut proj))) = (pos_prov, e.camera.single_mut()) {
             tf.translation.x = pp.x;
             tf.translation.y = pp.y;
             if let Projection::Orthographic(o) = &mut *proj {
@@ -591,7 +589,7 @@ fn desenhar(
             }
         }
         Alvo::Provincia(_) => {
-            if let (Some(pp), Ok((cam, gt, _, _))) = (pos_prov, camera.single())
+            if let (Some(pp), Ok((cam, gt, _, _))) = (pos_prov, e.camera.single())
                 && let Ok(v) = cam.world_to_viewport(gt, pp.extend(0.0))
             {
                 buraco = Some(egui::Rect::from_center_size(egui::pos2(v.x, v.y), egui::vec2(64.0, 64.0)));
@@ -738,7 +736,7 @@ fn desenhar(
     }
     if acao_livre {
         t.ativo = false;
-        ligado_relogio.pausado = true;
+        e.relogio.pausado = true;
     } else if acao_menu || m.estado == EstadoTut::Saiu {
         t.ativo = false;
         *menu = super::menu_ui::TelaMenu::Titulo;
