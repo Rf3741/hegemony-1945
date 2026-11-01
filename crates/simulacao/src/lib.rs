@@ -9,6 +9,7 @@
 
 pub mod economia;
 pub mod erro;
+pub mod formacao;
 pub mod mapa;
 pub mod mundo;
 pub mod politica;

@@ -544,7 +544,7 @@ impl MundoJogo {
     }
 }
 
-fn gerar_pops_iniciais(
+pub(crate) fn gerar_pops_iniciais(
     provincia_id: u32,
     populacao_total: u64,
     urbanizacao: f64,
@@ -603,7 +603,7 @@ fn gerar_pops_iniciais(
     pops
 }
 
-fn gerar_predios_iniciais(pop_total: u64, pib_milhoes: u64, dano_guerra: f32) -> Vec<Predio> {
+pub(crate) fn gerar_predios_iniciais(pop_total: u64, pib_milhoes: u64, dano_guerra: f32) -> Vec<Predio> {
     if pop_total == 0 {
         return Vec::new();
     }
