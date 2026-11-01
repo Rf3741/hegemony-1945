@@ -227,7 +227,9 @@ fn detectar_eventos(
                 notas.push("Obra concluída!", agora);
             }
             if ant.tag == jogador.0 && calote && !ant.calote {
-                notas.push("Calote soberano: dívida acima do limite de crédito!", agora);
+                let juros = format!("{:.1}", pe.orcamento.taxa_juros_efetiva_anual * 100.0);
+                let txt = super::enciclopedia::texto_notificacao("msg_tesouro_insolvente", &[("pais", p.nome.clone()), ("taxa_juros", juros)], "Calote soberano: dívida acima do limite de crédito!");
+                notas.push(txt, agora);
             }
         }
     }
