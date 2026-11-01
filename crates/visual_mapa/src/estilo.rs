@@ -36,6 +36,8 @@ pub struct EstiloMapa {
     /// Aplica o tema de gabinete de guerra (fontes e cores) na UI egui.
     pub tema_ui: bool,
     /// Oceano com ondas animadas (intensidade 0 desliga) e velocidade.
+    /// Desligado por padrão (a animação do mar piscava); ligue para ondas suaves e lentas.
+    pub oceano_ondas_ativo: bool,
     pub oceano_ondas_alfa: f32,
     pub oceano_ondas_vel: f32,
     /// Zoom suave: taxa de aproximação por segundo (0 = zoom instantâneo).
@@ -63,8 +65,9 @@ impl Default for EstiloMapa {
             pais_alfa: 0.62,
             pais_altura_min_px: 9.0,
             tema_ui: true,
-            oceano_ondas_alfa: 0.10,
-            oceano_ondas_vel: 0.35,
+            oceano_ondas_ativo: false,
+            oceano_ondas_alfa: 0.08,
+            oceano_ondas_vel: 0.12,
             zoom_suave: 12.0,
             vinheta_alfa: 0.35,
             moldura_antiga: true,
