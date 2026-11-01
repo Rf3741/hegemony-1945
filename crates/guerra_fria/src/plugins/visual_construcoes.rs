@@ -78,21 +78,32 @@ pub fn sincronizar_dados_construcoes_sistema(
     mut entrada_eco: ResMut<EntradaEconomiaVisual>,
     mut entrada_vis: ResMut<EntradaVisual>,
     tempo: Res<Time<Real>>,
+    mut coords_cache: Local<Option<HashMap<String, (f32, f32)>>>,
 ) {
     let Some(ref nucleo) = eco.nucleo else { return };
+    let precisa = !estado.inicializado
+        || (eco.versao_construcao != estado.ultima_versao_construcao && tempo.elapsed_secs() - estado.ultima_extracao >= 2.0);
+    if !precisa {
+        return;
+    }
 
-    // Tabela de coordenadas: código ADM1 ou ID de província -> centroide (lon, lat)
-    let coords: HashMap<String, (f32, f32)> = catalogo_mapa
-        .as_ref()
-        .map(|cat| {
-            cat.0
-                .provincias
-                .iter()
-                .rev() // a 1ª província de cada estado (a do centroide original) prevalece
-                .map(|p| (p.adm1_code.clone(), p.centroide))
-                .collect()
-        })
-        .unwrap_or_default();
+    // Tabela de coordenadas: código ADM1 ou ID de província -> centroide (lon, lat); montada uma só vez.
+    if coords_cache.is_none() {
+        *coords_cache = Some(
+            catalogo_mapa
+                .as_ref()
+                .map(|cat| {
+                    cat.0
+                        .provincias
+                        .iter()
+                        .rev() // a 1ª província de cada estado (a do centroide original) prevalece
+                        .map(|p| (p.adm1_code.clone(), p.centroide))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        );
+    }
+    let coords = coords_cache.as_ref().unwrap();
 
     if !estado.inicializado {
         // 1. Carregar cidades demográficas de 1945
@@ -123,7 +134,7 @@ pub fn sincronizar_dados_construcoes_sistema(
         }
 
         // 2. Extrair construções de MundoEconomico
-        atualizar_predios_de_mundo(&nucleo.mundo, &coords, &mut entrada_eco);
+        atualizar_predios_de_mundo(&nucleo.mundo, coords, &mut entrada_eco);
 
         estado.total_predios = entrada_eco.total_predios();
         estado.total_cidades = entrada_eco.total_cidades();
@@ -139,7 +150,7 @@ pub fn sincronizar_dados_construcoes_sistema(
     {
         estado.ultima_extracao = tempo.elapsed_secs();
         estado.ultima_versao_construcao = eco.versao_construcao;
-        atualizar_predios_de_mundo(&nucleo.mundo, &coords, &mut entrada_eco);
+        atualizar_predios_de_mundo(&nucleo.mundo, coords, &mut entrada_eco);
         estado.total_predios = entrada_eco.total_predios();
         info!(
             "visual_construcoes: construções atualizadas no mapa vivo! Total prédios: {}",
