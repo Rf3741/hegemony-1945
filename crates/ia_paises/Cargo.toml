@@ -1,0 +1,10 @@
+[package]
+name = "ia_paises"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "IA dos paises (economia e politica): postura fiscal, construcao por retorno/necessidade e reforma de leis"
+
+[dependencies]
+sim_economia.workspace = true
+sim_politica.workspace = true
