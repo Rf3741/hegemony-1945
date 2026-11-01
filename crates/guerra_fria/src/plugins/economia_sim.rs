@@ -308,8 +308,12 @@ impl Nucleo {
             let taxa_desemp = if pop_trab > 0.0 { desemp_qtd / pop_trab } else { 0.0 };
             let prod_bens = prod_bens_por_pais.remove(&p.id).unwrap_or_else(|| vec![0.0; num_bens]);
             let tag = p.tag.clone().unwrap_or_else(|| p.id.to_uppercase());
+            let com = mundo.resumo_comercio_pais(&p.id);
 
             v.ranking.push(ResumoPaisEco {
+                exportacoes: com.total_exportacoes_valor,
+                importacoes: com.total_importacoes_valor,
+                turismo_receita_dia: mundo.turismo_receita_pais(&p.id),
                 id: p.id.clone(),
                 tag,
                 nome: p.nome.clone(),
@@ -471,6 +475,10 @@ pub struct ResumoPaisEco {
     pub tesouro: f64,
     pub divida: f64,
     pub producao_bens: Vec<f64>,
+    /// Exportações e importações (valor/dia, a preços de mercado) e receita de turismo receptivo (por dia).
+    pub exportacoes: f64,
+    pub importacoes: f64,
+    pub turismo_receita_dia: f64,
 }
 
 #[derive(Debug, Clone, Default)]
