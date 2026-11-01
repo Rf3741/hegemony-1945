@@ -92,5 +92,6 @@ fn main() {
         .add_plugins(plugins::menu_ui::MenuUiPlugin)
         .add_plugins(plugins::saveload::SaveLoadPlugin)
         .add_plugins(plugins::hud_mapas::HudMapasPlugin)
+        .add_plugins(plugins::polimento_visual::PolimentoVisualPlugin)
         .run();
 }

@@ -33,6 +33,18 @@ pub struct EstiloMapa {
     pub pais_alfa: f32,
     /// Altura mínima do texto na tela (px) para ser mostrado.
     pub pais_altura_min_px: f32,
+    /// Aplica o tema de gabinete de guerra (fontes e cores) na UI egui.
+    pub tema_ui: bool,
+    /// Oceano com ondas animadas (intensidade 0 desliga) e velocidade.
+    pub oceano_ondas_alfa: f32,
+    pub oceano_ondas_vel: f32,
+    /// Zoom suave: taxa de aproximação por segundo (0 = zoom instantâneo).
+    pub zoom_suave: f32,
+    /// Vinheta nas bordas da tela (0 a 1) e moldura de mapa antigo.
+    pub vinheta_alfa: f32,
+    pub moldura_antiga: bool,
+    /// Transição suave entre modos de mapa: duração em segundos.
+    pub transicao_modo_s: f32,
 }
 
 impl Default for EstiloMapa {
@@ -50,6 +62,13 @@ impl Default for EstiloMapa {
             pais_escala_some: 0.4,
             pais_alfa: 0.62,
             pais_altura_min_px: 9.0,
+            tema_ui: true,
+            oceano_ondas_alfa: 0.10,
+            oceano_ondas_vel: 0.35,
+            zoom_suave: 12.0,
+            vinheta_alfa: 0.35,
+            moldura_antiga: true,
+            transicao_modo_s: 0.35,
         }
     }
 }

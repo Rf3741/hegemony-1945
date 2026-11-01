@@ -3307,6 +3307,7 @@ dependencies = [
  "sim_politica",
  "sim_tecnologia",
  "simulacao",
+ "ui_refinada",
  "visual_mapa",
 ]
 

@@ -49,6 +49,8 @@ pub struct ProvinciaSelecionada(pub u32);
 
 #[derive(Resource, Default)]
 struct ArrastoCamera {
+    /// Escala alvo do zoom suave (0 = ainda não inicializada).
+    escala_alvo: f32,
     inicio: Option<Vec2>,
     moveu: f32,
     /// O clique começou fora da UI (pode virar seleção).
@@ -81,6 +83,7 @@ impl Plugin for MapPlugin {
             .add_systems(Startup, |mut c: Commands| {
                 c.spawn(Camera2d);
             })
+            .add_systems(Update, animar_ondas)
             .add_systems(OnEnter(AppState::Carregando), iniciar_carga)
             .add_systems(Update, aguardar_carga.run_if(in_state(AppState::Carregando)))
             .add_systems(EguiPrimaryContextPass, tela_carregando.run_if(in_state(AppState::Carregando)))
@@ -208,7 +211,16 @@ pub fn colorir_com_hachura(
                     }
                 }
             } else {
-                // Brilho suave na costa (1 a 3 px de terra).
+                // Oceano com textura: gradiente por latitude (mais claro no equador e perto dos polos
+                // mais escuro) e ruído suave de baixa frequência.
+                let (fx, fy) = (x as f32, y as f32);
+                let lat = ((fy / hu as f32) - 0.5).abs() * 2.0;
+                let ruido = (fx * 0.021 + fy * 0.013).sin() * 0.5 + (fx * 0.047 - fy * 0.031).sin() * 0.3 + (fx * 0.09 + fy * 0.07).sin() * 0.2;
+                let f = 1.0 + (0.22 - lat * 0.40) + ruido * 0.045;
+                for ch in c.iter_mut().take(3) {
+                    *ch = (*ch as f32 * f).clamp(0.0, 255.0) as u8;
+                }
+                // Brilho suave na costa (1 a 3 px de terra) e espuma clara na linha d'água.
                 let mut d = 0u8;
                 'costa: for r in 1..=3i32 {
                     for (dx, dy) in [(r, 0), (-r, 0), (0, r), (0, -r)] {
@@ -221,7 +233,7 @@ pub fn colorir_com_hachura(
                     }
                 }
                 if d > 0 {
-                    let t = [0.40, 0.22, 0.10][d as usize - 1];
+                    let t = [0.55, 0.30, 0.14][d as usize - 1];
                     for k in 0..3 {
                         c[k] = (c[k] as f32 + (COR_COSTA[k] as f32 - c[k] as f32) * t) as u8;
                     }
@@ -387,9 +399,82 @@ fn aguardar_carga(
             Visibility::Hidden,
         ));
     }
+    criar_ondas(&mut commands, &mut imagens, &saida.ids, saida.largura, saida.altura);
     commands.insert_resource(CaixasProvincia(saida.caixas));
     commands.insert_resource(DadosMapa { largura: saida.largura, altura: saida.altura, ids: saida.ids });
     proximo.set(AppState::Menu);
+}
+
+/// Camada de ondas do oceano: duas texturas de baixa resolução (1/4) que só cobrem o mar aberto
+/// e se alternam em fade, dando um leve movimento de brilho na água.
+#[derive(Component)]
+struct OndasOceano {
+    fase: f32,
+}
+
+fn criar_ondas(commands: &mut Commands, imagens: &mut Assets<Image>, ids: &[u32], w: u32, h: u32) {
+    const D: u32 = 4;
+    let (lw, lh) = (w / D, h / D);
+    let mut handles = Vec::new();
+    for variante in 0..2u32 {
+        let mut px = vec![0u8; (lw * lh * 4) as usize];
+        for ly in 0..lh {
+            for lx in 0..lw {
+                // Só mar aberto: todo o bloco DxD é oceano.
+                let mut mar = true;
+                'b: for dy in 0..D {
+                    for dx in 0..D {
+                        if ids[((ly * D + dy) * w + lx * D + dx) as usize] != 0 {
+                            mar = false;
+                            break 'b;
+                        }
+                    }
+                }
+                if !mar {
+                    continue;
+                }
+                let (fx, fy) = (lx as f32, ly as f32);
+                let v = if variante == 0 {
+                    (fx * 0.35 + fy * 0.18).sin() * (fy * 0.27 - fx * 0.11).cos()
+                } else {
+                    (fx * 0.22 - fy * 0.31 + 2.0).sin() * (fx * 0.15 + fy * 0.24).cos()
+                };
+                let a = (v.max(0.0).powf(1.5) * 255.0) as u8;
+                let i = ((ly * lw + lx) * 4) as usize;
+                px[i..i + 4].copy_from_slice(&[170, 215, 245, a]);
+            }
+        }
+        let mut img = Image::new(
+            Extent3d { width: lw, height: lh, depth_or_array_layers: 1 },
+            TextureDimension::D2,
+            px,
+            TextureFormat::Rgba8UnormSrgb,
+            RenderAssetUsages::RENDER_WORLD,
+        );
+        img.sampler = ImageSampler::linear();
+        handles.push(imagens.add(img));
+    }
+    for k in [-1.0f32, 0.0, 1.0] {
+        for (i, hdl) in handles.iter().enumerate() {
+            commands.spawn((
+                OndasOceano { fase: i as f32 * std::f32::consts::PI },
+                Sprite { image: hdl.clone(), custom_size: Some(Vec2::new(w as f32, h as f32)), color: Color::srgba(1.0, 1.0, 1.0, 0.0), ..default() },
+                Transform::from_xyz(k * w as f32, 0.0, 0.2),
+            ));
+        }
+    }
+}
+
+fn animar_ondas(
+    tempo: Res<Time>,
+    estilo: Res<visual_mapa::EstiloMapa>,
+    mut ondas: Query<(&OndasOceano, &mut Sprite)>,
+) {
+    let t = tempo.elapsed_secs() * estilo.oceano_ondas_vel;
+    for (o, mut sp) in &mut ondas {
+        let a = (t + o.fase).sin().max(0.0) * estilo.oceano_ondas_alfa;
+        sp.color = Color::srgba(1.0, 1.0, 1.0, a);
+    }
 }
 
 fn tela_carregando(mut contextos: EguiContexts, tempo: Res<Time>, dicas: Res<super::menu_ui::Dicas>) -> Result {
@@ -419,6 +504,7 @@ fn mover_camera(
     botoes: Res<ButtonInput<MouseButton>>,
     mut arrasto: ResMut<ArrastoCamera>,
     mapa: Option<Res<DadosMapa>>,
+    estilo: Option<Res<visual_mapa::EstiloMapa>>,
 ) {
     let Ok((mut tf, mut proj)) = camera.single_mut() else { return };
     let Projection::Orthographic(ortho) = &mut *proj else { return };
@@ -432,7 +518,19 @@ fn mover_camera(
     tf.translation += (dir * 900.0 * ortho.scale * time.delta_secs()).extend(0.0);
 
     if scroll.delta.y != 0.0 && !sobre_ui {
-        ortho.scale = (ortho.scale * (1.0 - scroll.delta.y * 0.12)).clamp(0.1, 4.0);
+        let base = if arrasto.escala_alvo > 0.0 { arrasto.escala_alvo } else { ortho.scale };
+        arrasto.escala_alvo = (base * (1.0 - scroll.delta.y * 0.12)).clamp(0.1, 4.0);
+    }
+    // Zoom suave: aproxima a escala do alvo de forma exponencial (independente do FPS).
+    let taxa = estilo.as_ref().map_or(0.0, |e| e.zoom_suave);
+    if arrasto.escala_alvo > 0.0 {
+        if taxa <= 0.0 || (ortho.scale - arrasto.escala_alvo).abs() < 0.0005 {
+            ortho.scale = arrasto.escala_alvo;
+            arrasto.escala_alvo = 0.0;
+        } else {
+            let k = 1.0 - (-taxa * time.delta_secs()).exp();
+            ortho.scale += (arrasto.escala_alvo - ortho.scale) * k;
+        }
     }
 
     let Ok(janela) = janela.single() else { return };
