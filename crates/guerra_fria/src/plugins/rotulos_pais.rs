@@ -27,7 +27,7 @@ pub struct TextoPais {
 }
 
 #[derive(Resource)]
-struct RotulosPaisCriados;
+pub struct RotulosPaisCriados;
 
 #[derive(Debug, Clone)]
 pub struct GeoPais {

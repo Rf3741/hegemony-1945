@@ -17,3 +17,5 @@ pub mod time;
 pub mod ui;
 pub mod visual_construcoes;
 pub mod tecnologia_ui;
+pub mod formacao_sim;
+pub mod bandeiras_ui;

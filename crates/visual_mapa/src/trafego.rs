@@ -412,6 +412,24 @@ pub fn calcular_plano(
     max_por_fluxo: usize,
     max_total: usize,
 ) -> Vec<RotaNavios> {
+    calcular_plano_com(caminho_mascara, cidades, fluxos, volume_por_navio, max_por_fluxo, max_total, &[])
+}
+
+/// Canais fechados na data atual (o cliente preenche a partir de `sim_economia::canal_disponivel`).
+/// Quando muda, o plano de rotas é refeito e os navios contornam (Suez fechado -> Cabo da Boa Esperança).
+#[derive(Resource, Default, Debug, Clone, PartialEq)]
+pub struct CanaisFechados(pub Vec<Canal>);
+
+/// Como [`calcular_plano`], evitando os canais `fechados`.
+pub fn calcular_plano_com(
+    caminho_mascara: &Path,
+    cidades: &[CidadeTrafego],
+    fluxos: &[FluxoComercio],
+    volume_por_navio: f32,
+    max_por_fluxo: usize,
+    max_total: usize,
+    fechados: &[Canal],
+) -> Vec<RotaNavios> {
     let Some(r) = roteador(caminho_mascara) else { return Vec::new() };
     // portos ancorados por país (top 4 por população)
     let mut portos: HashMap<&str, Vec<(u32, Vec2)>> = HashMap::new();
@@ -437,7 +455,7 @@ pub fn calcular_plano(
         for &(_, a, b) in pares.iter().take(3) {
             let rota = cache
                 .entry((a, b))
-                .or_insert_with(|| r.caminho(a, b).map(|p| Arc::new(p.rota)))
+                .or_insert_with(|| r.caminho_sem(a, b, fechados).map(|p| Arc::new(p.rota)))
                 .clone();
             if let Some(rota) = rota {
                 let c = rota.comprimento();
@@ -686,6 +704,7 @@ fn gerenciar_plano_sistema(
     cfg: Res<ConfigTrafego>,
     fluxos: Res<FluxosComercio>,
     cidades: Res<CidadesTrafego>,
+    fechados: Res<CanaisFechados>,
     rec: Option<Res<RecursosTrafego>>,
     mut estado: ResMut<EstadoPlano>,
     navios: Query<Entity, With<NavioVisual>>,
@@ -693,7 +712,7 @@ fn gerenciar_plano_sistema(
     if !cfg.ativo {
         return;
     }
-    if fluxos.is_changed() {
+    if fluxos.is_changed() || (fechados.is_changed() && !fechados.is_added()) {
         estado.refazer = true;
     }
     // resultado pronto?
@@ -722,9 +741,10 @@ fn gerenciar_plano_sistema(
         let (tx, rx) = mpsc::channel();
         estado.rx = Some(Mutex::new(rx));
         let (cam, cs, fl) = (cfg.caminho_mascara.clone(), cidades.cidades.clone(), fluxos.fluxos.clone());
+        let fechados = fechados.0.clone();
         let (vpn, mpf, mt) = (cfg.volume_por_navio, cfg.max_navios_por_fluxo, cfg.max_navios);
         std::thread::spawn(move || {
-            let _ = tx.send(calcular_plano(&cam, &cs, &fl, vpn, mpf, mt));
+            let _ = tx.send(calcular_plano_com(&cam, &cs, &fl, vpn, mpf, mt, &fechados));
         });
     }
 }
@@ -995,6 +1015,7 @@ impl Plugin for TrafegoPlugin {
             .init_resource::<RelatorioCanais>()
             .init_resource::<CidadesTrafego>()
             .init_resource::<EstadoPlano>()
+            .init_resource::<CanaisFechados>()
             .add_systems(Startup, (criar_recursos, carregar_fluxos_padrao))
             .add_systems(
                 Update,

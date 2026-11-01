@@ -142,9 +142,18 @@ impl Formacoes {
     }
 
     pub fn novo(
-        mut formaveis: Vec<Formavel>,
+        formaveis: Vec<Formavel>,
         independencias: Vec<Independencia>,
         catalogo: &CatalogoProvincias,
+    ) -> Self {
+        let provs = catalogo.provincias.iter().map(|p| (p.id, p.adm1_code.as_str(), p.centroide));
+        Self::com_indice(formaveis, independencias, provs)
+    }
+
+    fn montar(
+        formaveis: &mut Vec<Formavel>,
+        independencias: Vec<Independencia>,
+        indice: HashMap<u32, (String, (f32, f32))>,
     ) -> Self {
         // Sucessores de formáveis ignorados herdam a origem deles.
         let origem_ignorados: BTreeMap<String, Vec<String>> = formaveis
@@ -153,7 +162,7 @@ impl Formacoes {
             .map(|f| (f.tag.clone(), f.formacao.origem_tags.clone()))
             .collect();
         formaveis.retain(|f| !IGNORADOS.contains(&f.tag.as_str()));
-        for f in &mut formaveis {
+        for f in formaveis.iter_mut() {
             let mut novas = Vec::new();
             for o in &f.formacao.origem_tags {
                 match origem_ignorados.get(o) {
@@ -164,15 +173,19 @@ impl Formacoes {
             f.formacao.origem_tags = novas;
         }
         formaveis.sort_by_key(|f| parse_data(&f.formacao.data_historica));
-        let indice = catalogo
-            .provincias
-            .iter()
-            .map(|p| {
-                let pref = p.adm1_code.split('-').next().unwrap_or("").to_string();
-                (p.id, (pref, p.centroide))
-            })
+        Self { formaveis: std::mem::take(formaveis), independencias, feitos: BTreeSet::new(), indice }
+    }
+
+    /// Igual a `novo`, mas a partir de qualquer catálogo: `(id, adm1_code, (lon, lat))`.
+    pub fn com_indice<'a>(
+        mut formaveis: Vec<Formavel>,
+        independencias: Vec<Independencia>,
+        provincias: impl Iterator<Item = (u32, &'a str, (f32, f32))>,
+    ) -> Self {
+        let indice = provincias
+            .map(|(id, adm1, c)| (id, (adm1.split('-').next().unwrap_or("").to_string(), c)))
             .collect();
-        Self { formaveis, independencias, feitos: BTreeSet::new(), indice }
+        Self::montar(&mut formaveis, independencias, indice)
     }
 
     pub fn formaveis(&self) -> &[Formavel] {

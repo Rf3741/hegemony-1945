@@ -412,6 +412,12 @@ impl Roteador {
 
     /// Caminho mínimo (A*) entre duas células de mar. `None` se desconectadas.
     pub fn caminho(&self, de: u32, para: u32) -> Option<Percurso> {
+        self.caminho_sem(de, para, &[])
+    }
+
+    /// Como [`Self::caminho`], mas sem usar os canais `fechados` (a rota contorna, ex.: Suez fechado
+    /// faz o navio dar a volta pela África). `None` se o destino só é alcançável pelo canal fechado.
+    pub fn caminho_sem(&self, de: u32, para: u32, fechados: &[Canal]) -> Option<Percurso> {
         if self.comp[de as usize] == 0 || self.comp[de as usize] != self.comp[para as usize] {
             return None;
         }
@@ -467,6 +473,9 @@ impl Roteador {
             }
             if let Some(ps) = self.portais.get(&idx) {
                 for p in ps {
+                    if p.canal.is_some_and(|c| fechados.contains(&c)) {
+                        continue;
+                    }
                     let d = self.celula_para_mundo(idx).distance(self.celula_para_mundo(p.destino)) / FATOR_GRADE as f32;
                     relaxar(p.destino, d.max(0.5), Some(p.canal), &mut heap);
                 }
@@ -606,5 +615,17 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn suez_fechado_contorna_a_africa() {
+        let Some(r) = real() else { return };
+        let londres = r.ancorar_geo(0.5, 51.5, 80).expect("Londres");
+        let bombaim = r.ancorar_geo(72.8, 18.9, 60).expect("Bombaim");
+        let aberto = r.caminho(londres, bombaim).expect("aberto");
+        assert!(aberto.rota.marcas.iter().any(|(_, c)| *c == Canal::Suez));
+        let fechado = r.caminho_sem(londres, bombaim, &[Canal::Suez]).expect("contorno");
+        assert!(fechado.rota.marcas.iter().all(|(_, c)| *c != Canal::Suez));
+        assert!(fechado.custo > aberto.custo * 1.3, "contorno {} vs {}", fechado.custo, aberto.custo);
     }
 }

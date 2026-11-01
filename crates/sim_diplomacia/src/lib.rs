@@ -262,6 +262,22 @@ impl Diplomacia {
         }
     }
 
+    /// Registra um país que surgiu depois do início (descolonização, formáveis). Idempotente.
+    pub fn adicionar_pais(&mut self, info: InfoPais) {
+        if self.paises.iter().any(|p| p.tag == info.tag) {
+            return;
+        }
+        let i = match (info.tag.as_str(), info.bloco) {
+            (_, Bloco::Ocidental) => (55.0, 0.0),
+            (_, Bloco::Sovietico) => (0.0, 55.0),
+            _ => (0.0, 0.0),
+        };
+        self.influencia.insert(info.tag.clone(), i);
+        self.pontos.insert(info.tag.clone(), 60.0);
+        self.paises.push(info);
+        self.paises.sort_by(|a, b| a.tag.cmp(&b.tag));
+    }
+
     pub fn bloco(&self, tag: &str) -> Bloco {
         self.paises.iter().find(|p| p.tag == tag).map_or(Bloco::NaoAlinhado, |p| p.bloco)
     }
