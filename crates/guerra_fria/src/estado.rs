@@ -1,6 +1,5 @@
 //! Estado global do aplicativo e transições.
 use bevy::prelude::*;
-use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum AppState {
@@ -37,39 +36,31 @@ impl Plugin for EstadoPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<AppState>()
             .add_systems(Update, tecla_esc)
-            .add_systems(EguiPrimaryContextPass, tela_pausa.run_if(in_state(AppState::Pausado)));
+            ;
     }
 }
 
-fn tecla_esc(teclas: Res<ButtonInput<KeyCode>>, atual: Res<State<AppState>>, mut prox: ResMut<NextState<AppState>>) {
-    if teclas.just_pressed(KeyCode::Escape)
-        && let Some(n) = alternar_pausa(*atual.get())
-    {
+fn tecla_esc(
+    teclas: Res<ButtonInput<KeyCode>>,
+    atual: Res<State<AppState>>,
+    mut prox: ResMut<NextState<AppState>>,
+    mut config: ResMut<crate::plugins::menu_pausa::JanelaConfig>,
+    mut saves: ResMut<crate::plugins::menu_saves::JanelaSaves>,
+    mut ledger: ResMut<crate::plugins::estatisticas::RecursoLedger>,
+) {
+    if !teclas.just_pressed(KeyCode::Escape) {
+        return;
+    }
+    // Esc fecha primeiro a janela que estiver aberta por cima.
+    if config.aberta {
+        config.aberta = false;
+    } else if saves.aberta {
+        saves.aberta = false;
+    } else if ledger.aberto {
+        ledger.aberto = false;
+    } else if let Some(n) = alternar_pausa(*atual.get()) {
         prox.set(n);
     }
-}
-
-fn tela_pausa(
-    mut contextos: EguiContexts,
-    mut prox: ResMut<NextState<AppState>>,
-    mut janela_saves: ResMut<crate::plugins::menu_saves::JanelaSaves>,
-    mut menu: ResMut<crate::plugins::menu_ui::TelaMenu>,
-) -> Result {
-    egui::Window::new("Pausado").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(contextos.ctx_mut()?, |ui| {
-        if ui.button("Continuar (Esc)").clicked() {
-            prox.set(AppState::Jogando);
-        }
-        ui.separator();
-        if ui.button("Salvar / Carregar").clicked() {
-            janela_saves.abrir(false);
-        }
-        ui.separator();
-        if ui.button("Sair para o menu principal").clicked() {
-            *menu = crate::plugins::menu_ui::TelaMenu::Titulo;
-            prox.set(AppState::Menu);
-        }
-    });
-    Ok(())
 }
 
 #[cfg(test)]

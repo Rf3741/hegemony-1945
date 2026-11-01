@@ -1,4 +1,6 @@
 pub mod audio;
+pub mod config;
+pub mod menu_pausa;
 pub mod comercio_ui;
 pub mod diplomacia_ui;
 pub mod construcao_ui;
