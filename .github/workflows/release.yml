@@ -31,11 +31,11 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: guerra-fria-${{ github.ref_name }}-linux-x86_64.tar.gz
+            artifact_name: hegemony-1945-${{ github.ref_name }}-linux-x86_64.tar.gz
             bin_ext: ""
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: guerra-fria-${{ github.ref_name }}-windows-x86_64.zip
+            artifact_name: hegemony-1945-${{ github.ref_name }}-windows-x86_64.zip
             bin_ext: ".exe"
 
     steps:
@@ -70,26 +70,26 @@ jobs:
       - name: Empacotar Release no Linux (.tar.gz com assets)
         if: runner.os == 'Linux'
         run: |
-          mkdir -p dist/guerra-fria
-          cp "target/${{ matrix.target }}/release/guerra_fria" dist/guerra-fria/
-          cp "target/${{ matrix.target }}/release/gerador_mapa" dist/guerra-fria/
-          cp -r assets data dist/guerra-fria/
-          test -f README.md && cp README.md dist/guerra-fria/ || true
-          test -f BUILD.md && cp BUILD.md dist/guerra-fria/ || true
-          tar -czvf "${{ matrix.artifact_name }}" -C dist/guerra-fria .
+          mkdir -p dist/hegemony-1945
+          cp "target/${{ matrix.target }}/release/guerra_fria" "dist/hegemony-1945/Hegemony-1945-${{ github.ref_name }}"
+          cp "target/${{ matrix.target }}/release/gerador_mapa" dist/hegemony-1945/
+          cp -r assets data dist/hegemony-1945/
+          test -f README.md && cp README.md dist/hegemony-1945/ || true
+          test -f BUILD.md && cp BUILD.md dist/hegemony-1945/ || true
+          tar -czvf "${{ matrix.artifact_name }}" -C dist/hegemony-1945 .
 
       # Empacotamento no Windows (.zip)
       - name: Empacotar Release no Windows (.zip com assets)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path dist/guerra-fria
-          Copy-Item "target/${{ matrix.target }}/release/guerra_fria.exe" -Destination dist/guerra-fria/
-          Copy-Item "target/${{ matrix.target }}/release/gerador_mapa.exe" -Destination dist/guerra-fria/
-          Copy-Item -Recurse assets, data -Destination dist/guerra-fria/
-          if (Test-Path README.md) { Copy-Item README.md -Destination dist/guerra-fria/ }
-          if (Test-Path BUILD.md) { Copy-Item BUILD.md -Destination dist/guerra-fria/ }
-          Compress-Archive -Path dist/guerra-fria/* -DestinationPath "${{ matrix.artifact_name }}"
+          New-Item -ItemType Directory -Force -Path dist/hegemony-1945
+          Copy-Item "target/${{ matrix.target }}/release/guerra_fria.exe" -Destination "dist/hegemony-1945/Hegemony-1945-${{ github.ref_name }}.exe"
+          Copy-Item "target/${{ matrix.target }}/release/gerador_mapa.exe" -Destination dist/hegemony-1945/
+          Copy-Item -Recurse assets, data -Destination dist/hegemony-1945/
+          if (Test-Path README.md) { Copy-Item README.md -Destination dist/hegemony-1945/ }
+          if (Test-Path BUILD.md) { Copy-Item BUILD.md -Destination dist/hegemony-1945/ }
+          Compress-Archive -Path dist/hegemony-1945/* -DestinationPath "${{ matrix.artifact_name }}"
 
       - name: Upload do artefato compilado
         uses: actions/upload-artifact@v4
