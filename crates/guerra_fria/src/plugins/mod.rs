@@ -9,6 +9,7 @@ pub mod mercado_ui;
 pub mod jogador;
 pub mod map;
 pub mod politics;
+pub mod polimento_visual;
 pub mod politica_sim;
 pub mod politica_ui;
 pub mod rotas_ponte;

@@ -162,8 +162,11 @@ pub struct SetorRegiao {
 pub fn atualizar_transicao_mapa_sistema(
     time: Res<Time>,
     mut estado_mapa: ResMut<EstadoModoMapa>,
+    estilo: Option<Res<crate::estilo::EstiloMapa>>,
 ) {
-    estado_mapa.atualizar(time.delta_secs());
+    // `transicao_modo_s` é a duração desejada; o passo base dura ~0.45 s.
+    let dur = estilo.map_or(0.45, |e| e.transicao_modo_s.max(0.05));
+    estado_mapa.atualizar(time.delta_secs() * 0.45 / dur);
 }
 
 #[cfg(test)]

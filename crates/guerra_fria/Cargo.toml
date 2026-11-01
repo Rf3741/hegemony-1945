@@ -15,6 +15,7 @@ simulacao.workspace = true
 gf_mapa.workspace = true
 sim_economia.workspace = true
 visual_mapa.workspace = true
+ui_refinada.workspace = true
 eventos.workspace = true
 sim_diplomacia.workspace = true
 egui_plot.workspace = true

@@ -47,6 +47,8 @@ pub struct ProvinciaSelecionada(pub u32);
 
 #[derive(Resource, Default)]
 struct ArrastoCamera {
+    /// Escala alvo do zoom suave (0 = ainda não inicializada).
+    escala_alvo: f32,
     inicio: Option<Vec2>,
     moveu: f32,
     /// O clique começou fora da UI (pode virar seleção).
@@ -387,6 +389,7 @@ fn mover_camera(
     botoes: Res<ButtonInput<MouseButton>>,
     mut arrasto: ResMut<ArrastoCamera>,
     mapa: Option<Res<DadosMapa>>,
+    estilo: Option<Res<visual_mapa::EstiloMapa>>,
 ) {
     let Ok((mut tf, mut proj)) = camera.single_mut() else { return };
     let Projection::Orthographic(ortho) = &mut *proj else { return };
@@ -400,7 +403,19 @@ fn mover_camera(
     tf.translation += (dir * 900.0 * ortho.scale * time.delta_secs()).extend(0.0);
 
     if scroll.delta.y != 0.0 && !sobre_ui {
-        ortho.scale = (ortho.scale * (1.0 - scroll.delta.y * 0.12)).clamp(0.1, 4.0);
+        let base = if arrasto.escala_alvo > 0.0 { arrasto.escala_alvo } else { ortho.scale };
+        arrasto.escala_alvo = (base * (1.0 - scroll.delta.y * 0.12)).clamp(0.1, 4.0);
+    }
+    // Zoom suave: aproxima a escala do alvo de forma exponencial (independente do FPS).
+    let taxa = estilo.as_ref().map_or(0.0, |e| e.zoom_suave);
+    if arrasto.escala_alvo > 0.0 {
+        if taxa <= 0.0 || (ortho.scale - arrasto.escala_alvo).abs() < 0.0005 {
+            ortho.scale = arrasto.escala_alvo;
+            arrasto.escala_alvo = 0.0;
+        } else {
+            let k = 1.0 - (-taxa * time.delta_secs()).exp();
+            ortho.scale += (arrasto.escala_alvo - ortho.scale) * k;
+        }
     }
 
     let Ok(janela) = janela.single() else { return };
