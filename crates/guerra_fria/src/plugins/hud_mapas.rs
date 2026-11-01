@@ -2,8 +2,9 @@
 use super::diplomacia_ui::{DiploSim, PainelDiplomacia};
 use super::economia_sim::EconomiaSim;
 use super::economy::RecursoMundo;
-use super::jogador::{PaisJogador, fmt_pop};
-use super::map::{CoresMapa, DadosMapa, ImagemMapa, colorir};
+use super::jogador::PaisJogador;
+use super::map::{CoresMapa, DadosMapa, ImagemMapa, RaizProjeto, RecursoCatalogo, colorir};
+use super::mapa_provincial::{Escala, Metrica, PesosProvincias};
 use super::politica_sim::PoliticaSim;
 use super::tecnologia_ui::TecnologiaSim;
 use super::time::{EventoTickDiario, RecursoRelogio};
@@ -20,20 +21,53 @@ pub enum ModoTematico {
     #[default]
     Politico,
     Populacao,
+    Densidade,
+    PibTotal,
     PibPerCapita,
+    PadraoVida,
+    Urbanizacao,
+    Industrializacao,
     Ideologia,
     Alinhamento,
-    PadraoVida,
 }
 
 impl ModoTematico {
-    pub const TODOS: [ModoTematico; 6] = [Self::Politico, Self::Populacao, Self::PibPerCapita, Self::Ideologia, Self::Alinhamento, Self::PadraoVida];
+    pub const TODOS: [ModoTematico; 10] = [
+        Self::Politico,
+        Self::Populacao,
+        Self::Densidade,
+        Self::PibTotal,
+        Self::PibPerCapita,
+        Self::PadraoVida,
+        Self::Urbanizacao,
+        Self::Industrializacao,
+        Self::Ideologia,
+        Self::Alinhamento,
+    ];
+
+    /// Métrica por província do modo (None nos modos políticos).
+    pub fn metrica(self) -> Option<Metrica> {
+        Some(match self {
+            Self::Populacao => Metrica::Populacao,
+            Self::Densidade => Metrica::Densidade,
+            Self::PibTotal => Metrica::PibTotal,
+            Self::PibPerCapita => Metrica::PibPerCapita,
+            Self::PadraoVida => Metrica::PadraoVida,
+            Self::Urbanizacao => Metrica::Urbanizacao,
+            Self::Industrializacao => Metrica::Industrializacao,
+            _ => return None,
+        })
+    }
 
     pub fn nome(self) -> &'static str {
         match self {
             Self::Politico => "Político",
             Self::Populacao => "População",
+            Self::Densidade => "Densidade demográfica",
+            Self::PibTotal => "PIB total",
             Self::PibPerCapita => "PIB per capita",
+            Self::Urbanizacao => "Urbanização",
+            Self::Industrializacao => "Industrialização",
             Self::Ideologia => "Ideologia",
             Self::Alinhamento => "Alinhamento/Esferas",
             Self::PadraoVida => "Padrão de vida",
@@ -119,6 +153,11 @@ fn repintar_tematico(
     cores: Option<Res<CoresMapa>>,
     dados: Option<Res<DadosMapa>>,
     imagem: Option<Res<ImagemMapa>>,
+    eco: Option<Res<EconomiaSim>>,
+    catalogo: Option<Res<RecursoCatalogo>>,
+    raiz: Option<Res<RaizProjeto>>,
+    mut pesos: Local<Option<PesosProvincias>>,
+    mut escala_ativa: ResMut<EscalaAtiva>,
     diplo: Option<Res<DiploSim>>,
     painel: Option<ResMut<PainelDiplomacia>>,
     mut imagens: ResMut<Assets<Image>>,
@@ -150,20 +189,31 @@ fn repintar_tematico(
     let _ = diplo;
     let mut cor_prov = cores.cor_prov.clone();
     if *modo != ModoTematico::Politico {
-        let (mut min, mut max) = (u64::MAX, 0u64);
-        for v in mundo.populacao_por_provincia.values() {
-            if *v > 0 {
-                min = min.min(*v);
-                max = max.max(*v);
+        let valores = modo.metrica().and_then(|m| {
+            let (cat, eco) = (catalogo.as_ref()?, eco.as_ref()?);
+            if eco.vista.regioes.is_empty() {
+                return None;
             }
+            let p = pesos.get_or_insert_with(|| {
+                let urbana = urbana_por_provincia(raiz.as_deref().map(|r| r.0.as_path()), &dados);
+                PesosProvincias::novo(&cat.0.provincias, &urbana)
+            });
+            Some((m, p.valores(m, &eco.vista.regioes)))
+        });
+        let escala = valores.as_ref().map(|(m, v)| Escala::de_valores(v, m.logaritmica()));
+        if let (Some(e), Some((m, _))) = (escala, valores.as_ref()) {
+            *escala_ativa = EscalaAtiva { modo: Some(*modo), escala: e, metrica: Some(*m) };
         }
-        let (min, max) = (min.max(1) as f64, (max.max(2)) as f64);
         for (id, tag) in &mundo.dono_por_provincia {
             let Some(slot) = cor_prov.get_mut(*id as usize) else { continue };
-            *slot = match *modo {
-                ModoTematico::Populacao => rampa(escala_log(mundo.populacao_por_provincia.get(id).copied().unwrap_or(0) as f64, min, max)),
-                _ => mundo.paises.get(tag).map_or([60, 60, 60, 255], |p| cor_pais_modo(*modo, p)),
+            let por_prov = match (&valores, escala) {
+                (Some((_, v)), Some(e)) => v.get(*id as usize).copied().filter(|x| x.is_finite()).map(|x| rampa(e.normalizar(x))),
+                _ => None,
             };
+            *slot = por_prov.unwrap_or_else(|| match *modo {
+                ModoTematico::Populacao | ModoTematico::Densidade | ModoTematico::PibTotal | ModoTematico::Urbanizacao | ModoTematico::Industrializacao => [60, 60, 60, 255],
+                _ => mundo.paises.get(tag).map_or([60, 60, 60, 255], |p| cor_pais_modo(*modo, p)),
+            });
         }
     }
     let (pixels, _) = colorir(&dados.ids, dados.largura, dados.altura, &cor_prov, &cores.dono_prov, &cores.estado_prov);
@@ -180,6 +230,45 @@ fn repintar_tematico(
         img.sampler = bevy::image::ImageSampler::nearest();
         let _ = imagens.insert(imagem.0.id(), img);
     }
+}
+
+/// Escala em uso no mapa (para a legenda).
+#[derive(Resource, Default)]
+pub struct EscalaAtiva {
+    pub modo: Option<ModoTematico>,
+    pub escala: Escala,
+    pub metrica: Option<Metrica>,
+}
+
+/// População urbana (cidades de 1945) atribuída à província do mapa onde cada cidade cai.
+fn urbana_por_provincia(raiz: Option<&std::path::Path>, dados: &DadosMapa) -> std::collections::HashMap<u32, f64> {
+    let caminho = raiz.map_or_else(|| std::path::PathBuf::from("assets/data/territorio/cidades.ron"), |r| r.join("assets/data/territorio/cidades.ron"));
+    let mut out = std::collections::HashMap::new();
+    let (w, h) = (dados.largura as i64, dados.altura as i64);
+    for c in visual_mapa::cenario::carregar_cidades_cenario(&caminho) {
+        let (px, py) = gf_mapa::mapa::projetar_miller(c.posicao.0 as f64, c.posicao.1 as f64, dados.largura, dados.altura);
+        let (px, py) = (px as i64, py as i64);
+        // A cidade pode cair num pixel de mar/borda: procura o pixel de terra mais próximo.
+        'busca: for r in 0..=8i64 {
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    if dx.abs().max(dy.abs()) != r {
+                        continue;
+                    }
+                    let (x, y) = (px + dx, py + dy);
+                    if x < 0 || y < 0 || x >= w || y >= h {
+                        continue;
+                    }
+                    let id = dados.ids[(y * w + x) as usize];
+                    if id != 0 {
+                        *out.entry(id).or_insert(0.0) += c.populacao_urbana as f64;
+                        break 'busca;
+                    }
+                }
+            }
+        }
+    }
+    out
 }
 
 /// Um alerta da barra (estilo Victoria 3).
@@ -342,7 +431,7 @@ fn seletor_canto(mut contextos: EguiContexts, mut modo: ResMut<ModoTematico>) ->
 }
 
 /// Legenda do modo ativo (canto inferior esquerdo).
-fn legenda(mut contextos: EguiContexts, modo: Res<ModoTematico>, mundo: Res<RecursoMundo>) -> Result {
+fn legenda(mut contextos: EguiContexts, modo: Res<ModoTematico>, escala: Res<EscalaAtiva>) -> Result {
     if matches!(*modo, ModoTematico::Politico) {
         return Ok(());
     }
@@ -358,26 +447,6 @@ fn legenda(mut contextos: EguiContexts, modo: Res<ModoTematico>, mundo: Res<Recu
                 });
             };
             match *modo {
-                ModoTematico::Populacao | ModoTematico::PibPerCapita | ModoTematico::PadraoVida => {
-                    let (baixo, alto) = match *modo {
-                        ModoTematico::Populacao => ("poucos habitantes", "muitos habitantes"),
-                        ModoTematico::PibPerCapita => ("PIB per capita baixo", "PIB per capita alto"),
-                        _ => ("padrão de vida baixo", "padrão de vida alto"),
-                    };
-                    for k in 0..=4 {
-                        let t = k as f32 / 4.0;
-                        let txt = match k {
-                            0 => baixo.to_string(),
-                            4 => alto.to_string(),
-                            _ => String::new(),
-                        };
-                        amostra(ui, rampa(t), &txt);
-                    }
-                    if *modo == ModoTematico::Populacao {
-                        let max = mundo.populacao_por_provincia.values().copied().max().unwrap_or(0);
-                        ui.weak(format!("Maior província: {} hab.", fmt_pop(max)));
-                    }
-                }
                 ModoTematico::Ideologia => {
                     for nome in LEGENDA_CATEGORIAS {
                         let cor = match nome {
@@ -399,6 +468,27 @@ fn legenda(mut contextos: EguiContexts, modo: Res<ModoTematico>, mundo: Res<Recu
                     }
                 }
                 ModoTematico::Politico => {}
+                _ => {
+                    let Some(m) = modo.metrica() else { return };
+                    let ativa = escala.modo == Some(*modo) && escala.metrica == Some(m);
+                    for k in (0..=4).rev() {
+                        let t = k as f32 / 4.0;
+                        let txt = if !ativa || !matches!(k, 0 | 2 | 4) {
+                            String::new()
+                        } else {
+                            let e = escala.escala;
+                            let v = if e.log { e.min * (e.max / e.min).powf(t as f64) } else { e.min + (e.max - e.min) * t as f64 };
+                            let pref = match k {
+                                0 => "≤ ",
+                                4 => "≥ ",
+                                _ => "",
+                            };
+                            format!("{pref}{}", m.formatar(v))
+                        };
+                        amostra(ui, rampa(t), &txt);
+                    }
+                    ui.weak(if m.logaritmica() { "Escala logarítmica, por província" } else { "Escala linear, por província" });
+                }
             }
         });
     });
@@ -410,6 +500,7 @@ pub struct HudMapasPlugin;
 impl Plugin for HudMapasPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ModoTematico>()
+            .init_resource::<EscalaAtiva>()
             .add_systems(Update, (teclas_modos, repintar_tematico).chain().run_if(crate::estado::em_partida))
             .add_systems(EguiPrimaryContextPass, (legenda, seletor_canto).run_if(crate::estado::em_partida));
     }
@@ -422,8 +513,8 @@ mod testes {
     #[test]
     fn ciclo_de_modos() {
         assert_eq!(ModoTematico::Politico.vizinho(false), ModoTematico::Populacao);
-        assert_eq!(ModoTematico::Politico.vizinho(true), ModoTematico::PadraoVida);
-        assert_eq!(ModoTematico::PadraoVida.vizinho(false), ModoTematico::Politico);
+        assert_eq!(ModoTematico::Politico.vizinho(true), ModoTematico::Alinhamento);
+        assert_eq!(ModoTematico::Alinhamento.vizinho(false), ModoTematico::Politico);
     }
 
     #[test]

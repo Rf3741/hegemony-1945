@@ -268,6 +268,48 @@ impl Nucleo {
         novos
     }
 
+    /// Perfil econômico de cada região (adm1) do mundo, calibrado pelo PIB de cada país.
+    fn perfis_regionais(&self, ranking: &[ResumoPaisEco]) -> Vec<PerfilRegiao> {
+        use sim_economia::CategoriaPredio;
+        let cat = &self.catalogo;
+        let cats: std::collections::HashMap<&str, CategoriaPredio> = cat.tipos_predio.iter().map(|t| (t.id.as_str(), t.categoria)).collect();
+        let mut out: Vec<PerfilRegiao> = Vec::new();
+        let mut pais_de: Vec<&str> = Vec::new();
+        let mut va_pais: BTreeMap<&str, f64> = BTreeMap::new();
+        for pr in self.mundo.provincias() {
+            let Some(adm1) = pr.codigo_externo.as_ref() else { continue };
+            let (mut pop, mut sol, mut renda) = (0.0, 0.0, 0.0);
+            for po in &pr.pops {
+                pop += po.populacao;
+                sol += po.populacao * po.padrao_de_vida;
+                renda += po.renda_ultimo_tick;
+            }
+            let (mut va, mut va_ind) = (0.0, 0.0);
+            for pd in &pr.predios {
+                let v = (pd.receita_ultimo_tick - pd.custo_insumos_ultimo_tick).max(0.0);
+                va += v;
+                if matches!(cats.get(pd.tipo_predio_id.as_str()), Some(CategoriaPredio::Industrial)) {
+                    va_ind += v;
+                }
+            }
+            if va <= 0.0 {
+                va = renda.max(0.0);
+            }
+            *va_pais.entry(pr.pais_id.as_str()).or_insert(0.0) += va;
+            pais_de.push(pr.pais_id.as_str());
+            out.push(PerfilRegiao { adm1: adm1.clone(), populacao: pop, pib_anual: va, padrao_vida: if pop > 0.0 { sol / pop } else { 0.0 }, pib_industrial_anual: va_ind });
+        }
+        let pib_pais: BTreeMap<&str, f64> = self.mundo.paises().iter().map(|p| (p.id.as_str(), p.pib_diario * 365.0)).collect();
+        let _ = ranking;
+        for (r, pid) in out.iter_mut().zip(pais_de) {
+            let soma = va_pais.get(pid).copied().unwrap_or(0.0);
+            let f = if soma > 0.0 { pib_pais.get(pid).copied().unwrap_or(0.0) / soma } else { 0.0 };
+            r.pib_anual *= f;
+            r.pib_industrial_anual *= f;
+        }
+        out
+    }
+
     /// Instantâneo para a interface do país `pais_id`.
     pub fn vista(&self, pais_id: &str) -> VistaEconomia {
         let mundo = &self.mundo;
@@ -324,6 +366,7 @@ impl Nucleo {
             });
         }
         v.pib_mundial_anual = v.ranking.iter().map(|r| r.pib_anual).sum();
+        v.regioes = Arc::new(self.perfis_regionais(&v.ranking));
 
         // Mercado: um item por bem
         if let Some(m) = m_idx {
@@ -473,8 +516,20 @@ pub struct ResumoPaisEco {
     pub producao_bens: Vec<f64>,
 }
 
+/// Perfil econômico de uma região (adm1) do mundo, para os modos de mapa por província.
+#[derive(Debug, Clone, Default)]
+pub struct PerfilRegiao {
+    pub adm1: String,
+    pub populacao: f64,
+    /// Valor agregado anual da região, calibrado para somar o PIB do país.
+    pub pib_anual: f64,
+    pub padrao_vida: f64,
+    pub pib_industrial_anual: f64,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct VistaEconomia {
+    pub regioes: Arc<Vec<PerfilRegiao>>,
     pub pais_id: String,
     #[allow(dead_code)]
     pub dias: u64,
