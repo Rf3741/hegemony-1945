@@ -19,7 +19,8 @@ fn aplicar_tema(mut contextos: EguiContexts, estilo: Res<EstiloMapa>, mut aplica
     }
     let ctx = contextos.ctx_mut()?;
     ui_refinada::setup_cold_war_fonts(ctx);
-    ctx.set_style(ui_refinada::cold_war_style());
+    ctx.set_style_of(egui::Theme::Dark, ui_refinada::cold_war_style());
+    ctx.set_theme(egui::ThemePreference::Dark);
     *aplicado = true;
     Ok(())
 }
