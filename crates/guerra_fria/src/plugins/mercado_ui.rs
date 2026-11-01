@@ -654,6 +654,13 @@ fn tela_mercado(
                 let total_bens = v.bens.len();
                 ui.label(format!("Bens catalogados: {total_bens}"));
                 ui.separator();
+                ui.label(format!(
+                    "Turismo (serviços): recebe {} /dia, viajantes gastam {} /dia no exterior, segurança {:.0}%",
+                    crate::plugins::jogador::fmt_din(v.turismo_receita_dia),
+                    crate::plugins::jogador::fmt_din(v.turismo_gasto_exterior_dia),
+                    v.turismo_seguranca * 100.0
+                ));
+                ui.separator();
                 ui.label(
                     egui::RichText::new("💡 Dica: Clique nas colunas para ordenar (▲/▼). Clique num bem para inspecionar.")
                         .italics()

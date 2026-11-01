@@ -712,6 +712,9 @@ pub struct OrcamentoGoverno {
     pub receita_dividendos_estatais: f64,
     #[serde(default)]
     pub receita_tarifas: f64,
+    /// Imposto sobre turismo e hotelaria (parte do gasto de turistas estrangeiros).
+    #[serde(default)]
+    pub receita_turismo: f64,
     #[serde(default)]
     pub gasto_burocracia: f64,
     #[serde(default)]
@@ -738,6 +741,7 @@ impl OrcamentoGoverno {
             + self.receita_imposto_terra
             + self.receita_dividendos_estatais
             + self.receita_tarifas
+            + self.receita_turismo
     }
 
     /// Soma de todas as despesas incorridas no último tick.
