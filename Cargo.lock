@@ -3289,6 +3289,7 @@ dependencies = [
 name = "guerra_fria"
 version = "0.1.0"
 dependencies = [
+ "bandeiras_resolver",
  "bevy",
  "bevy_egui",
  "egui_plot",

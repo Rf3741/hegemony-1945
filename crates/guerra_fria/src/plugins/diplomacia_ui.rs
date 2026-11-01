@@ -81,6 +81,15 @@ fn normalizar(t: &str) -> String {
     }
 }
 
+/// Tag diplomática -> tag do cenário legado (inverso de `normalizar`).
+fn tag_diplo_para_legado(t: &str) -> String {
+    match t {
+        "BUL" => "BGR".into(),
+        "GRE" => "GRC".into(),
+        _ => t.to_string(),
+    }
+}
+
 fn alternar(teclas: Res<ButtonInput<KeyCode>>, mut p: ResMut<PainelDiplomacia>) {
     if teclas.just_pressed(KeyCode::F4) {
         p.aberto = !p.aberto;
@@ -220,7 +229,9 @@ fn tela_diplomacia(
                     let r = d.0.relacao(&eu, &t);
                     let e = d.0.esfera(&t);
                     ui.horizontal(|ui| {
-                        ui.colored_label(cor_egui(e), "■");
+                        if !super::bandeiras_ui::bandeira_ui(ui, &tag_diplo_para_legado(&t), 14.0) {
+                            ui.colored_label(cor_egui(e), "■");
+                        }
                         let sel = painel.alvo == t;
                         if ui.selectable_label(sel, format!("{} ({t})", nome(&t))).clicked() {
                             painel.alvo = t.clone();
@@ -239,7 +250,10 @@ fn tela_diplomacia(
             } else {
                 let alvo = painel.alvo.clone();
                 let r = d.0.relacao(&eu, &alvo);
-                ui.heading(nome(&alvo));
+                ui.horizontal(|ui| {
+                    super::bandeiras_ui::bandeira_ui(ui, &tag_diplo_para_legado(&alvo), 32.0);
+                    ui.heading(nome(&alvo));
+                });
                 if let (Some(el), Some(r)) = (elenco.as_deref(), retratos.as_deref_mut()) {
                     super::personagens_ui::retrato_chefe(ui, el, r, &alvo, 72.0);
                 }

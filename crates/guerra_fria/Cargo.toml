@@ -9,6 +9,7 @@ description = "Cliente gráfico em Bevy + bevy_egui para o jogo de grande estrat
 bevy = { workspace = true, features = ["wav", "vorbis"] }
 bevy_egui.workspace = true
 image.workspace = true
+bandeiras_resolver.workspace = true
 ron.workspace = true
 serde.workspace = true
 simulacao.workspace = true

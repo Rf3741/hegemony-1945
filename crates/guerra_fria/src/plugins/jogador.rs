@@ -129,8 +129,10 @@ fn cor_saldo(v: f64) -> egui::Color32 {
 /// Faixa do HUD com os indicadores do país do jogador (economia vinda do `sim_economia`).
 pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_aberto: &mut bool, mercado_aberto: &mut bool, comercio_aberto: &mut bool, construcao_aberta: &mut bool) {
     ui.horizontal_wrapped(|ui| {
-        let (r, _) = ui.allocate_exact_size(egui::vec2(22.0, 14.0), egui::Sense::hover());
-        ui.painter().rect_filled(r, 2.0, cor_pais(p));
+        if !super::bandeiras_ui::bandeira_ui(ui, &p.tag, 18.0) {
+            let (r, _) = ui.allocate_exact_size(egui::vec2(22.0, 14.0), egui::Sense::hover());
+            ui.painter().rect_filled(r, 2.0, cor_pais(p));
+        }
         ui.strong(&p.nome);
         ui.separator();
         match (&eco.vista.pais, eco.vista.pais_id.is_empty()) {
@@ -286,7 +288,16 @@ fn painel_pais(
     let mut aberto = true;
     let mut aba = painel.aba;
     let ctx = contextos.ctx_mut()?;
+    let (tag_p, nome_p) = pol.as_ref().and_then(|p| p.vista.pais.as_ref().map(|x| (x.tag.clone(), x.nome.clone()))).unwrap_or_default();
     egui::Window::new("Painel do país (F1)").open(&mut aberto).default_size([720.0, 600.0]).show(ctx, |ui| {
+        if !tag_p.is_empty() {
+            ui.horizontal(|ui| {
+                let tl = super::politica_sim::tag_legado_pub(&tag_p);
+                super::bandeiras_ui::bandeira_ui(ui, &tl, 40.0);
+                ui.heading(super::bandeiras_ui::nome_dinamico(ui, &tl).unwrap_or(nome_p.clone()));
+            });
+            ui.separator();
+        }
         ui.horizontal(|ui| {
             ui.selectable_value(&mut aba, Aba::Economia, "Economia");
             ui.selectable_value(&mut aba, Aba::Construcao, "Construção e Prédios");
