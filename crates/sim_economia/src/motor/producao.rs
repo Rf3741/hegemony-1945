@@ -7,6 +7,16 @@ use crate::motor::governo::compilar_cache_predio;
 use crate::motor::trabalho::reconciliar_empregados_provincia;
 use std::collections::BTreeMap;
 use crate::tipos::{CategoriaBem, CategoriaPredio};
+use rayon::prelude::*;
+
+/// Trabalho de um mercado na fase de produção (partes disjuntas do estado, seguras para threads).
+struct TarefaMercadoProducao<'a> {
+    provs: Vec<&'a mut Provincia>,
+    oferta: &'a mut [f64],
+    demanda: &'a mut [f64],
+    /// (índice do país, país, pop. incorporada, pontos de construção)
+    paises: Vec<(usize, &'a mut Pais, &'a mut f64, &'a mut f64)>,
+}
 
 /// Executa a produção física de todos os prédios e fazendas de subsistência em passagem única,
 /// atualizando também acesso ao mercado dos estados e eficiência burocrática dos países.
@@ -85,121 +95,145 @@ pub(crate) fn executar_producao_diaria(
         };
     }
 
-    // 2. Passagem linear única sobre todas as províncias, pops de subsistência e prédios
+    // 2. Passagem sobre as províncias, paralela por MERCADO. Cada mercado só escreve nas suas próprias
+    // células de oferta/demanda e nos acumuladores dos países que lhe pertencem; dentro do mercado a ordem
+    // das províncias é a global, então toda soma de ponto flutuante é idêntica à versão sequencial
+    // (resultado determinístico, independente do número de threads).
     let num_alimentos = bens_alimento_basico.len();
-    for prov in provincias.iter_mut() {
-        let m_idx = prov.mercado_idx;
-        let c_idx = prov.pais_idx;
-        let e_idx = prov.estado_idx;
-        let acesso = estados[e_idx].acesso_mercado;
-        let est_inc = estados[e_idx].incorporado;
-        let offset_mercado = m_idx * num_bens;
-
-        let mut pop_prov = 0.0;
-        let mut camponeses_ativos = 0.0;
-        for pop in &prov.pops {
-            pop_prov += pop.populacao;
-            if catalogo.tipos_pop[pop.tipo_idx].subsistencia {
-                camponeses_ativos += pop.desempregados();
-            }
-        }
-        if est_inc {
-            pop_incorporada_pais[c_idx] += pop_prov;
-        }
-
-        // 2a. Produção excedente das terras de subsistência
-        if num_alimentos > 0 && camponeses_ativos > 0.0 && prov.terra_aravel_livre() > 0 {
-            let cap_camponeses = (prov.terra_aravel_livre() as f64) * 5_000.0;
-            let efetivos = camponeses_ativos.min(cap_camponeses);
-            let excedente_total = (efetivos / 1_000.0) * 0.30 * acesso;
-            let por_bem = excedente_total / (num_alimentos as f64);
-            for &g_idx in bens_alimento_basico {
-                proxima_oferta[offset_mercado + g_idx] += por_bem;
-            }
-        }
-
-        // 2b. Prédios formais
-        let util_construcao = paises[c_idx].utilizacao_construcao_ultimo_tick;
-        let sup_mercado = &mercados[m_idx].fator_suprimento_idx;
-        let mut vagas_abertas_prov = 0.0;
-
-        for b in &mut prov.predios {
-            if b.nivel == 0 {
-                b.cache.escala_efetiva_ultimo_tick = 0.0;
-                continue;
-            }
-            let vagas_totais = b.total_vagas();
-            let emp_totais = b.total_empregados();
-            if vagas_totais > emp_totais {
-                vagas_abertas_prov += vagas_totais - emp_totais;
-            }
-            let r_emp = if vagas_totais <= 0.0 {
-                1.0
-            } else {
-                (emp_totais / vagas_totais).clamp(0.0, 1.0)
-            };
-            if r_emp <= 1e-7 {
-                b.cache.escala_efetiva_ultimo_tick = 0.0;
-                continue;
-            }
-
-            let nivel_f = b.nivel as f64;
-            let escala_inst = nivel_f * r_emp;
-            let categoria = catalogo.tipos_predio[b.cache.tipo_idx].categoria;
-
-            let mut fator_insumos = 1.0_f64;
-            for &(g_in, _) in b.cache.insumos() {
-                fator_insumos = fator_insumos.min(sup_mercado[g_in as usize]);
-            }
-
-            let mult_setor = if categoria == CategoriaPredio::Construcao {
-                0.10 + 0.90 * util_construcao
-            } else {
-                1.0
-            };
-
-            let econ_escala = 1.0 + 0.01 * (b.nivel.saturating_sub(1).min(25) as f64);
-            let mult_qualidade = estados[e_idx].fator_qualidade_predio(&catalogo.tipos_predio[b.cache.tipo_idx]);
-            let mult_fabrica = if categoria == CategoriaPredio::Industrial {
-                let bonus_mercado = if acesso >= 0.90 { 0.03 } else { 0.0 };
-                let bonus_insumo = if b.cache.insumos().iter().any(|&(g_in, _)| {
-                    let bem_id = &catalogo.bens[g_in as usize].id;
-                    estado_tem_insumo_local(&estados[e_idx], bem_id)
-                }) {
-                    0.05
-                } else {
-                    0.0
-                };
-                1.0 + bonus_mercado + bonus_insumo
-            } else {
-                1.0
-            };
-            let escala = escala_inst * econ_escala * acesso * fator_insumos * mult_setor * mult_qualidade * mult_fabrica;
-
-            b.cache.escala_efetiva_ultimo_tick = escala;
-            b.cache.fator_insumos_ultimo_tick = fator_insumos;
-
-            for &(g_in, qtd) in b.cache.insumos() {
-                proxima_demanda[offset_mercado + (g_in as usize)] += escala * qtd;
-            }
-            for &(g_out, qtd) in b.cache.produtos() {
-                proxima_oferta[offset_mercado + (g_out as usize)] += escala * qtd;
-            }
-
-            let escala_cap = escala_inst * fator_insumos;
-            if b.cache.pontos_construcao_por_nivel > 0.0 {
-                pontos_construcao_setores_pais[c_idx] +=
-                    escala_cap * b.cache.pontos_construcao_por_nivel * mult_setor;
-            }
-            if b.cache.burocracia_por_nivel > 0.0 {
-                paises[c_idx].burocracia_produzida += escala_cap * b.cache.burocracia_por_nivel;
-            }
-            if b.cache.forca_militar_por_nivel > 0.0 {
-                paises[c_idx].forca_militar_total += escala_cap * b.cache.forca_militar_por_nivel;
-            }
-        }
-        prov.vagas_abertas_cache = vagas_abertas_prov;
+    let estados_ro: &[Estado] = &*estados;
+    let mut tarefas: Vec<TarefaMercadoProducao> = proxima_oferta
+        .chunks_mut(num_bens)
+        .zip(proxima_demanda.chunks_mut(num_bens))
+        .map(|(oferta, demanda)| TarefaMercadoProducao { provs: Vec::new(), oferta, demanda, paises: Vec::new() })
+        .collect();
+    for (c_idx, ((pais, pop_inc), pontos)) in paises
+        .iter_mut()
+        .zip(pop_incorporada_pais.iter_mut())
+        .zip(pontos_construcao_setores_pais.iter_mut())
+        .enumerate()
+    {
+        tarefas[pais.mercado_idx].paises.push((c_idx, pais, pop_inc, pontos));
     }
+    for prov in provincias.iter_mut() {
+        tarefas[prov.mercado_idx].provs.push(prov);
+    }
+    tarefas.into_par_iter().for_each(|mut t| {
+        let provs = std::mem::take(&mut t.provs);
+        for prov in provs {
+            let m_idx = prov.mercado_idx;
+            let c_idx = prov.pais_idx;
+            let ci = t.paises.iter().position(|x| x.0 == c_idx).expect("país do mercado");
+            let e_idx = prov.estado_idx;
+            let acesso = estados[e_idx].acesso_mercado;
+            let est_inc = estados[e_idx].incorporado;
+            let offset_mercado = 0usize;
+
+            let mut pop_prov = 0.0;
+            let mut camponeses_ativos = 0.0;
+            for pop in &prov.pops {
+                pop_prov += pop.populacao;
+                if catalogo.tipos_pop[pop.tipo_idx].subsistencia {
+                    camponeses_ativos += pop.desempregados();
+                }
+            }
+            if est_inc {
+                *t.paises[ci].2 += pop_prov;
+            }
+
+            // 2a. Produção excedente das terras de subsistência
+            if num_alimentos > 0 && camponeses_ativos > 0.0 && prov.terra_aravel_livre() > 0 {
+                let cap_camponeses = (prov.terra_aravel_livre() as f64) * 5_000.0;
+                let efetivos = camponeses_ativos.min(cap_camponeses);
+                let excedente_total = (efetivos / 1_000.0) * 0.30 * acesso;
+                let por_bem = excedente_total / (num_alimentos as f64);
+                for &g_idx in bens_alimento_basico {
+                    t.oferta[offset_mercado + g_idx] += por_bem;
+                }
+            }
+
+            // 2b. Prédios formais
+            let util_construcao = t.paises[ci].1.utilizacao_construcao_ultimo_tick;
+            let sup_mercado = &mercados[m_idx].fator_suprimento_idx;
+            let mut vagas_abertas_prov = 0.0;
+
+            for b in &mut prov.predios {
+                if b.nivel == 0 {
+                    b.cache.escala_efetiva_ultimo_tick = 0.0;
+                    continue;
+                }
+                let vagas_totais = b.total_vagas();
+                let emp_totais = b.total_empregados();
+                if vagas_totais > emp_totais {
+                    vagas_abertas_prov += vagas_totais - emp_totais;
+                }
+                let r_emp = if vagas_totais <= 0.0 {
+                    1.0
+                } else {
+                    (emp_totais / vagas_totais).clamp(0.0, 1.0)
+                };
+                if r_emp <= 1e-7 {
+                    b.cache.escala_efetiva_ultimo_tick = 0.0;
+                    continue;
+                }
+
+                let nivel_f = b.nivel as f64;
+                let escala_inst = nivel_f * r_emp;
+                let categoria = catalogo.tipos_predio[b.cache.tipo_idx].categoria;
+
+                let mut fator_insumos = 1.0_f64;
+                for &(g_in, _) in b.cache.insumos() {
+                    fator_insumos = fator_insumos.min(sup_mercado[g_in as usize]);
+                }
+
+                let mult_setor = if categoria == CategoriaPredio::Construcao {
+                    0.10 + 0.90 * util_construcao
+                } else {
+                    1.0
+                };
+
+                let econ_escala = 1.0 + 0.01 * (b.nivel.saturating_sub(1).min(25) as f64);
+                let mult_qualidade = estados[e_idx].fator_qualidade_predio(&catalogo.tipos_predio[b.cache.tipo_idx]);
+                let mult_fabrica = if categoria == CategoriaPredio::Industrial {
+                    let bonus_mercado = if acesso >= 0.90 { 0.03 } else { 0.0 };
+                    let bonus_insumo = if b.cache.insumos().iter().any(|&(g_in, _)| {
+                        let bem_id = &catalogo.bens[g_in as usize].id;
+                        estado_tem_insumo_local(&estados[e_idx], bem_id)
+                    }) {
+                        0.05
+                    } else {
+                        0.0
+                    };
+                    1.0 + bonus_mercado + bonus_insumo
+                } else {
+                    1.0
+                };
+                let escala = escala_inst * econ_escala * acesso * fator_insumos * mult_setor * mult_qualidade * mult_fabrica;
+
+                b.cache.escala_efetiva_ultimo_tick = escala;
+                b.cache.fator_insumos_ultimo_tick = fator_insumos;
+
+                for &(g_in, qtd) in b.cache.insumos() {
+                    t.demanda[offset_mercado + (g_in as usize)] += escala * qtd;
+                }
+                for &(g_out, qtd) in b.cache.produtos() {
+                    t.oferta[offset_mercado + (g_out as usize)] += escala * qtd;
+                }
+
+                let escala_cap = escala_inst * fator_insumos;
+                if b.cache.pontos_construcao_por_nivel > 0.0 {
+                    *t.paises[ci].3 +=
+                        escala_cap * b.cache.pontos_construcao_por_nivel * mult_setor;
+                }
+                if b.cache.burocracia_por_nivel > 0.0 {
+                    t.paises[ci].1.burocracia_produzida += escala_cap * b.cache.burocracia_por_nivel;
+                }
+                if b.cache.forca_militar_por_nivel > 0.0 {
+                    t.paises[ci].1.forca_militar_total += escala_cap * b.cache.forca_militar_por_nivel;
+                }
+            }
+            prov.vagas_abertas_cache = vagas_abertas_prov;
+        }
+    });
 
     // 3. Consolidar acesso ao mercado por Estado
     for (e_idx, est) in estados.iter_mut().enumerate() {

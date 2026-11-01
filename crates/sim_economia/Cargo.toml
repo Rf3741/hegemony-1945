@@ -9,6 +9,7 @@ license.workspace = true
 ron.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+rayon.workspace = true
 
 [[bench]]
 name = "tick_mundo"
