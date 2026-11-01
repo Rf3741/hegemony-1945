@@ -26,6 +26,7 @@ use crate::motor::governo::{
 use crate::motor::producao::listar_bens_alimento_basico;
 use crate::motor::trabalho::{LotePromocao, reconciliar_empregados_provincia};
 use crate::tipos::{DataJogo, GrupoLeiEconomica, ModoCadencia, NUM_NECESSIDADES};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Medição detalhada em milissegundos de cada etapa interna de um tick diário.
@@ -2065,4 +2066,53 @@ fn compilar_cache_fiscal_pais(
     }
 
     Ok(())
+}
+
+/// Estado dinâmico completo da economia para salvar/carregar (o catálogo vem dos arquivos do jogo).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EstadoEconomiaSalvo {
+    pub data: DataJogo,
+    pub dias_decorridos: u64,
+    pub config: ConfigSimulacao,
+    pub mercados: Vec<Mercado>,
+    pub paises: Vec<Pais>,
+    pub estados: Vec<Estado>,
+    pub provincias: Vec<Provincia>,
+    pub rotas_comerciais: Vec<RotaComercial>,
+    pub blocos_comerciais: Vec<BlocoComercial>,
+}
+
+impl MundoEconomico {
+    /// Captura o estado dinâmico (sem o catálogo).
+    pub fn salvar_estado(&mut self) -> EstadoEconomiaSalvo {
+        let c = self.exportar_cenario();
+        EstadoEconomiaSalvo {
+            data: c.data_inicial,
+            dias_decorridos: self.dias_decorridos,
+            config: c.config,
+            mercados: c.mercados,
+            paises: c.paises,
+            estados: c.estados,
+            provincias: c.provincias,
+            rotas_comerciais: c.rotas_comerciais,
+            blocos_comerciais: c.blocos_comerciais,
+        }
+    }
+
+    /// Reconstrói o mundo (reindexando tudo) a partir do catálogo e do estado salvo.
+    pub fn restaurar_estado(catalogo: CatalogoEconomia, e: EstadoEconomiaSalvo) -> ResultadoEconomia<Self> {
+        let mut m = Self::novo(CenarioEconomia {
+            data_inicial: e.data,
+            config: e.config,
+            catalogo,
+            mercados: e.mercados,
+            paises: e.paises,
+            estados: e.estados,
+            provincias: e.provincias,
+            rotas_comerciais: e.rotas_comerciais,
+            blocos_comerciais: e.blocos_comerciais,
+        })?;
+        m.dias_decorridos = e.dias_decorridos;
+        Ok(m)
+    }
 }

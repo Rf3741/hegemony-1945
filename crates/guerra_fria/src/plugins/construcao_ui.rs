@@ -648,7 +648,12 @@ fn repintar_mapa(
     mut ultimo: Local<Option<(ModoMapa, usize, u64, String)>>,
     tempo: Res<Time<Real>>,
     mut ultima_pintura: Local<f32>,
+    tematico: Option<Res<super::hud_mapas::ModoTematico>>,
 ) {
+    // Um modo temático (população, PIB...) ativo é dono da textura do mapa.
+    if tematico.is_some_and(|t| *t != super::hud_mapas::ModoTematico::Politico) {
+        return;
+    }
     let (Some(cores), Some(dados), Some(imagem)) = (cores, dados, imagem) else { return };
     // No modo Normal as obras concluídas não mudam as cores: não repinta a textura inteira a cada obra.
     let versao = if c.modo_mapa == ModoMapa::Normal { 0 } else { eco.versao_construcao };

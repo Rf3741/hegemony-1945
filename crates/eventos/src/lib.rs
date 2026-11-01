@@ -227,20 +227,20 @@ impl CatalogoEventos {
 
 // ---------------------------------------------------------------- estado em jogo
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Noticia {
     pub data: (i32, u8, u8),
     pub texto: String,
 }
 
 /// Evento aguardando decisão do jogador (o cliente pausa o tempo enquanto houver um).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pendente {
     pub evento_id: String,
     pub pais: String,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct EstadoEventos {
     /// Evento -> opção escolhida (`None` enquanto o jogador não decidiu).
     pub disparados: BTreeMap<String, Option<String>>,

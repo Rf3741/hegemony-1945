@@ -2,7 +2,7 @@
 //! ações diplomáticas com aceitação da IA, pactos e organizações com gatilho dinâmico.
 //! Crate puro (sem Bevy). Fórmulas de `DIPLOMACIA.md`.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub const RELACOES_1945: &str = include_str!("../dados/relacoes_iniciais_1945.ron");
@@ -14,7 +14,7 @@ struct ParRelacao {
     valor: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Bloco {
     Ocidental,
     Sovietico,
@@ -31,13 +31,13 @@ pub enum Esfera {
 }
 
 /// Dados mínimos de um país vindos do cenário.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InfoPais {
     pub tag: String,
     pub bloco: Bloco,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Acao {
     MelhorarRelacoes,
     AjudaEconomica,
@@ -119,7 +119,7 @@ impl Acao {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum TipoPacto {
     AcordoComercial,
     PactoDefesa,
@@ -141,7 +141,7 @@ impl TipoPacto {
 }
 
 /// Pacto de `a` para `b` (simétrico, exceto embargo/rivalidade, que têm autor).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Pacto {
     pub tipo: TipoPacto,
     pub a: String,
@@ -837,5 +837,79 @@ mod testes {
         assert!(d.pactos.iter().any(|p| p.a == "USA" || p.a == "SOV"));
         let neutros: f32 = ["IND", "YUG", "EGY", "SWE", "CHE", "IRL"].iter().map(|t| d.influencia(t).0 + d.influencia(t).1).sum();
         assert!(neutros > 0.0, "a IA deve disputar países não alinhados");
+    }
+}
+
+/// Parte dinâmica de uma organização internacional.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OrgSalva {
+    pub id: String,
+    pub formada: Option<(i32, u8)>,
+    pub membros: BTreeSet<String>,
+}
+
+/// Estado dinâmico da diplomacia para salvar/carregar.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DiplomaciaSalva {
+    pub paises: Vec<InfoPais>,
+    pub relacoes: Vec<((String, String), f32)>,
+    pub influencia: Vec<(String, (f32, f32))>,
+    pub pontos: Vec<(String, f32)>,
+    pub infamia: Vec<(String, f32)>,
+    pub tesouro_ia: Vec<(String, f64)>,
+    pub tensao: f32,
+    pub pactos: Vec<Pacto>,
+    pub orgs: Vec<OrgSalva>,
+    pub eventos: Vec<String>,
+    pub cooldowns: Vec<((String, String, Acao), i64)>,
+    pub dia: i64,
+    pub log: Vec<String>,
+}
+
+fn ordenado<K: Ord + Clone, V: Clone>(m: &HashMap<K, V>) -> Vec<(K, V)> {
+    let mut v: Vec<(K, V)> = m.iter().map(|(k, x)| (k.clone(), x.clone())).collect();
+    v.sort_by(|a, b| a.0.cmp(&b.0));
+    v
+}
+
+impl Diplomacia {
+    pub fn salvar_estado(&self) -> DiplomaciaSalva {
+        DiplomaciaSalva {
+            paises: self.paises.clone(),
+            relacoes: ordenado(&self.relacoes),
+            influencia: ordenado(&self.influencia),
+            pontos: ordenado(&self.pontos),
+            infamia: ordenado(&self.infamia),
+            tesouro_ia: ordenado(&self.tesouro_ia),
+            tensao: self.tensao,
+            pactos: self.pactos.clone(),
+            orgs: self.orgs.iter().map(|o| OrgSalva { id: o.id.to_string(), formada: o.formada, membros: o.membros.clone() }).collect(),
+            eventos: self.eventos.iter().map(|e| e.to_string()).collect(),
+            cooldowns: ordenado(&self.cooldowns),
+            dia: self.dia,
+            log: self.log.clone(),
+        }
+    }
+
+    pub fn restaurar_estado(&mut self, s: DiplomaciaSalva) {
+        self.paises = s.paises;
+        self.relacoes = s.relacoes.into_iter().collect();
+        self.influencia = s.influencia.into_iter().collect();
+        self.pontos = s.pontos.into_iter().collect();
+        self.infamia = s.infamia.into_iter().collect();
+        self.tesouro_ia = s.tesouro_ia.into_iter().collect();
+        self.tensao = s.tensao;
+        self.pactos = s.pactos;
+        for o in s.orgs {
+            if let Some(d) = self.orgs.iter_mut().find(|x| x.id == o.id) {
+                d.formada = o.formada;
+                d.membros = o.membros;
+            }
+        }
+        // Os ids de eventos são literais estáticos; reaproveita-os pelo valor (vazamento mínimo e único por carga).
+        self.eventos = s.eventos.into_iter().map(|e| &*Box::leak(e.into_boxed_str())).collect();
+        self.cooldowns = s.cooldowns.into_iter().collect();
+        self.dia = s.dia;
+        self.log = s.log;
     }
 }

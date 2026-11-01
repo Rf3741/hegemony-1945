@@ -40,6 +40,15 @@ pub struct TecnologiaSim {
 }
 
 impl TecnologiaSim {
+    pub fn restaurar_estado(&mut self, paises: BTreeMap<String, sim_tecnologia::EstadoPais>) {
+        self.mundo.restaurar_estado(paises);
+        self.sujo = true;
+        self.ultimo_refresh = u64::MAX;
+        self.concluidas_jogador.clear();
+    }
+}
+
+impl TecnologiaSim {
     pub fn carregar(raiz: &std::path::Path) -> Result<Self, String> {
         let cat = CatalogoTec::carregar(&raiz.join("assets/data/tecnologia")).map_err(|e| e.to_string())?;
         let blocos = blocos_para(&cat);

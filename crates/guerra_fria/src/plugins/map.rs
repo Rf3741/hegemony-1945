@@ -392,8 +392,16 @@ fn aguardar_carga(
     proximo.set(AppState::Menu);
 }
 
-fn tela_carregando(mut contextos: EguiContexts, tempo: Res<Time>) -> Result {
+fn tela_carregando(mut contextos: EguiContexts, tempo: Res<Time>, dicas: Res<super::menu_ui::Dicas>) -> Result {
     let ctx = contextos.ctx_mut()?;
+    if let Some(d) = super::menu_ui::dica_atual(&dicas.0, tempo.elapsed_secs()) {
+        egui::Area::new("dica_carregando".into()).anchor(egui::Align2::CENTER_BOTTOM, [0.0, -60.0]).show(ctx, |ui| {
+            ui.set_max_width(640.0);
+            ui.label(egui::RichText::new(format!("{} — {} ({})", d.categoria, d.titulo, d.ano)).strong());
+            ui.label(&d.texto);
+            ui.label(egui::RichText::new(format!("Dica: {}", d.dica_mecanica)).italics());
+        });
+    }
     let pontos = ".".repeat((tempo.elapsed_secs() * 2.0) as usize % 4);
     egui::Area::new("carregando".into()).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
         ui.heading(format!("Carregando o mapa e a economia de 1945{pontos}"));

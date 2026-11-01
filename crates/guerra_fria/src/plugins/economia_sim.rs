@@ -584,6 +584,25 @@ impl EconomiaSim {
     }
 }
 
+impl EconomiaSim {
+    /// Estado dinâmico para salvar; `None` se a thread ainda está processando um lote.
+    pub fn estado_salvo(&mut self) -> Option<(sim_economia::EstadoEconomiaSalvo, MercadoGlobal)> {
+        let n = self.nucleo.as_mut()?;
+        Some((n.mundo.salvar_estado(), n.global.clone()))
+    }
+
+    /// Restaura o estado salvo (reindexa o mundo) e força a remontagem da vista.
+    pub fn restaurar_estado(&mut self, e: sim_economia::EstadoEconomiaSalvo, g: MercadoGlobal) -> Result<(), String> {
+        let n = self.nucleo.as_mut().ok_or("economia ocupada")?;
+        n.mundo = MundoEconomico::restaurar_estado(n.catalogo.as_ref().clone(), e).map_err(|e| e.to_string())?;
+        n.global = g;
+        self.vista.pais_id.clear();
+        self.pendentes = 0;
+        self.versao_construcao = self.versao_construcao.wrapping_add(1);
+        Ok(())
+    }
+}
+
 #[derive(Resource)]
 struct CargaEconomia(Task<Result<Nucleo, String>>);
 

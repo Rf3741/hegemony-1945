@@ -1,0 +1,247 @@
+// ==============================================================================
+// 30 DICAS HISTÓRICAS E ESTRATÉGICAS - GUERRA FRIA (1945-1960)
+// Formato: Rustic Object Notation (RON) para Bevy
+// ==============================================================================
+
+[
+    (
+        id: 1,
+        categoria: "Diplomacia",
+        ano: 1945,
+        titulo: "A Conferência de Yalta",
+        texto: "Em fevereiro de 1945, Churchill, Roosevelt e Stalin se reuniram na Crimeia para decidir o destino da Europa pós-nazista. A promessa soviética de eleições livres na Polônia e nos Bálcãs logo ruiu, estabelecendo as linhas do confronto bipolar.",
+        dica_mecanica: "Zonas de ocupação compartilhadas sofrem penalidade de estabilidade se ambas as potências tiverem alta tensão ideológica."
+    ),
+    (
+        id: 2,
+        categoria: "Economia",
+        ano: 1944,
+        titulo: "O Padrão Ouro de Bretton Woods",
+        texto: "Os Acordos de Bretton Woods consagraram o dólar americano como moeda de reserva global, com paridade fixa de US$ 35 por onça de ouro. Isso garantiu a Washington a capacidade ímpar de financiar comércio e déficits no exterior.",
+        dica_mecanica: "Controlar a moeda de reserva global reduz a inflação doméstica e concede influência comercial sobre nações devedoras."
+    ),
+    (
+        id: 3,
+        categoria: "Militar",
+        ano: 1945,
+        titulo: "O Monopólio Atômico e o Projeto Manhattan",
+        texto: "Entre agosto de 1945 e agosto de 1949, os Estados Unidos foram a única potência nuclear do planeta. No entanto, o gigantesco Exército Vermelho na Europa Central serviu como dissuasor convencional equilibrador.",
+        dica_mecanica: "O monopólio nuclear impede que potências rivais declarem guerras diretas, mas aumenta a corrida por espionagem e pesquisas atômicas."
+    ),
+    (
+        id: 4,
+        categoria: "Doutrina",
+        ano: 1946,
+        titulo: "O Longo Telegrama de George Kennan",
+        texto: "O diplomata George F. Kennan enviou de Moscou um memorando de 8.000 palavras alertando que o regime soviético só responderia à 'lógica da força'. Nascia ali a Doutrina da Contenção, pedra angular da estratégia externa americana.",
+        dica_mecanica: "Adotar a doutrina de Contenção aumenta o custo de alianças ofensivas, mas concede bônus de legitimidade ao intervir em revoltas comunistas."
+    ),
+    (
+        id: 5,
+        categoria: "Diplomacia",
+        ano: 1946,
+        titulo: "O Discurso da Cortina de Ferro",
+        texto: "Em Fulton (Missouri), Winston Churchill proclamou que 'de Stettin, no Báltico, a Trieste, no Adriático, uma cortina de ferro desceu sobre o continente', consagrando a expressão que definiu a divisão da Europa.",
+        dica_mecanica: "A Cortina de Ferro reduz o comércio leste-oeste a quase zero, forçando as nações a integrarem seus próprios blocos autárquicos."
+    ),
+    (
+        id: 6,
+        categoria: "Economia",
+        ano: 1947,
+        titulo: "O Plano Marshall (ERP)",
+        texto: "O Programa de Recuperação Europeia injetou mais de 13 bilhões de dólares na reconstrução da Europa Ocidental devastada, reerguendo a indústria alemã e francesa e criando mercados prósperos para as manufaturas dos EUA.",
+        dica_mecanica: "Subsidiar aliados com ajuda econômica eleva seu PIB e alinhamento político, além de gerar demanda para suas próprias exportações de bens de capital."
+    ),
+    (
+        id: 7,
+        categoria: "Economia",
+        ano: 1949,
+        titulo: "O COMECON e o Bloco Socialista",
+        texto: "Em resposta ao Plano Marshall, Moscou organizou o Conselho para Assistência Econômica Mútua (COMECON), estruturando o comércio das democracias populares em torno de trocas planificadas e suprimento soviético de matérias-primas.",
+        dica_mecanica: "Economias planificadas sofrem menos com flutuações de mercado e desemprego, mas acumulam escassez crônica de bens de consumo sofisticados."
+    ),
+    (
+        id: 8,
+        categoria: "Crise",
+        ano: 1948,
+        titulo: "O Bloqueio de Berlim e a Ponte Aérea",
+        texto: "Stalin cortou todas as rotas terrestres para Berlim Ocidental após a reforma monetária aliada. A resposta anglo-americana foi uma ponte aérea histórica que sustentou mais de dois milhões de civis por quase um ano com alimentos e carvão.",
+        dica_mecanica: "Bloqueios territoriais podem ser contornados com pontes aéreas se você tiver superioridade de frota de transporte e orçamento para combustível."
+    ),
+    (
+        id: 9,
+        categoria: "Geopolítica",
+        ano: 1949,
+        titulo: "A Revolução Chinesa e Mao Tsé-Tung",
+        texto: "A vitória do Exército de Libertação Popular sobre os Nacionalistas do Kuomintang em 1949 culminou na proclamação da República Popular da China, alterando drasticamente o equilíbrio demográfico e estratégico na Ásia.",
+        dica_mecanica: "Perder uma potência regional para o bloco oposto causa uma crise de legitimidade interna e força gastos emergenciais de contenção."
+    ),
+    (
+        id: 10,
+        categoria: "Descolonização",
+        ano: 1947,
+        titulo: "A Partição da Índia",
+        texto: "A saída britânica do subcontinente indiano resultou na criação de dois Estados independentes: Índia e Paquistão. A partição causou o deslocamento forçado de mais de 14 milhões de pessoas e severos confrontos intercomunais.",
+        dica_mecanica: "Processos rápidos de independência criam Estados com legitimidade instável, fronteiras contestadas e suscetíveis a guerras por procuração."
+    ),
+    (
+        id: 11,
+        categoria: "Conflito por Procuração",
+        ano: 1946,
+        titulo: "A Guerra Civil Grega",
+        texto: "O confronto entre monarquistas apoiados pela Grã-Bretanha (e depois pelos EUA) e guerrilheiros comunistas do DSE levou à enunciação da Doutrina Truman, selando o compromisso de Washington de conter o comunismo em qualquer latitude.",
+        dica_mecanica: "Apoiar governos locais contra guerrilhas insurgentes custa armas e dinheiro, mas evita a expansão de bases militares rivais."
+    ),
+    (
+        id: 12,
+        categoria: "Economia",
+        ano: 1946,
+        titulo: "O 4º Plano Quinquenal Soviético",
+        texto: "Com 27 milhões de mortos e um terço de seu parque industrial arrasado, a URSS priorizou a indústria pesada, ferrovias e reconstrução armamentista em detrimento imediato do padrão de vida de seus cidadãos.",
+        dica_mecanica: "Concentrar investimento em indústria pesada amplia rapidamente sua capacidade fabril militar, mas reduz a aprovação popular civil."
+    ),
+    (
+        id: 13,
+        categoria: "Instituições",
+        ano: 1945,
+        titulo: "A Fundação da ONU e o Poder de Veto",
+        texto: "Em São Francisco, 50 nações assinaram a Carta da Organização das Nações Unidas. Para garantir a adesão das grandes potências, os cinco membros permanentes do Conselho de Segurança receberam poder de veto irrestrito.",
+        dica_mecanica: "O poder de veto na ONU permite bloquear resoluções hostis de sanções econômicas ou intervenções militares internacionais."
+    ),
+    (
+        id: 14,
+        categoria: "Espionagem",
+        ano: 1947,
+        titulo: "Criação da CIA e do MGB/KGB",
+        texto: "A aprovação do National Security Act de 1947 nos EUA fundiu as forças armadas e criou a Central Intelligence Agency (CIA). Paralelamente, o aparato de segurança soviético reorganizou-se sob o MGB e, mais tarde, KGB.",
+        dica_mecanica: "Agências de inteligência bem financiadas aumentam as chances de desbaratar golpes de Estado e infiltrar agentes nos ministérios rivais."
+    ),
+    (
+        id: 15,
+        categoria: "Militar",
+        ano: 1949,
+        titulo: "Nascimento da OTAN",
+        texto: "O Tratado do Atlântico Norte formalizou a aliança militar entre doze nações ocidentais. Pelo Artigo 5º, um ataque armado contra qualquer uma delas na Europa ou América do Norte seria considerado um ataque contra todas.",
+        dica_mecanica: "Pactos de defesa mútua dissuadem agressões diretas de potências rivais, elevando o custo diplomático de qualquer incidente de fronteira."
+    ),
+    (
+        id: 16,
+        categoria: "Doutrina",
+        ano: 1948,
+        titulo: "O Cisma Tito-Stalin",
+        texto: "A recusa do Marechal Josip Broz Tito em submeter a Iugoslávia às ordens diretas de Moscou provocou a expulsão de Belgrado do Kominform, provando que o bloco comunista não era um monólito inquebrantável.",
+        dica_mecanica: "Países socialistas dissidentes podem negociar acordos comerciais com o Ocidente sem abandonar suas reformas internas."
+    ),
+    (
+        id: 17,
+        categoria: "Economia",
+        ano: 1945,
+        titulo: "O Empréstimo Anglo-Americano de 1946",
+        texto: "Vitorioso mas falido, o Reino Unido contraiu um empréstimo colossal de US$ 3,75 bilhões dos EUA. Em contrapartida, Londres teve que aceitar a conversibilidade da libra esterlina, acelerando o fim do sistema de preferência imperial.",
+        dica_mecanica: "Dívidas de guerra externas reduzem drasticamente seu prestígio internacional e limitam sua capacidade de projetar poder ultramarino."
+    ),
+    (
+        id: 18,
+        categoria: "Tecnologia",
+        ano: 1945,
+        titulo: "Operação Paperclip e Osoaviakhim",
+        texto: "Nos meses finais da guerra, cientistas e engenheiros do programa de foguetes V-2 alemão foram disputados ferozmente. Wernher von Braun foi para os EUA, enquanto centenas de técnicos foram levados para o programa balístico soviético.",
+        dica_mecanica: "Capturar cientistas em capitais ocupadas acelera suas pesquisas de balística, radares e tecnologia nuclear em vários anos."
+    ),
+    (
+        id: 19,
+        categoria: "Descolonização",
+        ano: 1946,
+        titulo: "A Primeira Guerra da Indochina",
+        texto: "A tentativa francesa de restabelecer o domínio colonial no sudeste asiático esbarrou na resistência organizada do Viet Minh de Ho Chi Minh, dando início a quase três décadas ininterruptas de conflito na região.",
+        dica_mecanica: "Manter colônias revoltosas consome reservas de divisas e efetivos militares, com retornos fiscais cada vez menores."
+    ),
+    (
+        id: 20,
+        categoria: "Energia",
+        ano: 1946,
+        titulo: "A Crise do Irã e o Petróleo do Golfo",
+        texto: "A relutância das tropas soviéticas em desocupar o norte do Irã após o fim da guerra foi um dos primeiros testes de força da ONU e alertou as superpotências para a importância estratégica vital das reservas de petróleo do Oriente Médio.",
+        dica_mecanica: "Garantir o fluxo de petróleo é indispensável para alimentar frotas de guerra mecanizadas e indústrias petroquímicas modernas."
+    ),
+    (
+        id: 21,
+        categoria: "Política Interna",
+        ano: 1945,
+        titulo: "Legitimidade Governamental e Eleições",
+        texto: "Na Grã-Bretanha de 1945, Winston Churchill perdeu as eleições no auge da vitória para o trabalhista Clement Attlee, refletindo o anseio da população por reformas sociais profundas, como a criação do Serviço Nacional de Saúde (NHS).",
+        dica_mecanica: "Alta popularidade em guerras não garante estabilidade política em tempos de paz se as demandas sociais civis forem ignoradas."
+    ),
+    (
+        id: 22,
+        categoria: "Propaganda",
+        ano: 1949,
+        titulo: "Guerra de Ondas de Rádio e Voz da América",
+        texto: "Antes dos satélites, ondas curtas de rádio eram a principal arma de propaganda transfronteiriça. A 'Voz da América' e a 'Rádio Moscou' transmitiam notícias filtradas e doutrinação em dezenas de idiomas dia e noite.",
+        dica_mecanica: "Investir em estações de radiodifusão internacional fomenta descontentamento civil nos centros urbanos de governos adversários."
+    ),
+    (
+        id: 23,
+        categoria: "América Latina",
+        ano: 1945,
+        titulo: "O Brasil e a Onda Democrática de 1945",
+        texto: "O retorno triunfal da Força Expedicionária Brasileira (FEB) dos campos de batalha da Itália gerou contradição insustentável com a ditadura do Estado Novo, culminando na deposição de Getúlio Vargas e na restauração das eleições.",
+        dica_mecanica: "Participar de coalizões militares com democracias ocidentais pressiona regimes autoritários domésticos rumo à abertura política."
+    ),
+    (
+        id: 24,
+        categoria: "Segurança",
+        ano: 1947,
+        titulo: "O Relógio do Juízo Final (Doomsday Clock)",
+        texto: "Criado pelos cientistas do Boletim dos Cientistas Atômicos de Chicago, o Doomsday Clock mede a proximidade da humanidade de uma catástrofe global irreversível, expressa em minutos para a meia-noite.",
+        dica_mecanica: "Conforme o medidor de Tensão Global sobe, os custos de seguros marítimos disparam e eventos aleatórios de crise tornam-se frequentes."
+    ),
+    (
+        id: 25,
+        categoria: "Militar",
+        ano: 1945,
+        titulo: "Operação Unthinkable",
+        texto: "Na primavera de 1945, Churchill ordenou planos ultrassecretos para uma invasão das linhas soviéticas pelas forças aliadas, batizada de 'Operação Impensável'. O Estado-Maior britânico concluiu que a superioridade terrestre da URSS tornava o plano inviável.",
+        dica_mecanica: "Avalie com precisão a relação de forças terrestres antes de escalar um ultimato na Europa Central."
+    ),
+    (
+        id: 26,
+        categoria: "Economia",
+        ano: 1948,
+        titulo: "A Reforma Monetária do Marco Alemão",
+        texto: "A introdução clandestina do Deutsche Mark nas zonas de ocupação ocidentais eliminou o mercado negro de cigarros e reanimou o comércio, mas enfureceu os soviéticos e foi o estopim imediato da crise de Berlim.",
+        dica_mecanica: "Reformas cambiais estabilizam a inflação de seus vassalos, mas provocam retaliação comercial dos rivais limítrofes."
+    ),
+    (
+        id: 27,
+        categoria: "Diplomacia",
+        ano: 1947,
+        titulo: "A Doutrina Jdanov e os Dois Campos",
+        texto: "Andrei Jdanov formalizou a visão soviética de que o mundo estava irrevogavelmente cindido entre o 'campo imperialista e antidemocrático' (liderado pelos EUA) e o 'campo anti-imperialista e democrático' (liderado pela URSS).",
+        dica_mecanica: "Polarização ideológica máxima impede a celebração de acordos comerciais bilaterais entre membros de blocos opostos."
+    ),
+    (
+        id: 28,
+        categoria: "Espionagem",
+        ano: 1945,
+        titulo: "O Círculo de Espionagem de Cambridge",
+        texto: "Espiões britânicos de alto escalão como Kim Philby, Guy Burgess e Donald Maclean repassavam segredos de gabinete e relatórios atômicos diretamente para Moscou durante toda a década de 1940.",
+        dica_mecanica: "Contraespionagem deficiente permite que potências inimigas vejam seu orçamento secreto e preparativos de mobilização."
+    ),
+    (
+        id: 29,
+        categoria: "Geopolítica",
+        ano: 1955,
+        titulo: "O Movimento Não-Alinhado e Bandung",
+        texto: "Lideranças do Terceiro Mundo como Nehru (Índia), Nasser (Egito), Sukarno (Indonésia) e Tito (Iugoslávia) buscaram uma terceira via soberana, rejeitando a subserviência tanto a Washington quanto a Moscou.",
+        dica_mecanica: "Liderar o bloco Não-Alinhado permite receber ajuda econômica de ambas as superpotências sem ceder bases militares soberanas."
+    ),
+    (
+        id: 30,
+        categoria: "Economia",
+        ano: 1945,
+        titulo: "Desmobilização e Reversão Industrial",
+        texto: "Ao término das hostilidades mundiais, milhões de soldados precisaram ser reintegrados à vida civil enquanto fábricas de tanques e munições corriam para se reconverter na produção de automóveis, tratores e eletrodomésticos.",
+        dica_mecanica: "Reduzir o tamanho das forças armadas diminui drasticamente a despesa pública diária, liberando mão de obra para a agricultura e indústrias de consumo."
+    )
+]

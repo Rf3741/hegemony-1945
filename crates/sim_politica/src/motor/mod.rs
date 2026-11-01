@@ -24,6 +24,7 @@ use crate::entidades::pais::PaisPolitica;
 use crate::erro::{ErroPolitica, ResultadoPolitica, validar_id_snake_case};
 use crate::rng::RngDeterministico;
 use crate::tipos::DataJogo;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Resumo executivo retornado ao final de cada tick diário.
@@ -260,5 +261,36 @@ impl MundoPolitico {
             }
         }
         Ok(())
+    }
+}
+
+/// Estado dinâmico do mundo político para salvar/carregar (o catálogo vem dos arquivos do jogo).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EstadoPoliticoSalvo {
+    pub data: DataJogo,
+    pub dias_decorridos: u64,
+    pub paises: Vec<PaisPolitica>,
+    pub rng: RngDeterministico,
+    pub eventos_guerra_civil: Vec<SinalGuerraCivil>,
+}
+
+impl MundoPolitico {
+    pub fn salvar_estado(&self) -> EstadoPoliticoSalvo {
+        EstadoPoliticoSalvo {
+            data: self.data_atual,
+            dias_decorridos: self.dias_decorridos,
+            paises: self.paises.clone(),
+            rng: self.rng,
+            eventos_guerra_civil: self.eventos_guerra_civil.clone(),
+        }
+    }
+
+    pub fn restaurar_estado(&mut self, e: EstadoPoliticoSalvo) {
+        self.data_atual = e.data;
+        self.dias_decorridos = e.dias_decorridos;
+        self.indice_paises = e.paises.iter().enumerate().map(|(i, p)| (p.id.clone(), i)).collect();
+        self.paises = e.paises;
+        self.rng = e.rng;
+        self.eventos_guerra_civil = e.eventos_guerra_civil;
     }
 }

@@ -27,3 +27,6 @@ pub mod guerra_ui;
 pub mod guerra_ia;
 pub mod formacao_sim;
 pub mod bandeiras_ui;
+pub mod menu_ui;
+pub mod saveload;
+pub mod hud_mapas;
