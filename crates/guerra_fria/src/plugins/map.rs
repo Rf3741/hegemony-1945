@@ -11,7 +11,7 @@ use super::super::estado::AppState;
 use bevy::tasks::{AsyncComputeTaskPool, Task, TaskPool, block_on, futures_lite::future};
 use bevy_egui::{EguiContexts, egui, EguiPrimaryContextPass};
 use bevy_egui::input::EguiWantsInput;
-use gf_mapa::mapa::{CatalogoProvincias, id_de_cor_provincia};
+use gf_mapa::mapa::{CatalogoProvincias, ESCALA_Y_MAPA, id_de_cor_provincia};
 use std::path::PathBuf;
 
 #[derive(Resource)]
@@ -87,6 +87,7 @@ impl Plugin for MapPlugin {
             .add_systems(OnEnter(AppState::Carregando), iniciar_carga)
             .add_systems(Update, aguardar_carga.run_if(in_state(AppState::Carregando)))
             .add_systems(EguiPrimaryContextPass, tela_carregando.run_if(in_state(AppState::Carregando)))
+            .add_systems(EguiPrimaryContextPass, legenda_zonas_ocupacao.run_if(in_state(AppState::Jogando)))
             .add_systems(
                 Update,
                 (mover_camera, selecionar_provincia)
@@ -105,7 +106,19 @@ pub struct EntradaMapa {
     pub dono_prov: Vec<u32>,
     /// Índice do estado por id de província (0 = nenhum).
     pub estado_prov: Vec<u32>,
+    /// Cor do ocupante por id de província (hachura de zona de ocupação já na carga inicial).
+    pub ocupante_cor: Vec<Option<[u8; 4]>>,
 }
+
+/// Berlim é uma única província no mapa; para mostrar os 4 setores de ocupação o pintor divide os
+/// pixels dela em torno do centroide (leste = URSS, oeste: norte França, centro Reino Unido, sul EUA).
+pub struct SetoresBerlim {
+    pub id: u32,
+    pub centro_px: (u32, u32),
+    /// Ordem: URSS, França, Reino Unido, EUA.
+    pub cores: [[u8; 4]; 4],
+}
+pub static SETORES_BERLIM: std::sync::OnceLock<SetoresBerlim> = std::sync::OnceLock::new();
 
 /// Resultado do processamento em segundo plano.
 pub struct SaidaMapa {
@@ -139,7 +152,7 @@ pub fn normalizar_x(x: f32, largura: f32) -> f32 {
 /// Retorna `None` se estiver fora na vertical.
 pub fn pixel_do_mundo(pos: Vec2, largura: u32, altura: u32) -> Option<(u32, u32)> {
     let px = (pos.x + largura as f32 / 2.0).floor().rem_euclid(largura as f32) as u32;
-    let py = (altura as f32 / 2.0 - pos.y).floor();
+    let py = (altura as f32 / 2.0 - pos.y / ESCALA_Y_MAPA).floor();
     if py < 0.0 || py >= altura as f32 {
         return None;
     }
@@ -155,7 +168,8 @@ pub fn gerar_mapa(ent: &EntradaMapa) -> Result<SaidaMapa, String> {
         .map(|p| id_de_cor_provincia((p[0], p[1], p[2])).unwrap_or(0))
         .collect();
     relevo_para(w, h, Some(&ent.caminho_png));
-    let (pixels, caixas) = colorir(&ids, w, h, &ent.cor_prov, &ent.dono_prov, &ent.estado_prov);
+    let (pixels, caixas) =
+        colorir_com_hachura(&ids, w, h, &ent.cor_prov, &ent.dono_prov, &ent.estado_prov, Some(&ent.ocupante_cor));
     Ok(SaidaMapa { largura: w, altura: h, ids, pixels, caixas })
 }
 
@@ -199,6 +213,11 @@ pub fn colorir_com_hachura(
                         // Hachura diagonal estilo Victoria 3: faixas de 4px na cor do ocupante militar
                         if (x + y) % 8 < 4 {
                             c = *cor_ocup;
+                            if let Some(b) = SETORES_BERLIM.get().filter(|b| b.id == id) {
+                                let (cx, cy) = b.centro_px;
+                                let k = if x as u32 >= cx { 0 } else if (y as u32) + 1 < cy { 1 } else if (y as u32) > cy + 1 { 3 } else { 2 };
+                                c = b.cores[k];
+                            }
                         }
                     }
                 }
@@ -351,9 +370,27 @@ fn iniciar_carga(mut commands: Commands, raiz: Res<RaizProjeto>, catalogo: Res<R
             dono_prov[prov.id as usize] = *indices.entry(tag.as_str()).or_insert(n);
         }
     }
-    let ocupante_cor = vec![None; max_id];
-    commands.insert_resource(CoresMapa { cor_prov: cor_prov.clone(), dono_prov: dono_prov.clone(), estado_prov: estado_prov.clone(), ocupante_cor });
-    let entrada = EntradaMapa { caminho_png: raiz.0.join("assets/map/provinces.png"), cor_prov, dono_prov, estado_prov };
+    // Zonas de ocupação (Alemanha/Áustria): controlador diferente do dono -> hachura na cor do ocupante.
+    let mut ocupante_cor: Vec<Option<[u8; 4]>> = vec![None; max_id];
+    for prov in &catalogo.0.provincias {
+        let dono = mundo.dono_por_provincia.get(&prov.id);
+        if let Some(ctrl) = mundo.controlador_por_provincia.get(&prov.id)
+            && Some(ctrl) != dono
+            && let Some(pais) = mundo.paises.get(ctrl)
+        {
+            ocupante_cor[prov.id as usize] = Some([pais.cor.0, pais.cor.1, pais.cor.2, 255]);
+            if prov.adm1_code == "DEU-1599" {
+                let cor = |t: &str| mundo.paises.get(t).map_or([200, 200, 200, 255], |p| [p.cor.0, p.cor.1, p.cor.2, 255]);
+                let _ = SETORES_BERLIM.set(SetoresBerlim {
+                    id: prov.id,
+                    centro_px: prov.centroide_px,
+                    cores: [cor("SOV"), cor("FRA"), cor("GBR"), cor("USA")],
+                });
+            }
+        }
+    }
+    commands.insert_resource(CoresMapa { cor_prov: cor_prov.clone(), dono_prov: dono_prov.clone(), estado_prov: estado_prov.clone(), ocupante_cor: ocupante_cor.clone() });
+    let entrada = EntradaMapa { caminho_png: raiz.0.join("assets/map/provinces.png"), cor_prov, dono_prov, estado_prov, ocupante_cor };
     let tarefa = AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move { gerar_mapa(&entrada) });
     commands.insert_resource(TarefaMapa(tarefa));
 }
@@ -391,11 +428,14 @@ fn aguardar_carga(
     commands.insert_resource(ImagemMapa(handle.clone()));
     // Três cópias lado a lado para o wrap horizontal.
     for k in [-1.0f32, 0.0, 1.0] {
-        commands.spawn((Sprite::from_image(handle.clone()), Transform::from_xyz(k * saida.largura as f32, 0.0, 0.0)));
+        commands.spawn((
+            Sprite::from_image(handle.clone()),
+            Transform::from_xyz(k * saida.largura as f32, 0.0, 0.0).with_scale(Vec3::new(1.0, ESCALA_Y_MAPA, 1.0)),
+        ));
         commands.spawn((
             Realce { deslocamento: k * saida.largura as f32 },
             Sprite::default(),
-            Transform::from_xyz(0.0, 0.0, 1.0),
+            Transform::from_xyz(0.0, 0.0, 1.0).with_scale(Vec3::new(1.0, ESCALA_Y_MAPA, 1.0)),
             Visibility::Hidden,
         ));
     }
@@ -417,7 +457,7 @@ fn criar_ondas(commands: &mut Commands, imagens: &mut Assets<Image>, ids: &[u32]
     let (lw, lh) = (w / D, h / D);
     let mut handles = Vec::new();
     for variante in 0..2u32 {
-        let mut px = vec![0u8; (lw * lh * 4) as usize];
+        let mut px = [170u8, 215, 245, 0].repeat((lw * lh) as usize);
         for ly in 0..lh {
             for lx in 0..lw {
                 // Só mar aberto: todo o bloco DxD é oceano.
@@ -454,12 +494,13 @@ fn criar_ondas(commands: &mut Commands, imagens: &mut Assets<Image>, ids: &[u32]
         img.sampler = ImageSampler::linear();
         handles.push(imagens.add(img));
     }
-    for k in [-1.0f32, 0.0, 1.0] {
+    for (ik, k) in [-1.0f32, 0.0, 1.0].into_iter().enumerate() {
         for (i, hdl) in handles.iter().enumerate() {
             commands.spawn((
                 OndasOceano { fase: i as f32 * std::f32::consts::PI },
-                Sprite { image: hdl.clone(), custom_size: Some(Vec2::new(w as f32, h as f32)), color: Color::srgba(1.0, 1.0, 1.0, 0.0), ..default() },
-                Transform::from_xyz(k * w as f32, 0.0, 0.2),
+                Sprite { image: hdl.clone(), custom_size: Some(Vec2::new(w as f32, h as f32 * ESCALA_Y_MAPA)), color: Color::srgba(1.0, 1.0, 1.0, 0.0), ..default() },
+                Transform::from_xyz(k * w as f32, 0.0, 0.2 + (ik * 2 + i) as f32 * 0.001),
+                Visibility::Hidden,
             ));
         }
     }
@@ -468,13 +509,57 @@ fn criar_ondas(commands: &mut Commands, imagens: &mut Assets<Image>, ids: &[u32]
 fn animar_ondas(
     tempo: Res<Time>,
     estilo: Res<visual_mapa::EstiloMapa>,
-    mut ondas: Query<(&OndasOceano, &mut Sprite)>,
+    mut ondas: Query<(&OndasOceano, &mut Sprite, &mut Visibility)>,
 ) {
     let t = tempo.elapsed_secs() * estilo.oceano_ondas_vel;
-    for (o, mut sp) in &mut ondas {
-        let a = (t + o.fase).sin().max(0.0) * estilo.oceano_ondas_alfa;
+    for (o, mut sp, mut vis) in &mut ondas {
+        if !estilo.oceano_ondas_ativo {
+            if *vis != Visibility::Hidden {
+                *vis = Visibility::Hidden;
+            }
+            continue;
+        }
+        if *vis != Visibility::Inherited {
+            *vis = Visibility::Inherited;
+        }
+        // Fade senoidal contínuo (sem corte em zero): as duas camadas se cruzam suavemente.
+        let a = (0.5 + 0.5 * (t + o.fase).sin()) * estilo.oceano_ondas_alfa;
         sp.color = Color::srgba(1.0, 1.0, 1.0, a);
     }
+}
+
+/// Legenda "Zona de ocupação" (canto inferior esquerdo) enquanto houver províncias ocupadas por zona.
+fn legenda_zonas_ocupacao(
+    mut contextos: EguiContexts,
+    mundo: Res<RecursoMundo>,
+    tempo: Res<Time>,
+    mut cache: Local<(f32, bool)>,
+) -> Result {
+    if tempo.elapsed_secs() - cache.0 > 1.0 || cache.0 == 0.0 {
+        cache.0 = tempo.elapsed_secs().max(0.001);
+        cache.1 = mundo.dono_por_provincia.iter().any(|(id, d)| {
+            matches!(d.as_str(), "GER" | "AUT") && mundo.controlador_por_provincia.get(id).is_some_and(|c| c != d)
+        });
+    }
+    if !cache.1 {
+        return Ok(());
+    }
+    let ctx = contextos.ctx_mut()?;
+    egui::Area::new("legenda_zonas".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(ctx, |ui| {
+        egui::Frame::popup(ui.style()).show(ui, |ui| {
+            ui.label(egui::RichText::new("Zona de ocupação (hachura)").strong());
+            for (tag, nome) in [("USA", "Estados Unidos"), ("GBR", "Reino Unido"), ("FRA", "França"), ("SOV", "União Soviética")] {
+                if let Some(p) = mundo.paises.get(tag) {
+                    ui.horizontal(|ui| {
+                        let (r, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
+                        ui.painter().rect_filled(r, 2.0, egui::Color32::from_rgb(p.cor.0, p.cor.1, p.cor.2));
+                        ui.label(nome);
+                    });
+                }
+            }
+        });
+    });
+    Ok(())
 }
 
 fn tela_carregando(mut contextos: EguiContexts, tempo: Res<Time>, dicas: Res<super::menu_ui::Dicas>) -> Result {
@@ -603,7 +688,7 @@ fn selecionar_provincia(
                 let cxm = (cx[0] + cx[2] + 1) as f32 / 2.0 - mapa.largura as f32 / 2.0;
                 let cym = mapa.altura as f32 / 2.0 - (cx[1] + cx[3] + 1) as f32 / 2.0;
                 tf.translation.x = cxm + r.deslocamento;
-                tf.translation.y = cym;
+                tf.translation.y = cym * ESCALA_Y_MAPA;
                 *vis = Visibility::Visible;
             }
             _ => *vis = Visibility::Hidden,
@@ -624,10 +709,10 @@ mod testes {
 
     #[test]
     fn pixel_com_wrap_e_limites() {
-        assert_eq!(pixel_do_mundo(Vec2::new(-50.0, 25.0), 100, 50), Some((0, 0)));
+        assert_eq!(pixel_do_mundo(Vec2::new(-50.0, 25.0 * ESCALA_Y_MAPA), 100, 50), Some((0, 0)));
         assert_eq!(pixel_do_mundo(Vec2::new(51.0, 0.0), 100, 50), Some((1, 25)));
         assert_eq!(pixel_do_mundo(Vec2::new(-51.0, 0.0), 100, 50), Some((99, 25)));
-        assert_eq!(pixel_do_mundo(Vec2::new(0.0, 30.0), 100, 50), None);
+        assert_eq!(pixel_do_mundo(Vec2::new(0.0, 30.0 * ESCALA_Y_MAPA), 100, 50), None);
     }
 
     #[test]
@@ -661,7 +746,7 @@ mod testes {
             let k = idx.len() as u32 + 1;
             estado_prov[p.id as usize] = *idx.entry(p.adm1_code.clone()).or_insert(k);
         }
-        let ent = EntradaMapa { caminho_png: raiz.join("assets/map/provinces.png"), cor_prov, dono_prov: vec![1; n], estado_prov };
+        let ent = EntradaMapa { caminho_png: raiz.join("assets/map/provinces.png"), cor_prov, dono_prov: vec![1; n], estado_prov, ocupante_cor: vec![None; n] };
         let t = std::time::Instant::now();
         let s = gerar_mapa(&ent).unwrap();
         eprintln!("gerar_mapa: {:?}", t.elapsed());
