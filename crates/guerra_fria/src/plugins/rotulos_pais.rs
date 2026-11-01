@@ -162,7 +162,13 @@ fn criar_rotulos(
     for (idx, g) in geometria_paises(&grade, w, h, n_donos) {
         let Some(tag) = tag_de.get(&idx) else { continue };
         let Some(estado) = mundo.0.paises.get(*tag) else { continue };
-        let (ang, comp, larg) = g.eixos();
+        let (ang0, comp0, larg0) = g.eixos();
+        // O mundo tem o eixo y esticado: ajusta ângulo e extensões dos eixos do país.
+        let ey = gf_mapa::mapa::ESCALA_Y_MAPA;
+        let (sa, ca) = ang0.sin_cos();
+        let ang = (ey * sa).atan2(ca);
+        let comp = comp0 * ca.hypot(ey * sa);
+        let larg = larg0 * sa.hypot(ey * ca);
         let nome = &estado.nome;
         let n_chars = nome.chars().count().max(1) as f32;
         let espacar = n_chars <= 13.0;
@@ -170,7 +176,7 @@ fn criar_rotulos(
         let n_vis = texto.chars().count() as f32;
         // largura do texto ~ 0.5 em por caractere (Oswald condensada)
         let fs = (0.8 * comp / (n_vis * 0.5)).min(larg * 0.55).clamp(4.0, 150.0);
-        let pos = Vec2::new(g.cx as f32 * CELULA as f32 + CELULA as f32 / 2.0 - largura_m / 2.0, altura_m / 2.0 - (g.cy as f32 * CELULA as f32 + CELULA as f32 / 2.0));
+        let pos = Vec2::new(g.cx as f32 * CELULA as f32 + CELULA as f32 / 2.0 - largura_m / 2.0, (altura_m / 2.0 - (g.cy as f32 * CELULA as f32 + CELULA as f32 / 2.0)) * gf_mapa::mapa::ESCALA_Y_MAPA);
         let pos = Vec2::new((pos.x + largura_m / 2.0).rem_euclid(largura_m) - largura_m / 2.0, pos.y);
         let esc = fs / FONTE_BASE;
         let o = FONTE_BASE * 0.045;

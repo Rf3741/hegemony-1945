@@ -29,7 +29,7 @@ pub struct MascaraTerra {
 impl MascaraTerra {
     fn eh_terra(&self, p: Vec2) -> bool {
         let px = (p.x + self.largura as f32 * 0.5).floor().rem_euclid(self.largura as f32) as u32;
-        let py = (self.altura as f32 * 0.5 - p.y).floor();
+        let py = (self.altura as f32 * 0.5 - p.y / gf_mapa::mapa::ESCALA_Y_MAPA).floor();
         if py < 0.0 || py >= self.altura as f32 {
             return false;
         }

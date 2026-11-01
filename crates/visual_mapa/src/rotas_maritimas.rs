@@ -10,7 +10,7 @@
 //! navegação rente à costa para as rotas contornarem cabos em vez de raspar a terra.
 
 use bevy::prelude::Vec2;
-use gf_mapa::mapa::{ALTURA_MAPA_PADRAO, LARGURA_MAPA_PADRAO, projetar_miller};
+use gf_mapa::mapa::{ALTURA_MAPA_PADRAO, ESCALA_Y_MAPA, LARGURA_MAPA_PADRAO, projetar_miller};
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use std::path::Path;
@@ -103,11 +103,11 @@ impl Mascara {
 
     /// Mundo (origem no centro, y para cima) -> pixel.
     pub fn mundo_para_pixel(&self, p: Vec2) -> (i32, i32) {
-        ((p.x + self.largura as f32 * 0.5).floor() as i32, (self.altura as f32 * 0.5 - p.y).floor() as i32)
+        ((p.x + self.largura as f32 * 0.5).floor() as i32, (self.altura as f32 * 0.5 - p.y / ESCALA_Y_MAPA).floor() as i32)
     }
 
     pub fn pixel_para_mundo(&self, x: f32, y: f32) -> Vec2 {
-        Vec2::new(x - self.largura as f32 * 0.5, self.altura as f32 * 0.5 - y)
+        Vec2::new(x - self.largura as f32 * 0.5, (self.altura as f32 * 0.5 - y) * ESCALA_Y_MAPA)
     }
 
     pub fn mundo_eh_oceano(&self, p: Vec2) -> bool {

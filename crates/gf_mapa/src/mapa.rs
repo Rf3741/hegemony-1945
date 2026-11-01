@@ -6,6 +6,11 @@ use std::f64::consts::PI;
 pub const LARGURA_MAPA_PADRAO: u32 = 5632;
 /// Altura padrão do bitmap de províncias (`assets/map/provinces.png`).
 pub const ALTURA_MAPA_PADRAO: u32 = 2048;
+/// Fator vertical mundo/pixel. O bitmap (5632x2048, 2,75:1) cobre a Miller completa (+-90 graus),
+/// cuja proporção correta é pi/MILLER_Y_MAX ~ 1,364:1; para o mapa não parecer achatado, todo o
+/// mundo do cliente usa `y_mundo = y_pixel_centrado * ESCALA_Y_MAPA` (x fica igual). Todas as
+/// conversões pixel/geo <-> mundo passam por este fator.
+pub const ESCALA_Y_MAPA: f32 = 2.0163;
 /// Cor reservada para oceanos, mares e grandes lagos sem soberania (`id = 0`).
 pub const COR_OCEANO: (u8, u8, u8) = (0, 0, 0);
 

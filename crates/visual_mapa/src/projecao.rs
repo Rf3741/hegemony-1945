@@ -7,7 +7,7 @@
 
 use bevy::prelude::*;
 use gf_mapa::mapa::{
-    ALTURA_MAPA_PADRAO, LARGURA_MAPA_PADRAO, desprojetar_miller, projetar_miller,
+    ALTURA_MAPA_PADRAO, ESCALA_Y_MAPA, LARGURA_MAPA_PADRAO, desprojetar_miller, projetar_miller,
 };
 
 /// Dimensões do mapa em pixels (= unidades de mundo do sprite do mapa).
@@ -27,20 +27,20 @@ impl ProjecaoMapa {
     /// (longitude, latitude) em graus -> posição de mundo.
     pub fn geo_para_mundo(&self, lon: f32, lat: f32) -> Vec2 {
         let (px, py) = projetar_miller(lon as f64, lat as f64, self.largura, self.altura);
-        Vec2::new(px as f32 - self.largura as f32 * 0.5, self.altura as f32 * 0.5 - py as f32)
+        Vec2::new(px as f32 - self.largura as f32 * 0.5, (self.altura as f32 * 0.5 - py as f32) * ESCALA_Y_MAPA)
     }
 
     /// Posição de mundo -> (longitude, latitude) em graus.
     pub fn mundo_para_geo(&self, p: Vec2) -> (f32, f32) {
         let px = p.x as f64 + self.largura as f64 * 0.5;
-        let py = self.altura as f64 * 0.5 - p.y as f64;
+        let py = self.altura as f64 * 0.5 - p.y as f64 / ESCALA_Y_MAPA as f64;
         let (lon, lat) = desprojetar_miller(px, py, self.largura, self.altura);
         (lon as f32, lat as f32)
     }
 
     /// Posição de mundo -> pixel da imagem do mapa (y para baixo).
     pub fn mundo_para_pixel(&self, p: Vec2) -> (f32, f32) {
-        (p.x + self.largura as f32 * 0.5, self.altura as f32 * 0.5 - p.y)
+        (p.x + self.largura as f32 * 0.5, self.altura as f32 * 0.5 - p.y / ESCALA_Y_MAPA)
     }
 }
 
@@ -63,7 +63,7 @@ mod tests {
     fn cantos_e_sentido_dos_eixos() {
         let proj = ProjecaoMapa::default();
         let nw = proj.geo_para_mundo(-180.0, 90.0);
-        assert!((nw.x + 2816.0).abs() < 0.5 && (nw.y - 1024.0).abs() < 0.5, "{nw:?}");
+        assert!((nw.x + 2816.0).abs() < 0.5 && (nw.y - 1024.0 * ESCALA_Y_MAPA).abs() < 0.5, "{nw:?}");
         let leste = proj.geo_para_mundo(10.0, 0.0);
         let oeste = proj.geo_para_mundo(-10.0, 0.0);
         assert!(leste.x > oeste.x);

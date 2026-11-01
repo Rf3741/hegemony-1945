@@ -8,7 +8,7 @@ pub mod mapa;
 pub mod tempo;
 
 pub use mapa::{
-    ALTURA_MAPA_PADRAO, AlinhamentoGeopolitico, COR_OCEANO, CatalogoProvincias, DefinicaoPais1945,
+    ALTURA_MAPA_PADRAO, ESCALA_Y_MAPA, AlinhamentoGeopolitico, COR_OCEANO, CatalogoProvincias, DefinicaoPais1945,
     DonosProvincias1945, LARGURA_MAPA_PADRAO, ProvinciaMapa, RegrasCenario1945,
     cor_unica_provincia, desprojetar_miller, id_de_cor_provincia, projetar_miller,
 };

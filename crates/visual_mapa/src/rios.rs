@@ -51,7 +51,14 @@ pub struct CamadaRios {
 
 pub fn carregar_arquivo_rios(caminho: &Path) -> Result<ArquivoRios, String> {
     let txt = std::fs::read_to_string(caminho).map_err(|e| format!("{}: {e}", caminho.display()))?;
-    ron::from_str(&txt).map_err(|e| e.to_string())
+    let mut arq: ArquivoRios = ron::from_str(&txt).map_err(|e| e.to_string())?;
+    // O arquivo está em coordenadas de pixel centradas; o mundo tem y esticado (ESCALA_Y_MAPA).
+    for r in &mut arq.rios {
+        for p in &mut r.pontos {
+            p.1 *= gf_mapa::mapa::ESCALA_Y_MAPA;
+        }
+    }
+    Ok(arq)
 }
 
 /// Cor por ordem do rio (azul suave, semitransparente).
