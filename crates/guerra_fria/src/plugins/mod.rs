@@ -17,3 +17,7 @@ pub mod time;
 pub mod ui;
 pub mod visual_construcoes;
 pub mod tecnologia_ui;
+pub mod guerra_dados;
+pub mod guerra_sim;
+pub mod guerra_ui;
+pub mod guerra_ia;

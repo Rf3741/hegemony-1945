@@ -1,0 +1,28 @@
+[
+    (
+        id: "divisao_infantaria_1945",
+        nome_pt: "Divisão de Fuzileiros 1945",
+        batalhoes: [
+            ("infantaria_linha", 9),
+            ("artilharia_campanha", 2),
+            ("engenheiros_combate", 1),
+        ],
+    ),
+    (
+        id: "divisao_blindada_1945",
+        nome_pt: "Divisão Blindada Mecanizada 1945",
+        batalhoes: [
+            ("blindados_medios", 6),
+            ("infantaria_linha", 4),
+            ("artilharia_campanha", 2),
+            ("engenheiros_combate", 1),
+        ],
+    ),
+    (
+        id: "brigada_guarnicao",
+        nome_pt: "Brigada de Segurança e Guarnição",
+        batalhoes: [
+            ("infantaria_linha", 4),
+        ],
+    ),
+]

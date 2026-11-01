@@ -1,0 +1,390 @@
+// ==============================================================================
+// GUERRAS HISTÓRICAS E CONFLITOS REGIONAIS - GUERRA FRIA (1945-1991)
+// Conflitos históricos, gatilhos, beligerantes, teatros e condições de vitória.
+// ==============================================================================
+
+[
+    // --------------------------------------------------------------------------
+    // 1. GUERRA CIVIL CHINESA (1946–1949 / 1950)
+    // --------------------------------------------------------------------------
+    (
+        id: "guerra_civil_chinesa",
+        nome: "Guerra Civil Chinesa (Segunda Fase)",
+        ano_inicio: 1946,
+        mes_inicio: 6,
+        dia_inicio: 26,
+        ano_fim_historico: 1949,
+        mes_fim_historico: 10,
+        dia_fim_historico: 1,
+        tipo_conflito: "guerra_civil",
+        casus_belli_id: "unificacao_nacional_civil",
+        beligerantes_lado_a: [
+            (
+                tag: "CHI",
+                papel: "governo_nacionalista_kuomintang",
+                lider_alianca: true,
+            ),
+        ],
+        beligerantes_lado_b: [
+            (
+                tag: "CCP",
+                papel: "exercito_popular_de_libertacao",
+                lider_alianca: true,
+            ),
+        ],
+        patrocinadores_superpotencias: {
+            "CHI": (potencia: "USA", tipo_ajuda: "lend_lease_pesado_e_conselheiros", intensidade: 0.8),
+            "CCP": (potencia: "SOV", tipo_ajuda: "arsenal_manchuria_e_conselheiros", intensidade: 0.7),
+        },
+        teatros_iniciais_provincias: [
+            "CHN-1813", // Liaoning (Manchúria)
+            "CHN-1828", // Jilin (Manchúria)
+            "CHN-1839", // Heilongjiang (Manchúria)
+            "CHN-1804", // Shaanxi (Yan'an)
+            "CHN-1811", // Hebei
+            "CHN-1814", // Shandong
+            "CHN-1818", // Jiangsu
+        ],
+        gatilho_disparo: (
+            tipo: "ruptura_negociacoes_marshall",
+            condicao_data: (ano: 1946, mes: 6, dia: 1),
+            condicao_tensao_minima: 15.0,
+            descricao: "Fracasso da Missão Marshall para mediar um governo de coalizão entre Chiang Kai-shek e Mao Tsé-Tung após a rendição japonesa.",
+        ),
+        condicoes_vitoria_lado_a: [
+            (tipo: "eliminar_governo_rival", alvo: "CCP"),
+            (tipo: "controlar_provincias", provincias: ["CHN-1804", "CHN-1813", "CHN-1839"]),
+        ],
+        condicoes_vitoria_lado_b: [
+            (tipo: "capturar_capital_rival", alvo: "CHN-1818"), // Nanjing / Jiangsu
+            (tipo: "proclamar_republica_popular", provinciade_capital: "CHN-1155"), // Pequim
+            (tipo: "forcar_retirada_para_ilha", alvo_ilha: "TWN-1166"), // Taiwan
+        ],
+        impacto_tensao_mundial_vitoria: 20.0,
+        consequencia_historica_texto: "Proclamação da República Popular da China em Pequim e recuo do governo da República da China para Taiwan.",
+    ),
+
+    // --------------------------------------------------------------------------
+    // 2. PRIMEIRA GUERRA DA INDOCHINA (1946–1954)
+    // --------------------------------------------------------------------------
+    (
+        id: "primeira_guerra_indochina",
+        nome: "Primeira Guerra da Indochina",
+        ano_inicio: 1946,
+        mes_inicio: 12,
+        dia_inicio: 19,
+        ano_fim_historico: 1954,
+        mes_fim_historico: 8,
+        dia_fim_historico: 1,
+        tipo_conflito: "guerra_anticolonial",
+        casus_belli_id: "libertacao_anticolonial",
+        beligerantes_lado_a: [
+            (
+                tag: "FRA",
+                papel: "corpo_expedicionario_frances_extremo_oriente",
+                lider_alianca: true,
+            ),
+            (
+                tag: "FIC",
+                papel: "administracao_indochina_francesa",
+                lider_alianca: false,
+            ),
+        ],
+        beligerantes_lado_b: [
+            (
+                tag: "VNM",
+                papel: "governo_revolucionario_viet_minh",
+                lider_alianca: true,
+            ),
+        ],
+        patrocinadores_superpotencias: {
+            "FRA": (potencia: "USA", tipo_ajuda: "financiamento_80pct_e_armas", intensidade: 0.85),
+            "VNM": (potencia: "CCP", tipo_ajuda: "artilharia_pesada_e_treinamento", intensidade: 0.9),
+        },
+        teatros_iniciais_provincias: [
+            "VNM-462",  // Hanói (Tonquim)
+            "VNM-4600", // Haiphong
+            "VNM-450",  // Dien Bien Phu (Điện Biên)
+            "VNM-454",  // Lang Son
+            "VNM-490",  // Thua Thien-Hue (Annam)
+            "VNM-501",  // Saigon (Cochinchina)
+        ],
+        gatilho_disparo: (
+            tipo: "incidente_haiphong_e_batalha_hanoi",
+            condicao_data: (ano: 1946, mes: 11, dia: 23),
+            condicao_tensao_minima: 10.0,
+            descricao: "Bombardeio naval francês do porto de Haiphong após disputas aduaneiras com a República Democrática do Vietnã proclamada por Ho Chi Minh.",
+        ),
+        condicoes_vitoria_lado_a: [
+            (tipo: "pacificar_guerrilha_rural", meta_resistencia_maxima: 20.0),
+            (tipo: "assegurar_cidades_principais", provincias: ["VNM-462", "VNM-501"]),
+        ],
+        condicoes_vitoria_lado_b: [
+            (tipo: "cerco_e_rendicao_guarnicao_francesa", local: "VNM-450"), // Dien Bien Phu
+            (tipo: "esgotar_apoio_politico_metropole", exaustao_minima: 85.0),
+        ],
+        impacto_tensao_mundial_vitoria: 15.0,
+        consequencia_historica_texto: "Acordos de Genebra de 1954: Partição temporária do Vietnã no Paralelo 17 e retirada militar francesa da Indochina.",
+    ),
+
+    // --------------------------------------------------------------------------
+    // 3. GUERRA CIVIL GREGA (1946–1949)
+    // --------------------------------------------------------------------------
+    (
+        id: "guerra_civil_grega",
+        nome: "Guerra Civil Grega",
+        ano_inicio: 1946,
+        mes_inicio: 3,
+        dia_inicio: 30,
+        ano_fim_historico: 1949,
+        mes_fim_historico: 10,
+        dia_fim_historico: 16,
+        tipo_conflito: "guerra_civil",
+        casus_belli_id: "contencao_do_comunismo",
+        beligerantes_lado_a: [
+            (
+                tag: "GRE",
+                papel: "reino_da_grecia_governo_monarquico",
+                lider_alianca: true,
+            ),
+        ],
+        beligerantes_lado_b: [
+            (
+                tag: "ALB", // Representando retaguarda e guerrilha DSE / KKE
+                papel: "exercito_democratico_da_grecia_dse",
+                lider_alianca: true,
+            ),
+        ],
+        patrocinadores_superpotencias: {
+            "GRE": (potencia: "USA", tipo_ajuda: "doutrina_truman_e_napalm", intensidade: 0.9),
+            "ALB": (potencia: "YUG", tipo_ajuda: "armamento_e_santuario_balcanico", intensidade: 0.6),
+        },
+        teatros_iniciais_provincias: [
+            "GRC-2892", // Macedônia Ocidental (Montes Grammos e Vitsi)
+            "GRC-2949", // Epiro
+            "GRC-2991", // Macedônia Central
+            "GRC-2900", // Tessália
+            "GRC-2884", // Ática (Atenas)
+        ],
+        gatilho_disparo: (
+            tipo: "ataque_litochoro_e_doutrina_truman",
+            condicao_data: (ano: 1946, mes: 3, dia: 30),
+            condicao_tensao_minima: 12.0,
+            descricao: "Ataque insurgente comunista contra o posto policial de Litochoro às vésperas das eleições parlamentares, deflagrando a Doutrina Truman.",
+        ),
+        condicoes_vitoria_lado_a: [
+            (tipo: "eliminar_santuarios_fronteiricos", provincias: ["GRC-2892", "GRC-2949"]),
+            (tipo: "fechamento_fronteira_iugoslava", evento: "cisao_tito_stalin_1948"),
+        ],
+        condicoes_vitoria_lado_b: [
+            (tipo: "capturar_capital_atenas", alvo: "GRC-2884"),
+            (tipo: "estabelecer_republica_popular_grega", alinhamento: "bloco_sovietico"),
+        ],
+        impacto_tensao_mundial_vitoria: 10.0,
+        consequencia_historica_texto: "Vitória do governo monárquico grego apoiado pelos EUA; consolidação da Grécia e Turquia na OTAN (1952).",
+    ),
+
+    // --------------------------------------------------------------------------
+    // 4. GUERRA INDO-PAQUISTANESA DE 1947 (PRIMEIRA GUERRA DA CAXEMIRA)
+    // --------------------------------------------------------------------------
+    (
+        id: "guerra_indo_paquistanesa_1947",
+        nome: "Primeira Guerra Indo-Paquistanesa (Guerra da Caxemira)",
+        ano_inicio: 1947,
+        mes_inicio: 10,
+        dia_inicio: 22,
+        ano_fim_historico: 1949,
+        mes_fim_historico: 1,
+        dia_fim_historico: 5,
+        tipo_conflito: "guerra_fronteirica_regional",
+        casus_belli_id: "litigio_fronteirico_regional",
+        beligerantes_lado_a: [
+            (
+                tag: "IND",
+                papel: "uniao_indiana",
+                lider_alianca: true,
+            ),
+        ],
+        beligerantes_lado_b: [
+            (
+                tag: "PAK",
+                papel: "dominio_do_paquistao",
+                lider_alianca: true,
+            ),
+        ],
+        patrocinadores_superpotencias: {
+            "IND": (potencia: "GBR", tipo_ajuda: "oficiais_britanicos_de_ligacao", intensidade: 0.3),
+            "PAK": (potencia: "GBR", tipo_ajuda: "oficiais_britanicos_de_ligacao", intensidade: 0.3),
+        },
+        teatros_iniciais_provincias: [
+            "IND-2431", // Jammu e Caxemira (Srinagar)
+            "PAK-1109", // Azad Kashmir
+            "PAK-1111", // Gilgit-Baltistão
+            "IND-3249", // Punjab Indiano
+            "PAK-1113", // Punjab Paquistanês
+        ],
+        gatilho_disparo: (
+            tipo: "incursao_tribal_pashtun_e_adesao_maharaja",
+            condicao_data: (ano: 1947, mes: 10, dia: 22),
+            condicao_tensao_minima: 8.0,
+            descricao: "Invasão do Principado de Jammu e Caxemira por milícias tribais paquistanesas, forçando o Marajá Hari Singh a assinar o Instrumento de Adesão à Índia.",
+        ),
+        condicoes_vitoria_lado_a: [
+            (tipo: "expulsar_invasores_caxemira", provincias: ["IND-2431"]),
+            (tipo: "integrar_vale_da_caxemira", status: "soberania_reconhecida"),
+        ],
+        condicoes_vitoria_lado_b: [
+            (tipo: "capturar_srinagar", alvo: "IND-2431"),
+            (tipo: "anexar_caxemira_ao_paquistao", alinhamento: "integrado_pak"),
+        ],
+        impacto_tensao_mundial_vitoria: 8.0,
+        consequencia_historica_texto: "Cessar-fogo mediado pela ONU estabelecendo a Linha de Controle (LoC) e dividindo a Caxemira permanentemente.",
+    ),
+
+    // --------------------------------------------------------------------------
+    // 5. GUERRA ÁRABE-ISRAELENSE DE 1948 (GUERRA DE INDEPENDÊNCIA DE ISRAEL)
+    // --------------------------------------------------------------------------
+    (
+        id: "guerra_arabe_israelense_1948",
+        nome: "Guerra Árabe-Israelense de 1948 (Guerra de Independência / Nakba)",
+        ano_inicio: 1948,
+        mes_inicio: 5,
+        dia_inicio: 15,
+        ano_fim_historico: 1949,
+        mes_fim_historico: 7,
+        dia_fim_historico: 20,
+        tipo_conflito: "guerra_regional_existencial",
+        casus_belli_id: "autodefesa_preventiva",
+        beligerantes_lado_a: [
+            (
+                tag: "ISR",
+                papel: "estado_de_israel_haganah_idf",
+                lider_alianca: true,
+            ),
+        ],
+        beligerantes_lado_b: [
+            (
+                tag: "EGY",
+                papel: "reino_do_egito",
+                lider_alianca: true,
+            ),
+            (
+                tag: "JOR",
+                papel: "transjordania_legiao_arabe",
+                lider_alianca: false,
+            ),
+            (
+                tag: "SYR",
+                papel: "republica_siria",
+                lider_alianca: false,
+            ),
+            (
+                tag: "IRQ",
+                papel: "reino_do_iraque",
+                lider_alianca: false,
+            ),
+            (
+                tag: "LBN",
+                papel: "republica_libanesa",
+                lider_alianca: false,
+            ),
+        ],
+        patrocinadores_superpotencias: {
+            "ISR": (potencia: "SOV", tipo_ajuda: "armas_checoslovacas_operacao_balak", intensidade: 0.7),
+            "EGY": (potencia: "GBR", tipo_ajuda: "armamento_tradicional_e_oficiais", intensidade: 0.4),
+        },
+        teatros_iniciais_provincias: [
+            "ISR-3057", // Tel Aviv
+            "ISR-3058", // Jerusalém
+            "ISR-3054", // Haifa
+            "ISR-3053", // HaDarom (Neguev)
+            "ISR-3056", // HaZafon (Galileia)
+            "EGY-1536", // Suez / Sinai
+        ],
+        gatilho_disparo: (
+            tipo: "fim_mandato_britanico_e_proclamacao_israel",
+            condicao_data: (ano: 1948, mes: 5, dia: 14),
+            condicao_tensao_minima: 14.0,
+            descricao: "Proclamação do Estado de Israel por David Ben-Gurion após o fim do Mandato Britânico na Palestina e imediata invasão por cinco exércitos da Liga Árabe.",
+        ),
+        condicoes_vitoria_lado_a: [
+            (tipo: "sobrevivencia_do_estado_israel", manter_capital: "ISR-3057"),
+            (tipo: "romper_bloqueio_jerusalem", corredor: "ISR-3058"),
+            (tipo: "estabelecer_fronteiras_armisticio_linha_verde", meta: "controle_territorial_estendido"),
+        ],
+        condicoes_vitoria_lado_b: [
+            (tipo: "aniquilar_forcas_israelenses", capturar_cidades: ["ISR-3057", "ISR-3054"]),
+            (tipo: "impedir_particao_palestina", restaurar_controle_arabe: true),
+        ],
+        impacto_tensao_mundial_vitoria: 14.0,
+        consequencia_historica_texto: "Acordos de Armistício de Rodes de 1949: Linha Verde, controle da Cisjordânia pela Transjordânia e Faixa de Gaza pelo Egito.",
+    ),
+
+    // --------------------------------------------------------------------------
+    // 6. GUERRA DA COREIA (1950–1953)
+    // --------------------------------------------------------------------------
+    (
+        id: "guerra_da_coreia",
+        nome: "Guerra da Coreia",
+        ano_inicio: 1950,
+        mes_inicio: 6,
+        dia_inicio: 25,
+        ano_fim_historico: 1953,
+        mes_fim_historico: 7,
+        dia_fim_historico: 27,
+        tipo_conflito: "guerra_por_procuracao_bipolar",
+        casus_belli_id: "mandato_seguranca_coletiva_onu",
+        beligerantes_lado_a: [
+            (
+                tag: "KOR",
+                papel: "republica_da_coreia_sul",
+                lider_alianca: false,
+            ),
+            (
+                tag: "USA",
+                papel: "comando_das_nacoes_unidas_onu",
+                lider_alianca: true,
+            ),
+        ],
+        beligerantes_lado_b: [
+            (
+                tag: "PRK",
+                papel: "republica_popular_democratica_da_coreia_norte",
+                lider_alianca: true,
+            ),
+            (
+                tag: "CCP",
+                papel: "exercito_de_voluntarios_do_povo_chines",
+                lider_alianca: false,
+            ),
+        ],
+        patrocinadores_superpotencias: {
+            "USA": (potencia: "USA", tipo_ajuda: "intervencao_direta_coalizao_onu", intensidade: 1.0),
+            "PRK": (potencia: "SOV", tipo_ajuda: "avioes_mig15_pilotos_e_tanques_t34", intensidade: 0.85),
+        },
+        teatros_iniciais_provincias: [
+            "KOR-2497", // Seul
+            "KOR-2495", // Incheon
+            "KOR-2507", // Busan (Perímetro de Pusan)
+            "PRK-3305", // Pyongyang
+            "PRK-3312", // Pyongan Norte (Rio Yalu)
+            "PRK-3307", // Hamgyong Norte
+        ],
+        gatilho_disparo: (
+            tipo: "invasao_norte_coreana_paralelo_38",
+            condicao_data: (ano: 1950, mes: 6, dia: 25),
+            condicao_tensao_minima: 30.0,
+            descricao: "Ofensiva surpresa do Exército Popular da Coreia através do Paralelo 38 autorizada por Kim Il-sung e Stalin, capturando Seul em três dias.",
+        ),
+        condicoes_vitoria_lado_a: [
+            (tipo: "repelir_invasao_sul", restabelecer_fronteira: "paralelo_38"),
+            (tipo: "conquistar_norte_se_permitido", limite_rio_yalu: true),
+        ],
+        condicoes_vitoria_lado_b: [
+            (tipo: "expulsar_onu_perimetro_busan", alvo: "KOR-2507"),
+            (tipo: "unificar_peninsula_sob_socialismo", capital_unificada: "PRK-3305"),
+        ],
+        impacto_tensao_mundial_vitoria: 35.0,
+        consequencia_historica_texto: "Armistício de Panmunjom em 1953: Criação da Zona Desmilitarizada da Coreia (DMZ) próxima ao Paralelo 38 sem tratado formal de paz.",
+    ),
+]

@@ -21,6 +21,7 @@ pub struct PainelDiplomacia {
     pub alvo: String,
     pub busca: String,
     pub mensagem: String,
+    pub cb_idx: usize,
     /// Modo de mapa "Esferas" ligado.
     pub mapa_esferas: bool,
     /// Pede repintura do mapa.
@@ -161,6 +162,9 @@ fn tela_diplomacia(
     mut mundo: ResMut<RecursoMundo>,
     mut eco: Option<ResMut<EconomiaSim>>,
     jogador: Res<PaisJogador>,
+    mut guerra_sim: Option<ResMut<super::guerra_sim::GuerraSim>>,
+    dados_guerra: Option<Res<super::guerra_sim::DadosGuerra>>,
+    mut painel_guerra: Option<ResMut<super::guerra_sim::PainelGuerra>>,
 ) -> Result {
     if !painel.aberto {
         return Ok(());
@@ -272,6 +276,64 @@ fn tela_diplomacia(
                                 }
                             }
                             Err(m) => painel.mensagem = m,
+                        }
+                    }
+                }
+                ui.separator();
+                ui.strong("Operações Militares");
+                if let Some(ref mut g_sim) = guerra_sim {
+                    let guerra_ativa = g_sim.0.guerras().iter().find(|gw| gw.ativa && gw.sao_inimigos(&eu, &alvo)).cloned();
+                    if let Some(gw) = guerra_ativa {
+                        ui.colored_label(egui::Color32::from_rgb(240, 80, 80), "⚔ VOCÊ ESTÁ EM GUERRA COM ESTE PAÍS");
+                        let score = if gw.eh_atacante(&eu) { gw.pontuacao_guerra } else { -gw.pontuacao_guerra };
+                        let cor_s = if score > 0.0 { egui::Color32::LIGHT_GREEN } else if score < 0.0 { egui::Color32::LIGHT_RED } else { egui::Color32::GRAY };
+                        ui.horizontal(|ui| {
+                            ui.label("Pontuação de Guerra:");
+                            ui.colored_label(cor_s, format!("{score:+.1}%"));
+                        });
+                        if ui.button("Abrir Painel de Guerra e Paz (F6)").clicked() {
+                            if let Some(ref mut pg) = painel_guerra {
+                                pg.aberto = true;
+                                pg.aba = 0;
+                            }
+                        }
+                    } else {
+                        let cbs = if let Some(ref dg) = dados_guerra {
+                            dg.0.casus_belli.clone()
+                        } else {
+                            Vec::new()
+                        };
+
+                        if !cbs.is_empty() {
+                            let idx = painel.cb_idx.min(cbs.len() - 1);
+                            let cb_atual = &cbs[idx];
+                            egui::ComboBox::from_label("Casus Belli")
+                                .selected_text(&cb_atual.nome)
+                                .show_ui(ui, |ui| {
+                                    for (i, cb) in cbs.iter().enumerate() {
+                                        ui.selectable_value(&mut painel.cb_idx, i, &cb.nome);
+                                    }
+                                });
+                            ui.label(format!("Descrição: {}", cb_atual.descricao));
+                            ui.label(format!("Tensão gerada: +{:.0} | Infâmia: +{:.0}", cb_atual.tensao_mundial_gerada, cb_atual.penalidade_infamia));
+
+                            let btn_decl = ui.button(egui::RichText::new("⚔ DECLARAR GUERRA").color(egui::Color32::from_rgb(255, 90, 90)));
+                            if btn_decl.clicked() {
+                                let nome_guerra = format!("{} de {} contra {}", cb_atual.nome, nome(&eu), nome(&alvo));
+                                match super::guerra_sim::acao_declarar_guerra(g_sim, &eu, &alvo, &nome_guerra) {
+                                    Ok(g_id) => {
+                                        d.0.tensao = (d.0.tensao + cb_atual.tensao_mundial_gerada).min(100.0);
+                                        painel.mensagem = format!("Guerra declarada contra {}! (ID: {})", nome(&alvo), g_id);
+                                        if let Some(ref mut pg) = painel_guerra {
+                                            pg.aberto = true;
+                                            pg.repintar = true;
+                                        }
+                                    }
+                                    Err(e) => {
+                                        painel.mensagem = e;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
