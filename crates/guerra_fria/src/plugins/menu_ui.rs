@@ -132,9 +132,7 @@ fn tela_menu_principal(
     mut busca: Local<String>,
     mut escolha: Local<Option<String>>,
     mut sair: MessageWriter<AppExit>,
-    mut carregar: MessageWriter<super::saveload::PedirCarregar>,
-    slots: Res<super::saveload::Slots>,
-    mut menu_slots: Local<bool>,
+    mut janela_saves: ResMut<super::menu_saves::JanelaSaves>,
 ) -> Result {
     let ctx = contextos.ctx_mut()?.clone();
     // Cliques no mapa escolhem o país, mas o fundo só aparece em Titulo/Paises/Opcoes.
@@ -154,21 +152,13 @@ fn tela_menu_principal(
                         *tela = TelaMenu::Paises;
                     }
                     if ui.add_sized(tam, egui::Button::new(egui::RichText::new("Carregar").size(22.0))).clicked() {
-                        *menu_slots = !*menu_slots;
+                        janela_saves.abrir(true);
                     }
                     if ui.add_sized(tam, egui::Button::new(egui::RichText::new("Opções").size(22.0))).clicked() {
                         *tela = TelaMenu::Opcoes;
                     }
                     if ui.add_sized(tam, egui::Button::new(egui::RichText::new("Sair").size(22.0))).clicked() {
                         sair.write(AppExit::Success);
-                    }
-                    if *menu_slots {
-                        ui.add_space(16.0);
-                        egui::Frame::NONE.fill(egui::Color32::from_black_alpha(170)).inner_margin(10.0).show(ui, |ui| {
-                            super::saveload::lista_slots(ui, &slots, |s| {
-                                carregar.write(super::saveload::PedirCarregar(s));
-                            }, None);
-                        });
                     }
                 });
             });

@@ -212,6 +212,8 @@ pub fn decodificar(b: &[u8]) -> Result<Partida, String> {
 pub struct InfoSlot {
     pub meta: Option<Meta>,
     pub bytes: u64,
+    /// Quando o arquivo foi gravado (relógio real).
+    pub modificado: Option<std::time::SystemTime>,
 }
 
 /// Lista de slots (atualizada ao salvar e ao abrir os menus).
@@ -219,6 +221,16 @@ pub struct InfoSlot {
 pub struct Slots {
     pub lista: Vec<(Slot, InfoSlot)>,
     pub mensagem: String,
+    /// Aviso curto ("Jogo salvo", "Carregado"); `aviso_id` muda a cada novo aviso.
+    pub aviso: String,
+    pub aviso_id: u32,
+}
+
+impl Slots {
+    pub fn avisar(&mut self, texto: &str) {
+        self.aviso = texto.into();
+        self.aviso_id = self.aviso_id.wrapping_add(1);
+    }
 }
 
 #[derive(Message, Debug, Clone, Copy)]
@@ -232,13 +244,14 @@ pub fn dir_saves(raiz: &Path) -> PathBuf {
     raiz.join("saves")
 }
 
-fn varrer(raiz: &Path) -> Vec<(Slot, InfoSlot)> {
+pub(crate) fn varrer(raiz: &Path) -> Vec<(Slot, InfoSlot)> {
     Slot::todos()
         .into_iter()
         .map(|s| {
             let c = dir_saves(raiz).join(s.arquivo());
-            let bytes = std::fs::metadata(&c).map(|m| m.len()).unwrap_or(0);
-            (s, InfoSlot { meta: ler_meta(&c), bytes })
+            let md = std::fs::metadata(&c).ok();
+            let bytes = md.as_ref().map(|m| m.len()).unwrap_or(0);
+            (s, InfoSlot { meta: ler_meta(&c), bytes, modificado: md.and_then(|m| m.modified().ok()) })
         })
         .collect()
 }
@@ -347,7 +360,10 @@ fn executar_salvar(mut pedidos: MessageReader<PedirSalvar>, mut espera: Local<Ve
         let caminho = dir.join(slot.arquivo());
         let tmp = caminho.with_extension("tmp");
         match std::fs::write(&tmp, &bytes).and_then(|_| std::fs::rename(&tmp, &caminho)) {
-            Ok(()) => slots.mensagem = format!("Salvo em {} ({}).", slot.rotulo(), partida.data_formatada()),
+            Ok(()) => {
+                slots.mensagem = format!("Salvo em {} ({}).", slot.rotulo(), partida.data_formatada());
+                slots.avisar("Jogo salvo");
+            }
             Err(e) => slots.mensagem = format!("Falha ao gravar {}: {e}", caminho.display()),
         }
     }
@@ -409,6 +425,7 @@ fn executar_carregar(mut pedidos: MessageReader<PedirCarregar>, mut espera: Loca
     }
     commands.insert_resource(PaisJogador(pais_jogador));
     slots.mensagem = format!("Carregado: {}.", slot.rotulo());
+    slots.avisar("Carregado");
     if *r.estado.get() == AppState::Menu {
         r.prox.set(AppState::Jogando);
     }

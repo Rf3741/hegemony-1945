@@ -39,8 +39,7 @@ fn barra_superior(
     mut contextos: EguiContexts,
     mut relogio: ResMut<RecursoRelogio>,
     camada_visivel: Option<Res<visual_mapa::CamadaConstrucoesVisivel>>,
-    mut salvar: MessageWriter<super::saveload::PedirSalvar>,
-    slots: Res<super::saveload::Slots>,
+    mut janela_saves: ResMut<super::menu_saves::JanelaSaves>,
 ) -> Result {
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
     egui::Panel::top("barra_superior").show(&mut raiz, |ui| {
@@ -59,11 +58,8 @@ fn barra_superior(
                 }
             }
             ui.separator();
-            if ui.button("Salvar").on_hover_text("Salvamento rápido (Ctrl+S); carregar com Ctrl+L").clicked() {
-                salvar.write(super::saveload::PedirSalvar(super::saveload::Slot::Rapido));
-            }
-            if !slots.mensagem.is_empty() {
-                ui.label(&slots.mensagem);
+            if ui.button("Salvar / Carregar").on_hover_text("Abre o menu de jogos salvos (Ctrl+S salva rápido, Ctrl+L carrega)").clicked() {
+                janela_saves.abrir(false);
             }
             ui.separator();
             if relogio.pausado {
