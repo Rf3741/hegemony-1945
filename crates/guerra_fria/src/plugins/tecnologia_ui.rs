@@ -35,6 +35,8 @@ pub struct TecnologiaSim {
     sujo: bool,
     ultimo_refresh: u64,
     ramo: Option<Ramo>,
+    pan: egui::Vec2,
+    zoom: f32,
     /// Avisos de pesquisas concluídas do jogador, para o HUD/tela.
     pub concluidas_jogador: Vec<String>,
 }
@@ -65,6 +67,8 @@ impl TecnologiaSim {
             sujo: true,
             ultimo_refresh: u64::MAX,
             ramo: None,
+            pan: egui::vec2(16.0, 16.0),
+            zoom: 1.0,
             concluidas_jogador: Vec::new(),
         })
     }
@@ -270,6 +274,7 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
     let mut aberto = true;
     let mut acoes: Vec<Acao> = Vec::new();
     let entrada = t.entrada(&tag);
+    let mut pan_zoom = (t.pan, t.zoom);
     {
         let m = &t.mundo;
         let est = m.paises.get(&tag);
@@ -320,43 +325,23 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
                     });
                 }
             });
+            let ramo_atual = t.ramo.unwrap_or(Ramo::Producao);
             ui.horizontal(|ui| {
-                ui.label("Ramo:");
-                if ui.selectable_label(t.ramo.is_none(), "Todos").clicked() {
-                    acoes.push(Acao::Ramo(None));
-                }
                 for r in Ramo::TODOS {
-                    if ui.selectable_label(t.ramo == Some(r), r.nome()).clicked() {
+                    if ui.selectable_label(ramo_atual == r, egui::RichText::new(r.nome()).color(cor_ramo(r))).clicked() {
                         acoes.push(Acao::Ramo(Some(r)));
                     }
                 }
+                ui.weak("  arraste = mover, scroll = zoom, clique = pesquisar/fila");
             });
             ui.separator();
 
-            // ---- Colunas por ramo ----
-            let ramos: Vec<Ramo> = Ramo::TODOS.iter().copied().filter(|r| t.ramo.is_none() || t.ramo == Some(*r)).collect();
-            ui.columns(ramos.len(), |cols| {
-                for (ci, r) in ramos.iter().enumerate() {
-                    let ui = &mut cols[ci];
-                    ui.colored_label(cor_ramo(*r), egui::RichText::new(r.nome()).strong().size(15.0));
-                    egui::ScrollArea::vertical().id_salt(("tec_col", ci)).auto_shrink([false, false]).show(ui, |ui| {
-                        let mut lista: Vec<&Tecnologia> = m.catalogo.techs.iter().filter(|x| x.ramo == *r).collect();
-                        lista.sort_by(|a, b| (a.era_visual, a.ano_historico).cmp(&(b.era_visual, b.ano_historico)).then(a.custo.total_cmp(&b.custo)));
-                        let mut era_ant = 0;
-                        for tec in lista {
-                            if tec.era_visual != era_ant {
-                                era_ant = tec.era_visual;
-                                ui.add_space(4.0);
-                                ui.weak(format!("— Era {} —", era_ant));
-                            }
-                            card(ui, m, &tag, tec, est, ano, &entrada, &mut acoes);
-                        }
-                    });
-                }
-            });
+            arvore(ui, m, &tag, ramo_atual, est, ano, &entrada, &mut pan_zoom, &mut acoes);
         });
     }
     let tec = &mut *t;
+    tec.pan = pan_zoom.0;
+    tec.zoom = pan_zoom.1;
     for a in acoes {
         match a {
             Acao::Iniciar(id) => match tec.mundo.iniciar(&tag, &id, ano) {
@@ -378,89 +363,241 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn card(ui: &mut egui::Ui, m: &MundoTec, tag: &str, tec: &Tecnologia, est: &sim_tecnologia::EstadoPais, ano: i32, entrada: &EntradaPais, acoes: &mut Vec<Acao>) {
-    let conhecida = est.conhecidas.contains(&tec.id);
-    let ativa = est.ativa.as_deref() == Some(tec.id.as_str());
-    let disp = m.disponivel(tag, tec);
-    let na_fila = est.fila.contains(&tec.id);
-    let fundo = if conhecida {
-        egui::Color32::from_rgb(28, 52, 34)
-    } else if ativa {
-        egui::Color32::from_rgb(28, 42, 70)
-    } else if disp {
-        egui::Color32::from_gray(40)
-    } else {
-        egui::Color32::from_gray(26)
-    };
-    egui::Frame::group(ui.style()).fill(fundo).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.horizontal_wrapped(|ui| {
-            let mut txt = egui::RichText::new(&tec.nome).strong();
-            if !conhecida && !disp {
-                txt = txt.weak();
-            }
-            ui.label(txt);
-            if conhecida {
-                ui.colored_label(egui::Color32::LIGHT_GREEN, "✓");
-            }
-        })
-        .response
-        .on_hover_text(&tec.descricao);
-        if conhecida {
-            return;
-        }
-        let custo = m.custo_efetivo(tag, tec, ano, entrada);
-        let pts = sim_tecnologia::pontos_diarios(entrada).max(0.1);
-        let desc = (1.0 - custo / (tec.custo * (1.0 + sim_tecnologia::penalidade_antecedencia(ano, tec.ano_historico)))) * 100.0;
-        ui.small(format!("Custo {:.0} pts | ~{:.0} dias | hist. {}", custo, custo / pts, tec.ano_historico));
-        if desc > 0.5 {
-            ui.small(egui::RichText::new(format!("Difusão: -{:.0}%", desc)).color(egui::Color32::LIGHT_BLUE));
-        }
-        if !tec.pre_requisitos.is_empty() {
-            ui.horizontal_wrapped(|ui| {
-                ui.small("Requer:");
-                for p in &tec.pre_requisitos {
-                    let c = if est.conhecidas.contains(p) { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED };
-                    ui.small(egui::RichText::new(nome_tec(m, p)).color(c));
+const NO_L: f32 = 180.0;
+const NO_A: f32 = 66.0;
+const GAP_X: f32 = 56.0;
+const GAP_Y: f32 = 14.0;
+
+/// Layout em colunas: coluna = max(índice da era no ramo, coluna dos pré-requisitos + 1);
+/// linha = ordem por média da posição dos pré-requisitos (baricentro), sem sobreposição.
+/// Retorna (coluna, linha) por nó. `pres` só contém pré-requisitos dentro do mesmo conjunto.
+pub fn layout_arvore(eras: &[u32], anos: &[i32], pres: &[Vec<usize>]) -> Vec<(usize, usize)> {
+    let n = eras.len();
+    let mut era_ord: Vec<u32> = eras.to_vec();
+    era_ord.sort_unstable();
+    era_ord.dedup();
+    let mut col: Vec<usize> = eras.iter().map(|e| era_ord.iter().position(|x| x == e).unwrap_or(0)).collect();
+    for _ in 0..=n {
+        let mut mudou = false;
+        for i in 0..n {
+            for &p in &pres[i] {
+                if p != i && col[i] <= col[p] && col[p] < n {
+                    col[i] = col[p] + 1;
+                    mudou = true;
                 }
-            });
+            }
         }
-        let d = &tec.desbloqueia;
-        let mut u: Vec<String> = Vec::new();
-        u.extend(d.predios.iter().map(|x| format!("prédio {}", bonito(x))));
-        u.extend(d.metodos_producao.iter().map(|x| format!("método {}", bonito(x))));
-        u.extend(d.leis.iter().map(|x| format!("lei {}", bonito(x))));
-        u.extend(d.unidades_militares.iter().map(|x| format!("unidade {}", bonito(x))));
-        if !u.is_empty() {
-            ui.small(egui::RichText::new(format!("Libera: {}", u.join(", "))).color(egui::Color32::from_rgb(220, 200, 120)));
+        if !mudou {
+            break;
+        }
+    }
+    let ncol = col.iter().copied().max().map_or(0, |m| m + 1);
+    let mut colunas: Vec<Vec<usize>> = vec![Vec::new(); ncol];
+    for i in 0..n {
+        colunas[col[i]].push(i);
+    }
+    let mut pos = vec![0.0f32; n];
+    for c in colunas.iter_mut() {
+        c.sort_by_key(|&i| (anos[i], i));
+        for (r, &i) in c.iter().enumerate() {
+            pos[i] = r as f32;
+        }
+    }
+    let mut filhos: Vec<Vec<usize>> = vec![Vec::new(); n];
+    for i in 0..n {
+        for &p in &pres[i] {
+            filhos[p].push(i);
+        }
+    }
+    let media = |v: &[usize], pos: &[f32], atual: f32| -> f32 {
+        if v.is_empty() { atual } else { v.iter().map(|&j| pos[j]).sum::<f32>() / v.len() as f32 }
+    };
+    for passo in 0..6 {
+        let ordem: Vec<usize> = if passo % 2 == 0 { (0..ncol).collect() } else { (0..ncol).rev().collect() };
+        for c in ordem {
+            let mut chaves: Vec<(f32, usize)> = colunas[c]
+                .iter()
+                .map(|&i| {
+                    let v = if passo % 2 == 0 { &pres[i] } else { &filhos[i] };
+                    (media(v, &pos, pos[i]), i)
+                })
+                .collect();
+            chaves.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+            for (r, (_, i)) in chaves.iter().enumerate() {
+                pos[*i] = r as f32;
+            }
+            colunas[c] = chaves.into_iter().map(|(_, i)| i).collect();
+        }
+    }
+    (0..n).map(|i| (col[i], pos[i] as usize)).collect()
+}
+
+fn cor_estado(conhecida: bool, ativa: bool, disp: bool) -> egui::Color32 {
+    if conhecida {
+        egui::Color32::from_rgb(24, 66, 36)
+    } else if ativa {
+        egui::Color32::from_rgb(28, 46, 84)
+    } else if disp {
+        egui::Color32::from_gray(52)
+    } else {
+        egui::Color32::from_gray(30)
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn arvore(ui: &mut egui::Ui, m: &MundoTec, tag: &str, ramo: Ramo, est: &sim_tecnologia::EstadoPais, ano: i32, entrada: &EntradaPais, pan_zoom: &mut (egui::Vec2, f32), acoes: &mut Vec<Acao>) {
+    let techs: Vec<&Tecnologia> = m.catalogo.techs.iter().filter(|x| x.ramo == ramo).collect();
+    let idx: BTreeMap<&str, usize> = techs.iter().enumerate().map(|(i, x)| (x.id.as_str(), i)).collect();
+    let pres: Vec<Vec<usize>> = techs.iter().map(|x| x.pre_requisitos.iter().filter_map(|p| idx.get(p.as_str()).copied()).collect()).collect();
+    let eras: Vec<u32> = techs.iter().map(|x| x.era_visual).collect();
+    let anos: Vec<i32> = techs.iter().map(|x| x.ano_historico).collect();
+    let lay = layout_arvore(&eras, &anos, &pres);
+
+    let tam = egui::vec2(ui.available_width(), ui.available_height().max(420.0));
+    let (resp, painter) = ui.allocate_painter(tam, egui::Sense::click_and_drag());
+    let rect = resp.rect;
+    let painter = painter.with_clip_rect(rect);
+    painter.rect_filled(rect, 4.0, egui::Color32::from_gray(16));
+    if resp.dragged() {
+        pan_zoom.0 += resp.drag_delta();
+    }
+    if resp.hovered() {
+        let rolar = ui.input(|i| i.smooth_scroll_delta.y);
+        if rolar != 0.0 {
+            let z0 = pan_zoom.1;
+            let z1 = (z0 * (1.0 + rolar * 0.002)).clamp(0.35, 2.2);
+            if let Some(p) = resp.hover_pos() {
+                // mantém o ponto sob o cursor fixo
+                let rel = p - rect.min - pan_zoom.0;
+                pan_zoom.0 -= rel * (z1 / z0 - 1.0);
+            }
+            pan_zoom.1 = z1;
+        }
+    }
+    let z = pan_zoom.1;
+    let origem = rect.min + pan_zoom.0;
+    let ncol = lay.iter().map(|l| l.0).max().map_or(0, |c| c + 1);
+    let nr = |i: usize| -> egui::Rect {
+        let (c, r) = lay[i];
+        let p = origem + egui::vec2(c as f32 * (NO_L + GAP_X), r as f32 * (NO_A + GAP_Y)) * z;
+        egui::Rect::from_min_size(p, egui::vec2(NO_L, NO_A) * z)
+    };
+    // cabeçalhos de coluna: ano médio da coluna
+    for c in 0..ncol {
+        let ys: Vec<i32> = (0..techs.len()).filter(|&i| lay[i].0 == c).map(|i| anos[i]).collect();
+        if ys.is_empty() {
+            continue;
+        }
+        let (mn, mx) = (ys.iter().min().copied().unwrap_or(0), ys.iter().max().copied().unwrap_or(0));
+        let x = origem.x + c as f32 * (NO_L + GAP_X) * z;
+        let txt = if mn == mx { format!("{mn}") } else { format!("{mn}–{mx}") };
+        painter.text(egui::pos2(x, rect.min.y + 2.0), egui::Align2::LEFT_TOP, txt, egui::FontId::proportional(12.0), egui::Color32::from_gray(140));
+    }
+    // linhas
+    let cr = cor_ramo(ramo);
+    for (i, ps) in pres.iter().enumerate() {
+        for &p in ps {
+            let (a, b) = (nr(p), nr(i));
+            if !a.union(b).intersects(rect) {
+                continue;
+            }
+            let (ini, fim) = (a.right_center(), b.left_center());
+            let dx = ((fim.x - ini.x) * 0.5).max(10.0 * z);
+            let ok = est.conhecidas.contains(&techs[p].id);
+            let cor = if ok { cr.gamma_multiply(0.9) } else { egui::Color32::from_gray(90) };
+            let st = egui::Stroke::new((1.6 * z).max(1.0), cor);
+            painter.add(egui::epaint::CubicBezierShape::from_points_stroke([ini, ini + egui::vec2(dx, 0.0), fim - egui::vec2(dx, 0.0), fim], false, egui::Color32::TRANSPARENT, st));
+            let s = 5.0 * z.max(0.6);
+            painter.add(egui::Shape::convex_polygon(vec![fim, fim - egui::vec2(s * 1.6, s), fim - egui::vec2(s * 1.6, -s)], cor, egui::Stroke::NONE));
+        }
+    }
+    // nós
+    let pts = sim_tecnologia::pontos_diarios(entrada).max(0.1);
+    for (i, tec) in techs.iter().enumerate() {
+        let r = nr(i);
+        if !r.intersects(rect) {
+            continue;
+        }
+        let conhecida = est.conhecidas.contains(&tec.id);
+        let ativa = est.ativa.as_deref() == Some(tec.id.as_str());
+        let disp = m.disponivel(tag, tec);
+        let na_fila = est.fila.contains(&tec.id);
+        let custo = m.custo_efetivo(tag, tec, ano, entrada);
+        let r_int = ui.interact(r.intersect(rect), resp.id.with(("no", i)), egui::Sense::click());
+        let mut fundo = cor_estado(conhecida, ativa, disp);
+        if r_int.hovered() {
+            fundo = fundo.gamma_multiply(1.35);
+        }
+        let borda = if ativa { egui::Color32::from_rgb(120, 160, 255) } else if na_fila { egui::Color32::YELLOW } else if conhecida { egui::Color32::from_rgb(60, 130, 80) } else { cr.gamma_multiply(if disp { 0.9 } else { 0.35 }) };
+        painter.rect(r, 5.0 * z, fundo, egui::Stroke::new(1.5, borda), egui::StrokeKind::Inside);
+        let txt_cor = if conhecida || disp || ativa { egui::Color32::from_gray(235) } else { egui::Color32::from_gray(130) };
+        let fs = (13.0 * z).max(7.0);
+        if z >= 0.45 {
+            painter.text(r.min + egui::vec2(8.0, 6.0) * z, egui::Align2::LEFT_TOP, &tec.nome, egui::FontId::proportional(fs), txt_cor);
+            let sub = if conhecida { "✓ pesquisada".to_string() } else { format!("{:.0} pts · ~{:.0} d · {}", custo, custo / pts, tec.ano_historico) };
+            painter.text(r.min + egui::vec2(8.0, 28.0) * z, egui::Align2::LEFT_TOP, sub, egui::FontId::proportional((11.0 * z).max(7.0)), if conhecida { egui::Color32::LIGHT_GREEN } else { egui::Color32::from_gray(160) });
         }
         if ativa {
-            let prog = est.progresso.get(&tec.id).copied().unwrap_or(0.0);
-            ui.add(egui::ProgressBar::new(prog.clamp(0.0, 1.0) as f32).desired_width(ui.available_width()));
-        } else if disp {
+            let prog = est.progresso.get(&tec.id).copied().unwrap_or(0.0).clamp(0.0, 1.0) as f32;
+            let barra = egui::Rect::from_min_max(egui::pos2(r.min.x + 6.0 * z, r.max.y - 12.0 * z), egui::pos2(r.max.x - 6.0 * z, r.max.y - 6.0 * z));
+            painter.rect_filled(barra, 2.0, egui::Color32::from_gray(20));
+            painter.rect_filled(egui::Rect::from_min_size(barra.min, egui::vec2(barra.width() * prog, barra.height())), 2.0, egui::Color32::from_rgb(90, 140, 240));
+        } else if !conhecida {
             if let Some(&p) = est.progresso.get(&tec.id) {
-                ui.small(format!("Progresso parcial: {:.0}%", p * 100.0));
+                let barra = egui::Rect::from_min_max(egui::pos2(r.min.x + 6.0 * z, r.max.y - 9.0 * z), egui::pos2(r.max.x - 6.0 * z, r.max.y - 6.0 * z));
+                painter.rect_filled(egui::Rect::from_min_size(barra.min, egui::vec2(barra.width() * p.clamp(0.0, 1.0) as f32, barra.height())), 1.0, egui::Color32::from_rgb(160, 130, 60));
             }
-            if m.pode_iniciar(tag, tec, ano) {
-                ui.horizontal(|ui| {
-                    if ui.small_button("Pesquisar").clicked() {
-                        acoes.push(Acao::Iniciar(tec.id.clone()));
-                    }
-                    if !na_fila && ui.small_button("+ Fila").clicked() {
-                        acoes.push(Acao::Enfileirar(tec.id.clone()));
-                    }
-                    if na_fila {
-                        ui.small("na fila");
-                    }
-                });
-            } else {
-                ui.small(egui::RichText::new("Adiantada demais (mais de 10 anos)").color(egui::Color32::LIGHT_RED));
-            }
-        } else if !na_fila && ui.small_button("+ Fila").on_hover_text("Entra na fila; inicia quando os pré-requisitos forem cumpridos").clicked() {
-            acoes.push(Acao::Enfileirar(tec.id.clone()));
         }
-    });
+        if r_int.clicked() && !conhecida && !ativa {
+            if disp && m.pode_iniciar(tag, tec, ano) && est.ativa.is_none() {
+                acoes.push(Acao::Iniciar(tec.id.clone()));
+            } else if !na_fila {
+                acoes.push(Acao::Enfileirar(tec.id.clone()));
+            }
+        }
+        r_int.on_hover_ui(|ui| tooltip(ui, m, tec, est, ano, entrada, custo, disp));
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn tooltip(ui: &mut egui::Ui, m: &MundoTec, tec: &Tecnologia, est: &sim_tecnologia::EstadoPais, ano: i32, _entrada: &EntradaPais, custo: f64, disp: bool) {
+    ui.set_max_width(320.0);
+    ui.colored_label(cor_ramo(tec.ramo), egui::RichText::new(&tec.nome).strong().size(15.0));
+    if !tec.descricao.is_empty() {
+        ui.label(&tec.descricao);
+    }
+    if est.conhecidas.contains(&tec.id) {
+        ui.colored_label(egui::Color32::LIGHT_GREEN, "Já pesquisada");
+    } else {
+        let base = tec.custo * (1.0 + sim_tecnologia::penalidade_antecedencia(ano, tec.ano_historico));
+        let desc = (1.0 - custo / base) * 100.0;
+        ui.small(format!("Custo {:.0} pts | histórica {}", custo, tec.ano_historico));
+        if desc > 0.5 {
+            ui.small(egui::RichText::new(format!("Desconto de difusão: -{:.0}%", desc)).color(egui::Color32::LIGHT_BLUE));
+        }
+        if disp && ano < tec.ano_historico - 10 {
+            ui.small(egui::RichText::new("Adiantada demais (mais de 10 anos)").color(egui::Color32::LIGHT_RED));
+        }
+        ui.small(if est.ativa.is_none() { "Clique: pesquisar" } else { "Clique: pôr na fila" });
+    }
+    if !tec.pre_requisitos.is_empty() {
+        ui.horizontal_wrapped(|ui| {
+            ui.small("Requer:");
+            for p in &tec.pre_requisitos {
+                let c = if est.conhecidas.contains(p) { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED };
+                ui.small(egui::RichText::new(nome_tec(m, p)).color(c));
+            }
+        });
+    }
+    let d = &tec.desbloqueia;
+    let mut u: Vec<String> = Vec::new();
+    u.extend(d.predios.iter().map(|x| format!("prédio {}", bonito(x))));
+    u.extend(d.metodos_producao.iter().map(|x| format!("método {}", bonito(x))));
+    u.extend(d.leis.iter().map(|x| format!("lei {}", bonito(x))));
+    u.extend(d.unidades_militares.iter().map(|x| format!("unidade {}", bonito(x))));
+    if !u.is_empty() {
+        ui.small(egui::RichText::new(format!("Libera: {}", u.join(", "))).color(egui::Color32::from_rgb(220, 200, 120)));
+    }
 }
 
 #[cfg(test)]
@@ -484,5 +621,32 @@ mod testes {
         }
         assert!(feitas > 3, "pesquisas concluídas: {feitas}");
         assert!(t.mundo.bloqueios_predios(tag).len() <= antes);
+    }
+
+    fn checa(eras: &[u32], anos: &[i32], pres: &[Vec<usize>]) {
+        let l = layout_arvore(eras, anos, pres);
+        let mut vistos = std::collections::HashSet::new();
+        for (i, &(c, r)) in l.iter().enumerate() {
+            assert!(vistos.insert((c, r)), "nós sobrepostos em {c},{r}");
+            for &p in &pres[i] {
+                assert!(l[p].0 < c, "pré-requisito {p} não está antes de {i}");
+            }
+        }
+    }
+
+    #[test]
+    fn layout_sem_sobreposicao_e_prereq_antes() {
+        checa(&[1, 1, 1, 2, 2, 2], &[1945, 1946, 1947, 1950, 1951, 1952], &[vec![], vec![], vec![], vec![0, 1], vec![2], vec![3]]);
+        checa(&[1, 1, 1], &[1945, 1945, 1945], &[vec![], vec![0], vec![1]]);
+        let raiz = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let t = TecnologiaSim::carregar(&raiz).expect("carregar");
+        for r in Ramo::TODOS {
+            let techs: Vec<&Tecnologia> = t.mundo.catalogo.techs.iter().filter(|x| x.ramo == r).collect();
+            let idx: BTreeMap<&str, usize> = techs.iter().enumerate().map(|(i, x)| (x.id.as_str(), i)).collect();
+            let pres: Vec<Vec<usize>> = techs.iter().map(|x| x.pre_requisitos.iter().filter_map(|p| idx.get(p.as_str()).copied()).collect()).collect();
+            let eras: Vec<u32> = techs.iter().map(|x| x.era_visual).collect();
+            let anos: Vec<i32> = techs.iter().map(|x| x.ano_historico).collect();
+            checa(&eras, &anos, &pres);
+        }
     }
 }
