@@ -53,6 +53,9 @@ pub struct Nucleo {
     pub global: MercadoGlobal,
     pub catalogo: Arc<CatalogoEconomia>,
     pub tags: BTreeMap<String, String>,
+    /// IA dos países (impostos e obras) e id do país do jogador, que ela não toca.
+    pub ia: ia_paises::IaEconomia,
+    pub jogador: Option<String>,
 }
 
 /// Ação do jogador sobre a economia (aplicada pela thread antes do próximo lote).
@@ -107,7 +110,7 @@ impl Nucleo {
             .iter()
             .filter_map(|p| p.tag.clone().map(|t| (t, p.id.clone())))
             .collect();
-        Ok(Self { mundo, global, catalogo, tags })
+        Ok(Self { mundo, global, catalogo, tags, ia: ia_paises::IaEconomia::novo(), jogador: None })
     }
 
     /// Id econômico do país a partir da tag do legado.
@@ -122,6 +125,8 @@ impl Nucleo {
         for _ in 0..dias {
             let rel = self.mundo.executar_tick_diario();
             obras += rel.obras_concluidas;
+            let ignorar: Vec<String> = self.jogador.iter().cloned().collect();
+            self.ia.passo_diario(&mut self.mundo, &ignorar);
             self.mundo.atualizar_mercado_global(&mut self.global);
         }
         obras
@@ -716,6 +721,7 @@ pub fn executar_lote(
     dias: u32,
 ) -> (VistaEconomia, Vec<String>, f64, usize) {
     let mut msgs = Vec::new();
+    nucleo.jogador = pais.map(str::to_string);
     if let Some(p) = pais {
         let idx = nucleo.mundo.indice_mercado_do_pais(p);
         nucleo.global.acompanhar_mercado(idx);

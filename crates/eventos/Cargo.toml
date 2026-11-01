@@ -9,3 +9,7 @@ description = "Sistema de eventos historicos: carga RON, gatilhos, efeitos e esc
 serde.workspace = true
 ron.workspace = true
 simulacao.workspace = true
+sim_politica.workspace = true
+sim_economia.workspace = true
+sim_diplomacia.workspace = true
+

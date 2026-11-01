@@ -46,6 +46,8 @@ pub struct NucleoPol {
     base_eco: BTreeMap<String, f64>,
     /// Padrão de vida político original das pops, por id de país.
     base_pops: BTreeMap<String, Vec<f64>>,
+    /// IA dos países (propõe leis para todos os países que não são do jogador).
+    ia: ia_paises::IaPolitica,
 }
 
 /// Resultado de um lote: mensagens e efeitos sobre a economia (categoria, lei antiga, lei nova).
@@ -63,7 +65,7 @@ impl NucleoPol {
         let mundo = MundoPolitico::novo(cen.catalogo, cen.paises, SEMENTE).map_err(|e| e.to_string())?;
         let base_pops = mundo.paises().iter().map(|p| (p.id.clone(), p.pops.iter().map(|x| x.padrao_de_vida).collect())).collect();
         let cat = Arc::new(mundo.catalogo().clone());
-        Ok((Self { mundo, base_eco: BTreeMap::new(), base_pops }, cat))
+        Ok((Self { mundo, base_eco: BTreeMap::new(), base_pops, ia: ia_paises::IaPolitica::novo() }, cat))
     }
 
     /// Escala o padrão de vida das pops conforme a evolução do padrão de vida econômico (tag -> padrão).
@@ -121,6 +123,8 @@ impl NucleoPol {
             let antes = id.as_deref().and_then(|i| self.mundo.pais(i)).map(|p| (p.leis_ativas.clone(), p.ultima_eleicao.as_ref().map(|e| e.data), crises_graves(p)));
             let data = self.mundo.data_atual();
             self.mundo.executar_tick_diario();
+            let ignorar: Vec<String> = id.iter().cloned().collect();
+            self.ia.passo_diario(&mut self.mundo, &ignorar);
             for s in self.mundo.drenar_eventos_guerra_civil() {
                 let nome = self.mundo.pais(&s.pais_id).map_or(s.pais_tag.clone(), |p| p.nome.clone());
                 msgs.push(format!("GUERRA CIVIL em {nome} ({}): {}", data, s.nome_faccao_rebelde));

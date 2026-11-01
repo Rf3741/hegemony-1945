@@ -13,6 +13,7 @@ members = [
     "crates/ui_refinada",
     "crates/visual_mapa",
     "crates/eventos",
+    "crates/ia_paises",
     "crates/sim_diplomacia",
     "crates/sim_tecnologia",
     "crates/personagens",
@@ -44,6 +45,7 @@ sim_guerra = { path = "crates/sim_guerra" }
 bandeiras_resolver = { path = "crates/bandeiras_resolver" }
 ui_refinada = { path = "crates/ui_refinada" }
 visual_mapa = { path = "crates/visual_mapa" }
+ia_paises = { path = "crates/ia_paises" }
 eventos = { path = "crates/eventos" }
 sim_diplomacia = { path = "crates/sim_diplomacia" }
 sim_tecnologia = { path = "crates/sim_tecnologia" }
