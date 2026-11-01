@@ -1,4 +1,4 @@
-//! Tela de Guerra (F6): frentes de combate, exércitos nacionais, pontuação de guerra e negociação de paz.
+//! Tela de Guerra (6): frentes de combate, exércitos nacionais, pontuação de guerra e negociação de paz.
 
 use super::economy::RecursoMundo;
 use super::guerra_sim::{GuerraSim, PainelGuerra, acao_propor_paz, normalizar_tag};
@@ -45,7 +45,7 @@ fn tela_guerra(
 
     let mut aberto = true;
 
-    egui::Window::new("Ministério da Guerra e Forças Armadas (F6)")
+    egui::Window::new("Ministério da Guerra e Forças Armadas (6)")
         .open(&mut aberto)
         .default_size([940.0, 620.0])
         .show(ctx, |ui| {
@@ -64,7 +64,7 @@ fn tela_guerra(
 
                     if guerras_ativas.is_empty() {
                         ui.label("O mundo encontra-se em estado de paz. Nenhuma guerra ativa.");
-                        ui.label("Você pode justificar e declarar guerra a outros países através do painel de Diplomacia (F4).");
+                        ui.label("Você pode justificar e declarar guerra a outros países através do painel de Diplomacia (4).");
                     } else {
                         egui::ScrollArea::vertical().id_salt("scroll_guerras").show(ui, |ui| {
                             for g in &guerras_ativas {

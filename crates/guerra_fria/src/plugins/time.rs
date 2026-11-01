@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use gf_mapa::tempo::{DataSimulacao, RelogioSimulacao, VelocidadeJogo};
+use gf_mapa::tempo::{DataSimulacao, RelogioSimulacao};
 
 /// Evento disparado quando um dia se passa na simulação.
 #[allow(dead_code)]
@@ -29,21 +29,6 @@ fn controlar_relogio_teclado(
 ) {
     if teclas.just_pressed(KeyCode::Space) {
         relogio.alternar_pausa();
-    }
-    if teclas.just_pressed(KeyCode::Digit1) || teclas.just_pressed(KeyCode::Numpad1) {
-        relogio.definir_velocidade(VelocidadeJogo::V1);
-    }
-    if teclas.just_pressed(KeyCode::Digit2) || teclas.just_pressed(KeyCode::Numpad2) {
-        relogio.definir_velocidade(VelocidadeJogo::V2);
-    }
-    if teclas.just_pressed(KeyCode::Digit3) || teclas.just_pressed(KeyCode::Numpad3) {
-        relogio.definir_velocidade(VelocidadeJogo::V3);
-    }
-    if teclas.just_pressed(KeyCode::Digit4) || teclas.just_pressed(KeyCode::Numpad4) {
-        relogio.definir_velocidade(VelocidadeJogo::V4);
-    }
-    if teclas.just_pressed(KeyCode::Digit5) || teclas.just_pressed(KeyCode::Numpad5) {
-        relogio.definir_velocidade(VelocidadeJogo::V5);
     }
     if teclas.just_pressed(KeyCode::Equal) || teclas.just_pressed(KeyCode::NumpadAdd) {
         let v = relogio.velocidade.aumentar();

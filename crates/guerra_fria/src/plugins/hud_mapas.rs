@@ -1,4 +1,4 @@
-//! HUD estendido: botões de módulos (F4/F5/F6), barra de alertas e modos de mapa temáticos com legenda.
+//! HUD estendido: botões de módulos (4/5/6), barra de alertas e modos de mapa temáticos com legenda.
 use super::diplomacia_ui::{DiploSim, PainelDiplomacia};
 use super::economia_sim::EconomiaSim;
 use super::economy::RecursoMundo;
@@ -45,28 +45,6 @@ impl ModoTematico {
         let n = Self::TODOS.len();
         let i = Self::TODOS.iter().position(|m| *m == self).unwrap_or(0);
         Self::TODOS[if anterior { (i + n - 1) % n } else { (i + 1) % n }]
-    }
-
-    pub fn tecla(self) -> KeyCode {
-        match self {
-            Self::Politico => KeyCode::KeyQ,
-            Self::Populacao => KeyCode::KeyE,
-            Self::PibPerCapita => KeyCode::KeyR,
-            Self::Ideologia => KeyCode::KeyT,
-            Self::Alinhamento => KeyCode::KeyY,
-            Self::PadraoVida => KeyCode::KeyU,
-        }
-    }
-
-    pub fn rotulo_tecla(self) -> &'static str {
-        match self {
-            Self::Politico => "Q",
-            Self::Populacao => "E",
-            Self::PibPerCapita => "R",
-            Self::Ideologia => "T",
-            Self::Alinhamento => "Y",
-            Self::PadraoVida => "U",
-        }
     }
 }
 
@@ -128,11 +106,6 @@ fn teclas_modos(teclas: Res<ButtonInput<KeyCode>>, mut modo: ResMut<ModoTematico
     if teclas.just_pressed(KeyCode::KeyM) {
         let recuar = teclas.pressed(KeyCode::ShiftLeft) || teclas.pressed(KeyCode::ShiftRight);
         *modo = modo.vizinho(recuar);
-    }
-    for m in ModoTematico::TODOS {
-        if teclas.just_pressed(m.tecla()) {
-            *modo = m;
-        }
     }
 }
 
@@ -278,6 +251,7 @@ pub fn barra_extra(
     pol: Option<Res<PoliticaSim>>,
     mut tec: Option<ResMut<TecnologiaSim>>,
     mut diplo: Option<ResMut<PainelDiplomacia>>,
+    mut guerra: Option<ResMut<super::guerra_sim::PainelGuerra>>,
     jogador: Option<Res<PaisJogador>>,
     relogio: Res<RecursoRelogio>,
 ) -> Result {
@@ -310,20 +284,24 @@ pub fn barra_extra(
     egui::Panel::top("barra_modulos").show(&mut raiz, |ui| {
         ui.horizontal_wrapped(|ui| {
             if let Some(d) = diplo.as_mut()
-                && ui.selectable_label(d.aberto, "Diplomacia (F4)").clicked()
+                && ui.selectable_label(d.aberto, "Diplomacia (4)").clicked()
             {
                 d.aberto = !d.aberto;
             }
             if let Some(t) = tec.as_mut()
-                && ui.selectable_label(t.aberto, "Tecnologia (F5)").clicked()
+                && ui.selectable_label(t.aberto, "Tecnologia (5)").clicked()
             {
                 t.aberto = !t.aberto;
             }
-            ui.add_enabled(false, egui::Button::new("Guerra (F6)")).on_disabled_hover_text("A interface de guerra ainda não está integrada.");
+            if let Some(g) = guerra.as_mut()
+                && ui.selectable_label(g.aberto, "Guerra (6)").clicked()
+            {
+                g.aberto = !g.aberto;
+            }
             ui.separator();
             ui.label("Mapa:");
             for m in ModoTematico::TODOS {
-                if ui.selectable_label(*modo == m, format!("{} ({})", m.nome(), m.rotulo_tecla())).clicked() {
+                if ui.selectable_label(*modo == m, m.nome()).clicked() {
                     *modo = m;
                 }
             }

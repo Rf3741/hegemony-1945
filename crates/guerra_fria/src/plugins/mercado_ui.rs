@@ -1,4 +1,4 @@
-//! Tela do Mercado Global e Nacional (F2) no estilo Victoria 3.
+//! Tela do Mercado Global e Nacional (2) no estilo Victoria 3.
 //!
 //! Funcionalidades:
 //! - Tabela de bens com colunas ordenáveis (Nome, Preço Nacional, Preço Mundial, Variação 30d, Oferta, Demanda e Saldo).
@@ -248,7 +248,7 @@ impl Plugin for MercadoUiPlugin {
 }
 
 fn alternar_mercado(teclas: Res<ButtonInput<KeyCode>>, mut p: ResMut<PainelMercado>) {
-    if teclas.just_pressed(KeyCode::F2) {
+    if teclas.just_pressed(KeyCode::Digit2) || teclas.just_pressed(KeyCode::Numpad2) {
         p.aberto = !p.aberto;
     }
 }
@@ -613,7 +613,7 @@ pub fn render_tooltip_diagnostico(ui: &mut egui::Ui, b: &VistaBem) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Tela Principal de Mercado (F2)
+// Tela Principal de Mercado (2)
 // ---------------------------------------------------------------------------------------------
 
 fn tela_mercado(
@@ -629,7 +629,7 @@ fn tela_mercado(
     let mut aberto = true;
     let v = &eco.vista;
 
-    egui::Window::new("🏛 Mercado Global & Nacional (F2)")
+    egui::Window::new("🏛 Mercado Global & Nacional (2)")
         .open(&mut aberto)
         .default_size([1240.0, 700.0])
         .resizable(true)

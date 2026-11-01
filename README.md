@@ -66,17 +66,23 @@ A navegação pelo globo e o gerenciamento do Estado utilizam atalhos ergonômic
 
 | Tecla / Entrada | Ação no Jogo |
 | :---: | :--- |
-| <kbd>F1</kbd> | **Painel Nacional:** Resumo do governo, estabilidade, finanças e perfil demográfico |
-| <kbd>F2</kbd> | **Mercado Interno:** Oferta, demanda, capacidade produtiva e cotação de bens |
-| <kbd>F3</kbd> | **Comércio Internacional:** Rotas de importação, exportação e tarifas aduaneiras |
-| <kbd>F4</kbd> | **Diplomacia:** Relações exteriores, alianças, atritos e esferas de poder |
-| <kbd>F5</kbd> | **Árvore de Tecnologia:** Seleção de projetos de inovação civil, industrial e militar |
+| <kbd>1</kbd> | **Painel Nacional:** Resumo do governo, estabilidade, finanças e perfil demográfico |
+| <kbd>2</kbd> | **Mercado Interno:** Oferta, demanda, capacidade produtiva e cotação de bens |
+| <kbd>3</kbd> | **Comércio Internacional:** Rotas de importação, exportação e tarifas aduaneiras |
+| <kbd>4</kbd> | **Diplomacia:** Relações exteriores, alianças, atritos e esferas de poder |
+| <kbd>5</kbd> | **Árvore de Tecnologia:** Seleção de projetos de inovação civil, industrial e militar |
+| <kbd>6</kbd> | **Guerra:** Frentes, exércitos, pontuação de guerra e paz (também pelo botão Guerra do HUD) |
+| <kbd>7</kbd> | **Estatísticas e Ledger:** Gráficos e indicadores nacionais |
+| <kbd>8</kbd> | **Enciclopédia:** Verbetes, busca e tutorial |
+| <kbd>9</kbd> | **Áudio:** Volumes por canal |
+| <kbd>M</kbd> / <kbd>Shift</kbd>+<kbd>M</kbd> | **Modos de Mapa:** Próximo/anterior (também pelo seletor no HUD) |
+| <kbd>Ctrl</kbd>+<kbd>S</kbd> / <kbd>Ctrl</kbd>+<kbd>L</kbd> | **Salvar / Carregar** rápido |
 | <kbd>B</kbd> | **Menu de Construção:** Abrir/fechar catálogo de infraestrutura e prédios |
 | <kbd>V</kbd> | **Camada Visual:** Alternar visualização de malha urbana e construções (LOD) |
 | <kbd>N</kbd> | **Modo Noturno:** Alternar ciclo dia/noite e iluminação das cidades |
 | <kbd>J</kbd> | **Jornal Histórico:** Consultar manchetes e histórico de telegramas mundiais |
 | <kbd>Espaço</kbd> | **Pausar / Retomar** o fluxo do tempo |
-| <kbd>1</kbd> a <kbd>5</kbd> | **Velocidade:** Ajustar a cadência temporal do jogo (1x até 5x) |
+| <kbd>+</kbd> / <kbd>−</kbd> | **Velocidade:** Aumentar/diminuir a cadência temporal (inclui teclado numérico) |
 | <kbd>Esc</kbd> | **Menu do Jogo:** Pausar e abrir menu de opções do sistema |
 | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> / <kbd>Setas</kbd> | **Mover Câmera:** Deslocar a visão pelo mapa mundial |
 | <kbd>Scroll do Mouse</kbd> | **Zoom:** Aproximar ou afastar a visualização cartográfica |

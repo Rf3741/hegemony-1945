@@ -175,9 +175,9 @@ fn tela_menu_principal(
         }
         TelaMenu::Opcoes => {
             egui::Window::new("Opções").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(&ctx, |ui| {
-                ui.label("Atalhos: F1 país, F2 mercado, F3 comércio, F4 diplomacia, F5 tecnologia, B construção, J jornal.");
-                ui.label("Câmera: WASD/setas, roda do mouse e arrastar. Espaço pausa; 1-5 velocidade.");
-                ui.label("Salvar: F9 (rápido) ou menu de pausa; carregar pelo menu.");
+                ui.label("Atalhos: 1 país, 2 mercado, 3 comércio, 4 diplomacia, 5 tecnologia, 6 guerra, 7 estatísticas, 8 enciclopédia, 9 áudio, B construção, J jornal, M modos de mapa.");
+                ui.label("Câmera: WASD/setas, roda do mouse e arrastar. Espaço pausa; + e − velocidade.");
+                ui.label("Salvar: Ctrl+S (rápido) ou menu de pausa; carregar: Ctrl+L ou pelo menu.");
                 if ui.button("Voltar").clicked() {
                     *tela = TelaMenu::Titulo;
                 }

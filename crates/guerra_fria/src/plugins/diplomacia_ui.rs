@@ -1,4 +1,4 @@
-//! Tela de Diplomacia (F4) e modo de mapa "Esferas": liga o crate puro `sim_diplomacia` ao cliente.
+//! Tela de Diplomacia (4) e modo de mapa "Esferas": liga o crate puro `sim_diplomacia` ao cliente.
 
 use super::economia_sim::{Comando, EconomiaSim};
 use super::economy::RecursoMundo;
@@ -91,7 +91,7 @@ fn tag_diplo_para_legado(t: &str) -> String {
 }
 
 fn alternar(teclas: Res<ButtonInput<KeyCode>>, mut p: ResMut<PainelDiplomacia>) {
-    if teclas.just_pressed(KeyCode::F4) {
+    if teclas.just_pressed(KeyCode::Digit4) || teclas.just_pressed(KeyCode::Numpad4) {
         p.aberto = !p.aberto;
     }
 }
@@ -191,7 +191,7 @@ fn tela_diplomacia(
     let nomes: std::collections::HashMap<String, String> = mundo.0.paises.values().map(|p| (normalizar(&p.tag), p.nome.clone())).collect();
     let nome = |t: &str| nomes.get(t).cloned().unwrap_or_else(|| t.to_string());
 
-    egui::Window::new("Diplomacia (F4)").open(&mut aberto).default_size([900.0, 600.0]).show(ctx, |ui| {
+    egui::Window::new("Diplomacia (4)").open(&mut aberto).default_size([900.0, 600.0]).show(ctx, |ui| {
         ui.horizontal_wrapped(|ui| {
             ui.group(|ui| {
                 ui.label("Tensão mundial:");
@@ -310,7 +310,7 @@ fn tela_diplomacia(
                             ui.label("Pontuação de Guerra:");
                             ui.colored_label(cor_s, format!("{score:+.1}%"));
                         });
-                        if ui.button("Abrir Painel de Guerra e Paz (F6)").clicked() {
+                        if ui.button("Abrir Painel de Guerra e Paz (6)").clicked() {
                             if let Some(ref mut pg) = painel_guerra {
                                 pg.aberto = true;
                                 pg.aba = 0;

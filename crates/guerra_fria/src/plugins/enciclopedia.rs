@@ -2,7 +2,7 @@
 //!
 //! Implementa:
 //! 1. Tooltips aninhados estilo Victoria 3 para métricas e HUD.
-//! 2. Tela Enciclopédia (tecla F9) com verbetes, busca, filtros de categoria e hiperlinks.
+//! 2. Tela Enciclopédia (tecla 8) com verbetes, busca, filtros de categoria e hiperlinks.
 //! 3. Tutorial guiado de 25 passos (tutorial.ron) integrado com janela interativa.
 //! 4. Sistema de modelos de notificação (mensagens.ron) com severidade e interpolação.
 
@@ -251,7 +251,7 @@ pub fn dica_com(r: egui::Response, tooltip_id: &str, detalhe: impl FnOnce(&mut e
             for id in ligados {
                 egui::Frame::group(ui.style()).show(ui, |ui| corpo_conceito(ui, id, if ctrl { 2 } else { 1 }));
             }
-            let dica = if ctrl { "Clique do meio: abrir na enciclopédia (F9)" } else { "Segure Ctrl para expandir | clique do meio: enciclopédia (F9)" };
+            let dica = if ctrl { "Clique do meio: abrir na enciclopédia (8)" } else { "Segure Ctrl para expandir | clique do meio: enciclopédia (8)" };
             ui.label(egui::RichText::new(dica).small().weak());
         }
     })
@@ -278,7 +278,7 @@ pub fn dica_conceito(r: egui::Response, conceito_id: &str) -> egui::Response {
                 });
             }
         }
-        ui.label(egui::RichText::new("Segure Ctrl para expandir | clique do meio: enciclopédia (F9)").small().weak());
+        ui.label(egui::RichText::new("Segure Ctrl para expandir | clique do meio: enciclopédia (8)").small().weak());
     })
 }
 
@@ -345,7 +345,7 @@ impl Plugin for EnciclopediaPlugin {
 }
 
 fn atalho_f9(teclas: Res<ButtonInput<KeyCode>>, mut enc: ResMut<EnciclopediaUi>) {
-    if teclas.just_pressed(KeyCode::F9) {
+    if teclas.just_pressed(KeyCode::Digit8) || teclas.just_pressed(KeyCode::Numpad8) {
         enc.aberta = !enc.aberta;
     }
 }
@@ -362,7 +362,7 @@ fn janela_enciclopedia(mut contextos: EguiContexts, mut enc: ResMut<Enciclopedia
     let mut ir: Option<String> = None;
     let mut voltar = false;
     let e = &mut *enc;
-    egui::Window::new("Enciclopédia (F9)").open(&mut aberta).default_size([920.0, 600.0]).show(contextos.ctx_mut()?, |ui| {
+    egui::Window::new("Enciclopédia (8)").open(&mut aberta).default_size([920.0, 600.0]).show(contextos.ctx_mut()?, |ui| {
         ui.horizontal(|ui| {
             ui.label("Buscar:");
             ui.text_edit_singleline(&mut e.busca);
@@ -468,7 +468,7 @@ fn janela_tutorial(
             return Ok(());
         }
         egui::Window::new("Tutorial do jogo").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).default_width(420.0).show(ctx, |ui| {
-            ui.label("Quer fazer o tutorial completo? São passos curtos sobre mapa, tempo, mercado, orçamento, política e diplomacia. Você pode abri-lo depois pela enciclopédia (F9).");
+            ui.label("Quer fazer o tutorial completo? São passos curtos sobre mapa, tempo, mercado, orçamento, política e diplomacia. Você pode abri-lo depois pela enciclopédia (8).");
             ui.horizontal(|ui| {
                 if ui.button("Fazer tutorial").clicked() {
                     tut.respondeu = true;
@@ -511,7 +511,7 @@ fn janela_tutorial(
             if ui.button("Sair do tutorial").clicked() {
                 novo = None;
             }
-            if ui.button("Enciclopédia (F9)").clicked() {
+            if ui.button("Enciclopédia (8)").clicked() {
                 enc.aberta = true;
             }
         });

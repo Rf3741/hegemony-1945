@@ -1,4 +1,4 @@
-//! Aba POLÍTICA (F1) estilo Victoria 3: GIs, partidos e eleições, leis, legitimidade e movimentos.
+//! Aba POLÍTICA (1) estilo Victoria 3: GIs, partidos e eleições, leis, legitimidade e movimentos.
 use super::politica_sim::{ComandoPol, PoliticaSim};
 use bevy_egui::egui;
 use sim_politica::{FaseLegislativa, HumorGrupoInteresse, PapelGrupoInteresse, PaisPolitica};

@@ -59,7 +59,7 @@ fn barra_superior(
                 }
             }
             ui.separator();
-            if ui.button("Salvar").on_hover_text("Salvamento rápido (F9); carregar com F10").clicked() {
+            if ui.button("Salvar").on_hover_text("Salvamento rápido (Ctrl+S); carregar com Ctrl+L").clicked() {
                 salvar.write(super::saveload::PedirSalvar(super::saveload::Slot::Rapido));
             }
             if !slots.mensagem.is_empty() {
@@ -74,7 +74,7 @@ fn barra_superior(
                 ui.label(texto);
                 ui.separator();
             }
-            ui.label("Espaço: pausa | 1-5: vel | WASD: mover | scroll: zoom | V: construções | F9: enciclopédia");
+            ui.label("Espaço: pausa | +/−: vel | WASD: mover | scroll: zoom | V: construções | M: modos de mapa | 1-9: painéis | Ctrl+S/L: salvar/carregar");
         });
     });
     Ok(())

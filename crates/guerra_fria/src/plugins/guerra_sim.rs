@@ -65,9 +65,9 @@ impl Plugin for GuerraSimPlugin {
     }
 }
 
-/// Tecla F6 para alternar o painel militar.
+/// Tecla 6 para alternar o painel militar.
 fn tecla_atalho_guerra(teclas: Res<ButtonInput<KeyCode>>, mut painel: ResMut<PainelGuerra>) {
-    if teclas.just_pressed(KeyCode::F6) {
+    if teclas.just_pressed(KeyCode::Digit6) || teclas.just_pressed(KeyCode::Numpad6) {
         painel.aberto = !painel.aberto;
     }
 }

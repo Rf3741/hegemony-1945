@@ -1,4 +1,4 @@
-//! Tela de Comércio Internacional (F3): controle de importações e exportações por bem e parceiro,
+//! Tela de Comércio Internacional (3): controle de importações e exportações por bem e parceiro,
 //! configuração de tarifas gerais e por bem, acordos bilaterais de livre comércio e blocos econômicos (URSS/COMECON).
 
 use super::economia_sim::{Comando, EconomiaSim, VistaEconomia};
@@ -65,7 +65,7 @@ impl Plugin for ComercioUiPlugin {
 }
 
 fn alternar_comercio(teclas: Res<ButtonInput<KeyCode>>, mut p: ResMut<PainelComercio>) {
-    if teclas.just_pressed(KeyCode::F3) {
+    if teclas.just_pressed(KeyCode::Digit3) || teclas.just_pressed(KeyCode::Numpad3) {
         p.aberto = !p.aberto;
     }
 }
@@ -86,7 +86,7 @@ fn tela_comercio(
     let r = &v.resumo_comercio;
     let mut comandos = Vec::new();
 
-    egui::Window::new("Comércio Internacional (F3)")
+    egui::Window::new("Comércio Internacional (3)")
         .open(&mut aberto)
         .default_size([960.0, 640.0])
         .show(ctx, |ui| {

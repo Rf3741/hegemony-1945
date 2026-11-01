@@ -1,4 +1,4 @@
-//! Tela de Tecnologia (F5) estilo Victoria 3 + ponte com o motor puro `sim_tecnologia`.
+//! Tela de Tecnologia (5) estilo Victoria 3 + ponte com o motor puro `sim_tecnologia`.
 //!
 //! * Pesquisa diária de todos os países (a IA escolhe por prioridade simples).
 //! * Pontos de pesquisa: níveis de universidade e alfabetização vindos do `MundoEconomico`
@@ -123,7 +123,7 @@ impl Plugin for TecnologiaUiPlugin {
 }
 
 fn alternar_tecnologia(teclas: Res<ButtonInput<KeyCode>>, mut t: ResMut<TecnologiaSim>) {
-    if teclas.just_pressed(KeyCode::F5) {
+    if teclas.just_pressed(KeyCode::Digit5) || teclas.just_pressed(KeyCode::Numpad5) {
         t.aberto = !t.aberto;
     }
 }
@@ -273,7 +273,7 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
     {
         let m = &t.mundo;
         let est = m.paises.get(&tag);
-        egui::Window::new("Tecnologia (F5)").open(&mut aberto).default_size([1180.0, 700.0]).show(ctx, |ui| {
+        egui::Window::new("Tecnologia (5)").open(&mut aberto).default_size([1180.0, 700.0]).show(ctx, |ui| {
             let Some(est) = est else {
                 ui.label("Este país não tem dados de tecnologia.");
                 return;

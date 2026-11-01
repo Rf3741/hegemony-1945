@@ -1,4 +1,4 @@
-//! Camada jogável: país do jogador, HUD, painel do país (F1), ranking e notificações.
+//! Camada jogável: país do jogador, HUD, painel do país (1), ranking e notificações.
 use super::enciclopedia::{dica_com, dica_conceito};
 use super::economia_sim::{Comando, EconomiaSim, VistaBem, VistaEconomia};
 use super::economy::RecursoMundo;
@@ -170,17 +170,17 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
         if ui.add(egui::Button::new(egui::RichText::new("🏗 Construir (B)").strong().size(16.0)).fill(egui::Color32::from_rgb(40, 100, 60))).on_hover_text("Abre a tela de construção").clicked() {
             *construcao_aberta = !*construcao_aberta;
         }
-        if ui.button("País (F1)").clicked() {
+        if ui.button("País (1)").clicked() {
             *painel_aberto = !*painel_aberto;
         }
-        if ui.button("Mercado (F2)").clicked() {
+        if ui.button("Mercado (2)").clicked() {
             *mercado_aberto = !*mercado_aberto;
         }
-        if ui.button("Comércio (F3)").clicked() {
+        if ui.button("Comércio (3)").clicked() {
             *comercio_aberto = !*comercio_aberto;
         }
-        ui.label("Tecnologia (F5)");
-        ui.label("Enciclopédia (F9)");
+        ui.label("Tecnologia (5)");
+        ui.label("Enciclopédia (8)");
     });
 }
 
@@ -202,7 +202,7 @@ pub fn resumo_pais(ui: &mut egui::Ui, p: &EstadoPais) {
 }
 
 fn alternar_painel(teclas: Res<ButtonInput<KeyCode>>, mut painel: ResMut<PainelPais>) {
-    if teclas.just_pressed(KeyCode::F1) {
+    if teclas.just_pressed(KeyCode::Digit1) || teclas.just_pressed(KeyCode::Numpad1) {
         painel.aberto = !painel.aberto;
     }
 }
@@ -289,7 +289,7 @@ fn painel_pais(
     let mut aba = painel.aba;
     let ctx = contextos.ctx_mut()?;
     let (tag_p, nome_p) = pol.as_ref().and_then(|p| p.vista.pais.as_ref().map(|x| (x.tag.clone(), x.nome.clone()))).unwrap_or_default();
-    egui::Window::new("Painel do país (F1)").open(&mut aberto).default_size([720.0, 600.0]).show(ctx, |ui| {
+    egui::Window::new("Painel do país (1)").open(&mut aberto).default_size([720.0, 600.0]).show(ctx, |ui| {
         if !tag_p.is_empty() {
             ui.horizontal(|ui| {
                 let tl = super::politica_sim::tag_legado_pub(&tag_p);

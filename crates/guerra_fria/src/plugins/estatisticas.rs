@@ -1,4 +1,4 @@
-//! Estatísticas e Ledger Nacional (estilo Victoria 3) - Tecla F7
+//! Estatísticas e Ledger Nacional (estilo Victoria 3) - Tecla 7
 //!
 //! - Gráficos históricos com `egui_plot`: PIB, PIB per capita, população, desemprego,
 //!   padrão de vida, dívida, tesouro e produção por bem, comparando múltiplos países.
@@ -218,7 +218,7 @@ pub enum ColunaLedger {
     Divida,
 }
 
-/// Abas principais da interface de Estatísticas e Ledger (F7).
+/// Abas principais da interface de Estatísticas e Ledger (7).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AbaLedger {
     #[default]
@@ -340,7 +340,7 @@ fn alternar_tecla_f7(
     teclas: Res<ButtonInput<KeyCode>>,
     mut ledger: ResMut<RecursoLedger>,
 ) {
-    if teclas.just_pressed(KeyCode::F7) {
+    if teclas.just_pressed(KeyCode::Digit7) || teclas.just_pressed(KeyCode::Numpad7) {
         ledger.aberto = !ledger.aberto;
     }
     if ledger.aberto && teclas.just_pressed(KeyCode::Escape) {
@@ -607,7 +607,7 @@ fn atualizar_rankings_sistema(
 }
 
 // -------------------------------------------------------------------------------------------------
-// Interface Gráfica egui (F7)
+// Interface Gráfica egui (7)
 // -------------------------------------------------------------------------------------------------
 
 fn desenhar_tela_ledger(
@@ -626,7 +626,7 @@ fn desenhar_tela_ledger(
 
     let mut aberto = ledger.aberto;
 
-    egui::Window::new("📊 Estatísticas & Ledger Geral (F7)")
+    egui::Window::new("📊 Estatísticas & Ledger Geral (7)")
         .open(&mut aberto)
         .default_width(1200.0)
         .default_height(720.0)

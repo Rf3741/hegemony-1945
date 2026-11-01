@@ -330,7 +330,7 @@ fn sons_de_ui(
     if !matches!(estado.as_deref().map(|s| *s.get()), Some(AppState::Jogando | AppState::Pausado)) || egui.wants_keyboard_input() {
         return;
     }
-    for tecla in [KeyCode::F1, KeyCode::F2, KeyCode::F3, KeyCode::F4, KeyCode::F5, KeyCode::KeyB, KeyCode::KeyJ] {
+    for tecla in [KeyCode::Digit1, KeyCode::Digit2, KeyCode::Digit3, KeyCode::Digit4, KeyCode::Digit5, KeyCode::KeyB, KeyCode::KeyJ] {
         if teclas.just_pressed(tecla) {
             if let Some(i) = abertos.iter().position(|t| *t == tecla) {
                 abertos.remove(i);
@@ -575,7 +575,7 @@ struct JanelaAudio {
     aberta: bool,
 }
 
-/// Janela "Áudio" (volumes por canal): botão no menu e na pausa; F10 alterna.
+/// Janela "Áudio" (volumes por canal): botão no menu e na pausa; a tecla 9 alterna.
 fn janela_audio(
     mut contextos: EguiContexts,
     teclas: Res<ButtonInput<KeyCode>>,
@@ -583,7 +583,7 @@ fn janela_audio(
     mut janela: ResMut<JanelaAudio>,
     mut vols: ResMut<VolumesAudio>,
 ) -> Result {
-    if teclas.just_pressed(KeyCode::F10) {
+    if teclas.just_pressed(KeyCode::Digit9) || teclas.just_pressed(KeyCode::Numpad9) {
         janela.aberta = !janela.aberta;
     }
     let Some(estado) = estado else { return Ok(()) };
@@ -593,7 +593,7 @@ fn janela_audio(
     let ctx = contextos.ctx_mut()?;
     if !janela.aberta {
         egui::Area::new(egui::Id::new("botao_audio")).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(ctx, |ui| {
-            if ui.button("Áudio (F10)").clicked() {
+            if ui.button("Áudio (9)").clicked() {
                 janela.aberta = true;
             }
         });
