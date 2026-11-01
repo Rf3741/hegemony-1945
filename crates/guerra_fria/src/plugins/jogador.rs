@@ -1,4 +1,5 @@
 //! Camada jogável: país do jogador, HUD, painel do país (F1), ranking e notificações.
+use super::enciclopedia::{dica_com, dica_conceito};
 use super::economia_sim::{Comando, EconomiaSim, VistaBem, VistaEconomia};
 use super::economy::RecursoMundo;
 use super::mercado_ui::Icones;
@@ -129,14 +130,18 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
         match (&eco.vista.pais, eco.vista.pais_id.is_empty()) {
             (Some(pe), false) => {
                 let o = &pe.orcamento;
-                ui.label(format!("Tesouro: {}", fmt_din(o.tesouro)));
-                ui.colored_label(cor_saldo(o.saldo_diario), format!("Saldo/dia: {}", fmt_din(o.saldo_diario)));
-                ui.label(format!("Dívida: {}", fmt_din(o.divida)));
+                dica_com(ui.label(format!("Tesouro: {}", fmt_din(o.tesouro))), "tooltip_topbar_tesouro", |ui| {
+                    ui.label(format!("Tesouro atual: {} | Dívida: {} | Saldo/dia: {}", fmt_din(o.tesouro), fmt_din(o.divida), fmt_din(o.saldo_diario)));
+                });
+                dica_com(ui.colored_label(cor_saldo(o.saldo_diario), format!("Saldo/dia: {}", fmt_din(o.saldo_diario))), "tooltip_topbar_balanco_diario", |ui| {
+                    ui.label(format!("Saldo diário atual: {} (por ano: {})", fmt_din(o.saldo_diario), fmt_din(o.saldo_diario * 365.0)));
+                });
+                dica_conceito(ui.label(format!("Dívida: {}", fmt_din(o.divida))), "divida_publica");
                 ui.separator();
-                ui.label(format!("PIB: {}", fmt_din(eco.vista.pib_anual)));
-                ui.label(format!("Pop.: {}", fmt_pop(eco.vista.populacao as u64)));
-                ui.label(format!("Padrão de vida: {:.1}", eco.vista.padrao_vida));
-                ui.label(format!("Desemprego: {:.1}%", eco.vista.desemprego * 100.0));
+                dica_conceito(ui.label(format!("PIB: {}", fmt_din(eco.vista.pib_anual))), "produtividade_do_trabalho");
+                dica_conceito(ui.label(format!("Pop.: {}", fmt_pop(eco.vista.populacao as u64))), "pop");
+                dica_conceito(ui.label(format!("Padrão de vida: {:.1}", eco.vista.padrao_vida)), "padrao_de_vida");
+                dica_conceito(ui.label(format!("Desemprego: {:.1}%", eco.vista.desemprego * 100.0)), "estrato_social");
                 if o.em_calote {
                     ui.colored_label(egui::Color32::LIGHT_RED, "CALOTE");
                 }
@@ -147,7 +152,9 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
                 ui.label("(economia detalhada indisponível para este país)");
             }
         }
-        ui.label(format!("Legitimidade: {:.0}%", p.politica.legitimidade));
+        dica_com(ui.label(format!("Legitimidade: {:.0}%", p.politica.legitimidade)), "tooltip_topbar_legitimidade", |ui| {
+            ui.label(format!("Legitimidade atual: {:.1}%", p.politica.legitimidade));
+        });
         if eco.atraso_dias() > 10 || eco.dias_perdidos > 0 {
             ui.colored_label(egui::Color32::YELLOW, format!("Economia atrasada {} d", eco.atraso_dias()));
         }
@@ -165,6 +172,7 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
             *comercio_aberto = !*comercio_aberto;
         }
         ui.label("Tecnologia (F5)");
+        ui.label("Enciclopédia (F9)");
     });
 }
 
