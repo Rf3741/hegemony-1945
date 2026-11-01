@@ -44,36 +44,56 @@ fn barra_superior(
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
     egui::Panel::top("barra_superior").show(&mut raiz, |ui| {
         ui.horizontal(|ui| {
-            dica(ui.heading(relogio.data.formatar_pt_br()), "tooltip_topbar_data");
-            ui.separator();
-            let rotulo = if relogio.pausado { "Continuar" } else { "Pausar" };
-            if dica(ui.button(rotulo), "tooltip_topbar_botao_pausar").clicked() {
-                relogio.alternar_pausa();
-            }
-            for v in VelocidadeJogo::TODAS {
-                let ativa = !relogio.pausado && relogio.velocidade == v;
-                let id_dica = format!("tooltip_topbar_velocidade_{}", v.nivel());
-                if dica(ui.selectable_label(ativa, v.nivel().to_string()), &id_dica).clicked() {
-                    relogio.definir_velocidade(v);
-                }
-            }
-            ui.separator();
             if ui.button("Salvar / Carregar").on_hover_text("Abre o menu de jogos salvos (Ctrl+S salva rápido, Ctrl+L carrega)").clicked() {
                 janela_saves.abrir(false);
             }
             ui.separator();
-            if relogio.pausado {
-                ui.label("PAUSADO");
-            }
             if let Some(c) = camada_visivel {
                 let texto = if c.0 { "🏛 Construções: [V] Ativas" } else { "🏛 Construções: [V] Ocultas" };
                 ui.label(texto);
                 ui.separator();
             }
-            ui.label("Espaço: pausa | +/−: vel | WASD: mover | scroll: zoom | V: construções | M: modos de mapa | 1-9: painéis | Ctrl+S/L: salvar/carregar");
+            ui.weak("?").on_hover_text("Espaço: pausa | +/−: velocidade | WASD: mover | scroll: zoom | V: construções | M: modos de mapa | 1-9: painéis | Ctrl+S/L: salvar/carregar");
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| widget_relogio(ui, &mut relogio));
         });
     });
     Ok(())
+}
+
+/// Relógio estilo Victoria 3/HOI4: data, pausa, − / + e barrinhas de velocidade (1–5).
+fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) {
+    // Em layout direita-para-esquerda: o último desenhado fica mais à esquerda.
+    if ui.small_button("+").on_hover_text("Aumentar velocidade (+)").clicked() {
+        let v = relogio.velocidade.aumentar();
+        relogio.definir_velocidade(v);
+    }
+    for v in VelocidadeJogo::TODAS.iter().rev() {
+        let n = v.nivel();
+        let (r, resp) = ui.allocate_exact_size(egui::vec2(8.0, 18.0), egui::Sense::click());
+        let acesa = !relogio.pausado && n <= relogio.velocidade.nivel();
+        let cor = if acesa {
+            egui::Color32::from_rgb(230, 200, 90)
+        } else if resp.hovered() {
+            egui::Color32::from_gray(110)
+        } else {
+            egui::Color32::from_gray(65)
+        };
+        let alto = 6.0 + 3.0 * n as f32;
+        let barra = egui::Rect::from_min_max(egui::pos2(r.left() + 1.0, r.bottom() - alto), egui::pos2(r.right() - 1.0, r.bottom()));
+        ui.painter().rect_filled(barra, 1.0, cor);
+        if resp.on_hover_text(v.rotulo_pt()).clicked() {
+            relogio.definir_velocidade(*v);
+        }
+    }
+    if ui.small_button("-").on_hover_text("Diminuir velocidade (−)").clicked() {
+        let v = relogio.velocidade.diminuir();
+        relogio.definir_velocidade(v);
+    }
+    let rotulo = if relogio.pausado { "Continuar" } else { "Pausar" };
+    if dica(ui.button(rotulo), "tooltip_topbar_botao_pausar").clicked() {
+        relogio.alternar_pausa();
+    }
+    dica(ui.heading(relogio.data.formatar_pt_br()), "tooltip_topbar_data");
 }
 
 fn barra_hud(
