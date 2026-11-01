@@ -52,6 +52,8 @@ pub struct SaidaPol {
     pub mensagens: Vec<String>,
     pub leis_trocadas: Vec<(String, String, String)>,
     pub ms: f64,
+    /// Estado político de todos os países (para as bandeiras dinâmicas).
+    pub bandeiras: Vec<super::bandeiras_ui::EntradaBandeira>,
 }
 
 impl NucleoPol {
@@ -137,6 +139,28 @@ impl NucleoPol {
         (msgs, leis)
     }
 
+    /// Resumo político de cada país para o resolvedor de bandeiras.
+    pub fn entradas_bandeira(&self) -> Vec<super::bandeiras_ui::EntradaBandeira> {
+        let cat = self.mundo.catalogo();
+        self.mundo
+            .paises()
+            .iter()
+            .map(|p| {
+                let venc = p.ultima_eleicao.as_ref().and_then(|e| e.partido_vencedor_id.as_ref()).and_then(|v| p.partidos.get(v));
+                let ideologia_partido = venc.and_then(|v| cat.arquetipos_partido.get(&v.arquetipo_id)).and_then(|a| a.ideologias_afins.first().cloned());
+                super::bandeiras_ui::EntradaBandeira {
+                    tag: tag_legado(&p.tag),
+                    forma_governo: p.leis_ativas.get("forma_governo").cloned().unwrap_or_default(),
+                    religiao_estatal: p.leis_ativas.get("religiao_estatal").cloned().unwrap_or_default(),
+                    ideologia_partido,
+                    ideologia_chefe: p.chefe_de_estado.as_ref().map(|l| l.ideologia_id.clone()),
+                    partido: venc.map(|v| v.arquetipo_id.clone()),
+                    guerra_civil: p.crises_ativas.iter().any(|c| !c.resolvida && c.tipo_crise == TipoCrisePolitica::Revolucao),
+                }
+            })
+            .collect()
+    }
+
     pub fn vista(&self, tag: &str) -> VistaPolitica {
         VistaPolitica { tag: tag.to_string(), data: Some(self.mundo.data_atual()), pais: self.mundo.paises().iter().find(|p| p.tag == tag).cloned() }
     }
@@ -162,12 +186,17 @@ pub fn executar_lote(nucleo: &mut NucleoPol, tag: &str, cmds: Vec<ComandoPol>, d
     saida.mensagens.extend(m);
     saida.leis_trocadas = l;
     saida.vista = nucleo.vista(tag);
+    saida.bandeiras = nucleo.entradas_bandeira();
     saida
 }
 
 /// Tag política (grafia do cenário político/econômico) a partir da tag do legado.
 pub fn tag_politica(legado: &str) -> String {
     ALIAS_TAGS.iter().find(|(l, _)| *l == legado).map_or(legado, |(_, e)| *e).to_string()
+}
+
+pub fn tag_legado_pub(pol: &str) -> String {
+    tag_legado(pol)
 }
 
 fn tag_legado(pol: &str) -> String {
@@ -188,6 +217,9 @@ pub struct PoliticaSim {
     pub mensagens: Vec<String>,
     pub leis_trocadas: Vec<(String, String, String)>,
     pub ms_por_dia: f64,
+    /// Estado político de todos os países no último lote e contador de versão (muda a cada lote).
+    pub bandeiras: Vec<super::bandeiras_ui::EntradaBandeira>,
+    pub versao_bandeiras: u64,
     pv_eco: BTreeMap<String, f64>,
 }
 
@@ -239,6 +271,8 @@ fn aguardar_carga(mut commands: Commands, carga: Option<ResMut<CargaPolitica>>) 
             mensagens: Vec::new(),
             leis_trocadas: Vec::new(),
             ms_por_dia: 0.0,
+            bandeiras: Vec::new(),
+            versao_bandeiras: 0,
             pv_eco: BTreeMap::new(),
         }),
         Err(e) => error!("falha ao carregar a política: {e}"),
@@ -306,6 +340,8 @@ fn recolher(mut pol: ResMut<PoliticaSim>, mut legado: Option<ResMut<RecursoMundo
         pol.tarefa = None;
         pol.nucleo = Some(n);
         pol.vista = s.vista;
+        pol.bandeiras = s.bandeiras;
+        pol.versao_bandeiras += 1;
         pol.mensagens.extend(s.mensagens);
         pol.leis_trocadas.extend(s.leis_trocadas);
         pol.ms_por_dia = if pol.ms_por_dia == 0.0 { s.ms } else { 0.8 * pol.ms_por_dia + 0.2 * s.ms };

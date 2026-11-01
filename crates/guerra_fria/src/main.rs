@@ -75,6 +75,8 @@ fn main() {
         })
         .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, ConstrucaoUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, RotasPontePlugin, VisualConstrucoesPlugin, RotulosPaisPlugin))
         .add_plugins(EventosPlugin)
+        .add_plugins(plugins::formacao_sim::FormacaoSimPlugin)
+        .add_plugins(plugins::bandeiras_ui::BandeirasPlugin)
         .add_plugins(DiplomaciaUiPlugin)
         .add_plugins(TecnologiaUiPlugin)
         .run();
