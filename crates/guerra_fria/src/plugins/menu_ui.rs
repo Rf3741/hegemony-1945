@@ -228,7 +228,10 @@ fn tela_menu_principal(
                 });
             });
             egui::CentralPanel::default().frame(egui::Frame::NONE).show(&mut raiz_ui, |ui| {
-                ui.centered_and_justified(|ui| {
+                // Centralizado sem "justified": o justified esticava a 1ª linha do card até o fim da tela
+                // e empurrava os dados e o botão "Governar" para fora da área visível.
+                ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                    ui.add_space((ui.available_height() * 0.12).max(20.0));
                     if let Some(tag) = escolha.clone()
                         && let Some(p) = mundo.paises.get(&tag)
                     {
