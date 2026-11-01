@@ -3273,6 +3273,7 @@ dependencies = [
  "eventos",
  "gf_mapa",
  "image",
+ "personagens",
  "ron",
  "serde",
  "sim_diplomacia",

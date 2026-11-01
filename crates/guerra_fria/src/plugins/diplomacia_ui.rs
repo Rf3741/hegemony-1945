@@ -161,6 +161,8 @@ fn tela_diplomacia(
     mut mundo: ResMut<RecursoMundo>,
     mut eco: Option<ResMut<EconomiaSim>>,
     jogador: Res<PaisJogador>,
+    elenco: Option<Res<super::personagens_sim::ElencoRes>>,
+    mut retratos: Option<ResMut<super::personagens_ui::Retratos>>,
 ) -> Result {
     if !painel.aberto {
         return Ok(());
@@ -234,6 +236,9 @@ fn tela_diplomacia(
                 let alvo = painel.alvo.clone();
                 let r = d.0.relacao(&eu, &alvo);
                 ui.heading(nome(&alvo));
+                if let (Some(el), Some(r)) = (elenco.as_deref(), retratos.as_deref_mut()) {
+                    super::personagens_ui::retrato_chefe(ui, el, r, &alvo, 72.0);
+                }
                 ui.label(format!("Relação: {r:+.0} ({})", Diplomacia::nivel_relacao(r)));
                 let e = d.0.esfera(&alvo);
                 let (iu, is) = d.0.influencia(&alvo);
