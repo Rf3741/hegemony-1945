@@ -1,0 +1,8 @@
+// Transições históricas de poder (data, país, papel, personagem que assume).
+// papel: "estado", "governo" ou "ambos".
+[
+    (data: "1945-07-26", pais: "GBR", papel: "governo", id: "clement_attlee"),
+    (data: "1946-01-31", pais: "BRA", papel: "ambos", id: "eurico_gaspar_dutra"),
+    (data: "1951-01-31", pais: "BRA", papel: "ambos", id: "getulio_vargas"),
+    (data: "1946-05-22", pais: "JAP", papel: "governo", id: "shigeru_yoshida"),
+]

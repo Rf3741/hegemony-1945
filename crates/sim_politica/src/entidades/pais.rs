@@ -39,6 +39,9 @@ pub struct PaisPolitica {
     pub pops: Vec<PopPolitica>,
     /// Chefe de Estado em exercício (Presidente, Monarca ou Secretário-Geral).
     pub chefe_de_estado: Option<LiderPolitico>,
+    /// Chefe de Governo em exercício (Primeiro-Ministro, Chanceler, Premier ou Vice-Presidente).
+    #[serde(default)]
+    pub chefe_de_governo: Option<LiderPolitico>,
     /// ID do Grupo de Interesse ao qual o Chefe de Estado pertence ou é filiado.
     pub gi_chefe_estado: Option<String>,
     /// Pontuação de legitimidade do gabinete governamental (0.0 a 100.0).
@@ -112,6 +115,7 @@ impl PaisPolitica {
             culturas_primarias: Vec::new(),
             pops: Vec::new(),
             chefe_de_estado: None,
+            chefe_de_governo: None,
             gi_chefe_estado: None,
             legitimidade: 65.0,
             faixa_legitimidade: FaixaLegitimidade::Aceitavel,
