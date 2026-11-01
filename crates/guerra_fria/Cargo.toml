@@ -10,6 +10,7 @@ bevy = { workspace = true, features = ["wav"] }
 bevy_egui.workspace = true
 image.workspace = true
 ron.workspace = true
+flate2.workspace = true
 serde.workspace = true
 simulacao.workspace = true
 gf_mapa.workspace = true

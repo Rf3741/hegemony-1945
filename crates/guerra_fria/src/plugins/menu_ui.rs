@@ -132,14 +132,18 @@ fn tela_menu_principal(
     mut busca: Local<String>,
     mut escolha: Local<Option<String>>,
     mut sair: MessageWriter<AppExit>,
+    mut carregar: MessageWriter<super::saveload::PedirCarregar>,
+    slots: Res<super::saveload::Slots>,
+    mut menu_slots: Local<bool>,
 ) -> Result {
     let ctx = contextos.ctx_mut()?.clone();
     // Cliques no mapa escolhem o país, mas o fundo só aparece em Titulo/Paises/Opcoes.
     desenhar_fundo(&ctx, &mut fundo.0, &raiz.0);
     let mut iniciar: Option<String> = None;
+    let mut raiz_ui = super::ui::ui_raiz(&ctx);
     match *tela {
         TelaMenu::Titulo => {
-            egui::CentralPanel::default().frame(egui::Frame::NONE).show(&ctx, |ui| {
+            egui::CentralPanel::default().frame(egui::Frame::NONE).show(&mut raiz_ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(ui.available_height() * 0.18);
                     ui.label(egui::RichText::new("HEGEMONY: 1945").size(64.0).strong().color(egui::Color32::from_rgb(0xE8, 0xDE, 0xC8)));
@@ -150,12 +154,21 @@ fn tela_menu_principal(
                         *tela = TelaMenu::Paises;
                     }
                     if ui.add_sized(tam, egui::Button::new(egui::RichText::new("Carregar").size(22.0))).clicked() {
+                        *menu_slots = !*menu_slots;
                     }
                     if ui.add_sized(tam, egui::Button::new(egui::RichText::new("Opções").size(22.0))).clicked() {
                         *tela = TelaMenu::Opcoes;
                     }
                     if ui.add_sized(tam, egui::Button::new(egui::RichText::new("Sair").size(22.0))).clicked() {
                         sair.write(AppExit::Success);
+                    }
+                    if *menu_slots {
+                        ui.add_space(16.0);
+                        egui::Frame::NONE.fill(egui::Color32::from_black_alpha(170)).inner_margin(10.0).show(ui, |ui| {
+                            super::saveload::lista_slots(ui, &slots, |s| {
+                                carregar.write(super::saveload::PedirCarregar(s));
+                            }, None);
+                        });
                     }
                 });
             });
@@ -180,7 +193,7 @@ fn tela_menu_principal(
             {
                 *escolha = Some(tag);
             }
-            egui::Panel::left("lista_paises").exact_size(300.0).show(&ctx, |ui| {
+            egui::Panel::left("lista_paises").exact_size(300.0).show(&mut raiz_ui, |ui| {
                 ui.heading("Escolha sua nação");
                 if ui.button("< Voltar").clicked() {
                     *tela = TelaMenu::Titulo;
@@ -214,7 +227,7 @@ fn tela_menu_principal(
                     }
                 });
             });
-            egui::CentralPanel::default().frame(egui::Frame::NONE).show(&ctx, |ui| {
+            egui::CentralPanel::default().frame(egui::Frame::NONE).show(&mut raiz_ui, |ui| {
                 ui.centered_and_justified(|ui| {
                     if let Some(tag) = escolha.clone()
                         && let Some(p) = mundo.paises.get(&tag)

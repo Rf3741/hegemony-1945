@@ -48,7 +48,7 @@ pub use motor::governo::{
     estado_comporta_novo_nivel, estado_niveis_recurso, materiais_por_ponto,
     provincia_comporta_novo_nivel,
 };
-pub use motor::{MundoEconomico, RelatorioTick, TemposFasesTick};
+pub use motor::{EstadoEconomiaSalvo, MundoEconomico, RelatorioTick, TemposFasesTick};
 pub use tipos::{
     CategoriaBem, CategoriaNecessidade, CategoriaPredio, DataJogo, Estrato, FormulaPreco,
     GrupoLeiEconomica, ModoCadencia, NUM_NECESSIDADES, RegimePropriedade, SlotMetodo,

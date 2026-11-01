@@ -7,7 +7,7 @@ use crate::motor::mercado::calcular_preco_alvo;
 use std::collections::VecDeque;
 
 /// Parâmetros do mercado global.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ConfigMercadoGlobal {
     /// Fração diária da diferença (preço mundial - preço nacional) absorvida por arbitragem, com abertura 1.0.
     pub forca_arbitragem: f64,
@@ -24,7 +24,7 @@ impl Default for ConfigMercadoGlobal {
 }
 
 /// Estado do mercado global (vetores indexados pela ordem de `catalogo().bens`).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MercadoGlobal {
     pub config: ConfigMercadoGlobal,
     pub preco_mundial: Vec<f64>,

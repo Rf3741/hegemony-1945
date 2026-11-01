@@ -10,7 +10,7 @@ use super::time::RecursoRelogio;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 
-fn ui_raiz(ctx: &egui::Context) -> egui::Ui {
+pub(crate) fn ui_raiz(ctx: &egui::Context) -> egui::Ui {
     egui::Ui::new(
         ctx.clone(),
         "viewport_raiz".into(),
@@ -27,7 +27,7 @@ impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             EguiPrimaryContextPass,
-            (barra_superior, barra_hud, painel_provincia)
+            (barra_superior, barra_hud, super::hud_mapas::barra_extra, painel_provincia)
                 .chain()
                 .run_if(crate::estado::em_partida),
         );
@@ -38,6 +38,8 @@ fn barra_superior(
     mut contextos: EguiContexts,
     mut relogio: ResMut<RecursoRelogio>,
     camada_visivel: Option<Res<visual_mapa::CamadaConstrucoesVisivel>>,
+    mut salvar: MessageWriter<super::saveload::PedirSalvar>,
+    slots: Res<super::saveload::Slots>,
 ) -> Result {
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
     egui::Panel::top("barra_superior").show(&mut raiz, |ui| {
@@ -53,6 +55,13 @@ fn barra_superior(
                 if ui.selectable_label(ativa, v.nivel().to_string()).clicked() {
                     relogio.definir_velocidade(v);
                 }
+            }
+            ui.separator();
+            if ui.button("Salvar").on_hover_text("Salvamento rápido (F9); carregar com F10").clicked() {
+                salvar.write(super::saveload::PedirSalvar(super::saveload::Slot::Rapido));
+            }
+            if !slots.mensagem.is_empty() {
+                ui.label(&slots.mensagem);
             }
             ui.separator();
             if relogio.pausado {

@@ -646,7 +646,12 @@ fn repintar_mapa(
     catalogo: Res<RecursoCatalogo>,
     mut imagens: ResMut<Assets<Image>>,
     mut ultimo: Local<Option<(ModoMapa, usize, u64, String)>>,
+    tematico: Option<Res<super::hud_mapas::ModoTematico>>,
 ) {
+    // Um modo temático (população, PIB...) ativo é dono da textura do mapa.
+    if tematico.is_some_and(|t| *t != super::hud_mapas::ModoTematico::Politico) {
+        return;
+    }
     let (Some(cores), Some(dados), Some(imagem)) = (cores, dados, imagem) else { return };
     let chave = (c.modo_mapa, c.tipo_idx, eco.versao_construcao, eco.vista.pais_id.clone());
     if ultimo.as_ref() == Some(&chave) || eco.vista.catalogo.is_none() {

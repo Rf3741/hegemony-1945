@@ -18,3 +18,5 @@ pub mod ui;
 pub mod visual_construcoes;
 pub mod tecnologia_ui;
 pub mod menu_ui;
+pub mod saveload;
+pub mod hud_mapas;

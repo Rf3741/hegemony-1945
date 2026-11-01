@@ -3271,6 +3271,7 @@ dependencies = [
  "bevy_egui",
  "egui_plot",
  "eventos",
+ "flate2",
  "gf_mapa",
  "image",
  "ron",

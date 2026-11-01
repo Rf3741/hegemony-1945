@@ -4,7 +4,7 @@
 //! custo efetivo (antecedencia historica e difusao), desbloqueio de predios/metodos, era visual e IA.
 //! Formulas em `TECNOLOGIA.md`.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::Arc;
@@ -235,7 +235,7 @@ pub struct ConfigBlocos {
 }
 
 /// Estado de pesquisa de um pais.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EstadoPais {
     pub conhecidas: BTreeSet<String>,
     pub ativa: Option<String>,
@@ -495,5 +495,17 @@ impl MundoTec {
             }
         }
         cont.into_iter().filter(|(_, n)| *n >= 3).map(|(e, _)| e).max().unwrap_or(1945)
+    }
+}
+
+impl MundoTec {
+    /// Estado dinâmico (pesquisas por país) para salvar.
+    pub fn salvar_estado(&self) -> BTreeMap<String, EstadoPais> {
+        self.paises.clone()
+    }
+
+    pub fn restaurar_estado(&mut self, paises: BTreeMap<String, EstadoPais>) {
+        self.paises = paises;
+        self.recontar();
     }
 }

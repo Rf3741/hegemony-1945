@@ -191,7 +191,30 @@ pub struct PoliticaSim {
     pv_eco: BTreeMap<String, f64>,
 }
 
+/// Estado político salvo: mundo + referências de padrão de vida.
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct PoliticaSalva {
+    pub mundo: sim_politica::EstadoPoliticoSalvo,
+    pub base_eco: BTreeMap<String, f64>,
+    pub base_pops: BTreeMap<String, Vec<f64>>,
+}
+
 impl PoliticaSim {
+    pub fn estado_salvo(&self) -> Option<PoliticaSalva> {
+        let n = self.nucleo.as_ref()?;
+        Some(PoliticaSalva { mundo: n.mundo.salvar_estado(), base_eco: n.base_eco.clone(), base_pops: n.base_pops.clone() })
+    }
+
+    pub fn restaurar_estado(&mut self, s: PoliticaSalva) -> Result<(), String> {
+        let n = self.nucleo.as_mut().ok_or("política ocupada")?;
+        n.mundo.restaurar_estado(s.mundo);
+        n.base_eco = s.base_eco;
+        n.base_pops = s.base_pops;
+        self.vista = VistaPolitica::default();
+        self.pendentes = 0;
+        Ok(())
+    }
+
     pub fn enviar(&mut self, c: ComandoPol) {
         self.comandos.push(c);
     }

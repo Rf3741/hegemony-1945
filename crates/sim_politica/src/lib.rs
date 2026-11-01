@@ -43,7 +43,7 @@ pub use entidades::{
     PopPolitica, RegistroInfluenciaExterna, ResultadoEleicao, SinalGuerraCivil, TramitacaoLei,
 };
 pub use erro::{ErroPolitica, ResultadoPolitica, validar_id_snake_case};
-pub use motor::{MundoPolitico, RelatorioTickPolitico};
+pub use motor::{EstadoPoliticoSalvo, MundoPolitico, RelatorioTickPolitico};
 pub use rng::RngDeterministico;
 pub use tipos::{
     AlinhamentoBloco, DataJogo, Estrato, FaixaLegitimidade, FaseLegislativa, HumorGrupoInteresse,

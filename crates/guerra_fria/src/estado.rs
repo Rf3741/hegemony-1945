@@ -49,10 +49,30 @@ fn tecla_esc(teclas: Res<ButtonInput<KeyCode>>, atual: Res<State<AppState>>, mut
     }
 }
 
-fn tela_pausa(mut contextos: EguiContexts, mut prox: ResMut<NextState<AppState>>) -> Result {
+fn tela_pausa(
+    mut contextos: EguiContexts,
+    mut prox: ResMut<NextState<AppState>>,
+    slots: Res<crate::plugins::saveload::Slots>,
+    mut salvar: MessageWriter<crate::plugins::saveload::PedirSalvar>,
+    mut carregar: MessageWriter<crate::plugins::saveload::PedirCarregar>,
+    mut menu: ResMut<crate::plugins::menu_ui::TelaMenu>,
+) -> Result {
     egui::Window::new("Pausado").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(contextos.ctx_mut()?, |ui| {
         if ui.button("Continuar (Esc)").clicked() {
             prox.set(AppState::Jogando);
+        }
+        ui.separator();
+        ui.strong("Salvar / Carregar");
+        let mut s = |slot| {
+            salvar.write(crate::plugins::saveload::PedirSalvar(slot));
+        };
+        crate::plugins::saveload::lista_slots(ui, &slots, |slot| {
+            carregar.write(crate::plugins::saveload::PedirCarregar(slot));
+        }, Some(&mut s));
+        ui.separator();
+        if ui.button("Sair para o menu principal").clicked() {
+            *menu = crate::plugins::menu_ui::TelaMenu::Titulo;
+            prox.set(AppState::Menu);
         }
     });
     Ok(())
