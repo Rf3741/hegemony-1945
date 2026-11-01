@@ -72,9 +72,10 @@ A navegação pelo globo e o gerenciamento do Estado utilizam atalhos ergonômic
 | <kbd>4</kbd> | **Diplomacia:** Relações exteriores, alianças, atritos e esferas de poder |
 | <kbd>5</kbd> | **Árvore de Tecnologia:** Seleção de projetos de inovação civil, industrial e militar |
 | <kbd>6</kbd> | **Guerra:** Frentes, exércitos, pontuação de guerra e paz (também pelo botão Guerra do HUD) |
-| <kbd>7</kbd> | **Estatísticas e Ledger:** Gráficos e indicadores nacionais |
+| <kbd>7</kbd> | **Rankings e Estatísticas:** Rankings entre países, gráficos e indicadores nacionais |
 | <kbd>8</kbd> | **Enciclopédia:** Verbetes, busca e tutorial |
 | <kbd>9</kbd> | **Áudio:** Volumes por canal |
+| <kbd>F11</kbd> / <kbd>Alt</kbd>+<kbd>Enter</kbd> | **Tela Cheia:** Alternar janela/tela cheia (também em Configurações) |
 | <kbd>M</kbd> / <kbd>Shift</kbd>+<kbd>M</kbd> | **Modos de Mapa:** Próximo/anterior (também pelo seletor no HUD) |
 | <kbd>Ctrl</kbd>+<kbd>S</kbd> / <kbd>Ctrl</kbd>+<kbd>L</kbd> | **Salvar / Carregar** rápido |
 | <kbd>B</kbd> | **Menu de Construção:** Abrir/fechar catálogo de infraestrutura e prédios |
@@ -83,7 +84,7 @@ A navegação pelo globo e o gerenciamento do Estado utilizam atalhos ergonômic
 | <kbd>J</kbd> | **Jornal Histórico:** Consultar manchetes e histórico de telegramas mundiais |
 | <kbd>Espaço</kbd> | **Pausar / Retomar** o fluxo do tempo |
 | <kbd>+</kbd> / <kbd>−</kbd> | **Velocidade:** Aumentar/diminuir a cadência temporal (inclui teclado numérico) |
-| <kbd>Esc</kbd> | **Menu do Jogo:** Pausar e abrir menu de opções do sistema |
+| <kbd>Esc</kbd> | **Menu de Pausa:** Retomar, salvar/carregar, Configurações e sair (o menu principal tem Novo jogo, Tutorial, Carregar, Opções e Sair) |
 | <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> / <kbd>Setas</kbd> | **Mover Câmera:** Deslocar a visão pelo mapa mundial |
 | <kbd>Scroll do Mouse</kbd> | **Zoom:** Aproximar ou afastar a visualização cartográfica |
 | **Arrastar (Botão Esquerdo)** | **Navegar:** Mover a visão do mapa arrastando livremente |

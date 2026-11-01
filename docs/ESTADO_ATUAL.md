@@ -11,13 +11,15 @@ Rust + Bevy 0.20, jogo de grande estratégia estilo Victoria 3, começando em 19
 - Tempo: pausa e velocidades; rótulos de países; áudio.
 
 ## Teclas
-- 1: país · 2: mercado · 3: comércio · 4: diplomacia · 5: tecnologia · 6: guerra · 7: estatísticas · 8: enciclopédia · 9: áudio (linha de cima e teclado numérico; sem F1–F10)
+- 1: país · 2: mercado · 3: comércio · 4: diplomacia · 5: tecnologia · 6: guerra · 7: rankings/estatísticas · 8: enciclopédia · 9: áudio (linha de cima e teclado numérico; sem F1–F10)
 - M / Shift+M: modos de mapa (também pelo seletor); Ctrl+S / Ctrl+L: salvar/carregar rápido
+- F11 / Alt+Enter: tela cheia (também em Configurações)
+- Menu principal: Novo jogo, Tutorial (partida guiada com os EUA; dica "faça o Tutorial" controlada por mostrar_tutorial), Carregar, Opções, Sair
 - B: abre/fecha construção
 - V: alterna a camada visual de construções/cidades (LOD)
 - N: alterna dia/noite (luzes das cidades)
 - J: jornal de eventos
-- Espaço: pausa; + / −: velocidade do tempo; Esc: menu/pausa
+- Espaço: pausa; + / −: velocidade do tempo; Esc: menu de pausa (configurações, salvar/carregar)
 - Câmera: WASD/setas, roda do mouse (zoom), arrastar com botão esquerdo; clique seleciona província
 
 ## Ficou de fora / falta
