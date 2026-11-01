@@ -17,7 +17,6 @@ pub mod time;
 pub mod ui;
 pub mod visual_construcoes;
 pub mod tecnologia_ui;
-<<<<<<< HEAD
 pub mod estatisticas;
 pub mod enciclopedia;
 pub mod personagens_sim;
@@ -26,7 +25,5 @@ pub mod guerra_dados;
 pub mod guerra_sim;
 pub mod guerra_ui;
 pub mod guerra_ia;
-=======
 pub mod formacao_sim;
 pub mod bandeiras_ui;
->>>>>>> a-descol
