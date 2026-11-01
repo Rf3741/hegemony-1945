@@ -372,6 +372,10 @@ fn sons_de_eventos(
 ) {
     if let Some(mut n) = notas {
         for texto in n.drenar_novas() {
+            // Sem som para "obra concluída" (pedido do usuário).
+            if evento_da_notificacao(&texto) == "economia.construcao_finalizada" {
+                continue;
+            }
             saida.write(SomTocar::novo(evento_da_notificacao(&texto)));
         }
     }
