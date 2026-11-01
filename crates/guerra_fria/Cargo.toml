@@ -22,3 +22,4 @@ egui_plot.workspace = true
 sim_politica.workspace = true
 sim_tecnologia.workspace = true
 personagens.workspace = true
+sim_guerra.workspace = true

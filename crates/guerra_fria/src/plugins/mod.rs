@@ -21,3 +21,7 @@ pub mod estatisticas;
 pub mod enciclopedia;
 pub mod personagens_sim;
 pub mod personagens_ui;
+pub mod guerra_dados;
+pub mod guerra_sim;
+pub mod guerra_ui;
+pub mod guerra_ia;

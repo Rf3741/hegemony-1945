@@ -9,7 +9,7 @@ pub mod suprimento;
 
 use crate::catalogo::CatalogoGuerra;
 use crate::cenario::CenarioGuerra;
-use crate::entidades::{Divisao, Exercito, Guerra, PaisMilitar, RegiaoMapa};
+use crate::entidades::{Divisao, Exercito, Frente, Guerra, PaisMilitar, RegiaoMapa};
 use crate::erro::{ErroGuerra, ResultadoGuerra, validar_id_snake_case, validar_tag_pais};
 use crate::grafo::GrafoCompilado;
 use crate::rng::RngDeterministico;
@@ -44,6 +44,7 @@ pub struct MundoGuerra {
     pub custos_terreno_por_regiao: Vec<f64>,
     pub buffers_suprimento: BuffersSuprimento,
     pub proximo_frente_id: u32,
+    pub frentes_ativas: Vec<Frente>,
     pub historico_tratados: Vec<TratadoPazAssinado>,
 }
 
@@ -112,6 +113,7 @@ impl MundoGuerra {
             custos_terreno_por_regiao,
             buffers_suprimento,
             proximo_frente_id,
+            frentes_ativas: Vec::new(),
             historico_tratados: Vec::new(),
         })
     }
@@ -135,12 +137,12 @@ impl MundoGuerra {
         );
 
         // 3. Atualiza frentes operacionais ativas na fronteira entre beligerantes
-        let mut frentes = Vec::new();
+        self.frentes_ativas.clear();
         frentes::atualizar_frentes_mundo(
             &self.cenario.regioes,
             &self.grafo,
             &self.cenario.guerras,
-            &mut frentes,
+            &mut self.frentes_ativas,
             &mut self.cenario.exercitos,
             &mut self.cenario.divisoes,
             &self.mapa_regioes,
@@ -156,7 +158,7 @@ impl MundoGuerra {
             &self.cenario.comandantes,
             &mut self.cenario.divisoes,
             &self.cenario.exercitos,
-            &frentes,
+            &self.frentes_ativas,
             &mut self.cenario.guerras,
             &self.cenario.config,
             &mut self.rng,
@@ -210,7 +212,7 @@ impl MundoGuerra {
             &mut self.cenario.guerras,
             &mut self.cenario.paises,
             &mut self.cenario.regioes,
-            &mut frentes,
+            &mut self.frentes_ativas,
             &self.cenario.config,
             data,
             &self.mapa_regioes,
@@ -228,7 +230,7 @@ impl MundoGuerra {
         }
 
         let guerras_ativas = self.cenario.guerras.iter().filter(|g| g.ativa).count();
-        let frentes_ativas = frentes.iter().filter(|f| f.ativa).count();
+        let frentes_ativas = self.frentes_ativas.iter().filter(|f| f.ativa).count();
 
         RelatorioTickGuerra {
             data,
@@ -360,6 +362,14 @@ impl MundoGuerra {
 
     pub fn exercitos(&self) -> &[Exercito] {
         &self.cenario.exercitos
+    }
+
+    pub fn frentes(&self) -> &[Frente] {
+        &self.frentes_ativas
+    }
+
+    pub fn exercitos_mut(&mut self) -> &mut [Exercito] {
+        &mut self.cenario.exercitos
     }
 
     pub fn catalogo(&self) -> &CatalogoGuerra {

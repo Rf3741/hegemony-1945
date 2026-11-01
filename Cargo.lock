@@ -3301,6 +3301,7 @@ dependencies = [
  "serde",
  "sim_diplomacia",
  "sim_economia",
+ "sim_guerra",
  "sim_politica",
  "sim_tecnologia",
  "simulacao",

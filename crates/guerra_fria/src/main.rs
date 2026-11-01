@@ -26,6 +26,9 @@ use plugins::{
     estatisticas::EstatisticasPlugin,
     enciclopedia::EnciclopediaPlugin,
     personagens_sim::PersonagensPlugin,
+    guerra_sim::GuerraSimPlugin,
+    guerra_ui::GuerraUiPlugin,
+    guerra_ia::GuerraIaPlugin,
 };
 use simulacao::mundo::MundoJogo;
 use std::path::PathBuf;
@@ -83,5 +86,6 @@ fn main() {
         .add_plugins(EstatisticasPlugin)
         .add_plugins(EnciclopediaPlugin)
         .add_plugins(PersonagensPlugin)
+        .add_plugins((GuerraSimPlugin, GuerraUiPlugin, GuerraIaPlugin))
         .run();
 }

@@ -35,6 +35,8 @@ pub struct CoresMapa {
     pub dono_prov: Vec<u32>,
     /// Índice do ESTADO (região admin-1 pai) por id de província (0 = nenhum).
     pub estado_prov: Vec<u32>,
+    /// Cor do ocupante se a província estiver sob controle militar de outra nação (None = soberana).
+    pub ocupante_cor: Vec<Option<[u8; 4]>>,
 }
 
 /// Imagem (textura) do mapa exibida.
@@ -163,6 +165,19 @@ pub fn colorir(
     dono_prov: &[u32],
     estado_prov: &[u32],
 ) -> (Vec<u8>, Vec<Option<[u32; 4]>>) {
+    colorir_com_hachura(ids, w, h, cor_prov, dono_prov, estado_prov, None)
+}
+
+/// Colore o mapa com suporte a hachura listrada para províncias ocupadas por forças inimigas.
+pub fn colorir_com_hachura(
+    ids: &[u32],
+    w: u32,
+    h: u32,
+    cor_prov: &[[u8; 4]],
+    dono_prov: &[u32],
+    estado_prov: &[u32],
+    ocupante_cor: Option<&[Option<[u8; 4]>]>,
+) -> (Vec<u8>, Vec<Option<[u32; 4]>>) {
     let (wu, hu) = (w as usize, h as usize);
     let dono = |id: u32| dono_prov.get(id as usize).copied().unwrap_or(0);
     let relevo = RELEVO.get().and_then(|r| r.as_deref()).filter(|v| v.len() == wu * hu);
@@ -176,6 +191,14 @@ pub fn colorir(
             let id = ids[i];
             let mut c = if id == 0 { COR_OCEANO_FUNDO } else { cor_prov.get(id as usize).copied().unwrap_or(COR_OCEANO_RGBA) };
             if id != 0 {
+                if let Some(ocupados) = ocupante_cor {
+                    if let Some(Some(cor_ocup)) = ocupados.get(id as usize) {
+                        // Hachura diagonal estilo Victoria 3: faixas de 4px na cor do ocupante militar
+                        if (x + y) % 8 < 4 {
+                            c = *cor_ocup;
+                        }
+                    }
+                }
                 if let Some(r) = relevo {
                     // 60% cor do país + 40% cor do país modulada pelo relevo sombreado.
                     let k = (((r[i] as f32 - 185.0) / 45.0) + 1.0).clamp(0.3, 1.6);
@@ -316,7 +339,8 @@ fn iniciar_carga(mut commands: Commands, raiz: Res<RaizProjeto>, catalogo: Res<R
             dono_prov[prov.id as usize] = *indices.entry(tag.as_str()).or_insert(n);
         }
     }
-    commands.insert_resource(CoresMapa { cor_prov: cor_prov.clone(), dono_prov: dono_prov.clone(), estado_prov: estado_prov.clone() });
+    let ocupante_cor = vec![None; max_id];
+    commands.insert_resource(CoresMapa { cor_prov: cor_prov.clone(), dono_prov: dono_prov.clone(), estado_prov: estado_prov.clone(), ocupante_cor });
     let entrada = EntradaMapa { caminho_png: raiz.0.join("assets/map/provinces.png"), cor_prov, dono_prov, estado_prov };
     let tarefa = AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move { gerar_mapa(&entrada) });
     commands.insert_resource(TarefaMapa(tarefa));
