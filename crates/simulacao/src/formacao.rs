@@ -94,7 +94,16 @@ pub fn parse_data(s: &str) -> Option<DataSimulacao> {
 }
 
 /// Países que dividem o mesmo prefixo adm1 com outro: separa pelo centroide `(lon, lat)`.
-fn pertence_ao_lado(tag: &str, c: (f32, f32)) -> bool {
+/// `controlador` é o ocupante atual da província: a RFA nasce das zonas ocidentais (USA, GBR, FRA)
+/// e a RDA da zona soviética; sem zona de ocupação vale o corte geográfico.
+fn pertence_ao_lado(tag: &str, c: (f32, f32), controlador: Option<&str>) -> bool {
+    match (tag, controlador) {
+        ("GDR", Some("SOV")) => return true,
+        ("GDR", Some("USA" | "GBR" | "FRA")) => return false,
+        ("FRG", Some("SOV")) => return false,
+        ("FRG", Some("USA" | "GBR" | "FRA")) => return true,
+        _ => {}
+    }
     match tag {
         "VDR" => c.1 >= 17.0,
         "RVN" => c.1 < 17.0,
@@ -250,7 +259,12 @@ impl Formacoes {
                 **dono != f.tag
                     && b.origem_tags.contains(dono)
                     && self.indice.get(id).is_some_and(|(pref, c)| {
-                        b.prefixos_adm1.contains(pref) && pertence_ao_lado(&f.tag, *c)
+                        b.prefixos_adm1.contains(pref)
+                            && pertence_ao_lado(
+                                &f.tag,
+                                *c,
+                                mundo.controlador_por_provincia.get(id).map(String::as_str),
+                            )
                     })
             })
             .map(|(id, _)| *id)
@@ -437,6 +451,42 @@ mod testes {
         .expect("cenario");
         let f = Formacoes::carregar(r.join("data/formaveis"), &cat).expect("formaveis");
         (cat, mundo, f)
+    }
+
+    #[test]
+    fn alemanha_ocupada_em_zonas_e_vira_rfa_rda() {
+        let (cat, mut mundo, mut f) = carregar();
+        // 1945: dono GER, controlador = ocupante da zona.
+        let zona = |mundo: &MundoJogo, adm1: &str| -> Vec<String> {
+            cat.provincias
+                .iter()
+                .filter(|p| p.adm1_code == adm1)
+                .map(|p| mundo.controlador_por_provincia[&p.id].clone())
+                .collect()
+        };
+        assert!(zona(&mundo, "DEU-1591").iter().all(|c| c == "USA")); // Baviera
+        assert!(zona(&mundo, "DEU-1576").iter().all(|c| c == "GBR")); // Baixa Saxônia
+        assert!(zona(&mundo, "DEU-1580").iter().all(|c| c == "FRA")); // Renânia-Palatinado
+        assert!(zona(&mundo, "DEU-1601").iter().all(|c| c == "SOV")); // Saxônia
+        assert!(zona(&mundo, "DEU-1599").iter().all(|c| c == "SOV")); // Berlim
+        let ger: Vec<u32> = mundo
+            .dono_por_provincia
+            .iter()
+            .filter(|(_, d)| *d == "GER")
+            .map(|(i, _)| *i)
+            .collect();
+        assert!(!ger.is_empty());
+        assert!(ger.iter().all(|i| mundo.controlador_por_provincia[i] != "GER"));
+        let sov: Vec<u32> =
+            ger.iter().copied().filter(|i| mundo.controlador_por_provincia[i] == "SOV").collect();
+        // 1949: ocidentais -> RFA, soviética -> RDA.
+        mundo.data = DataSimulacao::nova(1949, 12, 31);
+        f.processar(&mut mundo);
+        for id in &ger {
+            let esperado = if sov.contains(id) { "GDR" } else { "FRG" };
+            assert_eq!(mundo.dono_por_provincia[id], esperado, "prov {id}");
+        }
+        assert!(sov.len() >= 5 && sov.len() < ger.len(), "sov={}", sov.len());
     }
 
     #[test]

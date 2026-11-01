@@ -977,7 +977,14 @@ mod testes_plugin {
         assert!(!catalogo.provincias.is_empty(), "catálogo de províncias vazio");
         // Dono e controlador por província, inicializados do dono do estado.
         assert_eq!(mundo.dono_por_provincia.len(), catalogo.provincias.len());
-        assert_eq!(mundo.controlador_por_provincia, mundo.dono_por_provincia);
+        // Só a Alemanha e a Áustria começam ocupadas (controlador = ocupante da zona).
+        for (id, dono) in &mundo.dono_por_provincia {
+            let ctrl = &mundo.controlador_por_provincia[id];
+            if ctrl != dono {
+                assert!(matches!(dono.as_str(), "GER" | "AUT"), "{id}: {dono} controlado por {ctrl}");
+                assert!(matches!(ctrl.as_str(), "USA" | "GBR" | "FRA" | "SOV"));
+            }
+        }
 
         // Carga da economia de 1945 pelo mesmo caminho do jogo
         let dir = dir_economia(&raiz);

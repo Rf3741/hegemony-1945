@@ -268,12 +268,21 @@ impl MundoJogo {
             );
         }
 
+        // Alemanha e Áustria começam sob ocupação aliada: o dono segue sendo GER/AUT, mas o
+        // controlador de cada província é o ocupante da sua zona (USA, GBR, FRA ou SOV).
+        let mut controlador_por_provincia = dono_por_provincia.clone();
+        for prov in &catalogo.provincias {
+            let dono = dono_por_provincia.get(&prov.id).map(String::as_str).unwrap_or("");
+            if let Some(ocupante) = zona_ocupacao_1945(&prov.adm1_code, dono) {
+                controlador_por_provincia.insert(prov.id, ocupante.to_string());
+            }
+        }
         let mut mundo = Self {
             data: DataSimulacao::INICIO_1945,
             tensao_mundial: 35.0,
             paises,
             mercados,
-            controlador_por_provincia: dono_por_provincia.clone(),
+            controlador_por_provincia,
             dono_por_provincia,
             populacao_por_provincia,
             ticks_executados: 0,
@@ -650,4 +659,28 @@ fn ler_ron<T: serde::de::DeserializeOwned>(caminho: &Path, contexto: &str) -> Re
         contexto: contexto.to_string(),
         fonte: Box::new(fonte),
     })
+}
+
+/// Zona de ocupação aliada (tag do ocupante) de uma província da Alemanha (dono `GER`) ou da
+/// Áustria (dono `AUT`) em 1945, a partir do código adm1. `None` para o resto do mundo.
+///
+/// Alemanha: USA (Baviera, Hesse, Bremen), GBR (Schleswig-Holstein, Hamburgo, Baixa Saxônia,
+/// Renânia do Norte-Vestfália), FRA (Renânia-Palatinado, Sarre, Baden-Württemberg),
+/// SOV (Saxônia, Turíngia, Brandemburgo, Mecklemburgo, Saxônia-Anhalt, Berlim, setor leste).
+/// Áustria: SOV (Baixa Áustria, Burgenland, Viena), USA (Salzburgo, Alta Áustria),
+/// GBR (Estíria, Caríntia), FRA (Tirol, Vorarlberg).
+pub fn zona_ocupacao_1945(adm1_code: &str, dono: &str) -> Option<&'static str> {
+    match (dono, adm1_code) {
+        ("GER", "DEU-1591" | "DEU-1574" | "DEU-1575") => Some("USA"),
+        ("GER", "DEU-1579" | "DEU-1578" | "DEU-1576" | "DEU-1572") => Some("GBR"),
+        ("GER", "DEU-1580" | "DEU-1581" | "DEU-1573") => Some("FRA"),
+        ("GER", "DEU-1601" | "DEU-1577" | "DEU-1600" | "DEU-1599" | "DEU-3487" | "DEU-3488") => {
+            Some("SOV")
+        }
+        ("AUT", "AUT-2330" | "AUT-2322" | "AUT-2331") => Some("SOV"),
+        ("AUT", "AUT-2327" | "AUT-2326") => Some("USA"),
+        ("AUT", "AUT-2323" | "AUT-2325") => Some("GBR"),
+        ("AUT", "AUT-2329" | "AUT-2320") => Some("FRA"),
+        _ => None,
+    }
 }
