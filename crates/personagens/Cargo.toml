@@ -1,0 +1,10 @@
+[package]
+name = "personagens"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Líderes históricos de 1945: traços, envelhecimento, morte e sucessão"
+
+[dependencies]
+serde.workspace = true
+ron.workspace = true

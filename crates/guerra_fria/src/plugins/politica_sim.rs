@@ -12,7 +12,7 @@ use super::economy::RecursoMundo;
 use super::time::EventoTickDiario;
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, TaskPool, block_on, futures_lite::future};
-use sim_politica::{CatalogoPolitica, CenarioPolitica, DataJogo, MundoPolitico, PaisPolitica, TipoCrisePolitica};
+use sim_politica::{CatalogoPolitica, LiderPolitico, CenarioPolitica, DataJogo, MundoPolitico, PaisPolitica, TipoCrisePolitica};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -27,6 +27,9 @@ const SEMENTE: u64 = 1945;
 pub enum ComandoPol {
     ProporLei { categoria: String, lei: String },
     CancelarLei,
+    /// Troca o chefe de Estado (`estado`) ou de Governo de um país e aplica o ajuste de legitimidade.
+    /// Aplicado ao país `tag` (não ao do jogador), por isso carrega a própria tag.
+    Lider { tag: String, estado: bool, lider: LiderPolitico, delta_legitimidade: f64 },
 }
 
 /// Instantâneo do país do jogador para a interface.
@@ -82,6 +85,18 @@ impl NucleoPol {
     }
 
     pub fn aplicar(&mut self, tag: &str, c: ComandoPol) -> Result<String, String> {
+        if let ComandoPol::Lider { tag: t, estado, lider, delta_legitimidade } = c {
+            let p = self.mundo.paises().iter().find(|p| p.tag == t).map(|p| p.id.clone()).ok_or("país sem dados políticos")?;
+            let pais = self.mundo.pais_mut(&p).ok_or("país inexistente")?;
+            let nome = lider.nome.clone();
+            if estado {
+                pais.chefe_de_estado = Some(lider);
+            } else {
+                pais.chefe_de_governo = Some(lider);
+            }
+            pais.legitimidade = (pais.legitimidade + delta_legitimidade).clamp(0.0, 100.0);
+            return Ok(if t == tag { format!("Novo líder: {nome}") } else { String::new() });
+        }
         let id = self.mundo.paises().iter().find(|p| p.tag == tag).map(|p| p.id.clone()).ok_or("país sem dados políticos")?;
         let p = self.mundo.pais_mut(&id).ok_or("país inexistente")?;
         match c {
@@ -93,6 +108,7 @@ impl NucleoPol {
                 p.lei_em_tramitacao = None;
                 Ok("Proposta de lei retirada.".into())
             }
+            ComandoPol::Lider { .. } => Ok(String::new()), // tratado no início da função
         }
     }
 
@@ -151,6 +167,7 @@ pub fn executar_lote(nucleo: &mut NucleoPol, tag: &str, cmds: Vec<ComandoPol>, d
     let mut saida = SaidaPol::default();
     for c in cmds {
         match nucleo.aplicar(tag, c) {
+            Ok(m) if m.is_empty() => {}
             Ok(m) => saida.mensagens.push(m),
             Err(e) => saida.mensagens.push(format!("Não foi possível: {e}")),
         }

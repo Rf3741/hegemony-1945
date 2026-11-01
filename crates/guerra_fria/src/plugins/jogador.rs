@@ -275,10 +275,14 @@ fn painel_pais(
     mut eco: ResMut<EconomiaSim>,
     mut pol: Option<ResMut<PoliticaSim>>,
     mut icones: ResMut<Icones>,
+    elenco: Option<Res<super::personagens_sim::ElencoRes>>,
+    mut retratos: Option<ResMut<super::personagens_ui::Retratos>>,
+    relogio: Res<super::time::RecursoRelogio>,
 ) -> Result {
     if !painel.aberto {
         return Ok(());
     }
+    let hoje = (relogio.data.ano, relogio.data.mes, relogio.data.dia);
     let mut aberto = true;
     let mut aba = painel.aba;
     let ctx = contextos.ctx_mut()?;
@@ -294,7 +298,13 @@ fn painel_pais(
             Aba::Economia => aba_economia(ui, &mut eco, &mut painel, &mut icones),
             Aba::Construcao => aba_construcao(ui, &mut eco, &mut painel, &mut icones),
             Aba::Politica => match pol.as_mut() {
-                Some(p) => super::politica_ui::aba_politica(ui, p),
+                Some(p) => {
+                    if let (Some(el), Some(r), Some(tag)) = (elenco.as_deref(), retratos.as_deref_mut(), p.tag.clone()) {
+                        super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
+                        ui.separator();
+                    }
+                    super::politica_ui::aba_politica(ui, p)
+                }
                 None => {
                     ui.label("Política ainda carregando...");
                 }

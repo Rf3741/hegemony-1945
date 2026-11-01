@@ -19,3 +19,5 @@ pub mod visual_construcoes;
 pub mod tecnologia_ui;
 pub mod estatisticas;
 pub mod enciclopedia;
+pub mod personagens_sim;
+pub mod personagens_ui;

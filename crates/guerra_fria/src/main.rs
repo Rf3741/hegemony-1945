@@ -25,6 +25,7 @@ use plugins::{
     tecnologia_ui::TecnologiaUiPlugin,
     estatisticas::EstatisticasPlugin,
     enciclopedia::EnciclopediaPlugin,
+    personagens_sim::PersonagensPlugin,
 };
 use simulacao::mundo::MundoJogo;
 use std::path::PathBuf;
@@ -81,5 +82,6 @@ fn main() {
         .add_plugins(TecnologiaUiPlugin)
         .add_plugins(EstatisticasPlugin)
         .add_plugins(EnciclopediaPlugin)
+        .add_plugins(PersonagensPlugin)
         .run();
 }

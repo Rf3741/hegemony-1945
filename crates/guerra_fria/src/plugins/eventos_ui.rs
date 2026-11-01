@@ -81,6 +81,8 @@ fn popup_evento(
     mut mundo: ResMut<RecursoMundo>,
     mut ev: ResMut<EstadoEv>,
     mut relogio: ResMut<RecursoRelogio>,
+    elenco: Option<Res<super::personagens_sim::ElencoRes>>,
+    mut retratos: Option<ResMut<super::personagens_ui::Retratos>>,
 ) -> Result {
     let Some(pend) = ev.estado.pendentes.first().cloned() else { return Ok(()) };
     let Some(evento) = cat.0.por_id(&pend.evento_id) else {
@@ -114,6 +116,11 @@ fn popup_evento(
                 });
             });
             egui::Frame::new().inner_margin(egui::Margin::symmetric(18, 12)).show(ui, |ui| {
+                if let (Some(el), Some(r)) = (elenco.as_deref(), retratos.as_deref_mut()) {
+                    // Retrato do chefe de Estado do país afetado (tag do legado -> política).
+                    super::personagens_ui::retrato_chefe(ui, el, r, &super::politica_sim::tag_politica(&pend.pais), 64.0);
+                    ui.add_space(4.0);
+                }
                 ui.label(egui::RichText::new(&evento.titulo).color(TINTA).size(20.0).strong());
                 ui.add_space(6.0);
                 egui::ScrollArea::vertical().max_height(180.0).show(ui, |ui| {
