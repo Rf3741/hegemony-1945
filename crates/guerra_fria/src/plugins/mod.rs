@@ -32,4 +32,5 @@ pub mod menu_saves;
 pub mod menu_ui;
 pub mod saveload;
 pub mod hud_mapas;
+pub mod tutorial_guiado;
 pub mod mapa_provincial;
