@@ -303,7 +303,7 @@ fn janela_config(mut contextos: EguiContexts, mut j: ResMut<JanelaConfig>, mut c
                     ui.checkbox(&mut c.partida.pausar_em_eventos, "pausar o tempo em eventos com decisão");
                 });
                 linha(ui, "Tutorial", |ui| {
-                    ui.checkbox(&mut c.partida.mostrar_tutorial, "mostrar dicas de tutorial");
+                    ui.checkbox(&mut c.partida.mostrar_tutorial, "mostrar a dica \"faça o Tutorial\" no menu principal");
                 });
             }
             AbaConfig::Interface => {

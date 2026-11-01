@@ -134,6 +134,8 @@ fn tela_menu_principal(
     mut sair: MessageWriter<AppExit>,
     mut janela_saves: ResMut<super::menu_saves::JanelaSaves>,
     mut config_janela: ResMut<super::menu_pausa::JanelaConfig>,
+    mut tutorial: ResMut<super::tutorial_guiado::TutorialGuiado>,
+    config: Res<super::config::ConfigJogo>,
 ) -> Result {
     let ctx = contextos.ctx_mut()?.clone();
     // Cliques no mapa escolhem o país, mas o fundo só aparece em Titulo/Paises/Opcoes.
@@ -151,6 +153,16 @@ fn tela_menu_principal(
                     let tam = egui::vec2(260.0, 44.0);
                     if ui.add_sized(tam, egui::Button::new(egui::RichText::new("Novo Jogo").size(22.0))).clicked() {
                         *tela = TelaMenu::Paises;
+                    }
+                    let botao_tut = egui::Button::new(egui::RichText::new("Tutorial").size(22.0).color(egui::Color32::from_rgb(0x23, 0x20, 0x1B)))
+                        .fill(egui::Color32::from_rgb(0xE8, 0xDE, 0xC8))
+                        .stroke(egui::Stroke::new(2.0, egui::Color32::from_rgb(0x8C, 0x25, 0x1E)));
+                    if ui.add_sized(tam, botao_tut).on_hover_text("Partida guiada com os Estados Unidos").clicked() {
+                        tutorial.iniciar();
+                        iniciar = Some("USA".to_string());
+                    }
+                    if config.partida.mostrar_tutorial {
+                        ui.label(egui::RichText::new("Primeira vez? Faça o Tutorial.").italics().color(egui::Color32::from_rgb(0xDF, 0xC9, 0xA0)));
                     }
                     if ui.add_sized(tam, egui::Button::new(egui::RichText::new("Carregar").size(22.0))).clicked() {
                         janela_saves.abrir(true);
@@ -226,6 +238,7 @@ fn tela_menu_principal(
                             .show(ui, |ui| {
                                 ui.set_width(420.0);
                                 if card_pais(ui, p, pos) {
+                                    tutorial.ativo = false;
                                     iniciar = Some(tag);
                                 }
                             });

@@ -14,7 +14,7 @@ pub struct EstadoEv {
     pub estado: EstadoEventos,
     /// O relógio estava rodando quando o pop-up abriu (retoma ao decidir).
     retomar: bool,
-    jornal_aberto: bool,
+    pub jornal_aberto: bool,
 }
 
 pub struct EventosPlugin;

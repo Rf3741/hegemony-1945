@@ -167,16 +167,24 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
             ui.colored_label(egui::Color32::YELLOW, format!("Economia atrasada {} d", eco.atraso_dias()));
         }
         ui.separator();
-        if ui.add(egui::Button::new(egui::RichText::new("🏗 Construir (B)").strong().size(16.0)).fill(egui::Color32::from_rgb(40, 100, 60))).on_hover_text("Abre a tela de construção").clicked() {
+        let b_constr = ui.add(egui::Button::new(egui::RichText::new("🏗 Construir (B)").strong().size(16.0)).fill(egui::Color32::from_rgb(40, 100, 60))).on_hover_text("Abre a tela de construção");
+        super::tutorial_guiado::marcar(&b_constr, "btn_construir");
+        if b_constr.clicked() {
             *construcao_aberta = !*construcao_aberta;
         }
-        if ui.button("País (1)").clicked() {
+        let b_pais = ui.button("País (1)");
+        super::tutorial_guiado::marcar(&b_pais, "btn_pais");
+        if b_pais.clicked() {
             *painel_aberto = !*painel_aberto;
         }
-        if ui.button("Mercado (2)").clicked() {
+        let b_merc = ui.button("Mercado (2)");
+        super::tutorial_guiado::marcar(&b_merc, "btn_mercado");
+        if b_merc.clicked() {
             *mercado_aberto = !*mercado_aberto;
         }
-        if ui.button("Comércio (3)").clicked() {
+        let b_com = ui.button("Comércio (3)");
+        super::tutorial_guiado::marcar(&b_com, "btn_comercio");
+        if b_com.clicked() {
             *comercio_aberto = !*comercio_aberto;
         }
         ui.label("Tecnologia (5)");

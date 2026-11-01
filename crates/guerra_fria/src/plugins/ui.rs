@@ -44,7 +44,9 @@ fn barra_superior(
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
     egui::Panel::top("barra_superior").show(&mut raiz, |ui| {
         ui.horizontal(|ui| {
-            if ui.button("Salvar / Carregar").on_hover_text("Abre o menu de jogos salvos (Ctrl+S salva rápido, Ctrl+L carrega)").clicked() {
+            let b_salvar = ui.button("Salvar / Carregar").on_hover_text("Abre o menu de jogos salvos (Ctrl+S salva rápido, Ctrl+L carrega)");
+            super::tutorial_guiado::marcar(&b_salvar, "salvar");
+            if b_salvar.clicked() {
                 janela_saves.abrir(false);
             }
             ui.separator();
@@ -54,7 +56,10 @@ fn barra_superior(
                 ui.separator();
             }
             ui.weak("?").on_hover_text("Espaço: pausa | +/−: velocidade | WASD: mover | scroll: zoom | V: construções | M: modos de mapa | 1-9: painéis | Ctrl+S/L: salvar/carregar");
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| widget_relogio(ui, &mut relogio));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                widget_relogio(ui, &mut relogio);
+                super::tutorial_guiado::alvo(ui.ctx(), "relogio", ui.min_rect());
+            });
         });
     });
     Ok(())
@@ -90,7 +95,9 @@ fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) {
         relogio.definir_velocidade(v);
     }
     let rotulo = if relogio.pausado { "Continuar" } else { "Pausar" };
-    if dica(ui.button(rotulo), "tooltip_topbar_botao_pausar").clicked() {
+    let b_pausa = dica(ui.button(rotulo), "tooltip_topbar_botao_pausar");
+    super::tutorial_guiado::marcar(&b_pausa, "pausa");
+    if b_pausa.clicked() {
         relogio.alternar_pausa();
     }
     dica(ui.heading(relogio.data.formatar_pt_br()), "tooltip_topbar_data");
@@ -109,7 +116,10 @@ fn barra_hud(
     let Some(eco) = eco else { return Ok(()) };
     let Some(p) = jogador.and_then(|j| mundo.paises.get(&j.0)) else { return Ok(()) };
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
-    egui::Panel::top("barra_hud").show(&mut raiz, |ui| hud_pais(ui, p, &eco, &mut painel.aberto, &mut mercado.aberto, &mut comercio.aberto, &mut constr.aberta));
+    egui::Panel::top("barra_hud").show(&mut raiz, |ui| {
+        hud_pais(ui, p, &eco, &mut painel.aberto, &mut mercado.aberto, &mut comercio.aberto, &mut constr.aberta);
+        super::tutorial_guiado::alvo(ui.ctx(), "hud", ui.min_rect());
+    });
     Ok(())
 }
 
@@ -127,6 +137,7 @@ fn painel_provincia(
     let Some(prov) = catalogo.0.obter_por_id(selecionada.0) else { return Ok(()) };
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
     egui::Panel::right("painel_provincia").min_size(260.0).show(&mut raiz, |ui| {
+        super::tutorial_guiado::alvo(ui.ctx(), "painel_provincia", ui.max_rect());
         ui.heading(&prov.nome);
         let estado = if prov.estado.is_empty() { prov.adm1_code.as_str() } else { prov.estado.as_str() };
         ui.label(format!("Estado: {estado}"));

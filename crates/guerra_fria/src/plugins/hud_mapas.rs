@@ -372,15 +372,19 @@ pub fn barra_extra(
     let _ = (&jogador, &relogio);
     egui::Panel::top("barra_modulos").show(&mut raiz, |ui| {
         ui.horizontal_wrapped(|ui| {
-            if let Some(d) = diplo.as_mut()
-                && ui.selectable_label(d.aberto, "Diplomacia (4)").clicked()
-            {
-                d.aberto = !d.aberto;
+            if let Some(d) = diplo.as_mut() {
+                let r = ui.selectable_label(d.aberto, "Diplomacia (4)");
+                super::tutorial_guiado::marcar(&r, "btn_diplo");
+                if r.clicked() {
+                    d.aberto = !d.aberto;
+                }
             }
-            if let Some(t) = tec.as_mut()
-                && ui.selectable_label(t.aberto, "Tecnologia (5)").clicked()
-            {
-                t.aberto = !t.aberto;
+            if let Some(t) = tec.as_mut() {
+                let r = ui.selectable_label(t.aberto, "Tecnologia (5)");
+                super::tutorial_guiado::marcar(&r, "btn_tec");
+                if r.clicked() {
+                    t.aberto = !t.aberto;
+                }
             }
             if let Some(g) = guerra.as_mut()
                 && ui.selectable_label(g.aberto, "Guerra (6)").clicked()
@@ -411,7 +415,7 @@ pub fn barra_extra(
 fn seletor_canto(mut contextos: EguiContexts, mut modo: ResMut<ModoTematico>) -> Result {
     let ctx = contextos.ctx_mut()?;
     egui::Area::new("seletor_modo_mapa".into()).anchor(egui::Align2::RIGHT_BOTTOM, [-10.0, -10.0]).show(ctx, |ui| {
-        egui::Frame::popup(ui.style()).show(ui, |ui| {
+        let quadro = egui::Frame::popup(ui.style()).show(ui, |ui| {
             ui.horizontal(|ui| {
                 if ui.small_button("<").on_hover_text("Modo anterior (Shift+M)").clicked() {
                     *modo = modo.vizinho(true);
@@ -426,6 +430,7 @@ fn seletor_canto(mut contextos: EguiContexts, mut modo: ResMut<ModoTematico>) ->
                 }
             });
         });
+        super::tutorial_guiado::alvo(ui.ctx(), "modos", quadro.response.rect);
     });
     Ok(())
 }

@@ -464,26 +464,9 @@ fn janela_tutorial(
     let Some(jogador) = jogador else { return Ok(()) };
     let d = dados();
     let ctx = contextos.ctx_mut()?;
-    let construcao_ativa = constr.is_some_and(|c| c.tutorial.is_some());
-    if !tut.respondeu {
-        // Só pergunta depois do tutorial de construção, para não sobrepor janelas.
-        if construcao_ativa || cfg!(test) {
-            return Ok(());
-        }
-        egui::Window::new("Tutorial do jogo").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).default_width(420.0).show(ctx, |ui| {
-            ui.label("Quer fazer o tutorial completo? São passos curtos sobre mapa, tempo, mercado, orçamento, política e diplomacia. Você pode abri-lo depois pela enciclopédia (8).");
-            ui.horizontal(|ui| {
-                if ui.button("Fazer tutorial").clicked() {
-                    tut.respondeu = true;
-                    tut.passo = Some(0);
-                }
-                if ui.button("Agora não").clicked() {
-                    tut.respondeu = true;
-                }
-            });
-        });
-        return Ok(());
-    }
+    let _ = &constr;
+    // Sem oferta automática: o tutorial guiado fica no menu principal; este abre só pela enciclopédia.
+    tut.respondeu = true;
     let Some(i) = tut.passo else { return Ok(()) };
     let passos = passos_para(d, &jogador.0);
     let Some(p) = passos.get(i) else {

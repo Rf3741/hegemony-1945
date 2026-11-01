@@ -51,7 +51,7 @@ impl Default for ConstrucaoUi {
             filtro_cat: None,
             mostrar_bloqueados: false,
             modo_mapa: ModoMapa::Normal,
-            tutorial: if tutorial_ja_visto() { None } else { Some(0) },
+            tutorial: None,
             pedidos: Vec::new(),
             ultima_selecao: 0,
         }
@@ -314,32 +314,6 @@ pub const PASSOS_TUTORIAL: [(&str, &str); 5] = [
     ("5/5  Setor privado e fila", "Capitalistas também investem sozinhos, conforme a lei econômica, usando o fundo privado. A fila de obras (na tela B) mostra o progresso de cada obra, estatal ou privada."),
 ];
 
-fn arquivo_tutorial() -> Option<std::path::PathBuf> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))?;
-    Some(base.join("hegemony1945").join("tutorial_construcao_visto"))
-}
-
-fn tutorial_ja_visto() -> bool {
-    // Testes nunca dependem/gravam o estado do usuário.
-    if cfg!(test) {
-        return true;
-    }
-    arquivo_tutorial().is_some_and(|p| p.exists())
-}
-
-fn marcar_tutorial_visto() {
-    if cfg!(test) {
-        return;
-    }
-    if let Some(p) = arquivo_tutorial() {
-        if let Some(d) = p.parent() {
-            let _ = std::fs::create_dir_all(d);
-        }
-        let _ = std::fs::write(p, "1");
-    }
-}
 
 // ---------------------------------------------------------------------------------------------
 // Interface
@@ -592,9 +566,6 @@ fn janela_tutorial(mut contextos: EguiContexts, mut c: ResMut<ConstrucaoUi>) -> 
             }
         });
     });
-    if novo.is_none() {
-        marcar_tutorial_visto();
-    }
     c.tutorial = novo;
     Ok(())
 }
