@@ -1,7 +1,7 @@
 //! IA economica: postura fiscal, obras estatais e reacao a crises.
 
 use sim_economia::entidades::{Pais, Provincia};
-use sim_economia::{calcular_lucratividade_esperada, CategoriaPredio, ContextoLucratividade, MundoEconomico, TipoPredio};
+use sim_economia::{calcular_com_perfil, PerfilPredio, CategoriaPredio, ContextoLucratividade, MundoEconomico, TipoPredio};
 use std::collections::BTreeMap;
 
 /// Histerese: apos mexer em impostos, a IA espera este numero de dias.
@@ -177,45 +177,60 @@ impl IaEconomia {
         self.n_provincias = n;
     }
 
-    fn contexto_lucratividade(mundo: &MundoEconomico, prov: &Provincia, tipo: &TipoPredio) -> ContextoLucratividade {
-            let Some(est) = mundo.obter_estado(&prov.estado_id) else { return ContextoLucratividade::default() };
-            let pop = prov.populacao_total();
-            let sol = prov.padrao_de_vida_medio();
-            let desempregados: f64 = prov.pops.iter().map(|p| p.desempregados()).sum();
-            let salario = prov.predios.iter().map(|p| p.salario_base).sum::<f64>() / prov.predios.len().max(1) as f64;
-            let niveis = mundo.provincias().iter().filter(|p| p.estado_id == est.id).flat_map(|p| &p.predios)
-                .filter(|b| b.tipo_predio_id == tipo.id).map(|b| b.nivel as f64).sum::<f64>();
-            let (livre, total) = if tipo.usa_terra_aravel {
-                (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
-            } else if let Some(rec) = &tipo.recurso_natural_requerido {
-                let total = est.limite_recurso(rec) as f64;
-                (Some(total - niveis), Some(total.max(1.0)))
-            } else {
-                (None, None)
-            };
-            ContextoLucratividade {
-                salario_base: if salario > 0.0 { salario } else { 4.0 * (sol / 10.0).clamp(0.55, 2.5) },
-                padrao_vida: sol,
-                desempregados,
-                mao_de_obra_total: pop,
-                infraestrutura_uso: est.infraestrutura_uso,
-                infraestrutura_capacidade: est.infraestrutura_capacidade,
-                acesso_mercado: est.acesso_mercado,
-                qualidade_recurso: est.fator_qualidade_predio(tipo),
-                potencial_livre: livre,
-                potencial_total: total,
-                niveis_iguais: niveis,
-            }
+    /// Contexto de uma província para um tipo de prédio. Tudo O(1): níveis por tipo e bônus de cadeia
+    /// vêm dos índices diários do `Estado` (nada de varrer o mundo por estimativa).
+    fn contexto_lucratividade(mundo: &MundoEconomico, prov: &Provincia, tipo_idx: usize, tipo: &TipoPredio) -> ContextoLucratividade {
+        let Some(est) = mundo.obter_estado(&prov.estado_id) else { return ContextoLucratividade::default() };
+        let pop = prov.populacao_total();
+        let sol = prov.padrao_de_vida_medio();
+        let desempregados: f64 = prov.pops.iter().map(|p| p.desempregados()).sum();
+        let salario = prov.predios.iter().map(|p| p.salario_base).sum::<f64>() / prov.predios.len().max(1) as f64;
+        let niveis = est.niveis_do_tipo(tipo_idx) as f64;
+        let (livre, total) = if tipo.usa_terra_aravel {
+            (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+        } else if let Some(rec) = &tipo.recurso_natural_requerido {
+            let total = est.limite_recurso(rec) as f64;
+            (Some(total - niveis), Some(total))
+        } else {
+            (None, None)
+        };
+        ContextoLucratividade {
+            salario_base: if salario > 0.0 { salario } else { 4.0 * (sol / 10.0).clamp(0.55, 2.5) },
+            padrao_vida: sol,
+            desempregados,
+            mao_de_obra_total: pop,
+            infraestrutura_uso: est.infraestrutura_uso,
+            infraestrutura_capacidade: est.infraestrutura_capacidade,
+            acesso_mercado: est.acesso_mercado,
+            qualidade_recurso: est.rendimento_recurso(tipo),
+            potencial_livre: livre,
+            potencial_total: total,
+            niveis_iguais: niveis,
+            bonus_cadeia: est.bonus_cadeia(tipo_idx),
         }
+    }
 
-    fn estimar_lucro(mundo: &MundoEconomico, prov: &Provincia, tipo: &TipoPredio) -> sim_economia::EstimativaLucratividade {
-            let cat = mundo.catalogo();
-            let mercado = mundo.indice_mercado_do_pais(&prov.pais_id);
-            let precos = cat.bens.iter().enumerate().map(|(i, b)| {
-                let preco = mercado.map(|m| mundo.dados_mercado_bem(m, i).0).unwrap_or(b.preco_base);
-                (b.id.clone(), preco)
-            }).collect::<Vec<_>>();
-        calcular_lucratividade_esperada(cat, tipo, &tipo.metodos_padrao, &precos, Self::contexto_lucratividade(mundo, prov, tipo))
+    /// Lucro esperado por ponto de construção (x500) de um nível do tipo na província.
+    fn pontuacao_regional(mundo: &MundoEconomico, pr: &Provincia, ti: usize, t: &TipoPredio, perfil: &PerfilPredio, precos: &[f64]) -> f64 {
+        let lucro = calcular_com_perfil(t, perfil, precos, Self::contexto_lucratividade(mundo, pr, ti, t)).lucro_liquido;
+        lucro / t.custo_pontos_construcao.max(1.0) * 500.0
+    }
+
+    /// Província do país onde a IA preferiria erguer o tipo (mesma regra da construção semanal,
+    /// sem o piso de capital semente). Considera só onde o prédio cabe.
+    pub fn melhor_provincia_para(mundo: &MundoEconomico, pais_id: &str, tipo_id: &str) -> Option<String> {
+        let cat = mundo.catalogo();
+        let ti = cat.tipos_predio.iter().position(|t| t.id == tipo_id)?;
+        let t = &cat.tipos_predio[ti];
+        let mercado = mundo.indice_mercado_do_pais(pais_id);
+        let precos: Vec<f64> = cat.bens.iter().enumerate()
+            .map(|(i, b)| mercado.map(|m| mundo.dados_mercado_bem(m, i).0).unwrap_or(b.preco_base)).collect();
+        let perfil = PerfilPredio::novo(cat, &t.metodos_padrao);
+        mundo.provincias().iter().enumerate()
+            .filter(|(_, p)| p.pais_id == pais_id && mundo.obter_estado(&p.estado_id).is_some_and(|e| sim_economia::estado_comporta_novo_nivel(cat, e, p, ti)))
+            .map(|(_, p)| (Self::pontuacao_regional(mundo, p, ti, t, &perfil, &precos) - p.predios.len() as f64 * 0.5, p))
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, p)| p.id.clone())
     }
 
     fn passo_semanal(&mut self, mundo: &mut MundoEconomico, id: &str, dia_atual: u64) {
@@ -297,6 +312,11 @@ impl IaEconomia {
         let burocracia_falta = (p.burocracia_necessaria - p.burocracia_produzida) / p.burocracia_necessaria.max(10.0);
         let burocracia_sobra = p.burocracia_produzida >= 1.10 * p.burocracia_necessaria;
 
+        // Preços do mercado do país (por índice de bem), uma vez por passo.
+        let precos: Vec<f64> = {
+            let mercado = mundo.indice_mercado_do_pais(id);
+            cat.bens.iter().enumerate().map(|(i, b)| mercado.map(|m| mundo.dados_mercado_bem(m, i).0).unwrap_or(b.preco_base)).collect()
+        };
         // Candidatos (score, tipo_idx, provincia_idx)
         let mut cands: Vec<(f64, usize, usize)> = Vec::new();
         for (ti, t) in cat.tipos_predio.iter().enumerate() {
@@ -333,6 +353,7 @@ impl IaEconomia {
                 }
             };
             // Escolhe a melhor provincia usando a mesma rentabilidade regional exibida ao jogador.
+            let perfil = PerfilPredio::novo(cat, &t.metodos_padrao);
             let mut melhor: Option<(f64, usize)> = None;
             for &pi in &idx {
                 let pr = &mundo.provincias()[pi];
@@ -341,8 +362,7 @@ impl IaEconomia {
                     if acesso >= 0.92 { continue }
                     180.0 * (1.0 - acesso)
                 } else {
-                    let lucro = Self::estimar_lucro(mundo, pr, t).lucro_liquido;
-                    let regional = lucro / t.custo_pontos_construcao.max(1.0) * 500.0;
+                    let regional = Self::pontuacao_regional(mundo, pr, ti, t, &perfil, &precos);
                     regional.max(base * 0.25) - pr.predios.len() as f64 * 0.5
                 };
                 if melhor.is_none_or(|(s, _)| score > s) {

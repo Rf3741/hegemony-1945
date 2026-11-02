@@ -9,7 +9,7 @@ use super::jogador::{calcular_custo_materiais_obra, fmt_din};
 use super::map::{CoresMapa, DadosMapa, ImagemMapa, ProvinciaSelecionada, RecursoCatalogo, pintar_paleta};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
-use sim_economia::{calcular_lucratividade_esperada, CategoriaPredio, ContextoLucratividade, Estado, EstimativaLucratividade, Provincia, TipoPredio};
+use sim_economia::{calcular_com_perfil, precos_por_indice, PerfilPredio, CategoriaPredio, ContextoLucratividade, Estado, EstimativaLucratividade, Provincia, TipoPredio};
 use std::collections::HashMap;
 
 /// Modo de pintura do mapa.
@@ -113,33 +113,29 @@ fn estado_de<'a>(v: &'a VistaEconomia, prov: &Provincia) -> Option<&'a Estado> {
     v.estados.iter().find(|e| e.id == prov.estado_id)
 }
 
+/// Níveis do tipo já construídos no estado (índice diário do `Estado`, O(1)).
 fn niveis_do_tipo_no_estado(v: &VistaEconomia, estado_id: &str, tipo_id: &str) -> u32 {
-    v.provincias
-        .iter()
-        .filter(|p| p.estado_id == estado_id)
-        .flat_map(|p| p.predios.iter())
-        .filter(|b| b.tipo_predio_id == tipo_id)
-        .map(|b| b.nivel)
-        .sum()
+    let Some(cat) = v.catalogo.as_ref() else { return 0 };
+    let Some(ti) = cat.tipos_predio.iter().position(|t| t.id == tipo_id) else { return 0 };
+    v.estados.iter().find(|e| e.id == estado_id).map_or(0, |e| e.niveis_do_tipo(ti))
 }
 
-fn contexto_lucratividade(v: &VistaEconomia, prov: &Provincia, t: &TipoPredio) -> ContextoLucratividade {
+fn contexto_lucratividade(v: &VistaEconomia, prov: &Provincia, tipo_idx: usize, t: &TipoPredio) -> ContextoLucratividade {
     let Some(est) = estado_de(v, prov) else { return ContextoLucratividade::default() };
-    let cat = v.catalogo.as_ref().expect("catálogo necessário para estimar lucro");
     let populacao = prov.populacao_total();
     let sol = prov.padrao_de_vida_medio();
     let desempregados: f64 = prov.pops.iter().map(|p| p.desempregados()).sum();
     let mao_de_obra_total: f64 = prov.pops.iter().map(|p| p.populacao).sum();
     let salario_base = prov.predios.iter().map(|p| p.salario_base).sum::<f64>() / prov.predios.len().max(1) as f64;
+    let niveis = est.niveis_do_tipo(tipo_idx) as f64;
     let (potencial_livre, potencial_total) = if t.usa_terra_aravel {
         (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
     } else if let Some(rec) = &t.recurso_natural_requerido {
         let total = est.limite_recurso(rec) as f64;
-        (Some(total - niveis_do_tipo_no_estado(v, &est.id, &t.id) as f64), Some(total.max(1.0)))
+        (Some(total - niveis), Some(total))
     } else {
         (None, None)
     };
-    let _ = cat;
     ContextoLucratividade {
         salario_base: if salario_base > 0.0 { salario_base } else { 4.0 * (sol / 10.0).clamp(0.55, 2.5) },
         padrao_vida: sol,
@@ -148,23 +144,63 @@ fn contexto_lucratividade(v: &VistaEconomia, prov: &Provincia, t: &TipoPredio) -
         infraestrutura_uso: est.infraestrutura_uso,
         infraestrutura_capacidade: est.infraestrutura_capacidade,
         acesso_mercado: est.acesso_mercado,
-        qualidade_recurso: est.fator_qualidade_predio(t),
+        qualidade_recurso: est.rendimento_recurso(t),
         potencial_livre,
         potencial_total,
-        niveis_iguais: niveis_do_tipo_no_estado(v, &est.id, &t.id) as f64,
+        niveis_iguais: niveis,
+        bonus_cadeia: est.bonus_cadeia(tipo_idx),
     }
 }
 
 fn estimar_lucro(v: &VistaEconomia, prov: &Provincia, t: &TipoPredio) -> EstimativaLucratividade {
     let Some(cat) = v.catalogo.as_ref() else { return EstimativaLucratividade::default() };
-    let precos = v.bens.iter().map(|b| (b.id.clone(), b.preco_nacional * (0.85 + 0.15 * estado_de(v, prov).map_or(1.0, |e| e.acesso_mercado)))).collect::<Vec<_>>();
-    calcular_lucratividade_esperada(cat, t, &t.metodos_padrao, &precos, contexto_lucratividade(v, prov, t))
+    let Some(ti) = cat.tipos_predio.iter().position(|x| x.id == t.id) else { return EstimativaLucratividade::default() };
+    let acesso = estado_de(v, prov).map_or(1.0, |e| e.acesso_mercado);
+    let mult = 0.85 + 0.15 * acesso;
+    let precos: Vec<f64> = if v.bens.len() == cat.bens.len() && v.bens.iter().zip(&cat.bens).all(|(a, b)| a.id == b.id) {
+        v.bens.iter().map(|b| b.preco_nacional * mult).collect()
+    } else {
+        let pares: Vec<(String, f64)> = v.bens.iter().map(|b| (b.id.clone(), b.preco_nacional * mult)).collect();
+        precos_por_indice(cat, &pares)
+    };
+    let perfil = PerfilPredio::novo(cat, &t.metodos_padrao);
+    calcular_com_perfil(t, &perfil, &precos, contexto_lucratividade(v, prov, ti, t))
 }
 
-fn detalhe_lucro(l: EstimativaLucratividade) -> String {
+/// Texto do detalhamento do lucro: recurso local, cadeia local e demais fatores.
+fn detalhe_lucro(v: &VistaEconomia, prov: &Provincia, t: &TipoPredio, l: EstimativaLucratividade) -> String {
+    let est = estado_de(v, prov);
+    let recurso = match (&t.recurso_natural_requerido, est) {
+        (Some(rec), Some(e)) => {
+            let lim = e.limite_recurso(rec);
+            if lim == 0 { format!("{rec}: nenhum depósito no estado") } else { format!("{rec} (depósito {lim}, qualidade x{:.2})", l.fator_recurso) }
+        }
+        _ if t.usa_terra_aravel => format!("terra arável (x{:.2})", l.fator_recurso),
+        _ => "não depende".to_string(),
+    };
+    let cadeia = match (v.catalogo.as_ref(), est) {
+        (Some(cat), Some(e)) => {
+            let perfil = PerfilPredio::novo(cat, &t.metodos_padrao);
+            let locais: Vec<String> = perfil
+                .insumos
+                .iter()
+                .filter(|&&(g, _)| e.producao_local(g) > 1e-6)
+                .map(|&(g, _)| cat.bens[g].nome.to_lowercase())
+                .collect();
+            if perfil.insumos.is_empty() {
+                "sem insumos".to_string()
+            } else if locais.is_empty() {
+                "insumos vêm de fora".to_string()
+            } else {
+                format!("{} no estado", locais.join(" e "))
+            }
+        }
+        _ => "-".to_string(),
+    };
     format!(
-        "Fatores locais: salário x{:.2}; mão de obra x{:.2}; infra x{:.2}; recurso x{:.2}; acesso x{:.2}; concorrência x{:.2}",
-        l.fator_salario, l.fator_mao_de_obra, l.fator_infraestrutura, l.fator_recurso, l.fator_acesso, l.fator_concorrencia
+        "Recurso local: {recurso}\nCadeia local: +{:.0}% ({cadeia})\nOutros fatores: salário x{:.2}; mão de obra x{:.2}; infra x{:.2}; acesso x{:.2}; concorrência x{:.2}",
+        (l.fator_cadeia_local - 1.0).max(0.0) * 100.0,
+        l.fator_salario, l.fator_mao_de_obra, l.fator_infraestrutura, l.fator_acesso, l.fator_concorrencia
     )
 }
 
@@ -236,7 +272,7 @@ pub fn opcoes_para_provincia(v: &VistaEconomia, prov: &Provincia) -> Vec<OpcaoCo
                 custo_bens: mat.total_reais,
                 itens: mat.itens.iter().map(|(n, q, _, _)| (n.clone(), *q)).collect(),
                 lucro_dia: if t.financiado_pelo_governo { -(luc.custo_insumos + luc.custo_folha) } else { luc.lucro_liquido },
-                detalhe_lucro: detalhe_lucro(luc),
+                detalhe_lucro: detalhe_lucro(v, prov, t, luc),
                 governamental: t.financiado_pelo_governo,
                 potencial,
                 na_fila: fila.map_or(0, |f| f.iter().filter(|it| it.provincia_id == prov.id && it.tipo_predio_id == t.id).count()),
@@ -277,16 +313,19 @@ pub fn ranking_estados(v: &VistaEconomia, tipo_idx: usize) -> Vec<LinhaEstado> {
         .iter()
         .map(|e| {
             let livre = potencial_livre(v, e, t);
-            let alvo = v
+            // Província sugerida: a que cabe +1 nível e dá o maior lucro esperado.
+            let melhor = v
                 .provincias
                 .iter()
-                .filter(|p| p.estado_id == e.id)
-                .find(|p| v.comporta(p, tipo_idx))
-                .map(|p| p.id.clone());
-            let luc = alvo.as_ref().and_then(|id| v.provincias.iter().find(|p| p.id == *id)).map_or_else(
-                || EstimativaLucratividade::default(),
-                |p| estimar_lucro(v, p, t),
-            );
+                .filter(|p| p.estado_id == e.id && v.comporta(p, tipo_idx))
+                .map(|p| {
+                    let l = estimar_lucro(v, p, t);
+                    let ls = if t.financiado_pelo_governo { -(l.custo_insumos + l.custo_folha) } else { l.lucro_liquido };
+                    (ls, p, l)
+                })
+                .max_by(|a, b| a.0.total_cmp(&b.0));
+            let alvo = melhor.as_ref().map(|(_, p, _)| p.id.clone());
+            let luc = melhor.map_or_else(EstimativaLucratividade::default, |(_, _, l)| l);
             let lucro = if t.financiado_pelo_governo { -(luc.custo_insumos + luc.custo_folha) } else { luc.lucro_liquido };
             let pot = livre.map_or(1.0, |n| (1.0 + n as f64).ln());
             let folga = (1.0 - e.penalidade_infraestrutura).clamp(0.05, 1.0);
