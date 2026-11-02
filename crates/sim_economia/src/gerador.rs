@@ -155,7 +155,9 @@ pub fn gerar_cenario_escala_mundial(
                 taxa_juros_efetiva_anual: 0.04,
                 ..Default::default()
             },
-            pontos_construcao_base: 12.0,
+            // Capacidade inicial compatível com a reconstrução do pós-guerra:
+            // sem ela o capital privado acumula, mas não consegue materializar obras.
+            pontos_construcao_base: 30.0,
             fila_construcao: Vec::new(),
             fundo_investimento_privado: 5_000.0,
             aporte_fundo_privado_ultimo_tick: 0.0,

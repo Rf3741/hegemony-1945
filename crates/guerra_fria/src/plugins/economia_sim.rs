@@ -133,6 +133,11 @@ impl Nucleo {
         self.tags.get(tag).cloned()
     }
 
+    /// Aplica uma lei aprovada pelo motor político ao país econômico correspondente.
+    pub fn aplicar_lei_politica(&mut self, pais_id: &str, lei_id: &str) -> Result<(), String> {
+        self.mundo.promulgar_lei(pais_id, lei_id).map_err(|e| e.to_string())
+    }
+
     pub fn avancar(&mut self, dias: u32) -> usize {
         let mut obras = 0;
         for _ in 0..dias {

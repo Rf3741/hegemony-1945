@@ -335,6 +335,9 @@ impl MundoEconomico {
                 p.orcamento.divida += -p.orcamento.tesouro;
                 p.orcamento.tesouro = 0.0;
             }
+            // A capacidade de construção de 1945 precisa acompanhar o esforço de
+            // reconstrução; sem escala, o fundo privado acumula sem virar capital.
+            p.pontos_construcao_base *= 2.0;
             compilar_cache_fiscal_pais(&catalogo, p)?;
         }
 

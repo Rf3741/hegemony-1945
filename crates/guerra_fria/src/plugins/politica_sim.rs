@@ -411,6 +411,34 @@ fn definir_pais(jogador: Option<Res<super::jogador::PaisJogador>>, mut pol: ResM
 /// Liga a economia à política: padrão de vida por país e efeitos de leis tributárias nos impostos.
 fn sincronizar_economia(mut pol: ResMut<PoliticaSim>, eco: Option<ResMut<EconomiaSim>>) {
     let Some(mut eco) = eco else { return };
+    // O motor político tem leis próprias, mas os mesmos IDs também são leis
+    // econômicas. Sincronizar todos os países evita que a IA mude apenas a UI.
+    if let Some(npol) = pol.nucleo.as_ref() {
+        let leis: Vec<(String, Vec<String>, Option<String>)> = npol
+            .mundo
+            .paises()
+            .iter()
+            .map(|p| {
+                let tag = p.tag.clone();
+                let id = eco.id_pais(&tag);
+                (tag, p.leis_ativas.values().cloned().collect(), id)
+            })
+            .collect();
+        if let Some(neco) = eco.nucleo.as_mut() {
+            for (_tag, ativas, id) in leis {
+                let Some(id) = id else { continue };
+                for lei in ativas {
+                    let Some(p) = neco.mundo.obter_pais(&id) else { continue };
+                    let aplicada = p.politica_fiscal.lei_sistema_economico_id == lei
+                        || p.politica_fiscal.lei_tributaria_id == lei
+                        || p.politica_fiscal.lei_comercial_id == lei;
+                    if !aplicada {
+                        let _ = neco.aplicar_lei_politica(&id, &lei);
+                    }
+                }
+            }
+        }
+    }
     if !eco.vista.ranking.is_empty() {
         let por_id: BTreeMap<&str, f64> = eco.vista.ranking.iter().map(|r| (r.id.as_str(), r.padrao_vida)).collect();
         let mut m = BTreeMap::new();

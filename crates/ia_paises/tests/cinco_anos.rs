@@ -22,12 +22,16 @@ fn em_calote(m: &MundoEconomico) -> usize {
     m.paises().iter().filter(|p| p.orcamento.em_calote).count()
 }
 
-/// Roda 5 anos; `ia` liga ou desliga a IA. Devolve (calotes no fim, pico de calotes, leis mudadas, propostas, obras, ajustes).
-fn rodar(ia: bool) -> (usize, usize, usize, u64, u64, u64) {
+/// Roda 5 anos; `ia` liga ou desliga a IA. Devolve (calotes, pico, leis, propostas, obras, ajustes, crescimento do PIB).
+fn rodar(ia: bool) -> (usize, usize, usize, u64, u64, u64, f64) {
     let mut eco = economia();
     let mut pol = politica();
     let mut ie = IaEconomia::novo();
     let mut ip = IaPolitica::novo();
+    for _ in 0..90 {
+        eco.executar_tick_diario();
+    }
+    let pib_inicial: f64 = eco.paises().iter().map(|p| p.pib_diario).sum();
     let leis_ini: Vec<_> = pol.paises().iter().map(|p| p.leis_ativas.clone()).collect();
     let mut pico = 0;
     for dia in 0..(365 * 5 + 1) {
@@ -48,16 +52,20 @@ fn rodar(ia: bool) -> (usize, usize, usize, u64, u64, u64) {
         em_calote(&eco), ip.propostas, ie.obras_enfileiradas, ie.ajustes_fiscais
     );
     eco.auditar_estabilidade().expect("estabilidade da economia");
-    (em_calote(&eco), pico, mudadas, ip.propostas, ie.obras_enfileiradas, ie.ajustes_fiscais)
+    let pib_final: f64 = eco.paises().iter().map(|p| p.pib_diario).sum();
+    let crescimento = pib_final / pib_inicial - 1.0;
+    eprintln!("IA={ia}: crescimento do PIB mundial em 5 anos = {:.1}%", crescimento * 100.0);
+    (em_calote(&eco), pico, mudadas, ip.propostas, ie.obras_enfileiradas, ie.ajustes_fiscais, crescimento)
 }
 
 #[test]
 fn cinco_anos_com_ia_sem_falencia_em_massa_e_com_mudanca_de_leis() {
-    let (sem_fim, _, _, _, _, _) = rodar(false);
-    let (fim, pico, mudadas, propostas, obras, ajustes) = rodar(true);
+    let (sem_fim, _, _, _, _, _, _) = rodar(false);
+    let (fim, pico, mudadas, propostas, obras, ajustes, crescimento) = rodar(true);
     let n = economia().paises().len();
     assert!(fim <= sem_fim, "a IA nao pode piorar os calotes ({fim} > {sem_fim})");
     assert!(pico * 10 <= n, "falencia em massa: pico {pico} de {n}");
     assert!(propostas > 0 && mudadas > 0, "nenhuma lei mudou ({propostas} propostas, {mudadas} paises)");
     assert!(obras + ajustes > 0, "IA economica inativa");
+    assert!(crescimento >= 0.03, "PIB mundial não cresceu em 5 anos: {:.1}%", crescimento * 100.0);
 }
