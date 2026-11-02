@@ -110,6 +110,8 @@ fn main() -> AppExit {
         VisualConstrucoesPlugin,
         RotulosPaisPlugin,
     ))
+    // Vídeo de abertura (pôster de propaganda) na tela de carregamento.
+    .add_plugins(plugins::abertura::AberturaPlugin)
     .add_plugins(AtmosferaPlugin)
     .add_plugins(EventosPlugin)
     .add_plugins(plugins::formacao_sim::FormacaoSimPlugin)

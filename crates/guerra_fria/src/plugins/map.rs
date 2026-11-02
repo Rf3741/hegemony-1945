@@ -119,7 +119,6 @@ impl Plugin for MapPlugin {
             .add_systems(Update, atualizar_legenda_zonas)
             .add_systems(OnEnter(AppState::Carregando), iniciar_carga)
             .add_systems(Update, aguardar_carga.run_if(in_state(AppState::Carregando)))
-            .add_systems(EguiPrimaryContextPass, tela_carregando.run_if(in_state(AppState::Carregando)))
             .add_systems(EguiPrimaryContextPass, legenda_zonas_ocupacao.run_if(in_state(AppState::Jogando)))
             .add_systems(
                 Update,
@@ -456,9 +455,9 @@ fn aguardar_carga(
     mut imagens: ResMut<Assets<Image>>,
     mut materiais: ResMut<Assets<TerrainMaterial>>,
     asset_server: Res<AssetServer>,
-    mut proximo: ResMut<NextState<AppState>>,
     economia: Option<Res<super::economia_sim::EconomiaSim>>,
     cfg: Option<Res<super::config::ConfigJogo>>,
+    mut abertura: ResMut<super::abertura::CarregamentoPronto>,
 ) {
     // O menu só abre quando a economia (sim_economia) também terminou de carregar.
     if economia.is_none() {
@@ -512,7 +511,7 @@ fn aguardar_carga(
     criar_ondas(&mut commands, &mut imagens, &saida.ids, saida.largura, saida.altura);
     commands.insert_resource(CaixasProvincia(saida.caixas));
     commands.insert_resource(DadosMapa { largura: saida.largura, altura: saida.altura, ids: saida.ids });
-    proximo.set(AppState::Menu);
+    abertura.0 = true;
 }
 
 /// Camada de ondas do oceano: duas texturas de baixa resolução (1/4) que só cobrem o mar aberto
@@ -657,24 +656,6 @@ fn legenda_zonas_ocupacao(
                 }
             }
         });
-    });
-    Ok(())
-}
-
-fn tela_carregando(mut contextos: EguiContexts, tempo: Res<Time>, dicas: Res<super::menu_ui::Dicas>) -> Result {
-    let ctx = contextos.ctx_mut()?;
-    super::menu_ui::desenhar_animacao_carregamento(ctx, tempo.elapsed_secs());
-    if let Some(d) = super::menu_ui::dica_atual(&dicas.0, tempo.elapsed_secs()) {
-        egui::Area::new("dica_carregando".into()).anchor(egui::Align2::CENTER_BOTTOM, [0.0, -60.0]).show(ctx, |ui| {
-            ui.set_max_width(640.0);
-            ui.label(egui::RichText::new(format!("{} — {} ({})", d.categoria, d.titulo, d.ano)).strong());
-            ui.label(&d.texto);
-            ui.label(egui::RichText::new(format!("Dica: {}", d.dica_mecanica)).italics());
-        });
-    }
-    let pontos = ".".repeat((tempo.elapsed_secs() * 2.0) as usize % 4);
-    egui::Area::new("carregando".into()).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).show(ctx, |ui| {
-        ui.heading(format!("Carregando o mapa e a economia de 1945{pontos}"));
     });
     Ok(())
 }
