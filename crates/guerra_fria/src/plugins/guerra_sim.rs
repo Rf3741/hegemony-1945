@@ -97,7 +97,25 @@ fn inicializar_guerra_sim(
         return;
     }
 
-    let pasta_guerra = raiz.0.join("data/guerra");
+    match construir_guerra_1945(&raiz.0, &catalogo_mapa.0, &mundo.0) {
+        Ok((mundo_guerra, catalogo_design)) => {
+            commands.insert_resource(GuerraSim(mundo_guerra));
+            commands.insert_resource(DadosGuerra(catalogo_design));
+            info!("Mundo de guerra inicializado com sucesso.");
+        }
+        Err(e) => {
+            error!("Falha crítica ao instanciar MundoGuerra: {}", e);
+        }
+    }
+}
+
+/// Constrói o `MundoGuerra` a partir do mapa, da economia e dos dados de 1945 (sem Bevy).
+pub fn construir_guerra_1945(
+    raiz: &std::path::Path,
+    catalogo_mapa: &gf_mapa::mapa::CatalogoProvincias,
+    mundo: &simulacao::mundo::MundoJogo,
+) -> Result<(MundoGuerra, CatalogoDesignGuerra), String> {
+    let pasta_guerra = raiz.join("data/guerra");
     let catalogo_militar = match CatalogoGuerra::carregar_diretorio(&pasta_guerra) {
         Ok(c) => c,
         Err(e) => {
@@ -109,17 +127,17 @@ fn inicializar_guerra_sim(
     let catalogo_design = CatalogoDesignGuerra::carregar_de_diretorio(&pasta_guerra).unwrap_or_default();
 
     // 1. Constrói regiões militares correspondentes às províncias
-    let mut regioes = Vec::with_capacity(catalogo_mapa.0.provincias.len());
+    let mut regioes = Vec::with_capacity(catalogo_mapa.provincias.len());
     let mut capitais_por_pais: HashMap<String, String> = HashMap::new();
 
-    for prov in &catalogo_mapa.0.provincias {
+    for prov in &catalogo_mapa.provincias {
         let adm1_code = format!("prov_{}", prov.id);
-        let dono = mundo.0.dono_por_provincia.get(&prov.id).map(|t| normalizar_tag(t)).unwrap_or_else(|| "NEU".to_string());
-        let controlador = mundo.0.controlador_por_provincia.get(&prov.id).map(|t| normalizar_tag(t)).unwrap_or_else(|| dono.clone());
+        let dono = mundo.dono_por_provincia.get(&prov.id).map(|t| normalizar_tag(t)).unwrap_or_else(|| "NEU".to_string());
+        let controlador = mundo.controlador_por_provincia.get(&prov.id).map(|t| normalizar_tag(t)).unwrap_or_else(|| dono.clone());
 
         capitais_por_pais.entry(dono.clone()).or_insert_with(|| adm1_code.clone());
 
-        let pop = mundo.0.populacao_por_provincia.get(&prov.id).copied().unwrap_or(15_000);
+        let pop = mundo.populacao_por_provincia.get(&prov.id).copied().unwrap_or(15_000);
         let eh_capital = capitais_por_pais.get(&dono).map_or(false, |c| c == &adm1_code);
         let pv = if eh_capital { 10.0 } else { 1.0 };
         let porto = if prov.vizinhos.iter().any(|&v| v == 0) { 15 } else { 0 };
@@ -142,8 +160,8 @@ fn inicializar_guerra_sim(
 
     // 2. Constrói arestas territoriais entre províncias vizinhas
     let mut arestas = Vec::new();
-    let max_id = catalogo_mapa.0.provincias.len() as u32;
-    for prov in &catalogo_mapa.0.provincias {
+    let max_id = catalogo_mapa.provincias.len() as u32;
+    for prov in &catalogo_mapa.provincias {
         let de = format!("prov_{}", prov.id);
         for &viz in &prov.vizinhos {
             if viz > prov.id && viz <= max_id {
@@ -163,7 +181,7 @@ fn inicializar_guerra_sim(
     let mut paises_militares = Vec::new();
     let mut tags_conhecidas = std::collections::HashSet::new();
 
-    for (tag_orig, pais) in &mundo.0.paises {
+    for (tag_orig, pais) in &mundo.paises {
         let tag = normalizar_tag(tag_orig);
         if tags_conhecidas.contains(&tag) {
             continue;
@@ -221,7 +239,7 @@ fn inicializar_guerra_sim(
             continue;
         }
 
-        let pib = mundo.0.paises.get(tag).map_or(5_000_000_000.0, |p| p.pib_anual_estimado.max(1_000_000.0));
+        let pib = mundo.paises.get(tag).map_or(5_000_000_000.0, |p| p.pib_anual_estimado.max(1_000_000.0));
         // Tamanho do exército em divisões determinado pelo PIB
         let n_divs = ((pib / 4_000_000_000.0).clamp(2.0, 40.0)) as usize;
 
@@ -275,9 +293,9 @@ fn inicializar_guerra_sim(
 
     let cenario = sim_guerra::CenarioGuerra {
         data_inicial: sim_guerra::DataJogo {
-            ano: mundo.0.data.ano as u16,
-            mes: mundo.0.data.mes as u8,
-            dia: mundo.0.data.dia as u8,
+            ano: mundo.data.ano as u16,
+            mes: mundo.data.mes as u8,
+            dia: mundo.data.dia as u8,
         },
         seed: 19450815,
         config: ConfigGuerra {
@@ -296,16 +314,9 @@ fn inicializar_guerra_sim(
         guerras: Vec::new(),
     };
 
-    match MundoGuerra::novo(cenario) {
-        Ok(mundo_guerra) => {
-            commands.insert_resource(GuerraSim(mundo_guerra));
-            commands.insert_resource(DadosGuerra(catalogo_design));
-            info!("Mundo de guerra inicializado com sucesso.");
-        }
-        Err(e) => {
-            error!("Falha crítica ao instanciar MundoGuerra: {}", e);
-        }
-    }
+    MundoGuerra::novo(cenario)
+        .map(|m| (m, catalogo_design))
+        .map_err(|e| e.to_string())
 }
 
 /// Tick diário de simulação da guerra sincronizado com o relógio do jogo.
@@ -316,74 +327,116 @@ fn tick_guerra(
     mut cores: Option<ResMut<CoresMapa>>,
     mut painel: ResMut<PainelGuerra>,
     eco: Option<ResMut<EconomiaSim>>,
+    mut ids_prov: Local<Vec<Option<u32>>>,
 ) {
     let Some(guerra) = guerra_sim.as_deref_mut() else { return };
     for _ in eventos.read() {
-        let rel = guerra.0.executar_tick_diario();
-
-        // 1. Consumo simples de bens militares e impacto no tesouro
-        if eco.is_some() {
-            for pais in guerra.0.cenario.paises.iter_mut() {
-                let divs_ativas = guerra.0.cenario.divisoes.iter().filter(|d| d.pais_tag == pais.tag && d.efetivos_atuais > 0).count();
-                if divs_ativas > 0 {
-                    // Manutenção diária simples: 0.05M por divisão
-                    let custo_manutencao = divs_ativas as f64 * 0.05;
-                    if let Some(p_jogo) = mundo.0.paises.get_mut(&pais.tag) {
-                        p_jogo.orcamento.tesouro -= custo_manutencao;
-                        if p_jogo.orcamento.tesouro < 0.0 {
-                            pais.estoque_suprimento = (pais.estoque_suprimento - 0.005).max(0.40);
-                        } else {
-                            pais.estoque_suprimento = (pais.estoque_suprimento + 0.01).min(1.0);
-                        }
-                    }
-                }
-            }
+        let mudou = aplicar_tick_guerra(
+            &mut guerra.0,
+            &mut mundo.0,
+            cores.as_deref_mut(),
+            eco.is_some(),
+            &mut ids_prov,
+        );
+        if mudou {
+            painel.repintar = true;
         }
+    }
+}
 
-        // 2. Sincroniza ocupação territorial das províncias
-        let mut mudou_territorio = false;
-        for reg in &guerra.0.cenario.regioes {
-            if let Some(id_str) = reg.adm1_code.strip_prefix("prov_")
-                && let Ok(id) = id_str.parse::<u32>()
+/// Executa um dia de guerra e sincroniza o resultado com o mundo do jogo.
+/// Devolve `true` se algum território mudou de controlador (precisa repintar o mapa).
+///
+/// `ids_prov` é um cache (índice da região -> id da província) para não reparsear
+/// `"prov_N"` das ~12 mil regiões todo dia.
+pub fn aplicar_tick_guerra(
+    guerra: &mut MundoGuerra,
+    mundo: &mut simulacao::mundo::MundoJogo,
+    mut cores: Option<&mut CoresMapa>,
+    com_economia: bool,
+    ids_prov: &mut Vec<Option<u32>>,
+) -> bool {
+    let rel = guerra.executar_tick_diario();
+
+    // 1. Consumo simples de bens militares e impacto no tesouro
+    if com_economia {
+        // Divisões ativas por país numa única passada (antes: países x divisões com String)
+        let mut divs_ativas = vec![0u32; guerra.cenario.paises.len()];
+        for d in &guerra.cenario.divisoes {
+            if d.efetivos_atuais > 0
+                && let Some(&p) = guerra.mapa_paises.get(&d.pais_tag)
             {
-                let ctrl_antigo = mundo.0.controlador_por_provincia.get(&id).cloned().unwrap_or_default();
-                if ctrl_antigo != reg.controlador_tag {
-                    mundo.0.controlador_por_provincia.insert(id, reg.controlador_tag.clone());
-                    mudou_territorio = true;
-
-                    if let Some(ref mut c) = cores {
-                        let cor_ocup = if reg.esta_ocupada() {
-                            mundo.0.paises.get(&reg.controlador_tag).map(|p| [p.cor.0, p.cor.1, p.cor.2, 255])
-                        } else {
-                            None
-                        };
-                        if (id as usize) < c.ocupante_cor.len() {
-                            c.ocupante_cor[id as usize] = cor_ocup;
-                        }
+                divs_ativas[p] += 1;
+            }
+        }
+        for (p_idx, pais) in guerra.cenario.paises.iter_mut().enumerate() {
+            let n = divs_ativas[p_idx];
+            if n > 0 {
+                // Manutenção diária simples: 0.05M por divisão
+                let custo_manutencao = n as f64 * 0.05;
+                if let Some(p_jogo) = mundo.paises.get_mut(&pais.tag) {
+                    p_jogo.orcamento.tesouro -= custo_manutencao;
+                    if p_jogo.orcamento.tesouro < 0.0 {
+                        pais.estoque_suprimento = (pais.estoque_suprimento - 0.005).max(0.40);
+                    } else {
+                        pais.estoque_suprimento = (pais.estoque_suprimento + 0.01).min(1.0);
                     }
                 }
             }
         }
+    }
 
-        // 3. Sincroniza transferências soberanas de tratados de paz assinados
-        if rel.tratados_assinados > 0 {
+    // 2. Sincroniza ocupação territorial das províncias
+    let mut mudou_territorio = false;
+    let regioes = &guerra.cenario.regioes;
+    if ids_prov.len() != regioes.len() {
+        ids_prov.clear();
+        ids_prov.extend(regioes.iter().map(|r| {
+            r.adm1_code.strip_prefix("prov_").and_then(|s| s.parse::<u32>().ok())
+        }));
+    }
+    for (reg, id) in regioes.iter().zip(ids_prov.iter()) {
+        let Some(id) = *id else { continue };
+        // Sem clonar a String do controlador antigo (antes: 1 alocação por região por dia)
+        let igual = match mundo.controlador_por_provincia.get(&id) {
+            Some(c) => *c == reg.controlador_tag,
+            None => reg.controlador_tag.is_empty(),
+        };
+        if !igual {
+            mundo.controlador_por_provincia.insert(id, reg.controlador_tag.clone());
             mudou_territorio = true;
-            for tratado in &guerra.0.historico_tratados {
-                for clausula in &tratado.clausulas_executadas {
-                    if let ClausulaPaz::AnexarRegioes { vencedor_tag, regioes_adm1, .. } = clausula {
-                        for reg_code in regioes_adm1 {
-                            if let Some(id_str) = reg_code.strip_prefix("prov_")
-                                && let Ok(id) = id_str.parse::<u32>()
-                            {
-                                mundo.0.dono_por_provincia.insert(id, vencedor_tag.clone());
-                                mundo.0.controlador_por_provincia.insert(id, vencedor_tag.clone());
-                                if let Some(ref mut c) = cores {
-                                    if let Some(p) = mundo.0.paises.get(vencedor_tag)
-                                        && (id as usize) < c.cor_prov.len()
-                                    {
-                                        c.cor_prov[id as usize] = [p.cor.0, p.cor.1, p.cor.2, 255];
-                                        c.ocupante_cor[id as usize] = None;
-                                    }
+
+            if let Some(c) = cores.as_deref_mut() {
+                let cor_ocup = if reg.esta_ocupada() {
+                    mundo.paises.get(&reg.controlador_tag).map(|p| [p.cor.0, p.cor.1, p.cor.2, 255])
+                } else {
+                    None
+                };
+                if (id as usize) < c.ocupante_cor.len() {
+                    c.ocupante_cor[id as usize] = cor_ocup;
+                }
+            }
+        }
+    }
+
+    // 3. Sincroniza transferências soberanas de tratados de paz assinados
+    if rel.tratados_assinados > 0 {
+        mudou_territorio = true;
+        for tratado in &guerra.historico_tratados {
+            for clausula in &tratado.clausulas_executadas {
+                if let ClausulaPaz::AnexarRegioes { vencedor_tag, regioes_adm1, .. } = clausula {
+                    for reg_code in regioes_adm1 {
+                        if let Some(id_str) = reg_code.strip_prefix("prov_")
+                            && let Ok(id) = id_str.parse::<u32>()
+                        {
+                            mundo.dono_por_provincia.insert(id, vencedor_tag.clone());
+                            mundo.controlador_por_provincia.insert(id, vencedor_tag.clone());
+                            if let Some(c) = cores.as_deref_mut() {
+                                if let Some(p) = mundo.paises.get(vencedor_tag)
+                                    && (id as usize) < c.cor_prov.len()
+                                {
+                                    c.cor_prov[id as usize] = [p.cor.0, p.cor.1, p.cor.2, 255];
+                                    c.ocupante_cor[id as usize] = None;
                                 }
                             }
                         }
@@ -391,11 +444,9 @@ fn tick_guerra(
                 }
             }
         }
-
-        if mudou_territorio {
-            painel.repintar = true;
-        }
     }
+
+    mudou_territorio
 }
 
 /// Repinta a textura do mapa aplicando hachura diagonal sobre províncias ocupadas.
@@ -547,5 +598,176 @@ mod testes {
         }
         assert!(g.0.guerras().iter().all(|w| !w.ativa));
         assert!(!g.0.frentes().iter().any(|f| f.ativa));
+    }
+
+    use simulacao::mundo::MundoJogo;
+    use std::time::Instant;
+
+    /// Versão ORIGINAL (antes da otimização) da sincronização do plugin, mantida só para
+    /// provar que a nova produz exatamente o mesmo resultado e para medir o ganho.
+    fn tick_legado(
+        guerra: &mut MundoGuerra,
+        mundo: &mut MundoJogo,
+        mut cores: Option<&mut CoresMapa>,
+        com_economia: bool,
+    ) -> bool {
+    let rel = guerra.executar_tick_diario();
+
+    // 1. Consumo simples de bens militares e impacto no tesouro
+    if com_economia {
+        for pais in guerra.cenario.paises.iter_mut() {
+            let divs_ativas = guerra.cenario.divisoes.iter().filter(|d| d.pais_tag == pais.tag && d.efetivos_atuais > 0).count();
+            if divs_ativas > 0 {
+                // Manutenção diária simples: 0.05M por divisão
+                let custo_manutencao = divs_ativas as f64 * 0.05;
+                if let Some(p_jogo) = mundo.paises.get_mut(&pais.tag) {
+                    p_jogo.orcamento.tesouro -= custo_manutencao;
+                    if p_jogo.orcamento.tesouro < 0.0 {
+                        pais.estoque_suprimento = (pais.estoque_suprimento - 0.005).max(0.40);
+                    } else {
+                        pais.estoque_suprimento = (pais.estoque_suprimento + 0.01).min(1.0);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Sincroniza ocupação territorial das províncias
+    let mut mudou_territorio = false;
+    for reg in &guerra.cenario.regioes {
+        if let Some(id_str) = reg.adm1_code.strip_prefix("prov_")
+            && let Ok(id) = id_str.parse::<u32>()
+        {
+            let ctrl_antigo = mundo.controlador_por_provincia.get(&id).cloned().unwrap_or_default();
+            if ctrl_antigo != reg.controlador_tag {
+                mundo.controlador_por_provincia.insert(id, reg.controlador_tag.clone());
+                mudou_territorio = true;
+
+                if let Some(ref mut c) = cores {
+                    let cor_ocup = if reg.esta_ocupada() {
+                        mundo.paises.get(&reg.controlador_tag).map(|p| [p.cor.0, p.cor.1, p.cor.2, 255])
+                    } else {
+                        None
+                    };
+                    if (id as usize) < c.ocupante_cor.len() {
+                        c.ocupante_cor[id as usize] = cor_ocup;
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Sincroniza transferências soberanas de tratados de paz assinados
+    if rel.tratados_assinados > 0 {
+        mudou_territorio = true;
+        for tratado in &guerra.historico_tratados {
+            for clausula in &tratado.clausulas_executadas {
+                if let ClausulaPaz::AnexarRegioes { vencedor_tag, regioes_adm1, .. } = clausula {
+                    for reg_code in regioes_adm1 {
+                        if let Some(id_str) = reg_code.strip_prefix("prov_")
+                            && let Ok(id) = id_str.parse::<u32>()
+                        {
+                            mundo.dono_por_provincia.insert(id, vencedor_tag.clone());
+                            mundo.controlador_por_provincia.insert(id, vencedor_tag.clone());
+                            if let Some(ref mut c) = cores {
+                                if let Some(p) = mundo.paises.get(vencedor_tag)
+                                    && (id as usize) < c.cor_prov.len()
+                                {
+                                    c.cor_prov[id as usize] = [p.cor.0, p.cor.1, p.cor.2, 255];
+                                    c.ocupante_cor[id as usize] = None;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+        mudou_territorio
+    }
+
+    fn carregar_1945() -> (MundoGuerra, MundoJogo) {
+        let raiz = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let (catalogo, mundo) = MundoJogo::carregar_de_arquivos(
+            raiz.join("assets/map/provinces.ron"),
+            raiz.join("data/scenario_1945/countries_1945.ron"),
+            raiz.join("data/scenario_1945/province_owners_1945.ron"),
+        )
+        .expect("cenário 1945");
+        let catalogo_mapa: gf_mapa::mapa::CatalogoProvincias = ron::from_str(
+            &std::fs::read_to_string(raiz.join("assets/map/provinces.ron")).expect("provinces.ron"),
+        )
+        .expect("provinces.ron inválido");
+        drop(catalogo);
+        let (g, _) = construir_guerra_1945(&raiz, &catalogo_mapa, &mundo).expect("guerra 1945");
+        (g, mundo)
+    }
+
+    fn resumo(g: &MundoGuerra, m: &MundoJogo) -> String {
+        let mut ctrl: Vec<_> = m.controlador_por_provincia.iter().collect();
+        ctrl.sort();
+        let mut dono: Vec<_> = m.dono_por_provincia.iter().collect();
+        dono.sort();
+        let tesouros: Vec<_> = m.paises.iter().map(|(t, p)| (t.clone(), p.orcamento.tesouro.to_bits())).collect();
+        format!(
+            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+            ctrl,
+            dono,
+            tesouros,
+            g.paises(),
+            g.guerras(),
+            g.divisoes()
+        )
+    }
+
+    /// A sincronização otimizada deve dar o mesmo estado que a original, em paz e em guerra.
+    #[test]
+    fn tick_otimizado_igual_ao_legado_com_dados_reais() {
+        let (mut g_novo, mut m_novo) = carregar_1945();
+        let (mut g_old, mut m_old) = carregar_1945();
+        // Guerra real entre duas potências vizinhas depois de alguns dias de paz
+        let mut ids = Vec::new();
+        for dia in 0..50 {
+            if dia == 10 {
+                for g in [&mut g_novo, &mut g_old] {
+                    let _ = g.declarar_guerra("SOV", "JAP", "Guerra de teste");
+                }
+            }
+            let a = aplicar_tick_guerra(&mut g_novo, &mut m_novo, None, true, &mut ids);
+            let b = tick_legado(&mut g_old, &mut m_old, None, true);
+            assert_eq!(a, b, "dia {dia}: flag de território divergiu");
+        }
+        assert_eq!(resumo(&g_novo, &m_novo), resumo(&g_old, &m_old));
+    }
+
+    /// Micro-benchmark do custo por dia do tick de guerra no cenário real de 1945 (paz).
+    /// Rodar: `cargo test --release -p guerra_fria bench_tick_guerra_1945 -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn bench_tick_guerra_1945() {
+        let dias = 230;
+        let (mut g, mut m) = carregar_1945();
+        println!("regioes={} paises={} divisoes={}", g.regioes().len(), g.paises().len(), g.divisoes().len());
+        let mut ids = Vec::new();
+        for _ in 0..5 {
+            aplicar_tick_guerra(&mut g, &mut m, None, true, &mut ids);
+        }
+        let t = Instant::now();
+        for _ in 0..dias {
+            aplicar_tick_guerra(&mut g, &mut m, None, true, &mut ids);
+        }
+        let novo = t.elapsed().as_secs_f64() * 1000.0 / dias as f64;
+
+        let (mut g2, mut m2) = carregar_1945();
+        for _ in 0..5 {
+            tick_legado(&mut g2, &mut m2, None, true);
+        }
+        let t = Instant::now();
+        for _ in 0..dias {
+            tick_legado(&mut g2, &mut m2, None, true);
+        }
+        let legado = t.elapsed().as_secs_f64() * 1000.0 / dias as f64;
+        println!("BENCH tick_guerra 1945 (paz): sincronizacao legada={legado:.3} ms/dia, otimizada={novo:.3} ms/dia");
     }
 }
