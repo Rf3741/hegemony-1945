@@ -666,7 +666,8 @@ fn ler_ron<T: serde::de::DeserializeOwned>(caminho: &Path, contexto: &str) -> Re
 }
 
 /// Zona de ocupação aliada (tag do ocupante) de uma província da Alemanha (dono `GER`) ou da
-/// Áustria (dono `AUT`) em 1945, a partir do código adm1. `None` para o resto do mundo.
+/// Áustria (dono `AUT`) em 1945, a partir do código adm1. `None` para o resto do mundo;
+/// outras ocupações históricas são aplicadas por seus eventos próprios.
 ///
 /// Alemanha: USA (Baviera, Hesse, Bremen), GBR (Schleswig-Holstein, Hamburgo, Baixa Saxônia,
 /// Renânia do Norte-Vestfália), FRA (Renânia-Palatinado, Sarre, Baden-Württemberg),
@@ -683,12 +684,12 @@ pub fn zona_ocupacao_1945(adm1_code: &str, dono: &str) -> Option<&'static str> {
 pub fn zona_ocupacao_1945_com_centroid(
     adm1_code: &str,
     dono: &str,
-    centroide: (f32, f32),
+    _centroide: (f32, f32),
 ) -> Option<&'static str> {
     // c-fix: proteção para não atribuir ocupação a países fora da lista conhecida
     let dono_permitido = matches!(
         dono,
-        "GER" | "AUT" | "KOR" | "JAP" | "FIC" | "IRN" | "CHI" | "DEN" | "ITA" | "PER"
+        "GER" | "AUT"
     );
     if !dono_permitido {
         return None;
@@ -705,22 +706,6 @@ pub fn zona_ocupacao_1945_com_centroid(
         ("AUT", "AUT-2327" | "AUT-2326") => Some("USA"),
         ("AUT", "AUT-2323" | "AUT-2325") => Some("GBR"),
         ("AUT", "AUT-2329" | "AUT-2320") => Some("FRA"),
-        ("KOR", code) if code.starts_with("KOR-") => {
-            Some(if centroide.1 >= 38.0 { "SOV" } else { "USA" })
-        }
-        ("KOR", code) if code.starts_with("PRK-") => Some("SOV"),
-        ("JAP", code) if code.starts_with("JPN-") => Some("USA"),
-        ("FIC", code) if matches!(code.split_once('-'), Some(("VNM" | "LAO" | "KHM", _))) => {
-            Some(if centroide.1 >= 16.0 { "CHI" } else { "GBR" })
-        }
-        ("IRN", _) => Some(if centroide.1 >= 35.5 { "SOV" } else { "GBR" }),
-        ("CHI", "CHN-1813" | "CHN-1828" | "CHN-1839") => Some("SOV"),
-        ("DEN", "DNK-3417") => Some("SOV"),
-        ("ITA", code) if code.starts_with("LBY-") || code.starts_with("ERI-") || code.starts_with("SOM-") => {
-            Some(if code.starts_with("LBY-") && centroide.0 < 15.0 { "FRA" } else { "GBR" })
-        }
-        ("PER", "ITA-5458") => Some("GBR"),
-        ("GER", "RUS-2324") => Some("SOV"),
         _ => None,
     }
 }

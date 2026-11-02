@@ -853,8 +853,46 @@ pub fn executar_lote(
             }
         }
     }
+    let fila_antes = pais
+        .and_then(|p| nucleo.mundo.obter_pais(p))
+        .map(|p| p.fila_construcao.clone())
+        .unwrap_or_default();
     let t = Instant::now();
     let obras = nucleo.avancar(dias);
+    if let Some(pais) = pais {
+        let fila_depois = nucleo.mundo.obter_pais(pais).map(|p| &p.fila_construcao);
+        let mut usados = vec![false; fila_depois.map_or(0, Vec::len)];
+        for item in fila_antes {
+            let ainda_na_fila = fila_depois.is_some_and(|fila| {
+                fila.iter().enumerate().any(|(i, atual)| {
+                    !usados[i]
+                        && atual.provincia_id == item.provincia_id
+                        && atual.tipo_predio_id == item.tipo_predio_id
+                })
+            });
+            if ainda_na_fila {
+                if let Some(fila) = fila_depois {
+                    if let Some((i, _)) = fila.iter().enumerate().find(|(i, atual)| {
+                        !usados[*i]
+                            && atual.provincia_id == item.provincia_id
+                            && atual.tipo_predio_id == item.tipo_predio_id
+                    }) {
+                        usados[i] = true;
+                    }
+                }
+                continue;
+            }
+            let tipo = nucleo
+                .catalogo
+                .obter_tipo_predio(&item.tipo_predio_id)
+                .map_or(item.tipo_predio_id.as_str(), |t| t.nome.as_str());
+            let provincia = nucleo
+                .mundo
+                .obter_provincia(&item.provincia_id)
+                .map_or(item.provincia_id.as_str(), |p| p.nome.as_str());
+            msgs.push(format!("Obra concluída: {tipo} em {provincia}"));
+        }
+    }
     let ms = if dias > 0 { t.elapsed().as_secs_f64() * 1000.0 / dias as f64 } else { 0.0 };
     let vista = pais.map(|p| nucleo.vista(p)).unwrap_or_default();
     (vista, msgs, ms, obras)

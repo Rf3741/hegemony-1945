@@ -70,7 +70,9 @@ fn carregar(mut commands: Commands, raiz: Option<Res<RaizProjeto>>, catalogo: Op
 }
 
 fn texto_noticia(e: &EventoFormacao) -> String {
-    if e.independencia {
+    if e.tipo == "desocupacao" {
+        e.descricao.clone()
+    } else if e.independencia {
         format!("{} conquista a independência.", e.nome)
     } else if e.origens.is_empty() {
         format!("Nasce um novo país: {}.", e.nome)
@@ -125,7 +127,13 @@ fn tick_formacao(
         form.avisos.push(e.clone());
         form.economia_pendentes.push(e.clone());
         form.politica_pendentes.push(e.clone());
-        let texto = if e.independencia {
+        let texto = if e.tipo == "desocupacao" {
+            super::enciclopedia::texto_notificacao(
+                "msg_desocupacao_historica",
+                &[("territorio", e.nome.clone()), ("descricao", texto_noticia(e))],
+                &texto_noticia(e),
+            )
+        } else if e.independencia {
             super::enciclopedia::texto_notificacao(
                 "msg_independencia",
                 &[("pais", e.nome.clone()), ("metropole", e.origens.first().cloned().unwrap_or_else(|| "a antiga metrópole".into()))],
@@ -166,7 +174,16 @@ fn repintar_provincias(c: &mut CoresMapa, provs: &[u32], tag: &str, cor: (u8, u8
     let _ = tag;
 }
 
-fn aviso_formacao(mut contextos: EguiContexts, mut form: ResMut<FormacaoSim>, mut relogio: ResMut<RecursoRelogio>) -> Result {
+fn aviso_formacao(
+    mut contextos: EguiContexts,
+    mut form: ResMut<FormacaoSim>,
+    mut relogio: ResMut<RecursoRelogio>,
+    ev: Res<EstadoEv>,
+) -> Result {
+    // Eventos urgentes têm prioridade absoluta; este aviso permanece na fila.
+    if !ev.estado.pendentes.is_empty() {
+        return Ok(());
+    }
     let Some(e) = form.avisos.first().cloned() else { return Ok(()) };
     if !relogio.pausado {
         form.retomar = true;

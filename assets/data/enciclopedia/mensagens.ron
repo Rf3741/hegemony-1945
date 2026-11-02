@@ -329,4 +329,13 @@
         placeholders: ["titulo", "descricao"],
         som_efeito: "teletipo_urgente",
     ),
+    ModeloMensagem(
+        id: "msg_desocupacao_historica",
+        categoria: "territorial",
+        tipo_alerta: "informativo",
+        titulo_template: "Fim da ocupação: {territorio}",
+        mensagem_template: "{descricao}",
+        placeholders: ["territorio", "descricao"],
+        som_efeito: "teletipo_leve",
+    ),
 ]
