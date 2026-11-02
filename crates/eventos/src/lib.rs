@@ -7,6 +7,7 @@ pub mod contexto;
 pub mod efeitos;
 pub mod modificadores;
 pub mod politicos;
+pub mod rotulos;
 
 pub use condicoes::{Condicao, Op};
 pub use contexto::ContextoEfeitos;
@@ -547,47 +548,7 @@ pub fn aplicar_opcao_com_contexto(
     }
 }
 
-/// Texto de tooltip para um efeito (ex.: "Tensão mundial +3.5").
+/// Texto de tooltip para um efeito (ex.: "Tensão da Guerra Fria +3,5").
 pub fn descrever_efeito(m: &Modificador) -> String {
-    let id = m.id.as_str();
-    if let Some(resto) = id.strip_prefix("mudar_lei:")
-        .or_else(|| id.strip_prefix("lei:"))
-        .or_else(|| id.strip_prefix("promulgar_lei:"))
-    {
-        let lei = resto.split_once(':').map(|(_, l)| l).unwrap_or(resto);
-        return format!("Promulgar Lei: {}", lei.replace('_', " "));
-    }
-    if let Some(resto) = id.strip_prefix("temp:") {
-        if let Some((nome, dias)) = resto.split_once(':') {
-            return format!("Modificador temporário: {} {:+.2} ({} dias)", nome.replace('_', " "), m.valor, dias);
-        }
-    }
-    if let Some(f) = id.strip_prefix("flag:").or_else(|| id.strip_prefix("definir_flag:")) {
-        return format!("Definir Flag Nacional: {}", f.replace('_', " "));
-    }
-    if let Some(f) = id.strip_prefix("remover_flag:") {
-        return format!("Remover Flag Nacional: {}", f.replace('_', " "));
-    }
-    if let Some(v) = id.strip_prefix("var:").or_else(|| id.strip_prefix("variavel:")) {
-        return format!("Variável {}: {:+.2}", v.replace('_', " "), m.valor);
-    }
-    if let Some(r) = id.strip_prefix("relacao:") {
-        return format!("Relações com {}: {:+.2}", r, m.valor);
-    }
-
-    let nome = match id {
-        "tensao_guerra_fria" => "Tensão mundial".to_string(),
-        "legitimidade_base" | "estabilidade_politica" => "Estabilidade".to_string(),
-        "legitimidade_internacional" => "Legitimidade internacional".to_string(),
-        "crescimento_pib" => "Tesouro (crescimento do PIB)".to_string(),
-        outro => {
-            let s = outro.replace('_', " ");
-            let mut c = s.chars();
-            c.next()
-                .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
-                .unwrap_or_default()
-        }
-    };
-    let v = if m.id == "tensao_guerra_fria" { m.valor * 10.0 } else { m.valor };
-    format!("{nome} {v:+.2}")
+    rotulos::descrever(m)
 }

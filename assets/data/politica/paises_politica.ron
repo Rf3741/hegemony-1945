@@ -14775,7 +14775,7 @@
         chefe_de_estado: Some((
             id: "mir_gholam_mohammad_ghobar",
             nome: "Mir Gholam Mohammad Ghobar",
-            ideologia_id: "nacionalismo_republicano",
+            ideologia_id: "tradicionalismo_monarquico",
             popularidade: 60.0,
             carisma: 1.1,
             ano_nascimento: 1895,

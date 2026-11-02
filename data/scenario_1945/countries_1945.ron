@@ -1201,7 +1201,7 @@
     ),
     (
         tag: "AFG",
-        nome: "Afeganistão",
+        nome: "Reino do Afeganistão",
         cor: (115, 135, 95),
         capital: "Cabul",
         suserano: None,
