@@ -221,7 +221,7 @@ fn test_simulacao_mundo_sintetico() {
 }
 
 #[test]
-fn zonas_de_ocupacao_nao_saem_de_alemanha_e_austria() {
+fn zonas_de_ocupacao_so_nos_territorios_historicos() {
     for codigo in ["CHL-2694", "USA-3521", "SOV-001", "FRA-2000"] {
         assert_eq!(zona_ocupacao_1945(codigo, "GER"), None, "{codigo} não pode ser zona alemã");
         assert_eq!(zona_ocupacao_1945(codigo, "AUT"), None, "{codigo} não pode ser zona austríaca");
@@ -236,7 +236,13 @@ fn zonas_de_ocupacao_nao_saem_de_alemanha_e_austria() {
     for prov in &catalogo.provincias {
         let dono = mundo.dono_por_provincia.get(&prov.id).expect("dono da província");
         let controlador = mundo.controlador_por_provincia.get(&prov.id).expect("controlador da província");
-        if dono != "GER" && dono != "AUT" {
+        // Donos com ocupação histórica em 1945 (ver .ops/OCUPACOES_1945.md); o resto do mundo
+        // (Chile incluído) tem de continuar controlado pelo próprio dono.
+        let ocupavel = matches!(
+            dono.as_str(),
+            "GER" | "AUT" | "KOR" | "JAP" | "FIC" | "IRN" | "CHI" | "DEN" | "ITA" | "PER"
+        );
+        if !ocupavel {
             assert_eq!(controlador, dono, "província {} ({}) fora das zonas foi ocupada", prov.id, prov.adm1_code);
         }
     }
