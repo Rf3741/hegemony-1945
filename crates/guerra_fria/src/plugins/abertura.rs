@@ -42,6 +42,7 @@ impl Plugin for AberturaPlugin {
             // O OnEnter do estado inicial roda antes do Startup: preparar e iniciar juntos,
             // encadeados, para o EstadoAbertura já existir quando iniciar_abertura rodar.
             .add_systems(OnEnter(AppState::Carregando), (preparar_abertura, iniciar_abertura).chain())
+            .add_systems(OnExit(AppState::Carregando), encerrar_abertura)
             .add_systems(Update, (atualizar_abertura, ajustar_sprite, controlar_audio_abertura).chain().run_if(in_state(AppState::Carregando)))
             .add_systems(EguiPrimaryContextPass, desenhar_abertura.run_if(in_state(AppState::Carregando)));
     }
@@ -234,5 +235,22 @@ mod testes {
     fn loop_retorna_ao_trecho_final() {
         assert_eq!(indice_loop(10.0), LOOP_INICIO);
         assert_eq!(indice_loop(10.1), LOOP_INICIO + 2);
+    }
+}
+
+/// Ao sair do carregamento, remove o vídeo (sprite por cima do mapa) e o áudio da abertura e
+/// solta a textura e o decodificador; sem isso o pôster ficava cobrindo o mapa na partida.
+fn encerrar_abertura(
+    mut commands: Commands,
+    entidades: Query<Entity, Or<(With<SpriteAbertura>, With<AudioAbertura>)>>,
+    mut estado: Option<ResMut<EstadoAbertura>>,
+    mut imagens: ResMut<Assets<Image>>,
+) {
+    for entidade in &entidades {
+        commands.entity(entidade).despawn();
+    }
+    if let Some(estado) = estado.as_mut() {
+        estado.receptor = None;
+        imagens.remove(&estado.imagem);
     }
 }
