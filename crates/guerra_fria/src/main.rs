@@ -86,6 +86,7 @@ fn main() {
         })
         .add_plugins((
             estado::EstadoPlugin,
+            plugins::abertura::AberturaPlugin,
             TimePlugin,
             EconomyPlugin,
             EconomiaSimPlugin,
@@ -95,6 +96,8 @@ fn main() {
             PoliticsPlugin,
             JogadorPlugin,
             MapPlugin,
+        ))
+        .add_plugins((
             UiPlugin,
             AudioPlugin,
             RotasPontePlugin,

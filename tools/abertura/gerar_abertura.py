@@ -8,7 +8,7 @@ import tempfile
 import wave
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 W, H, FPS, N = 1280, 720, 24, 240
 ROOT = Path(__file__).resolve().parents[2]
@@ -16,6 +16,10 @@ OUT = ROOT / "assets/abertura"
 FRAMES = OUT / "quadros"
 FONT = ROOT / "assets/fonts/Oswald-Bold.ttf"
 CREME, VERMELHO, AZUL, TINTA, AMARELO = "#efe4cc", "#b3261e", "#1f3a5f", "#171515", "#e8b530"
+CONTINENTE = (159, 179, 200, 255)
+CONTORNO_TERRA = (58, 74, 90, 255)
+GRADE = "#5f7fa3"
+CARIMBO = "#c02a26"
 
 
 def font(size):
@@ -58,114 +62,258 @@ def sombra(draw, shape, offset=(10, 10), fill=TINTA):
     draw.polygon(shape, fill=fill)
 
 
-def foice_martelo(draw, cx, cy, scale=1.0):
-    gold = AMARELO
-    # Sombra serigráfica, deliberadamente deslocada.
-    draw.arc((cx-73*scale+8, cy-56*scale+9, cx+45*scale+8, cy+59*scale+9),
-             205, 48, fill=TINTA, width=max(4, int(13*scale)))
-    draw.line((cx-8*scale+8, cy+45*scale+9, cx+28*scale+8, cy-4*scale+9),
-              fill=TINTA, width=max(4, int(11*scale)))
-    draw.rectangle((cx+8*scale+8, cy-39*scale+9, cx+62*scale+8, cy-24*scale+9), fill=TINTA)
-    # Lâmina crescente e cabo curto.
-    draw.arc((cx-73*scale, cy-56*scale, cx+45*scale, cy+59*scale),
-             205, 48, fill=gold, width=max(5, int(13*scale)))
-    draw.line((cx-8*scale, cy+45*scale, cx+28*scale, cy-4*scale),
-              fill=gold, width=max(5, int(11*scale)))
-    # Martelo: cabo diagonal e cabeça retangular.
-    draw.line((cx+7*scale, cy+40*scale, cx+39*scale, cy-32*scale),
-              fill=gold, width=max(5, int(11*scale)))
-    draw.rectangle((cx+18*scale, cy-45*scale, cx+73*scale, cy-27*scale), fill=gold)
+def suavizar(pontos, fechado=True, steps=14):
+    """Catmull-Rom -> malha densa, para contornos contínuos sem cantos vivos."""
+    n = len(pontos)
+    saida = []
+    faixa = range(n) if fechado else range(n - 1)
+    for i in faixa:
+        if fechado:
+            p0, p1, p2, p3 = (pontos[(i - 1) % n], pontos[i],
+                              pontos[(i + 1) % n], pontos[(i + 2) % n])
+        else:
+            p0 = pontos[max(i - 1, 0)]
+            p1, p2 = pontos[i], pontos[i + 1]
+            p3 = pontos[min(i + 2, n - 1)]
+        for k in range(steps):
+            t = k / steps
+            t2, t3 = t * t, t * t * t
+            saida.append(tuple(
+                0.5 * (2 * p1[d] + (-p0[d] + p2[d]) * t
+                       + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * t2
+                       + (-p0[d] + 3 * p1[d] - 3 * p2[d] + p3[d]) * t3)
+                for d in (0, 1)))
+    return saida
+
+
+def bloco(draw, pts, cor, contorno=TINTA, esp=6):
+    """Forma preenchida com contorno escuro por fora."""
+    draw.line(pts + [pts[0]], fill=contorno, width=esp, joint="curve")
+    draw.polygon(pts, fill=cor)
+
+
+def foice_martelo(draw, cx, cy, h):
+    """Emblema desenhado em unidades próprias (~152u de altura)."""
+    u = h / 140.0
+
+    def P(x, y):
+        return (cx + x * u, cy + y * u)
+
+    # Foice: crescente de ~270° aberta para a direita, afinando até a ponta.
+    mx, my, raio = -20.0, -20.0, 50.0
+    externa, interna = [], []
+    for i in range(61):
+        k = i / 60
+        g = math.radians(45 + 270 * k)
+        meia = 10.5 - 8.3 * k ** 1.5
+        x, y = mx + raio * math.cos(g), my + raio * math.sin(g)
+        externa.append(P(x + math.cos(g) * meia, y + math.sin(g) * meia))
+        interna.append(P(x - math.cos(g) * meia, y - math.sin(g) * meia))
+    lamina = externa + interna[::-1]
+    cabo_foice = [P(21, 9), P(36, 24), P(52, 47), P(58, 61),
+                  P(46, 68), P(39, 55), P(26, 37), P(11, 23)]
+    # Martelo: cabo reto na diagonal oposta (cruzando a foice em X) e cabeça grossa.
+    cabo_martelo = [P(-58, 78), P(-46, 62), P(40, -26), P(52, -38),
+                    P(40, -48), P(-48, 42), P(-64, 70)]
+    cabeca = [P(4, -74), P(72, -66), P(68, -34), P(0, -42)]
+
+    pecas = [lamina, cabo_foice, cabo_martelo, cabeca]
+    for pts in pecas:
+        draw.polygon([(x + 7 * u, y + 8 * u) for x, y in pts], fill=TINTA)
+    for pts in pecas:
+        bloco(draw, pts, AMARELO, esp=max(3, int(4 * u)))
+
+
+PERFIL_CONTORNO = [
+    (95, 8), (140, 22), (156, 54), (148, 68), (158, 80), (182, 98),
+    (152, 108), (164, 120), (140, 130), (158, 142), (146, 154), (168, 172),
+    (124, 196), (142, 232), (162, 274), (208, 314), (252, 402), (-72, 402),
+    (-16, 302), (18, 252), (32, 210), (12, 150), (-2, 96), (22, 40),
+]
+PERFIL_QUEPE = [(-8, 44), (-12, 14), (16, -14), (88, -26), (142, -12),
+                (166, 24), (150, 40), (2, 46)]
+PERFIL_ABA = [(144, 32), (198, 42), (202, 58), (150, 52)]
 
 
 def perfil(draw, side, color, p=1.0):
-    left = side < 0
-    # Contorno Bézier com testa, nariz, lábios, queixo e pescoço.
-    if left:
-        segs = [
-            ((120, 525), (105, 430), (115, 300), (155, 230)),
-            ((155, 230), (190, 185), (270, 180), (305, 220)),
-            ((305, 220), (335, 245), (328, 270), (320, 291)),
-            ((320, 291), (337, 301), (349, 311), (325, 320)),
-            ((325, 320), (344, 332), (340, 344), (315, 349)),
-            ((315, 349), (330, 375), (318, 410), (285, 430)),
-            ((285, 430), (260, 451), (270, 510), (300, 555)),
-            ((300, 555), (230, 575), (160, 570), (120, 525)),
-        ]
-        hat = [(135, 235), (150, 178), (214, 154), (285, 181), (305, 215), (170, 205)]
-    else:
-        segs = [
-            ((1160, 525), (1175, 430), (1165, 300), (1125, 230)),
-            ((1125, 230), (1090, 185), (1010, 180), (975, 220)),
-            ((975, 220), (945, 245), (952, 270), (960, 291)),
-            ((960, 291), (943, 301), (931, 311), (955, 320)),
-            ((955, 320), (936, 332), (940, 344), (965, 349)),
-            ((965, 349), (950, 375), (962, 410), (995, 430)),
-            ((995, 430), (1020, 451), (1010, 510), (980, 555)),
-            ((980, 555), (1050, 575), (1120, 570), (1160, 525)),
-        ]
-        hat = [(1145, 235), (1130, 178), (1066, 154), (995, 181), (975, 215), (1110, 205)]
-    pts = []
-    for seg in segs:
-        pts.extend(bezier(*seg))
-    scaled = [(640 + (x-640)*p, 360 + (y-360)*p) for x, y in pts]
-    dshadow = [(x+9, y+10) for x, y in scaled]
-    draw.polygon(dshadow, fill=TINTA)
-    draw.polygon(scaled, fill=color, outline=CREME)
-    hscaled = [(640 + (x-640)*p, 360 + (y-360)*p) for x, y in hat]
-    draw.polygon([(x+8, y+9) for x, y in hscaled], fill=TINTA)
-    draw.polygon(hscaled, fill=color, outline=CREME)
-    draw.line((hscaled[0], hscaled[-1]), fill=CREME, width=3)
+    """Busto em perfil; cabeça entre 8 e 196 nas unidades locais."""
+    s = 1.55 * p
+    f = 1 if side < 0 else -1          # o perfil da esquerda olha para a direita
+    ox = 345 if side < 0 else 935
+    oy = 372
+    ax, ay = 90.0, 110.0
+
+    def T(x, y):
+        return (ox + f * s * (x - ax), oy + s * (y - ay))
+
+    pts = [T(*q) for q in suavizar(PERFIL_CONTORNO, True, 12)]
+    draw.polygon([(x + 9, y + 10) for x, y in pts], fill=TINTA)
+    bloco(draw, pts, color, contorno=CREME, esp=6)
+
+    qpts = [T(*q) for q in suavizar(PERFIL_QUEPE, True, 8)]
+    draw.polygon([(x + 8, y + 9) for x, y in qpts], fill=TINTA)
+    bloco(draw, qpts, color, contorno=CREME, esp=5)
+    aba = [T(*q) for q in suavizar(PERFIL_ABA, True, 6)]
+    draw.polygon([(x + 6, y + 7) for x, y in aba], fill=TINTA)
+    bloco(draw, aba, TINTA, contorno=CREME, esp=4)
 
 
-def globo(draw, gx, gy, gr, t):
-    draw.ellipse((gx-gr+9, gy-gr+11, gx+gr+9, gy+gr+11), fill=TINTA)
-    draw.ellipse((gx-gr, gy-gr, gx+gr, gy+gr), fill=CREME, outline=TINTA, width=7)
-    # Paralelos e meridianos visíveis.
-    for ratio in (-.62, -.32, 0, .32, .62):
-        yy = gy + ratio * gr
-        half = gr * math.sqrt(max(.05, 1-ratio*ratio))
-        draw.arc((gx-half, yy-gr*.18, gx+half, yy+gr*.18), 180, 360, fill=AZUL, width=4)
-        draw.arc((gx-half, yy-gr*.18, gx+half, yy+gr*.18), 0, 180, fill=AZUL, width=4)
-    for ratio in (-.58, -.28, .28, .58):
-        half = gr * (1-abs(ratio))*.72
-        draw.ellipse((gx-half, gy-gr, gx+half, gy+gr), outline=AZUL, width=4)
-    # Continentes estilizados.
-    europe = [(gx-22, gy-55), (gx+5, gy-69), (gx+25, gy-52), (gx+18, gy-31),
-              (gx+43, gy-20), (gx+20, gy-4), (gx-7, gy-14), (gx-30, gy-34)]
-    africa = [(gx-4, gy-8), (gx+26, gy-2), (gx+16, gy+28), (gx+2, gy+60),
-              (gx-18, gy+28)]
-    americas = [(gx-75, gy-45), (gx-50, gy-60), (gx-48, gy-20), (gx-63, gy+5),
-                (gx-45, gy+35), (gx-59, gy+72), (gx-77, gy+38)]
-    for land in (europe, africa, americas):
-        draw.polygon(land, fill=TINTA)
-    # Arame serrilhado da Cortina de Ferro atravessando a Europa.
-    wire = [(gx-74, gy-36), (gx-56, gy-48), (gx-42, gy-30), (gx-26, gy-47),
-            (gx-10, gy-29), (gx+7, gy-45), (gx+23, gy-28), (gx+42, gy-42),
-            (gx+68, gy-25)]
-    draw.line(wire, fill=TINTA, width=11, joint="curve")
-    for x, y in wire[1:-1]:
-        draw.line((x-8, y-11, x+8, y+11), fill=TINTA, width=3)
+CONTINENTES = [
+    # Europa, África, Ásia e as duas Américas em coordenadas do disco (-100..100).
+    [(-30, -46), (-38, -58), (-26, -64), (-16, -56), (-8, -72), (6, -76),
+     (16, -62), (28, -56), (32, -44), (20, -36), (4, -30), (-10, -34), (-22, -40)],
+    [(-24, -24), (-4, -28), (18, -30), (34, -22), (40, -6), (32, 12),
+     (24, 34), (10, 52), (-4, 40), (-14, 18), (-26, 4), (-18, -10)],
+    [(28, -72), (50, -82), (76, -72), (94, -54), (98, -34), (84, -24),
+     (72, -10), (60, -18), (52, 6), (44, -8), (36, -22), (30, -40), (24, -56)],
+    [(-98, -56), (-80, -70), (-58, -64), (-48, -46), (-56, -34),
+     (-70, -28), (-82, -16), (-92, -26), (-98, -42)],
+    [(-76, -12), (-58, -8), (-50, 10), (-58, 30), (-70, 48),
+     (-82, 40), (-86, 18), (-80, 2)],
+]
+
+
+def globo(im, gx, gy, gr):
+    if gr < 10:
+        return
+    d = ImageDraw.Draw(im)
+    r = gr
+    d.ellipse((gx - r + 9, gy - r + 11, gx + r + 9, gy + r + 11), fill=TINTA)
+    d.ellipse((gx - r, gy - r, gx + r, gy + r), fill=CREME)
+
+    lado = int(2 * r) + 6
+    c = lado / 2.0
+    U = r / 100.0
+    tile = Image.new("RGBA", (lado, lado), (0, 0, 0, 0))
+    td = ImageDraw.Draw(tile)
+
+    def P(x, y):
+        return (c + x * U, c + y * U)
+
+    # Grade discreta, para não brigar com as terras.
+    for lat in (-62, -34, 0, 34, 62):
+        meia = math.sqrt(max(0.0, 10000 - lat * lat))
+        td.ellipse((c - meia * U, c + lat * U - meia * U * .2,
+                    c + meia * U, c + lat * U + meia * U * .2), outline=GRADE, width=3)
+    for fra in (0.34, 0.68, 1.0):
+        td.ellipse((c - fra * 100 * U, c - 100 * U, c + fra * 100 * U, c + 100 * U),
+                   outline=GRADE, width=3)
+
+    # Terras em azul-acinzentado claro, com contorno fino.
+    for terra in CONTINENTES:
+        pts = [P(*q) for q in suavizar(terra, True, 8)]
+        td.line(pts + [pts[0]], fill=CONTORNO_TERRA, width=max(2, int(3 * U)), joint="curve")
+        td.polygon(pts, fill=CONTINENTE)
+
+    # Cortina de Ferro: serra preta grossa apenas sobre a Europa.
+    dentes = []
+    n = 11
+    for i in range(n + 1):
+        x = -44 + 80 * i / n
+        y = -50 + (8 if i % 2 else -8) + 6 * i / n
+        dentes.append(P(x, y))
+    td.line(dentes, fill=TINTA, width=max(4, int(6 * U)), joint="curve")
+    for (x, y) in dentes[1:-1]:
+        e = 7 * U
+        td.line((x - e, y - e, x + e, y + e), fill=TINTA, width=max(2, int(3 * U)))
+        td.line((x - e, y + e, x + e, y - e), fill=TINTA, width=max(2, int(3 * U)))
+
+    mascara = Image.new("L", (lado, lado), 0)
+    ImageDraw.Draw(mascara).ellipse((3, 3, lado - 4, lado - 4), fill=255)
+    tile.putalpha(ImageChops.multiply(tile.getchannel("A"), mascara))
+    im.paste(tile, (int(gx - r - 3), int(gy - r - 3)), tile)
+    d.ellipse((gx - r, gy - r, gx + r, gy + r), outline=TINTA, width=7)
 
 
 def missil(draw, side, q):
-    x = 100 if side < 0 else 1180
-    y = 735 - 350*q
-    direction = 1 if side < 0 else -1
-    # Rastro curvo e chama animada.
-    smoke = [(x-direction*18, y+70), (x-direction*75, y+115),
-             (x-direction*145, y+92), (x-direction*205, y+145)]
-    draw.line(smoke, fill=CREME, width=34, joint="curve")
-    draw.line(smoke, fill=TINTA, width=9, joint="curve")
-    flame = [(x, y+60), (x-direction*18, y+105), (x, y+89),
-             (x+direction*14, y+112)]
-    draw.polygon(flame, fill="#e47725")
-    body = [(x-17, y+55), (x-17, y-28), (x, y-53), (x+17, y-28), (x+17, y+55)]
-    draw.polygon([(a+9, b+10) for a, b in body], fill=TINTA)
-    draw.polygon(body, fill=CREME, outline=TINTA)
-    draw.polygon([(x-17, y-28), (x, y-53), (x+17, y-28)], fill=VERMELHO)
-    draw.rectangle((x-18, y-3, x+18, y+9), fill=VERMELHO)
-    draw.polygon([(x-17, y+38), (x-42, y+62), (x-17, y+58)], fill=TINTA)
-    draw.polygon([(x+17, y+38), (x+42, y+62), (x+17, y+58)], fill=TINTA)
+    if q <= 0:
+        return
+    dir_ = 1 if side < 0 else -1
+    xb = 70 if side < 0 else 1210
+    trilha = bezier((xb, 824), (xb + dir_ * 12, 700),
+                    (xb + dir_ * 46, 592), (xb + dir_ * 70, 478), steps=48)
+    i = max(1, min(48, int(q * 48)))
+    trecho = trilha[:i + 1]
+    atual, anterior = trilha[i], trilha[max(i - 1, 0)]
+    ang = math.atan2(atual[1] - anterior[1], atual[0] - anterior[0]) + math.pi / 2
+
+    # Nuvem de fumaça: volumosa na base e afinando atrás do míssil.
+    nuvens = []
+    for k in range(0, i + 1, 4):
+        f = k / max(i, 1)
+        raio = int(30 - 16 * f)
+        cx, cy = trecho[k]
+        nuvens.append((cx, cy, raio))
+    for cx, cy, raio in nuvens:
+        draw.ellipse((cx - raio - 5, cy - raio - 5, cx + raio + 5, cy + raio + 5), fill=TINTA)
+    draw.line(trecho, fill=TINTA, width=48, joint="curve")
+    for cx, cy, raio in nuvens:
+        draw.ellipse((cx - raio, cy - raio, cx + raio, cy + raio), fill=CREME)
+    draw.line(trecho, fill=CREME, width=38, joint="curve")
+
+    s = 1.25
+    ca, sa = math.cos(ang), math.sin(ang)
+
+    def M(x, y):
+        x, y = x * s, y * s
+        return (atual[0] + x * ca - y * sa, atual[1] + x * sa + y * ca)
+
+    corpo = [(-20, 36), (-20, -38), (0, -72), (20, -38), (20, 36)]
+    cone = [(-20, -38), (0, -72), (20, -38)]
+    faixa = [(-20, -8), (20, -8), (20, 10), (-20, 10)]
+    aletas = [[(-20, 6), (-48, 46), (-20, 42)], [(20, 6), (48, 46), (20, 42)]]
+    chama = [(-13, 34), (0, 74 + 10 * math.sin(q * 20)), (13, 34)]
+
+    for peca in [corpo] + aletas:
+        draw.polygon([(x + 9, y + 10) for x, y in (M(*p) for p in peca)], fill=TINTA)
+    for peca in aletas:
+        draw.polygon([M(*p) for p in peca], fill=TINTA)
+    bloco(draw, [M(*p) for p in corpo], CREME, esp=5)
+    draw.polygon([M(*p) for p in cone], fill=VERMELHO)
+    bloco(draw, [M(*p) for p in faixa], VERMELHO, esp=4)
+    draw.polygon([M(*p) for p in chama], fill="#e47725")
+    draw.polygon([M(*p) for p in [(-6, 34), (0, 56), (6, 34)]], fill=AMARELO)
+
+
+def carimbo(im, cx, cy, w, h, q):
+    """Carimbo grande e gasto, com lavagem clara para ler sobre qualquer fundo."""
+    pad = 34
+    cw, ch = w + 2 * pad, h + 2 * pad
+    stamp = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(stamp)
+    sd.rounded_rectangle((pad - 16, pad - 16, cw - pad + 16, ch - pad + 16), radius=18,
+                         fill=(239, 228, 204, 125))
+    sd.rounded_rectangle((pad + 10, pad + 11, cw - pad + 10, ch - pad + 11), radius=12,
+                         outline=(23, 21, 21, 110), width=9)
+    bx = (pad, pad, cw - pad, ch - pad)
+    sd.rounded_rectangle(bx, radius=12, outline=CARIMBO, width=12)
+    sd.rounded_rectangle((bx[0] + 17, bx[1] + 17, bx[2] - 17, bx[3] - 17), radius=7,
+                         outline=CARIMBO, width=5)
+    tam = h - 30
+    while tam > 20 and sd.textlength("TOP SECRET", font=font(tam)) > w - 80:
+        tam -= 2
+    sd.text((cw / 2, ch / 2 + 2), "TOP SECRET", font=font(tam), fill=CARIMBO,
+            anchor="mm", stroke_width=4, stroke_fill=CARIMBO)
+
+    gasto = Image.new("L", (cw, ch), 255)
+    gd = ImageDraw.Draw(gasto)
+    rng = np.random.default_rng(7719)
+    for _ in range(520):
+        x, y = int(rng.integers(0, cw)), int(rng.integers(0, ch))
+        r = int(rng.integers(1, 5))
+        gd.ellipse((x - r, y - r, x + r, y + r), fill=int(rng.integers(40, 200)))
+    for _ in range(18):
+        y = int(rng.integers(pad - 10, ch - pad + 10))
+        gd.line((pad - 14, y, cw - pad + 14, y + int(rng.integers(-12, 12))),
+                fill=int(rng.integers(30, 130)), width=int(rng.integers(2, 8)))
+    stamp.putalpha(ImageChops.multiply(stamp.getchannel("A"), gasto))
+
+    escala = 1.30 - 0.30 * q
+    if abs(escala - 1.0) > 0.01:
+        stamp = stamp.resize((max(1, int(cw * escala)), max(1, int(ch * escala))),
+                             Image.Resampling.BICUBIC)
+    stamp = stamp.rotate(12, resample=Image.Resampling.BICUBIC, expand=True)
+    im.paste(stamp, (int(cx - stamp.width / 2), int(cy - stamp.height / 2)), stamp)
 
 
 def cartaz(t):
@@ -184,52 +332,38 @@ def cartaz(t):
         d.polygon([(0, 0), (W * (0.56 * p), 0), (W * (0.18 * p), H), (0, H)], fill=AZUL)
         d.polygon([(W, 0), (W, H), (W * (0.65 + .35 * p), H), (W * (0.46 + .25 * p), 0)],
                   fill=VERMELHO)
-        estrela(d, 210, 205, 92 * p, CREME)
+        estrela(d, 112, 138, 60 * p, CREME)
         for y in range(390, 690, 54):
             d.line((0, y, 520, y - 100), fill=CREME, width=18)
-        estrela(d, 1080, 200, 68 * p, AMARELO)
-        foice_martelo(d, 1080, 335, p*.78)
+        estrela(d, 1185, 70, 36 * p, AMARELO)
+        foice_martelo(d, 1195, 192, 132 * p)
     # Perfis de silhueta e globo.
     if t >= 3:
         p = ease((t - 3) / 2)
         perfil(d, -1, AZUL, p)
         perfil(d, 1, VERMELHO, p)
-        globo(d, 640, 350, 202*p, t)
+        globo(im, 640, 272, 138 * p)
     # Título, mísseis e selo.
     if t >= 5:
         for i, ch in enumerate("HEGEMONY"):
             q = ease((t - 5 - i * .12) / .55)
-            x = 235 + i * 116
-            y = 82 - 35 * (1 - q) + abs(math.sin(q * math.pi)) * 7
-            d.text((x + 8, y + 10), ch, font=font(112), fill=TINTA, anchor="mm")
-            d.text((x, y), ch, font=font(112), fill=CREME, stroke_width=2, stroke_fill=TINTA, anchor="mm")
-        d.rectangle((455, 485, 825, 590), fill=TINTA)
-        d.rectangle((445, 475, 815, 580), fill=VERMELHO)
-        d.text((630, 527), "1945", font=font(106), fill=CREME, anchor="mm")
+            x = 247 + i * 112
+            y = 76 - 35 * (1 - q) + abs(math.sin(q * math.pi)) * 7
+            d.text((x + 8, y + 10), ch, font=font(106), fill=TINTA, anchor="mm")
+            d.text((x, y), ch, font=font(106), fill=CREME, stroke_width=2, stroke_fill=TINTA, anchor="mm")
+        d.rectangle((510, 378, 790, 462), fill=TINTA)
+        d.rectangle((500, 368, 780, 452), fill=VERMELHO)
+        d.text((640, 410), "1945", font=font(82), fill=CREME, anchor="mm")
     if t >= 7:
         q = ease((t - 7) / 1.4)
         missil(d, -1, q)
         missil(d, 1, q)
-        d.rectangle((190, 631, 1090, 674), fill=(23, 21, 21, 170))
-        d.text((640, 652), "1º DE JANEIRO DE 1945 — O MUNDO SE DIVIDE",
-                font=font(31), fill=CREME, anchor="mm")
+        d.rectangle((170, 690, 1110, 720), fill=(23, 21, 21, 235))
+        d.text((640, 705), "1º DE JANEIRO DE 1945 — O MUNDO SE DIVIDE",
+                font=font(26), fill=CREME, anchor="mm")
     if t >= 8.5:
         q = min(1.0, (t - 8.5) / .3)
-        scale = 1.4 - .4*q
-        stamp = Image.new("RGBA", (760, 250), (0, 0, 0, 0))
-        sd = ImageDraw.Draw(stamp)
-        box = (35, 40, 725, 210)
-        sd.rounded_rectangle((box[0]+10, box[1]+11, box[2]+10, box[3]+11), radius=10,
-                             outline=TINTA, width=8)
-        sd.rounded_rectangle(box, radius=10, outline=VERMELHO, width=8)
-        sd.rounded_rectangle((box[0]+17, box[1]+17, box[2]-17, box[3]-17), radius=5,
-                             outline=VERMELHO, width=5)
-        sd.text((380, 125), "TOP SECRET", font=font(82), fill=VERMELHO, anchor="mm")
-        for x, y in ((100, 80), (250, 177), (435, 91), (620, 160), (555, 185)):
-            sd.rectangle((x, y, x+35, y+7), fill=(239, 228, 204, 150))
-        stamp = stamp.resize((int(760*scale), int(250*scale)), Image.Resampling.BICUBIC)
-        stamp = stamp.rotate(12, resample=Image.Resampling.BICUBIC, expand=True)
-        im.paste(stamp, (int(640-stamp.width/2), int(370-stamp.height/2)), stamp)
+        carimbo(im, 640, 562, 576, 104, q)
     # Papel, granulação e vinheta.
     arr = np.asarray(im, dtype=np.int16)
     arr += rng.normal(0, 3.2, (H, W, 1)).astype(np.int16)

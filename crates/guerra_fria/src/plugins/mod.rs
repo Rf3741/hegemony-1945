@@ -1,4 +1,5 @@
 pub mod atmosfera;
+pub mod abertura;
 pub mod audio;
 pub mod bandeiras_ui;
 pub mod comercio_ui;
