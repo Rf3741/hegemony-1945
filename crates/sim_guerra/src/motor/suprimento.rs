@@ -5,6 +5,7 @@
 
 use crate::entidades::{Divisao, PaisMilitar, RegiaoMapa};
 use crate::grafo::GrafoCompilado;
+use super::territorio::CacheTerritorial;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
@@ -40,6 +41,8 @@ pub struct BuffersSuprimento {
     distancias: Vec<f32>,
     fontes: Vec<f32>,
     visitados_stamp: Vec<u32>,
+    /// Marca (stamp do país) das regiões-alvo ainda não finalizadas pelo Dijkstra.
+    alvo_stamp: Vec<u32>,
     stamp_atual: u32,
     demanda_local: Vec<f32>,
 }
@@ -51,6 +54,7 @@ impl BuffersSuprimento {
             self.distancias.resize(n_regioes, f32::MAX);
             self.fontes.resize(n_regioes, 0.0);
             self.visitados_stamp.resize(n_regioes, 0);
+            self.alvo_stamp.resize(n_regioes, 0);
             self.demanda_local.resize(n_regioes, 0.0);
         }
     }
@@ -65,6 +69,7 @@ pub fn calcular_suprimentos_mundo(
     mapa_regioes: &std::collections::HashMap<String, usize>,
     mapa_paises: &std::collections::HashMap<String, usize>,
     custos_terreno: &[f64],
+    territorio: &CacheTerritorial,
     buffers: &mut BuffersSuprimento,
 ) {
     let n_regioes = regioes.len();
@@ -94,9 +99,9 @@ pub fn calcular_suprimentos_mundo(
     let mut portos_por_pais: Vec<Vec<usize>> = vec![Vec::new(); paises.len()];
     for (r_idx, reg) in regioes.iter().enumerate() {
         if reg.nivel_porto > 0
-            && let Some(&p) = mapa_paises.get(&reg.controlador_tag)
+            && let Some(p) = portos_por_pais.get_mut(territorio.ctrl[r_idx] as usize)
         {
-            portos_por_pais[p].push(r_idx);
+            p.push(r_idx);
         }
     }
 
@@ -105,19 +110,37 @@ pub fn calcular_suprimentos_mundo(
         let p_tag = &pais.tag;
         let mut tem_regioes_controladas = false;
 
+        // O resultado do Dijkstra só é consumido pelas divisões do país: sem divisões,
+        // propagar o suprimento por todo o território seria trabalho descartado.
+        if divs_por_pais[p_pos].is_empty() {
+            continue;
+        }
+
         buffers.stamp_atual = buffers.stamp_atual.wrapping_add(1);
         if buffers.stamp_atual == 0 {
             buffers.visitados_stamp.fill(0);
+            buffers.alvo_stamp.fill(0);
             buffers.stamp_atual = 1;
         }
         let stamp = buffers.stamp_atual;
 
         buffers.fila.clear();
 
+        // Regiões onde há divisões do país: o Dijkstra pode parar assim que todas forem finalizadas.
+        let mut alvos_restantes = 0usize;
+        for &d_idx in &divs_por_pais[p_pos] {
+            if let Some(r) = regiao_da_div[d_idx]
+                && buffers.alvo_stamp[r] != stamp
+            {
+                buffers.alvo_stamp[r] = stamp;
+                alvos_restantes += 1;
+            }
+        }
+
         // 1. Identifica fontes: Capital (se controlada pelo país)
         if let Some(&cap_idx) = mapa_regioes.get(&pais.capital_adm1)
             && cap_idx < n_regioes
-            && &regioes[cap_idx].controlador_tag == p_tag
+            && territorio.ctrl[cap_idx] as usize == p_pos
         {
             buffers.distancias[cap_idx] = 0.0;
             buffers.fontes[cap_idx] = 1.0;
@@ -161,17 +184,26 @@ pub fn calcular_suprimentos_mundo(
                 continue;
             }
 
+            // `u` acaba de ser finalizado (distância mínima definitiva)
+            if buffers.alvo_stamp[u] == stamp {
+                buffers.alvo_stamp[u] = 0;
+                alvos_restantes -= 1;
+                if alvos_restantes == 0 {
+                    break;
+                }
+            }
+
             for viz in grafo.vizinhos(u) {
                 let v = viz.destino_idx as usize;
                 // Suprimento terrestre só flui por território controlado pelo mesmo país
-                if &regioes[v].controlador_tag != p_tag {
+                if territorio.ctrl[v] as usize != p_pos {
                     continue;
                 }
 
                 let reg_v = &regioes[v];
                 let infra_efetiva = (reg_v.infraestrutura as f32)
                     * (1.0 - 0.5 * reg_v.destruicao_guerra as f32)
-                    * (if reg_v.esta_ocupada() { 0.70 } else { 1.0 });
+                    * (if territorio.ctrl[v] != territorio.dono[v] { 0.70 } else { 1.0 });
                 let infra_clamped = infra_efetiva.clamp(5.0, 100.0);
 
                 let custo_t = custos_terreno.get(v).copied().unwrap_or(1.0) as f32;

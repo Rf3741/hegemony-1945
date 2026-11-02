@@ -44,6 +44,11 @@ pub fn resolver_combates_mundo(
 ) -> Vec<RelatorioBatalha> {
     let mut relatorios = Vec::new();
 
+    // Sem frentes ativas não há combate: evita montar os índices auxiliares (O(regiões + divisões)).
+    if !frentes.iter().any(|f| f.ativa) {
+        return relatorios;
+    }
+
     // Mapeia cada divisão ao seu exército e comandante
     let mut div_para_exercito: Vec<Option<usize>> = vec![None; divisoes.len()];
     let indice_divs: HashMap<&str, usize> = divisoes

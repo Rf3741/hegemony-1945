@@ -25,6 +25,12 @@ pub fn atualizar_frentes_mundo(
     _mapa_regioes: &HashMap<String, usize>,
     proximo_frente_id: &mut u32,
 ) {
+    // Sem guerra ativa nenhum passo abaixo tem efeito (frentes e exércitos só mudam
+    // para guerras ativas): retorna sem varrer as regiões.
+    if !guerras.iter().any(|g| g.ativa) {
+        return;
+    }
+
     // Interna as tags de controlador em ids pequenos (uma passada) para varreduras baratas
     let mut ids_tag: HashMap<&str, usize> = HashMap::new();
     let ctrl_id: Vec<usize> = regioes
