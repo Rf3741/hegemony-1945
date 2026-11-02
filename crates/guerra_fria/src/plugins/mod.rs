@@ -32,6 +32,7 @@ pub mod politics;
 pub mod rotas_ponte;
 pub mod rotulos_pais;
 pub mod saveload;
+pub mod smoke;
 pub mod tecnologia_ui;
 pub mod time;
 pub mod tutorial_guiado;

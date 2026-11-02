@@ -47,7 +47,11 @@ fn raiz_projeto() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-fn main() {
+fn main() -> AppExit {
+    let opcoes = plugins::smoke::analisar_args(std::env::args()).unwrap_or_else(|erro| {
+        eprintln!("argumentos inválidos: {erro}");
+        std::process::exit(2);
+    });
     // Caminho absoluto: o AssetServer resolve caminhos relativos a partir do crate quando roda via cargo.
     let raiz = raiz_projeto()
         .canonicalize()
@@ -64,60 +68,72 @@ fn main() {
     )
     .expect("provinces.ron inválido");
 
-    App::new()
-        .add_plugins(
-            DefaultPlugins
-                .set(AssetPlugin {
-                    file_path: raiz.join("assets").to_string_lossy().into_owned(),
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(plugins::config::ConfigJogo::carregar().janela()),
-                    ..default()
-                }),
-        )
-        .add_plugins(EguiPlugin::default())
-        .insert_resource(RecursoMundo(mundo))
-        .insert_resource(plugins::map::RaizProjeto(raiz.clone()))
-        .insert_resource(plugins::map::RecursoCatalogo(catalogo))
-        .insert_resource(visual_mapa::VisualMapaConfig {
-            raiz_dados: raiz.join("crates/visual_mapa/assets/visual"),
-            ..default()
-        })
-        .add_plugins((
-            estado::EstadoPlugin,
-            TimePlugin,
-            EconomyPlugin,
-            EconomiaSimPlugin,
-            MercadoUiPlugin,
-            ComercioUiPlugin,
-            ConstrucaoUiPlugin,
-            PoliticsPlugin,
-            JogadorPlugin,
-            MapPlugin,
-            UiPlugin,
-            AudioPlugin,
-            RotasPontePlugin,
-            VisualConstrucoesPlugin,
-            RotulosPaisPlugin,
-        ))
-        .add_plugins(AtmosferaPlugin)
-        .add_plugins(EventosPlugin)
-        .add_plugins(plugins::formacao_sim::FormacaoSimPlugin)
-        .add_plugins(plugins::bandeiras_ui::BandeirasPlugin)
-        .add_plugins(DiplomaciaUiPlugin)
-        .add_plugins(TecnologiaUiPlugin)
-        .add_plugins(EstatisticasPlugin)
-        .add_plugins(EnciclopediaPlugin)
-        .add_plugins(PersonagensPlugin)
-        .add_plugins((GuerraSimPlugin, GuerraUiPlugin, GuerraIaPlugin))
-        .add_plugins(plugins::config::ConfigPlugin)
-        .add_plugins(plugins::menu_pausa::MenuPausaPlugin)
-        .add_plugins(plugins::menu_ui::MenuUiPlugin)
-        .add_plugins(plugins::saveload::SaveLoadPlugin)
-        .add_plugins(plugins::menu_saves::MenuSavesPlugin)
-        .add_plugins(plugins::hud_mapas::HudMapasPlugin)
-        .add_plugins(plugins::tutorial_guiado::TutorialGuiadoPlugin)
-        .add_plugins(plugins::polimento_visual::PolimentoVisualPlugin)
-        .run();
+    let mut config = plugins::config::ConfigJogo::carregar();
+    if let Some(qualidade) = opcoes.qualidade {
+        config.graficos.qualidade = qualidade;
+    }
+
+    let mut app = App::new();
+    app.add_plugins(
+        DefaultPlugins
+            .set(AssetPlugin {
+                file_path: raiz.join("assets").to_string_lossy().into_owned(),
+                ..default()
+            })
+            .set(WindowPlugin {
+                primary_window: Some(config.janela()),
+                ..default()
+            }),
+    )
+    .add_plugins(EguiPlugin::default())
+    .insert_resource(RecursoMundo(mundo))
+    .insert_resource(plugins::map::RaizProjeto(raiz.clone()))
+    .insert_resource(plugins::map::RecursoCatalogo(catalogo))
+    .insert_resource(visual_mapa::VisualMapaConfig {
+        raiz_dados: raiz.join("crates/visual_mapa/assets/visual"),
+        ..default()
+    })
+    .add_plugins((
+        estado::EstadoPlugin,
+        TimePlugin,
+        EconomyPlugin,
+        EconomiaSimPlugin,
+        MercadoUiPlugin,
+        ComercioUiPlugin,
+        ConstrucaoUiPlugin,
+        PoliticsPlugin,
+        JogadorPlugin,
+        MapPlugin,
+        UiPlugin,
+        AudioPlugin,
+        RotasPontePlugin,
+        VisualConstrucoesPlugin,
+        RotulosPaisPlugin,
+    ))
+    .add_plugins(AtmosferaPlugin)
+    .add_plugins(EventosPlugin)
+    .add_plugins(plugins::formacao_sim::FormacaoSimPlugin)
+    .add_plugins(plugins::bandeiras_ui::BandeirasPlugin)
+    .add_plugins(DiplomaciaUiPlugin)
+    .add_plugins(TecnologiaUiPlugin)
+    .add_plugins(EstatisticasPlugin)
+    .add_plugins(EnciclopediaPlugin)
+    .add_plugins(PersonagensPlugin)
+    .add_plugins((GuerraSimPlugin, GuerraUiPlugin, GuerraIaPlugin))
+    .add_plugins(plugins::config::ConfigPlugin)
+    // Sobrepõe o arquivo lido pelo ConfigPlugin (qualidade do smoke não é gravada).
+    .insert_resource(config)
+    .add_plugins(plugins::menu_pausa::MenuPausaPlugin)
+    .add_plugins(plugins::menu_ui::MenuUiPlugin)
+    .add_plugins(plugins::saveload::SaveLoadPlugin)
+    .add_plugins(plugins::menu_saves::MenuSavesPlugin)
+    .add_plugins(plugins::hud_mapas::HudMapasPlugin)
+    .add_plugins(plugins::tutorial_guiado::TutorialGuiadoPlugin)
+    .add_plugins(plugins::polimento_visual::PolimentoVisualPlugin);
+
+    if opcoes.smoke_ativo() {
+        app.add_plugins(plugins::smoke::SmokePlugin(opcoes));
+    }
+
+    app.run()
 }
