@@ -5,7 +5,7 @@ use simulacao::mapa::{
     AlinhamentoGeopolitico, CatalogoProvincias, DefinicaoPais1945, DonosProvincias1945,
     ProvinciaMapa, cor_unica_provincia, desprojetar_miller, id_de_cor_provincia, projetar_miller,
 };
-use simulacao::mundo::MundoJogo;
+use simulacao::mundo::{MundoJogo, zona_ocupacao_1945};
 use simulacao::politica::{
     EsferaInfluencia, GrupoInteresseId, construir_politica_inicial,
 };
@@ -218,4 +218,26 @@ fn test_simulacao_mundo_sintetico() {
     }
     assert_eq!(mundo.ticks_executados, 10);
     assert_eq!(mundo.data.dia, 11);
+}
+
+#[test]
+fn zonas_de_ocupacao_nao_saem_de_alemanha_e_austria() {
+    for codigo in ["CHL-2694", "USA-3521", "SOV-001", "FRA-2000"] {
+        assert_eq!(zona_ocupacao_1945(codigo, "GER"), None, "{codigo} não pode ser zona alemã");
+        assert_eq!(zona_ocupacao_1945(codigo, "AUT"), None, "{codigo} não pode ser zona austríaca");
+    }
+
+    let raiz = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+    let (catalogo, mundo) = MundoJogo::carregar_de_arquivos(
+        raiz.join("map/provinces.ron"),
+        raiz.join("../data/scenario_1945/countries_1945.ron"),
+        raiz.join("../data/scenario_1945/province_owners_1945.ron"),
+    ).expect("cenário 1945");
+    for prov in &catalogo.provincias {
+        let dono = mundo.dono_por_provincia.get(&prov.id).expect("dono da província");
+        let controlador = mundo.controlador_por_provincia.get(&prov.id).expect("controlador da província");
+        if dono != "GER" && dono != "AUT" {
+            assert_eq!(controlador, dono, "província {} ({}) fora das zonas foi ocupada", prov.id, prov.adm1_code);
+        }
+    }
 }
