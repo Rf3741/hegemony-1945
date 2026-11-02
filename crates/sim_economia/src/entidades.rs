@@ -134,7 +134,6 @@ pub(crate) struct PredioCompilado {
     /// Fator de qualidade do recurso do estado e bônus de insumo local (estáticos por prédio;
     /// `NAN` = ainda não calculado, preenchido no primeiro tick de produção após compilar o cache).
     pub qualidade_local: f64,
-    pub bonus_insumo_local: f64,
 }
 
 impl PredioCompilado {
@@ -180,7 +179,6 @@ impl Default for PredioCompilado {
             fator_insumos_ultimo_tick: 1.0,
             margem_lucro_ultimo_tick: 0.0,
             qualidade_local: f64::NAN,
-            bonus_insumo_local: f64::NAN,
         }
     }
 }
@@ -447,9 +445,51 @@ pub struct Estado {
     pub(crate) provincias_indices: Vec<usize>,
     #[serde(skip)]
     pub(crate) terra_aravel_ocupada: u32,
+    /// Índices diários (ver `motor::cadeia`): níveis por tipo de prédio, produção local por bem e
+    /// bônus de cadeia local por tipo de prédio. Vazios até o primeiro tick.
+    #[serde(skip)]
+    pub(crate) niveis_por_tipo: Vec<u32>,
+    #[serde(skip)]
+    pub(crate) producao_local_bem: Vec<f32>,
+    #[serde(skip)]
+    pub(crate) bonus_cadeia_tipo: Vec<f32>,
 }
 
 impl Estado {
+    /// Níveis já construídos de um tipo de prédio (índice do catálogo) em todo o estado.
+    #[inline]
+    pub fn niveis_do_tipo(&self, tipo_idx: usize) -> u32 {
+        self.niveis_por_tipo.get(tipo_idx).copied().unwrap_or(0)
+    }
+
+    /// Produção diária local (equivalente em escala) do bem de índice `bem_idx` neste estado.
+    #[inline]
+    pub fn producao_local(&self, bem_idx: usize) -> f64 {
+        self.producao_local_bem.get(bem_idx).copied().unwrap_or(0.0) as f64
+    }
+
+    /// Bônus de produtividade (0.0..=0.2) de um processador por obter insumos no próprio estado
+    /// (e, em menor grau, nos demais estados do país).
+    #[inline]
+    pub fn bonus_cadeia(&self, tipo_idx: usize) -> f64 {
+        self.bonus_cadeia_tipo.get(tipo_idx).copied().unwrap_or(0.0) as f64
+    }
+
+    /// Rendimento do recurso local para um prédio extrativo: qualidade do depósito x riqueza
+    /// (quantidade do depósito, 0.8..1.2). Sem depósito, 0. Demais prédios: só a qualidade.
+    pub fn rendimento_recurso(&self, def: &TipoPredio) -> f64 {
+        let q = self.fator_qualidade_predio(def).max(0.0);
+        match &def.recurso_natural_requerido {
+            Some(rec) if !self.limites_recursos.is_empty() => {
+                let lim = self.limite_recurso(rec);
+                // Prédios já existentes sem depósito registrado (dados de 1945) mantêm o piso 0.8;
+                // construir novos exige depósito (`estado_comporta_novo_nivel`) e a estimativa zera o lucro.
+                q * (0.8 + 0.4 * (lim as f64 / 120.0).clamp(0.0, 1.0))
+            }
+            _ => q,
+        }
+    }
+
     /// Saldo líquido de capacidade de infraestrutura (positivo = folga, negativo = déficit/gargalo).
     #[inline]
     pub fn saldo_infraestrutura(&self) -> f64 {

@@ -194,20 +194,13 @@ pub(crate) fn executar_producao_diaria(
 
                 let econ_escala = 1.0 + 0.01 * (b.nivel.saturating_sub(1).min(25) as f64);
                 if b.cache.qualidade_local.is_nan() {
-                    b.cache.qualidade_local = estados[e_idx].fator_qualidade_predio(&catalogo.tipos_predio[b.cache.tipo_idx]);
-                    b.cache.bonus_insumo_local = if categoria == CategoriaPredio::Industrial
-                        && b.cache.insumos().iter().any(|&(g_in, _)| {
-                            estado_tem_insumo_local(&estados[e_idx], &catalogo.bens[g_in as usize].id)
-                        }) {
-                        0.05
-                    } else {
-                        0.0
-                    };
+                    b.cache.qualidade_local = estados[e_idx].rendimento_recurso(&catalogo.tipos_predio[b.cache.tipo_idx]);
                 }
                 let mult_qualidade = b.cache.qualidade_local;
+                // Cadeia local: processar onde o insumo é produzido (menos transporte, mais produtividade).
                 let mult_fabrica = if categoria == CategoriaPredio::Industrial {
                     let bonus_mercado = if acesso >= 0.90 { 0.03 } else { 0.0 };
-                    1.0 + bonus_mercado + b.cache.bonus_insumo_local
+                    1.0 + bonus_mercado + estados[e_idx].bonus_cadeia(b.cache.tipo_idx)
                 } else {
                     1.0
                 };
@@ -239,6 +232,9 @@ pub(crate) fn executar_producao_diaria(
             prov.vagas_abertas_cache = vagas_abertas_prov;
         }
     });
+
+    // 2c. Índices por estado (níveis por tipo, produção local, bônus de cadeia) para o próximo tick e para a IA/UI.
+    crate::motor::cadeia::atualizar_indices_estados(catalogo, estados, provincias);
 
     // 3. Consolidar acesso ao mercado por Estado
     for (e_idx, est) in estados.iter_mut().enumerate() {
@@ -274,31 +270,6 @@ pub(crate) fn listar_bens_alimento_basico(catalogo: &CatalogoEconomia) -> Vec<us
         .enumerate()
         .filter_map(|(i, b)| (b.categoria == CategoriaBem::AlimentoBasico).then_some(i))
         .collect()
-}
-
-/// Verifica se um estado possui o recurso geológico ou cultura agrícola que origina um insumo fabril.
-fn estado_tem_insumo_local(estado: &Estado, bem_id: &str) -> bool {
-    let rec = match bem_id {
-        "minerio_ferro" | "ferro" => "ferro",
-        "carvao" => "carvao",
-        "petroleo" => "petroleo",
-        "gas_natural" => "gas_natural",
-        "bauxita" => "bauxita",
-        "cobre" => "cobre",
-        "madeira" => "madeira",
-        "ouro_prata" | "ouro" => "ouro_prata",
-        "peixe" | "pesca" => "pesca",
-        "borracha_natural" | "borracha" => "borracha",
-        "graos" => return estado.cultura_permitida("graos"),
-        "carne" | "la" => return estado.cultura_permitida("gado"),
-        "algodao" => return estado.cultura_permitida("algodao"),
-        "acucar" => return estado.cultura_permitida("acucar"),
-        "cafe_cha" => return estado.cultura_permitida("cafe"),
-        "tabaco" => return estado.cultura_permitida("tabaco"),
-        "frutas_legumes" => return estado.cultura_permitida("frutas"),
-        _ => return false,
-    };
-    estado.limite_recurso(rec) > 0
 }
 
 /// Recalcula e consolida a capacidade, uso, penalidade e acesso ao mercado de todos os `Estado`s (estilo Victoria 3).

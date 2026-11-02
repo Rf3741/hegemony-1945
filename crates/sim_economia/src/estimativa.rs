@@ -16,6 +16,8 @@ pub struct ContextoLucratividade {
     pub potencial_livre: Option<f64>,
     pub potencial_total: Option<f64>,
     pub niveis_iguais: f64,
+    /// Bônus de cadeia local (0.0 = nenhum; 0.2 = +20%), vindo de `Estado::bonus_cadeia`.
+    pub bonus_cadeia: f64,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -33,6 +35,59 @@ pub struct EstimativaLucratividade {
     pub fator_recurso: f64,
     pub fator_acesso: f64,
     pub fator_concorrencia: f64,
+    /// 1.0 + bônus de cadeia local.
+    pub fator_cadeia_local: f64,
+}
+
+/// Insumos, produtos e vagas de um tipo de prédio com seus métodos, pré-agregados uma única vez
+/// (a IA e a UI estimam o mesmo tipo em centenas de províncias).
+#[derive(Debug, Clone, Default)]
+pub struct PerfilPredio {
+    /// (índice do bem no catálogo, quantidade por nível)
+    pub produtos: Vec<(usize, f64)>,
+    pub insumos: Vec<(usize, f64)>,
+    /// (vagas, multiplicador salarial do tipo de pop)
+    pub vagas: Vec<(f64, f64)>,
+}
+
+impl PerfilPredio {
+    pub fn novo(cat: &CatalogoEconomia, metodos: &[String]) -> Self {
+        let mut produtos: BTreeMap<usize, f64> = BTreeMap::new();
+        let mut insumos: BTreeMap<usize, f64> = BTreeMap::new();
+        let mut empregos: BTreeMap<&str, i32> = BTreeMap::new();
+        let bem_idx = |id: &str| cat.bens.iter().position(|b| b.id == id);
+        for mid in metodos {
+            if let Some(m) = cat.metodos_producao.iter().find(|m| &m.id == mid) {
+                for (id, qtd) in &m.produtos {
+                    if let Some(i) = bem_idx(id) {
+                        *produtos.entry(i).or_default() += *qtd;
+                    }
+                }
+                for (id, qtd) in &m.insumos {
+                    if let Some(i) = bem_idx(id) {
+                        *insumos.entry(i).or_default() += *qtd;
+                    }
+                }
+                for (id, qtd) in &m.empregos {
+                    *empregos.entry(id.as_str()).or_default() += *qtd;
+                }
+            }
+        }
+        let vagas = empregos
+            .into_iter()
+            .filter(|(_, d)| *d > 0)
+            .map(|(id, d)| (d as f64, cat.tipos_pop.iter().find(|tp| tp.id == id).map_or(1.0, |tp| tp.multiplicador_salario)))
+            .collect();
+        Self { produtos: produtos.into_iter().collect(), insumos: insumos.into_iter().collect(), vagas }
+    }
+}
+
+/// Preços indexados pelo catálogo de bens (preço de mercado quando existe, senão o preço base).
+pub fn precos_por_indice(cat: &CatalogoEconomia, precos: &[(String, f64)]) -> Vec<f64> {
+    cat.bens
+        .iter()
+        .map(|b| precos.iter().find(|(id, _)| id == &b.id).map_or(b.preco_base, |(_, p)| *p))
+        .collect()
 }
 
 /// Calcula a rentabilidade de um nível usando preços do mercado e condições locais.
@@ -43,35 +98,26 @@ pub fn calcular_lucratividade_esperada(
     precos: &[(String, f64)],
     contexto: ContextoLucratividade,
 ) -> EstimativaLucratividade {
-    let preco_de = |bid: &str| -> f64 {
-        precos
-            .iter()
-            .find(|(id, _)| id == bid)
-            .map(|(_, preco)| *preco)
-            .unwrap_or_else(|| cat.bens.iter().find(|b| b.id == bid).map_or(20.0, |b| b.preco_base))
-    };
+    let perfil = PerfilPredio::novo(cat, metodos);
+    calcular_com_perfil(tipo, &perfil, &precos_por_indice(cat, precos), contexto)
+}
 
-    let mut produtos: BTreeMap<String, f64> = BTreeMap::new();
-    let mut insumos: BTreeMap<String, f64> = BTreeMap::new();
-    let mut empregos: BTreeMap<String, i32> = BTreeMap::new();
-    for mid in metodos {
-        if let Some(m) = cat.metodos_producao.iter().find(|m| &m.id == mid) {
-            for (id, qtd) in &m.produtos {
-                *produtos.entry(id.clone()).or_default() += *qtd;
-            }
-            for (id, qtd) in &m.insumos {
-                *insumos.entry(id.clone()).or_default() += *qtd;
-            }
-            for (id, qtd) in &m.empregos {
-                *empregos.entry(id.clone()).or_default() += *qtd;
-            }
-        }
-    }
+/// Versão barata: perfil do tipo e preços (por índice de bem) pré-calculados pelo chamador.
+pub fn calcular_com_perfil(
+    tipo: &TipoPredio,
+    perfil: &PerfilPredio,
+    precos: &[f64],
+    contexto: ContextoLucratividade,
+) -> EstimativaLucratividade {
+    let preco_de = |i: usize| precos.get(i).copied().unwrap_or(20.0);
 
     let acesso = contexto.acesso_mercado.clamp(0.0, 1.0);
     let fator_acesso = (0.65 + 0.35 * acesso).clamp(0.35, 1.0);
+    // Recurso local domina a extração: sem depósito (ou sem espaço livre) o rendimento é zero.
     let fator_recurso = match (contexto.potencial_livre, contexto.potencial_total) {
-        (Some(livre), Some(total)) if total > 0.0 => (0.55 + 0.45 * (livre / total).clamp(0.0, 1.0)) * contexto.qualidade_recurso.max(0.0),
+        (Some(livre), Some(total)) if total > 0.0 && livre > 0.0 => {
+            (0.35 + 0.65 * (livre / total).clamp(0.0, 1.0)) * contexto.qualidade_recurso.max(0.0)
+        }
         (Some(_), Some(_)) => 0.0,
         _ => contexto.qualidade_recurso.max(0.0),
     };
@@ -93,24 +139,21 @@ pub fn calcular_lucratividade_esperada(
     let salario = contexto.salario_base.max(salario_referencia * 0.75);
     let fator_salario = salario / 4.0;
 
-    let mut receita = produtos.iter().map(|(id, qtd)| qtd * preco_de(id)).sum::<f64>();
-    let mut custo_insumos = insumos.iter().map(|(id, qtd)| qtd * preco_de(id)).sum::<f64>();
+    let mut receita = perfil.produtos.iter().map(|&(i, qtd)| qtd * preco_de(i)).sum::<f64>();
+    let mut custo_insumos = perfil.insumos.iter().map(|&(i, qtd)| qtd * preco_de(i)).sum::<f64>();
     let mut vagas_totais = 0.0;
     let mut custo_folha = 0.0;
-    for (id, delta) in empregos {
-        if delta > 0 {
-            let vagas = delta as f64;
-            vagas_totais += vagas;
-            let mult = cat.tipos_pop.iter().find(|tp| tp.id == id).map_or(1.0, |tp| tp.multiplicador_salario);
-            custo_folha += vagas * salario * mult;
-        }
+    for &(vagas, mult) in &perfil.vagas {
+        vagas_totais += vagas;
+        custo_folha += vagas * salario * mult;
     }
     let fator_mao_de_obra = if vagas_totais > 0.0 {
         (contexto.desempregados.max(0.0) / vagas_totais.max(1.0)).clamp(0.35, 1.0)
     } else {
         1.0
     };
-    let fator_producao = fator_acesso * fator_recurso * fator_infra * fator_concorrencia * fator_mao_de_obra;
+    let fator_cadeia_local = 1.0 + contexto.bonus_cadeia.max(0.0);
+    let fator_producao = fator_acesso * fator_recurso * fator_infra * fator_concorrencia * fator_mao_de_obra * fator_cadeia_local;
     receita *= fator_producao;
     custo_insumos *= fator_producao;
     custo_folha *= fator_salario;
@@ -135,6 +178,7 @@ pub fn calcular_lucratividade_esperada(
         fator_recurso,
         fator_acesso,
         fator_concorrencia,
+        fator_cadeia_local,
     }
 }
 
@@ -182,7 +226,7 @@ mod tests {
             salario_base: 4.0, padrao_vida: 10.0, desempregados: 100.0, mao_de_obra_total: 100.0,
             infraestrutura_uso: 5.0, infraestrutura_capacidade: 20.0, acesso_mercado: 1.0,
             qualidade_recurso: 1.0, potencial_livre: Some(10.0), potencial_total: Some(10.0),
-            niveis_iguais: 0.0,
+            niveis_iguais: 0.0, bonus_cadeia: 0.0,
         };
         let rica = calcular_lucratividade_esperada(&cat, tipo, &tipo.metodos_padrao, &[("ferro".into(), 10.0)], base);
         let pobre = calcular_lucratividade_esperada(&cat, tipo, &tipo.metodos_padrao, &[("ferro".into(), 10.0)], ContextoLucratividade {
@@ -194,5 +238,28 @@ mod tests {
             potencial_livre: Some(0.0), ..base
         });
         assert!(rica.lucro_liquido > sem_recurso.lucro_liquido);
+    }
+
+    #[test]
+    fn mina_so_rende_com_deposito_e_cadeia_local_aumenta_o_lucro() {
+        let cat = catalogo();
+        let tipo = &cat.tipos_predio[0];
+        let base = ContextoLucratividade {
+            salario_base: 4.0, padrao_vida: 10.0, desempregados: 100.0, mao_de_obra_total: 100.0,
+            infraestrutura_uso: 5.0, infraestrutura_capacidade: 20.0, acesso_mercado: 1.0,
+            qualidade_recurso: 1.0, potencial_livre: Some(10.0), potencial_total: Some(10.0),
+            niveis_iguais: 0.0, bonus_cadeia: 0.0,
+        };
+        let precos = [("ferro".to_string(), 10.0)];
+        let com = calcular_lucratividade_esperada(&cat, tipo, &tipo.metodos_padrao, &precos, base);
+        assert!(com.lucro_liquido > 0.0, "mina com depósito deve dar lucro");
+        let sem = calcular_lucratividade_esperada(&cat, tipo, &tipo.metodos_padrao, &precos, ContextoLucratividade {
+            potencial_livre: Some(0.0), potencial_total: Some(0.0), qualidade_recurso: 0.0, ..base
+        });
+        assert!(sem.lucro_liquido < 0.0 && sem.fator_recurso == 0.0, "sem depósito não há receita");
+        let cadeia = calcular_lucratividade_esperada(&cat, tipo, &tipo.metodos_padrao, &precos, ContextoLucratividade {
+            bonus_cadeia: 0.2, ..base
+        });
+        assert!(cadeia.lucro_liquido > com.lucro_liquido && (cadeia.fator_cadeia_local - 1.2).abs() < 1e-9);
     }
 }

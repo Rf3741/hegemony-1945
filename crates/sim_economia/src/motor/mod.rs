@@ -1,6 +1,7 @@
 //! Motor principal de simulação econômica (`MundoEconomico`), buffers livres de alocação
 //! e auditoria de invariantes numéricas.
 
+pub mod cadeia;
 pub mod consumo;
 pub mod demografia;
 pub mod distribuicao;

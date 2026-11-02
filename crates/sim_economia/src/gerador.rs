@@ -213,6 +213,9 @@ pub fn gerar_cenario_escala_mundial(
                 pais_idx: 0,
                 provincias_indices: Vec::new(),
                 terra_aravel_ocupada: 0,
+                niveis_por_tipo: Vec::new(),
+                producao_local_bem: Vec::new(),
+                bonus_cadeia_tipo: Vec::new(),
             });
         }
     }

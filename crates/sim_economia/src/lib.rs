@@ -45,7 +45,7 @@ pub use motor::mercado::{atualizar_precos_mercado_isolado, calcular_preco_alvo};
 pub use motor::producao::atualizar_infraestrutura_estados;
 pub use motor::global::{ConfigMercadoGlobal, MercadoGlobal};
 pub mod estimativa;
-pub use estimativa::{calcular_lucratividade_esperada, ContextoLucratividade, EstimativaLucratividade};
+pub use estimativa::{calcular_com_perfil, precos_por_indice, PerfilPredio, calcular_lucratividade_esperada, ContextoLucratividade, EstimativaLucratividade};
 pub use motor::governo::{
     estado_comporta_novo_nivel, estado_niveis_recurso, materiais_por_ponto,
     provincia_comporta_novo_nivel,
