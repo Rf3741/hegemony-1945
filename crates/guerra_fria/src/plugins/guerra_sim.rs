@@ -768,6 +768,17 @@ mod testes {
             tick_legado(&mut g2, &mut m2, None, true);
         }
         let legado = t.elapsed().as_secs_f64() * 1000.0 / dias as f64;
+        // Só o motor (sem a sincronização do plugin)
+        let (mut g3, _) = carregar_1945();
+        for _ in 0..5 {
+            g3.executar_tick_diario();
+        }
+        let t = Instant::now();
+        for _ in 0..dias {
+            g3.executar_tick_diario();
+        }
+        let motor = t.elapsed().as_secs_f64() * 1000.0 / dias as f64;
+        println!("BENCH motor sim_guerra sozinho: {motor:.3} ms/dia");
         println!("BENCH tick_guerra 1945 (paz): sincronizacao legada={legado:.3} ms/dia, otimizada={novo:.3} ms/dia");
     }
 }
