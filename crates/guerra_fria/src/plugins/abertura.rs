@@ -39,8 +39,9 @@ pub struct AberturaPlugin;
 impl Plugin for AberturaPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CarregamentoPronto(false))
-            .add_systems(Startup, preparar_abertura)
-            .add_systems(OnEnter(AppState::Carregando), iniciar_abertura)
+            // O OnEnter do estado inicial roda antes do Startup: preparar e iniciar juntos,
+            // encadeados, para o EstadoAbertura já existir quando iniciar_abertura rodar.
+            .add_systems(OnEnter(AppState::Carregando), (preparar_abertura, iniciar_abertura).chain())
             .add_systems(Update, (atualizar_abertura, ajustar_sprite, controlar_audio_abertura).chain().run_if(in_state(AppState::Carregando)))
             .add_systems(EguiPrimaryContextPass, desenhar_abertura.run_if(in_state(AppState::Carregando)));
     }
@@ -109,9 +110,11 @@ fn atualizar_abertura(
     botoes: Res<ButtonInput<MouseButton>>,
 ) {
     estado.inicio += time.delta_secs();
-    let Some(receptor) = estado.receptor.take() else { return };
-    let Ok(receptor_guard) = receptor.lock() else { return };
+    // Depois que o decodificador termina, o receptor fica None: não pode haver `return` aqui,
+    // senão a regra de saída abaixo nunca mais roda e a tela trava no último quadro.
+    if let Some(receptor) = estado.receptor.take() {
     let mut desconectado = false;
+    if let Ok(receptor_guard) = receptor.lock() {
     loop {
         match receptor_guard.try_recv() {
             Ok((indice, pixels)) => {
@@ -140,16 +143,18 @@ fn atualizar_abertura(
             }
         }
     }
-    drop(receptor_guard);
+    }
     if !desconectado {
         estado.receptor = Some(receptor);
     }
-    if !estado.pronto {
-        return;
     }
-    let indice = indice_loop(estado.inicio);
-    if indice > estado.indice && indice < QUADROS {
-        estado.indice = indice;
+    // A saída não depende do vídeo: se os quadros falharem ao carregar, a regra dos 8 s + jogo
+    // carregado ainda leva ao menu (senão a tela de carregamento ficaria presa para sempre).
+    if estado.pronto {
+        let indice = indice_loop(estado.inicio);
+        if indice > estado.indice && indice < QUADROS {
+            estado.indice = indice;
+        }
     }
     let pular = botoes.get_just_pressed().next().is_some();
     if regra_saida_abertura(estado.inicio, pronto.0)
