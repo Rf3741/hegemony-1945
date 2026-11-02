@@ -95,6 +95,19 @@ pub enum Comando {
 }
 
 impl Nucleo {
+    pub fn aplicar_formacao(&mut self, e: &simulacao::formacao::EventoFormacao) -> Result<(), String> {
+        if !e.pais_novo {
+            return Ok(());
+        }
+        self.mundo
+            .adicionar_pais_formado(&e.tag, &e.nome, &e.origens, &e.adm1)
+            .map_err(|e| e.to_string())?;
+        if let Some(id) = self.mundo.paises().iter().find(|p| p.tag.as_deref() == Some(e.tag.as_str())).map(|p| p.id.clone()) {
+            self.tags.insert(e.tag.clone(), id);
+        }
+        Ok(())
+    }
+
     pub fn carregar(dir: &Path, aquecimento: u32) -> Result<Self, String> {
         let mut cen = CenarioEconomia::carregar_diretorio(dir).map_err(|e| e.to_string())?;
         // Demografia e mercado de trabalho só a cada 7 dias: ~25% mais rápido, sem perder a produção/preços diários.
@@ -681,6 +694,7 @@ impl Plugin for EconomiaSimPlugin {
                     acumular_dias,
                     definir_pais_economico,
                     conduzir_economia_recolher.in_set(EconomiaSimSet::Recolher),
+                    aplicar_formacoes_economia,
                     conduzir_economia_despachar
                         .in_set(EconomiaSimSet::Despachar)
                         .after(EconomiaSimSet::Recolher),
@@ -688,6 +702,26 @@ impl Plugin for EconomiaSimPlugin {
                     .chain()
                     .run_if(resource_exists::<EconomiaSim>),
             );
+    }
+
+}
+
+fn aplicar_formacoes_economia(form: Option<ResMut<super::formacao_sim::FormacaoSim>>, mut eco: ResMut<EconomiaSim>) {
+    let Some(mut form) = form else { return };
+    let Some(mut nucleo) = eco.nucleo.take() else { return };
+    let eventos = std::mem::take(&mut form.economia_pendentes);
+    let mut integrados = 0;
+    for evento in eventos {
+        if let Err(e) = nucleo.aplicar_formacao(&evento) {
+            error!("economia: falha ao integrar {}: {e}", evento.tag);
+        } else {
+            integrados += 1;
+        }
+    }
+    eco.nucleo = Some(nucleo);
+    if integrados > 0 {
+        eco.vista.pais_id.clear();
+        eco.versao_construcao = eco.versao_construcao.wrapping_add(integrados);
     }
 }
 

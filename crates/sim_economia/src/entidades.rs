@@ -856,6 +856,67 @@ pub struct Pais {
 }
 
 impl Pais {
+    /// Cria uma nação surgida durante a partida, antes de sua primeira atualização.
+    pub fn novo_dinamico(id: impl Into<String>, tag: impl Into<String>, nome: impl Into<String>, mercado_id: impl Into<String>, tesouro: f64) -> Self {
+        Self {
+            id: id.into(),
+            tag: Some(tag.into()),
+            nome: nome.into(),
+            mercado_id: mercado_id.into(),
+            acordos_comerciais: Vec::new(),
+            culturas_primarias: Vec::new(),
+            religiao_oficial: "religiao_local".into(),
+            politica_fiscal: PoliticaFiscal {
+                lei_sistema_economico_id: "intervencionismo".into(),
+                lei_tributaria_id: "imposto_renda_progressivo".into(),
+                lei_comercial_id: "protecionismo".into(),
+                aliquota_imposto_renda_baixo: 0.10,
+                aliquota_imposto_renda_medio: 0.15,
+                aliquota_imposto_renda_alto: 0.25,
+                aliquota_imposto_dividendos: 0.20,
+                imposto_sobre_terra_por_campones: 0.02,
+                imposto_sobre_terra_por_nivel_rural: 4.0,
+                aliquota_consumo_geral: 0.04,
+                bens_tributados_consumo: BTreeMap::new(),
+                tarifa_importacao: 0.08,
+                tarifa_exportacao: 0.02,
+                tarifas_importacao_bens: BTreeMap::new(),
+                tarifas_exportacao_bens: BTreeMap::new(),
+                nivel_abertura_mercado: Some(0.65),
+                nivel_investimento_educacao: 1,
+                multiplicador_salario_governo: 1.0,
+                multiplicador_salario_militar: 1.0,
+            },
+            orcamento: OrcamentoGoverno {
+                tesouro: tesouro.max(0.0),
+                limite_credito: tesouro.max(0.0) * 0.5,
+                ..OrcamentoGoverno::default()
+            },
+            pontos_construcao_base: 20.0,
+            fila_construcao: Vec::new(),
+            fundo_investimento_privado: tesouro.max(0.0) * 0.015,
+            aporte_fundo_privado_ultimo_tick: 0.0,
+            gasto_fundo_privado_ultimo_tick: 0.0,
+            pontos_privados_ultimo_tick: 0.0,
+            pontos_publicos_ultimo_tick: 0.0,
+            burocracia_produzida: 0.0,
+            burocracia_necessaria: 0.0,
+            eficiencia_arrecadacao: 1.0,
+            forca_militar_total: 0.0,
+            pib_diario: 0.0,
+            mercado_idx: 0,
+            provincias_indices: Vec::new(),
+            estados_indices: Vec::new(),
+            aliquota_consumo_por_bem: Vec::new(),
+            mult_eficiencia_construcao_lei: 1.0,
+            mult_volume_comercio_lei: 1.0,
+            exige_propriedade_estatal_lei: false,
+            utilizacao_construcao_ultimo_tick: 0.0,
+            demanda_obras: Vec::new(),
+            pontos_aplicados_ultimo_tick: 0.0,
+        }
+    }
+
     /// Índices das províncias pertencentes a este país no `MundoEconomico`.
     #[inline]
     pub fn provincias_indices(&self) -> &[usize] {

@@ -74,8 +74,12 @@ pub struct EventoFormacao {
     pub tipo: String,
     pub origens: Vec<String>,
     pub provincias: Vec<u32>,
+    /// Prefixos ADM1 das províncias transferidas, usados pelos motores paralelos.
+    pub adm1: Vec<String>,
     pub populacao: u64,
     pub descricao: String,
+    pub leis_iniciais: BTreeMap<String, String>,
+    pub ideologia: String,
     /// `true` se o país não existia antes (precisa ser criado em economia/política/diplomacia).
     pub pais_novo: bool,
     /// `true` se foi só uma independência de tag existente.
@@ -388,9 +392,15 @@ impl Formacoes {
             data,
             tipo: b.tipo.clone(),
             origens: b.origem_tags.clone(),
-            provincias: provs,
+            provincias: provs.clone(),
+            adm1: provs
+                .iter()
+                .filter_map(|id| self.indice.get(id).map(|(pref, _)| pref.clone()))
+                .collect(),
             populacao,
             descricao: b.condicao.descricao.clone(),
+            leis_iniciais: f.leis_iniciais.clone(),
+            ideologia: f.ideologia_dominante.clone(),
             pais_novo: !existe,
             independencia: false,
         })
@@ -421,11 +431,14 @@ fn aplicar_independencia(
     Some(EventoFormacao {
         tag: tag.clone(),
         descricao: format!("{nome} conquista a independência ({}).", ind.tipo),
+        leis_iniciais: BTreeMap::new(),
+        ideologia: String::new(),
         nome,
         data,
         tipo: ind.tipo.clone(),
         origens: Vec::new(),
         provincias: provs,
+        adm1: Vec::new(),
         populacao,
         pais_novo: false,
         independencia: true,
