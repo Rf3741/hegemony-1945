@@ -532,11 +532,17 @@ fn animar_ondas(
 fn legenda_zonas_ocupacao(
     mut contextos: EguiContexts,
     mundo: Res<RecursoMundo>,
+    modo: Res<super::hud_mapas::ModoTematico>,
     tempo: Res<Time>,
     mut cache: Local<(f32, bool)>,
+    mut ultimo_modo: Local<Option<super::hud_mapas::ModoTematico>>,
 ) -> Result {
-    if tempo.elapsed_secs() - cache.0 > 1.0 || cache.0 == 0.0 {
+    if *modo != super::hud_mapas::ModoTematico::Politico {
+        return Ok(());
+    }
+    if tempo.elapsed_secs() - cache.0 > 1.0 || cache.0 == 0.0 || *ultimo_modo != Some(*modo) {
         cache.0 = tempo.elapsed_secs().max(0.001);
+        *ultimo_modo = Some(*modo);
         cache.1 = mundo.dono_por_provincia.iter().any(|(id, d)| {
             matches!(d.as_str(), "GER" | "AUT") && mundo.controlador_por_provincia.get(id).is_some_and(|c| c != d)
         });
@@ -545,7 +551,7 @@ fn legenda_zonas_ocupacao(
         return Ok(());
     }
     let ctx = contextos.ctx_mut()?;
-    egui::Area::new("legenda_zonas".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(ctx, |ui| {
+    egui::Area::new("legenda_zonas".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -88.0]).show(ctx, |ui| {
         egui::Frame::popup(ui.style()).show(ui, |ui| {
             ui.label(egui::RichText::new("Zona de ocupação (hachura)").strong());
             for (tag, nome) in [("USA", "Estados Unidos"), ("GBR", "Reino Unido"), ("FRA", "França"), ("SOV", "União Soviética")] {

@@ -670,6 +670,9 @@ fn ler_ron<T: serde::de::DeserializeOwned>(caminho: &Path, contexto: &str) -> Re
 /// Áustria: SOV (Baixa Áustria, Burgenland, Viena), USA (Salzburgo, Alta Áustria),
 /// GBR (Estíria, Caríntia), FRA (Tirol, Vorarlberg).
 pub fn zona_ocupacao_1945(adm1_code: &str, dono: &str) -> Option<&'static str> {
+    if !(adm1_code.starts_with("DEU-") || adm1_code.starts_with("AUT-")) {
+        return None;
+    }
     match (dono, adm1_code) {
         ("GER", "DEU-1591" | "DEU-1574" | "DEU-1575") => Some("USA"),
         ("GER", "DEU-1579" | "DEU-1578" | "DEU-1576" | "DEU-1572") => Some("GBR"),

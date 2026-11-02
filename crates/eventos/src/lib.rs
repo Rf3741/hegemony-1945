@@ -258,6 +258,12 @@ pub struct EstadoEventos {
     pub relacoes: BTreeMap<(String, String), f32>,
     /// Registro de leis alteradas (pais, categoria, nova_lei).
     pub leis_trocadas: Vec<(String, String, String)>,
+    /// Semana em que cada país recebeu o último pop-up do jogador.
+    #[serde(default)]
+    pub ultimo_popup_por_pais: BTreeMap<String, i64>,
+    /// Quantidade de pop-ups exibidos ao jogador por semana.
+    #[serde(default)]
+    pub popups_por_semana: BTreeMap<i64, u8>,
     avisados: BTreeSet<String>,
 }
 
@@ -386,7 +392,7 @@ impl EstadoEventos {
 }
 
 /// Dias de tolerância depois da data do gatilho para as condições ainda poderem ser atendidas.
-const JANELA_DIAS: i64 = 180;
+const JANELA_DIAS: i64 = 0;
 
 fn dias(d: (i32, u8, u8)) -> i64 {
     d.0 as i64 * 365 + (d.1 as i64 - 1) * 30 + d.2 as i64
@@ -470,11 +476,19 @@ pub fn avaliar_dia_com_contexto(
         }
         disparados.push(ev.id.clone());
         if alvo == jogador {
-            est.disparados.insert(ev.id.clone(), None);
-            est.pendentes.push(Pendente {
-                evento_id: ev.id.clone(),
-                pais: alvo,
-            });
+            let semana = dias(hoje).div_euclid(7);
+            let exibidos = est.popups_por_semana.get(&semana).copied().unwrap_or(0);
+            let cooldown_liberado = est.ultimo_popup_por_pais.get(&alvo).copied() != Some(semana);
+            if exibidos < 2 && cooldown_liberado {
+                est.disparados.insert(ev.id.clone(), None);
+                est.pendentes.push(Pendente { evento_id: ev.id.clone(), pais: alvo.clone() });
+                est.popups_por_semana.insert(semana, exibidos + 1);
+                est.ultimo_popup_por_pais.insert(alvo, semana);
+            } else {
+                // Eventos excedentes continuam históricos, mas entram no Jornal sem interromper o jogo.
+                let i = escolha_ia(ev, hoje);
+                aplicar_opcao_com_contexto(ctx, est, ev, i, &alvo);
+            }
         } else {
             let i = escolha_ia(ev, hoje);
             aplicar_opcao_com_contexto(ctx, est, ev, i, &alvo);
