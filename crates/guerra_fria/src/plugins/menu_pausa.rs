@@ -1,6 +1,6 @@
 //! Menu de pausa (Esc), janela de Configurações e botão "Rankings", no estilo do card de país:
 //! papel #E8DEC8, borda vermelha #8C251E, tinta escura.
-use super::config::{CANAIS, ConfigJogo, ModoTela, RESOLUCOES};
+use super::config::{CANAIS, ConfigJogo, ModoTela, QualidadeAtmosfera, RESOLUCOES};
 use super::estatisticas::{AbaLedger, RecursoLedger};
 use super::menu_saves::JanelaSaves;
 use super::menu_ui::TelaMenu;
@@ -25,7 +25,13 @@ pub enum AbaConfig {
 }
 
 impl AbaConfig {
-    const TODAS: [(Self, &'static str); 5] = [(Self::Video, "Vídeo"), (Self::Audio, "Áudio"), (Self::Jogo, "Jogo"), (Self::Interface, "Interface"), (Self::Controles, "Controles")];
+    const TODAS: [(Self, &'static str); 5] = [
+        (Self::Video, "Vídeo"),
+        (Self::Audio, "Áudio"),
+        (Self::Jogo, "Jogo"),
+        (Self::Interface, "Interface"),
+        (Self::Controles, "Controles"),
+    ];
 }
 
 #[derive(Resource, Default)]
@@ -57,15 +63,29 @@ impl Plugin for MenuPausaPlugin {
                 (
                     tela_pausa.run_if(in_state(AppState::Pausado)),
                     botao_rankings.run_if(in_state(AppState::Jogando)),
-                    janela_config.run_if(|e: Option<Res<State<AppState>>>| matches!(e.as_deref().map(|s| *s.get()), Some(AppState::Menu | AppState::Jogando | AppState::Pausado))),
+                    janela_config.run_if(|e: Option<Res<State<AppState>>>| {
+                        matches!(
+                            e.as_deref().map(|s| *s.get()),
+                            Some(AppState::Menu | AppState::Jogando | AppState::Pausado)
+                        )
+                    }),
                 ),
             );
     }
 }
 
 /// Tecla 9: abre as Configurações direto na aba Áudio (antiga janela de áudio).
-fn tecla_audio(teclas: Res<ButtonInput<KeyCode>>, estado: Option<Res<State<AppState>>>, mut j: ResMut<JanelaConfig>) {
-    if (teclas.just_pressed(KeyCode::Digit9) || teclas.just_pressed(KeyCode::Numpad9)) && matches!(estado.as_deref().map(|s| *s.get()), Some(AppState::Menu | AppState::Jogando | AppState::Pausado)) {
+fn tecla_audio(
+    teclas: Res<ButtonInput<KeyCode>>,
+    estado: Option<Res<State<AppState>>>,
+    mut j: ResMut<JanelaConfig>,
+) {
+    if (teclas.just_pressed(KeyCode::Digit9) || teclas.just_pressed(KeyCode::Numpad9))
+        && matches!(
+            estado.as_deref().map(|s| *s.get()),
+            Some(AppState::Menu | AppState::Jogando | AppState::Pausado)
+        )
+    {
         if j.aberta && j.aba == AbaConfig::Audio {
             j.aberta = false;
         } else {
@@ -76,12 +96,22 @@ fn tecla_audio(teclas: Res<ButtonInput<KeyCode>>, estado: Option<Res<State<AppSt
 }
 
 fn botao(ui: &mut egui::Ui, texto: &str, fill: egui::Color32, tam: egui::Vec2) -> bool {
-    ui.add(egui::Button::new(egui::RichText::new(texto).size(20.0).color(PAPEL)).fill(fill).min_size(tam)).clicked()
+    ui.add(
+        egui::Button::new(egui::RichText::new(texto).size(20.0).color(PAPEL))
+            .fill(fill)
+            .min_size(tam),
+    )
+    .clicked()
 }
 
 fn botao_menor(ui: &mut egui::Ui, texto: &str, ativo: bool) -> bool {
     let fill = if ativo { VERMELHO } else { CINZA };
-    ui.add(egui::Button::new(egui::RichText::new(texto).size(15.0).color(PAPEL)).fill(fill).min_size(egui::vec2(60.0, 28.0))).clicked()
+    ui.add(
+        egui::Button::new(egui::RichText::new(texto).size(15.0).color(PAPEL))
+            .fill(fill)
+            .min_size(egui::vec2(60.0, 28.0)),
+    )
+    .clicked()
 }
 
 /// Estilo escuro-sobre-papel para widgets dentro do card.
@@ -89,7 +119,11 @@ fn estilo_papel(ui: &mut egui::Ui) {
     let v = ui.visuals_mut();
     v.override_text_color = Some(TINTA);
     let fundo = egui::Color32::from_rgb(0xD2, 0xC5, 0xA6);
-    for w in [&mut v.widgets.inactive, &mut v.widgets.hovered, &mut v.widgets.active] {
+    for w in [
+        &mut v.widgets.inactive,
+        &mut v.widgets.hovered,
+        &mut v.widgets.active,
+    ] {
         w.fg_stroke.color = TINTA;
         w.bg_stroke.color = TINTA_SUAVE;
         w.bg_fill = fundo;
@@ -107,7 +141,12 @@ fn card(ctx: &egui::Context, id: &str, largura: f32, conteudo: impl FnOnce(&mut 
         .resizable(false)
         .order(egui::Order::Foreground)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-        .frame(egui::Frame::NONE.fill(PAPEL).stroke(egui::Stroke::new(2.0, VERMELHO)).inner_margin(24.0))
+        .frame(
+            egui::Frame::NONE
+                .fill(PAPEL)
+                .stroke(egui::Stroke::new(2.0, VERMELHO))
+                .inner_margin(24.0),
+        )
         .show(ctx, |ui| {
             ui.set_width(largura);
             estilo_papel(ui);
@@ -117,11 +156,15 @@ fn card(ctx: &egui::Context, id: &str, largura: f32, conteudo: impl FnOnce(&mut 
 
 /// Escurece tudo atrás e bloqueia cliques no jogo.
 fn escurecer(ctx: &egui::Context) {
-    egui::Area::new(egui::Id::new("escurecer_pausa")).order(egui::Order::Background).fixed_pos(egui::pos2(0.0, 0.0)).show(ctx, |ui| {
-        let r = ctx.viewport_rect();
-        ui.allocate_rect(r, egui::Sense::click_and_drag());
-        ui.painter().rect_filled(r, 0.0, egui::Color32::from_black_alpha(170));
-    });
+    egui::Area::new(egui::Id::new("escurecer_pausa"))
+        .order(egui::Order::Background)
+        .fixed_pos(egui::pos2(0.0, 0.0))
+        .show(ctx, |ui| {
+            let r = ctx.viewport_rect();
+            ui.allocate_rect(r, egui::Sense::click_and_drag());
+            ui.painter()
+                .rect_filled(r, 0.0, egui::Color32::from_black_alpha(170));
+        });
 }
 
 fn tela_pausa(
@@ -142,8 +185,17 @@ fn tela_pausa(
     }
     card(&ctx, "menu_pausa", 340.0, |ui| {
         ui.vertical_centered(|ui| {
-            ui.label(egui::RichText::new("PAUSADO").size(34.0).strong().color(VERMELHO));
-            ui.label(egui::RichText::new("Hegemony: 1945").size(15.0).color(TINTA_SUAVE));
+            ui.label(
+                egui::RichText::new("PAUSADO")
+                    .size(34.0)
+                    .strong()
+                    .color(VERMELHO),
+            );
+            ui.label(
+                egui::RichText::new("Hegemony: 1945")
+                    .size(15.0)
+                    .color(TINTA_SUAVE),
+            );
         });
         ui.add_space(12.0);
         let tam = egui::vec2(ui.available_width(), 40.0);
@@ -197,7 +249,11 @@ fn tela_pausa(
 }
 
 /// Botão fixo no canto inferior esquerdo durante o jogo.
-fn botao_rankings(mut contextos: EguiContexts, mut ledger: ResMut<RecursoLedger>, mut config: ResMut<JanelaConfig>) -> Result {
+fn botao_rankings(
+    mut contextos: EguiContexts,
+    mut ledger: ResMut<RecursoLedger>,
+    mut config: ResMut<JanelaConfig>,
+) -> Result {
     egui::Area::new(egui::Id::new("botao_rankings")).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(contextos.ctx_mut()?, |ui| {
         ui.horizontal(|ui| {
             let b = egui::Button::new(egui::RichText::new("Rankings (7)").strong().size(16.0).color(PAPEL)).fill(VERMELHO).stroke(egui::Stroke::new(1.5, PAPEL));
@@ -221,7 +277,11 @@ fn linha(ui: &mut egui::Ui, rotulo: &str, conteudo: impl FnOnce(&mut egui::Ui)) 
     ui.end_row();
 }
 
-fn janela_config(mut contextos: EguiContexts, mut j: ResMut<JanelaConfig>, mut cfg: ResMut<ConfigJogo>) -> Result {
+fn janela_config(
+    mut contextos: EguiContexts,
+    mut j: ResMut<JanelaConfig>,
+    mut cfg: ResMut<ConfigJogo>,
+) -> Result {
     if !j.aberta {
         return Ok(());
     }
@@ -230,7 +290,12 @@ fn janela_config(mut contextos: EguiContexts, mut j: ResMut<JanelaConfig>, mut c
     let mut fechar = false;
     let mut aba = j.aba;
     card(&ctx, "janela_config", 700.0, |ui| {
-        ui.label(egui::RichText::new("CONFIGURAÇÕES").size(28.0).strong().color(VERMELHO));
+        ui.label(
+            egui::RichText::new("CONFIGURAÇÕES")
+                .size(28.0)
+                .strong()
+                .color(VERMELHO),
+        );
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             for (a, nome) in AbaConfig::TODAS {
@@ -271,6 +336,27 @@ fn janela_config(mut contextos: EguiContexts, mut j: ResMut<JanelaConfig>, mut c
                             c.video.limite_fps = v;
                         }
                     }
+                });
+                linha(ui, "Qualidade da atmosfera", |ui| {
+                    for (q, nome) in [
+                        (QualidadeAtmosfera::Baixo, "Baixo"),
+                        (QualidadeAtmosfera::Medio, "Médio"),
+                        (QualidadeAtmosfera::Alto, "Alto"),
+                        (QualidadeAtmosfera::Ultra, "Ultra"),
+                    ] {
+                        if botao_menor(ui, nome, c.video.qualidade_atmosfera == q) {
+                            c.video.qualidade_atmosfera = q;
+                        }
+                    }
+                });
+                linha(ui, "Ciclo dia/noite", |ui| {
+                    ui.checkbox(&mut c.video.ciclo_dia_noite, "terminador ligado à data da partida");
+                });
+                linha(ui, "Efeito carta antiga", |ui| {
+                    ui.checkbox(&mut c.video.efeito_papel, "bordas de papel e vinheta");
+                });
+                linha(ui, "Intensidade da noite", |ui| {
+                    ui.add(egui::Slider::new(&mut c.video.intensidade_noite, 0.0..=1.0).fixed_decimals(2));
                 });
                 linha(ui, "", |ui| {
                     ui.label(egui::RichText::new("F11 ou Alt+Enter alternam a tela cheia.").size(13.0).color(TINTA_SUAVE));
@@ -342,7 +428,13 @@ fn janela_config(mut contextos: EguiContexts, mut j: ResMut<JanelaConfig>, mut c
             if botao_menor(ui, "Restaurar padrão", false) {
                 c = ConfigJogo::default();
             }
-            ui.label(egui::RichText::new("As mudanças valem na hora e ficam em ~/.config/hegemony1945/config.ron").size(12.0).color(TINTA_SUAVE));
+            ui.label(
+                egui::RichText::new(
+                    "As mudanças valem na hora e ficam em ~/.config/hegemony1945/config.ron",
+                )
+                .size(12.0)
+                .color(TINTA_SUAVE),
+            );
         });
     });
     j.aba = aba;
