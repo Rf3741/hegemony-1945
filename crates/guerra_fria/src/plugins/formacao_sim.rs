@@ -16,6 +16,7 @@ use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use eventos::Noticia;
 use sim_diplomacia::{Bloco, InfoPais};
+use simulacao::artigo;
 use simulacao::formacao::{EventoFormacao, Formacoes};
 use simulacao::mapa::AlinhamentoGeopolitico;
 
@@ -134,9 +135,16 @@ fn tick_formacao(
                 &texto_noticia(e),
             )
         } else if e.independencia {
+            // A metrópole entra pelo nome com o artigo concordado ("do Reino Unido", "da França").
+            let metropole = e
+                .origens
+                .first()
+                .and_then(|t| mundo.0.paises.get(t))
+                .map(|p| format!("{} {}", artigo::contraido_de(&p.nome), p.nome))
+                .unwrap_or_else(|| "da antiga metrópole".into());
             super::enciclopedia::texto_notificacao(
                 "msg_independencia",
-                &[("pais", e.nome.clone()), ("metropole", e.origens.first().cloned().unwrap_or_else(|| "a antiga metrópole".into()))],
+                &[("pais", e.nome.clone()), ("metropole", metropole)],
                 &texto_noticia(e),
             )
         } else {

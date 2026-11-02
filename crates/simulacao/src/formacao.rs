@@ -5,6 +5,7 @@
 //! `data/formaveis/independencias_existentes.ron`. A condição usada é a data histórica; as províncias
 //! são escolhidas pelo prefixo do código adm1 (`PAK-1234`) entre as que pertencem aos países de origem.
 
+use crate::artigo;
 use crate::economia::{Mercado, OrcamentoNacional};
 use crate::erro::{ErroSimulacao, ResultadoSimulacao};
 use crate::mapa::{AlinhamentoGeopolitico, CatalogoProvincias};
@@ -95,21 +96,6 @@ pub fn parse_data(s: &str) -> Option<DataSimulacao> {
     let m = it.next()?.parse().ok()?;
     let d = it.next()?.parse().ok()?;
     Some(DataSimulacao::nova(a, m, d))
-}
-
-/// Artigo contraído que acompanha o nome de um país ("União Soviética" -> "da",
-/// "Reino Unido" -> "do", "Estados Unidos da América" -> "dos"). Olha o primeiro termo
-/// (o núcleo do nome) para o número e o último para o gênero.
-fn artigo_pais(nome: &str) -> &'static str {
-    let primeiro = nome.split_whitespace().next().unwrap_or("");
-    let ultimo = nome.split_whitespace().next_back().unwrap_or("");
-    if primeiro.ends_with('s') {
-        "dos"
-    } else if primeiro.ends_with('a') || ultimo.ends_with('a') {
-        "da"
-    } else {
-        "do"
-    }
 }
 
 /// Países que dividem o mesmo prefixo adm1 com outro: separa pelo centroide `(lon, lat)`.
@@ -346,10 +332,11 @@ impl Formacoes {
                     .iter()
                     .map(|t| {
                         let n = mundo.paises.get(t).map_or_else(|| t.clone(), |p| p.nome.clone());
-                        format!("{} {n}", artigo_pais(&n))
+                        format!("{} {n}", artigo::contraido_de(&n))
                     })
                     .collect();
                 let nome_soberano = pais.nome.trim_end_matches(" Ocupada");
+                let artigo_soberano = artigo::contraido_de(nome_soberano);
                 let adm1_codes: Vec<String> = ids
                     .iter()
                     .filter_map(|id| self.indice.get(id).map(|(pref, _)| pref.clone()))
@@ -364,7 +351,8 @@ impl Formacoes {
                     adm1: adm1_codes,
                     populacao: pais.populacao_total(),
                     descricao: format!(
-                        "Fim da ocupação de {territorio}: o território volta ao controle de {nome_soberano} (retirada {}).",
+                        "Fim da ocupação de {territorio}: o território volta ao controle {} {nome_soberano} (retirada {}).",
+                        artigo_soberano,
                         nomes_ocupantes.join(" e ")
                     ),
                     leis_iniciais: BTreeMap::new(),
@@ -502,6 +490,8 @@ impl Formacoes {
                 EstadoPais {
                     tag: f.tag.clone(),
                     nome: f.nome.clone(),
+                    // País que nasce depois do cenário não tem "nome de 1945": usa o nome do catálogo.
+                    nome_cenario: None,
                     cor: f.cor_mapa,
                     capital: f.capital.clone(),
                     suserano: f.suserano.clone(),
@@ -546,8 +536,13 @@ fn aplicar_independencia(
 ) -> Option<EventoFormacao> {
     let pais = mundo.paises.get_mut(&ind.tag)?;
     let tinha = pais.suserano.is_some();
+    let metropole = pais.suserano.clone();
     if ind.remove_suserano {
         pais.suserano = None;
+    }
+    if tinha {
+        // Deixou de ser o território do cenário: o nome passa a ser o do catálogo de governo.
+        pais.nome_cenario = None;
     }
     let mercado_id = format!("MKT_{}", ind.tag);
     pais.mercado_id = mercado_id.clone();
@@ -560,15 +555,21 @@ fn aplicar_independencia(
     if !tinha {
         return None;
     }
+    // A metrópole sai no evento como origem (era o soberano) e no texto com o artigo concordado.
+    let nome_metro = metropole.as_deref().and_then(|t| mundo.paises.get(t)).map(|p| p.nome.clone());
+    let descricao = match &nome_metro {
+        Some(m) => format!("{nome} conquista a independência {} {m} ({}).", artigo::contraido_de(m), ind.tipo),
+        None => format!("{nome} conquista a independência ({}).", ind.tipo),
+    };
     Some(EventoFormacao {
         tag: tag.clone(),
-        descricao: format!("{nome} conquista a independência ({}).", ind.tipo),
+        descricao,
         leis_iniciais: BTreeMap::new(),
         ideologia: String::new(),
         nome,
         data,
         tipo: ind.tipo.clone(),
-        origens: Vec::new(),
+        origens: metropole.into_iter().collect(),
         provincias: provs,
         adm1: Vec::new(),
         populacao,
@@ -664,6 +665,10 @@ mod testes {
         let ev = f.processar(&mut mundo);
         assert!(ev.iter().any(|e| e.tag == "GHA" && e.independencia));
         assert!(mundo.paises["GHA"].suserano.is_none());
+        // A metrópole sai no evento (era o soberano) e no texto com o artigo concordado.
+        let gha = ev.iter().find(|e| e.tag == "GHA").expect("independência de GHA");
+        assert_eq!(gha.origens, vec!["GBR".to_string()], "o soberano anterior vai em origens");
+        assert!(gha.descricao.contains("independência do Reino Unido"), "{}", gha.descricao);
         assert!(ev.iter().any(|e| e.tag == "FRG"));
         assert!(ev.iter().any(|e| e.tag == "GDR"));
         assert!(mundo.paises["FRG"].provincias_ids.len() > 0);

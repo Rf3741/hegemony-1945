@@ -316,7 +316,7 @@
         categoria: "diplomacia",
         tipo_alerta: "importante",
         titulo_template: "Independência: {pais}",
-        mensagem_template: "{pais} deixou de ser dependência de {metropole} e passou a administrar seu próprio mercado e território.",
+        mensagem_template: "{pais} deixou de ser dependência {metropole} e passou a administrar seu próprio mercado e território.",
         placeholders: ["pais", "metropole"],
         som_efeito: "fanfarra_eleicao",
     ),

@@ -66,8 +66,83 @@ fn colonia_que_se_torna_independente() {
     assert_eq!(r.id, "gha_independente");
     // regime comunista vence a independente liberal (mais especifico); Angola usa a historica
     e.ideologia_partido = Some("marxismo_leninismo".into());
+    // Independência + partido comunista no poder = mudança real de regime: é aí que a regra
+    // genérica de ideologia pode renomear o país.
+    e.mudanca_regime = true;
     assert_eq!(resolver_bandeira("GHA", &e).id, "comunista");
     assert_eq!(resolver_bandeira("ANG", &e).id, "ang_mpla");
+}
+
+/// Variante religiosa: a lei de religião de estado sozinha não basta, o clero tem de dominar o governo.
+#[test]
+fn teocracia_exige_a_lei_e_o_clero_no_governo() {
+    let mut e = EstadoPais {
+        ano: 1945,
+        mes: 1,
+        forma_governo: "autocracia_monarquica".into(),
+        religiao_estatal: "religiao_oficial_obrigatoria".into(),
+        ideologia_dominante: "tradicionalismo_monarquico".into(),
+        ..Default::default()
+    };
+    assert_ne!(resolver_bandeira("POR", &e).id, "teocracia", "sem o clero no governo não é teocracia");
+    e.grupo_religioso_no_poder = true;
+    let r = resolver_bandeira("POR", &e);
+    assert_eq!(r.id, "teocracia");
+    assert!(r.nome.contains("Teocrático"), "{}", r.nome);
+}
+
+/// Regra genérica de ideologia ("República Revolucionária") não renomeia país sem mudança de regime,
+/// e mesmo com mudança precisa da ideologia do partido no poder (não a crença do chefe de Estado).
+#[test]
+fn regra_generica_de_ideologia_precisa_de_regime_e_do_partido_no_poder() {
+    let mut e = EstadoPais {
+        ano: 1945,
+        mes: 1,
+        forma_governo: "republica_parlamentarista".into(),
+        religiao_estatal: "estado_laico".into(),
+        ideologia_dominante: "democracia_liberal".into(),
+        ideologia_chefe: Some("nacionalismo_republicano".into()),
+        ..Default::default()
+    };
+    assert_ne!(resolver_bandeira("FRA", &e).id, "nacionalista", "de Gaulle não faz da França uma república revolucionária");
+    e.mudanca_regime = true;
+    assert_ne!(resolver_bandeira("FRA", &e).id, "nacionalista", "mudança de regime sem o partido no poder não basta");
+    e.ideologia_partido = Some("nacionalismo_republicano".into());
+    let r = resolver_bandeira("FRA", &e);
+    assert_eq!(r.id, "nacionalista");
+    assert!(r.nome.contains("Revolucionária"), "{}", r.nome);
+}
+
+/// Com o regime do cenário (sem mudança), o nome mostrado é o nome histórico do cenário.
+#[test]
+fn regime_inicial_mostra_o_nome_do_cenario() {
+    let mut e = EstadoPais {
+        ano: 1945,
+        mes: 1,
+        forma_governo: "estado_partido_unico".into(),
+        religiao_estatal: "ateismo_estatal_combatente".into(),
+        ideologia_dominante: "comunismo".into(),
+        ideologia_chefe: Some("comunismo_marxista_leninista".into()),
+        nome_cenario: "União Soviética".into(),
+        ..Default::default()
+    };
+    let r = resolver_bandeira("SOV", &e);
+    assert_eq!(r.id, "sov_comunista", "a bandeira soviética é a correta para 1945");
+    assert_eq!(r.nome, "União Soviética", "o nome é o do cenário enquanto nada mudou");
+    e.mudanca_regime = true;
+    assert!(resolver_bandeira("SOV", &e).nome.contains("Socialistas Soviéticas"), "depois de mudar o regime, vale o título do catálogo");
+}
+
+#[test]
+fn legenda_de_ocupacao_nao_vai_no_nome() {
+    assert_eq!(sem_ocupacao("Alemanha Ocupada (Conselho de Controle)"), "Alemanha");
+    assert_eq!(sem_ocupacao("Japão Ocupado (SCAP)"), "Japão");
+    assert_eq!(sem_ocupacao("Áustria Ocupada"), "Áustria");
+    assert_eq!(sem_ocupacao("França (Governo Provisório)"), "França (Governo Provisório)");
+
+    let mut e = est("republica_parlamentarista", "democracia_liberal");
+    e.nome_cenario = "Áustria Ocupada".into();
+    assert_eq!(resolver_bandeira("AUT", &e).nome, "Áustria", "a ocupação se mostra pela hachura, não pelo nome");
 }
 
 #[test]
@@ -89,6 +164,7 @@ fn mais_especifico_vence_taliba() {
     e.ideologia_partido = Some("islamismo_politico".into());
     assert_eq!(resolver_bandeira("AFG", &e).id, "afg_islamico");
     e.religiao_estatal = "religiao_oficial_obrigatoria".into();
+    e.grupo_religioso_no_poder = true;
     assert_eq!(resolver_bandeira("AFG", &e).id, "afg_emirado");
 }
 

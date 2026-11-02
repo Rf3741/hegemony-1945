@@ -18,6 +18,10 @@ use std::path::Path;
 pub struct EstadoPais {
     pub tag: String,
     pub nome: String,
+    /// Nome histórico com que o país entrou no cenário (01/01/1945). É o nome mostrado enquanto o
+    /// regime é o do cenário; `None` nos países que nascem ou ficam independentes depois do início.
+    #[serde(default)]
+    pub nome_cenario: Option<String>,
     pub cor: (u8, u8, u8),
     pub capital: String,
     pub suserano: Option<String>,
@@ -252,6 +256,7 @@ impl MundoJogo {
                 EstadoPais {
                     tag: def.tag.clone(),
                     nome: def.nome.clone(),
+                    nome_cenario: Some(def.nome.clone()),
                     cor: def.cor,
                     capital: def.capital.clone(),
                     suserano: def.suserano.clone(),
