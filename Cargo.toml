@@ -70,6 +70,16 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
+# Jogo: o binário que o usuário joga (hegemony-compilar). Otimização total em todos os crates,
+# com codegen-units maior que o release para compilar em tempo razoável nesta máquina.
+[profile.jogo]
+inherits = "release"
+lto = "thin"
+codegen-units = 16
+panic = "unwind"
+strip = false
+debug = false
+
 # CI: testes rapidos com limite de tempo
 [profile.ci]
 inherits = "dev"
