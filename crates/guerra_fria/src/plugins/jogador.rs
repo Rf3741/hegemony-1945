@@ -55,20 +55,11 @@ impl Notificacoes {
     /// Converte as mensagens legadas dos simuladores em modelos da enciclopédia.
     pub fn mensagem_modelada(texto: &str, pais: &str) -> String {
         if texto == "Obra concluída!" || texto.starts_with("Obra concluída: ") {
-            let (predio, provincia) = texto
-                .strip_prefix("Obra concluída: ")
-                .and_then(|s| s.split_once(" em "))
-                .map_or(("novo empreendimento", "território nacional"), |(p, pr)| (p, pr));
-            return texto_notificacao(
-                "msg_predio_inaugurado",
-                &[
-                    ("provincia", provincia.into()),
-                    ("predio", predio.into()),
-                    ("pais", pais.into()),
-                    ("bem_produzido", "bens industriais".into()),
-                ],
-                texto,
-            );
+            // Toast curto (1-2 linhas): "Obra concluída: Ateliê de Alta-Costura em Manus".
+            return match texto.strip_prefix("Obra concluída: ") {
+                Some(curto) => format!("Obra concluída: {curto}"),
+                None => "Obra concluída: um novo empreendimento".to_string(),
+            };
         }
         if let Some(lei) = texto.strip_prefix("Lei aprovada: ") {
             return texto_notificacao(
@@ -341,7 +332,8 @@ fn toasts(mut contextos: EguiContexts, tempo: Res<Time<Real>>, mut notas: ResMut
     if notas.0.is_empty() {
         return Ok(());
     }
-    egui::Area::new("toasts".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(contextos.ctx_mut()?, |ui| {
+    // Acima dos botões fixos "Rankings (7)" e "Configurações" (canto inferior esquerdo).
+    egui::Area::new("toasts".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -64.0]).show(contextos.ctx_mut()?, |ui| {
         for (txt, _, repeticoes) in notas.0.iter().rev().take(3) {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.label(if *repeticoes > 1 {

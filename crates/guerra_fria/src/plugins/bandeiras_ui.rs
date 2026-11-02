@@ -275,6 +275,25 @@ mod testes {
         assert_eq!(depois.nome, "República Italiana");
     }
 
+    /// O Afeganistão de 1945 é uma monarquia: a variante base, não a islâmica de 1992.
+    #[test]
+    fn afeganiste_1945_e_o_reino() {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/data/politica");
+        let cenario = sim_politica::CenarioPolitica::carregar_diretorio(&dir).expect("cenário político");
+        let pais = cenario.paises.iter().find(|p| p.tag == "AFG").expect("AFG em paises_politica.ron");
+        let entrada = EstadoBandeira {
+            ano: 1945,
+            mes: 1,
+            forma_governo: pais.leis_ativas.get("forma_governo").cloned().unwrap_or_default(),
+            religiao_estatal: pais.leis_ativas.get("religiao_estatal").cloned().unwrap_or_default(),
+            ideologia_dominante: "monarquia_tradicional".into(),
+            ideologia_chefe: pais.chefe_de_estado.as_ref().map(|l| l.ideologia_id.clone()),
+            ..Default::default()
+        };
+        let v = catalogo_embutido().resolver_bandeira("AFG", &entrada);
+        assert_eq!(v.nome, "Reino do Afeganistão", "ideologia efetiva = {}", entrada.ideologia_efetiva());
+    }
+
     #[test]
     fn pngs_das_variantes_existem() {
         let raiz = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets/bandeiras");

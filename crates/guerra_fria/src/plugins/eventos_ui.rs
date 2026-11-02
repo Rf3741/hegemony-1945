@@ -94,16 +94,29 @@ fn popup_evento(
     if cfg.partida.pausar_em_eventos {
         relogio.pausado = true;
     }
-    let data = format!("{:02}/{:02}/{}", evento.data.2, evento.data.1, evento.data.0);
+    let d = mundo.0.data;
+    let data = format!("{:02}/{:02}/{}", d.dia, d.mes, d.ano);
     let cor_pais = mundo.0.paises.get(&pend.pais).map(|p| egui::Color32::from_rgb(p.cor.0, p.cor.1, p.cor.2)).unwrap_or(CARIMBO);
     let nome_pais = mundo.0.paises.get(&pend.pais).map(|p| p.nome.clone()).unwrap_or_default();
     let mut escolhida: Option<usize> = None;
     let faltam = ev.estado.pendentes.len() - 1;
 
+    // Véu escurecido acima dos painéis abertos: bloqueia cliques enquanto o dossiê urgente está na tela.
+    let ctx = contextos.ctx_mut()?.clone();
+    egui::Area::new(egui::Id::new("veu_evento_urgente"))
+        .order(egui::Order::Foreground)
+        .fixed_pos(egui::pos2(0.0, 0.0))
+        .show(&ctx, |ui| {
+            let tela = ui.ctx().viewport_rect();
+            ui.allocate_rect(tela, egui::Sense::click_and_drag());
+            ui.painter().rect_filled(tela, 0.0, egui::Color32::from_black_alpha(140));
+        });
+
     egui::Window::new("evento_historico")
         .title_bar(false)
         .collapsible(false)
         .resizable(false)
+        .order(egui::Order::Foreground)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .fixed_size([620.0, 0.0])
         .frame(egui::Frame::new().fill(PAPEL).stroke(egui::Stroke::new(2.0, BORDA)).inner_margin(0.0))
