@@ -5,29 +5,30 @@ mod plugins;
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
 use plugins::{
+    atmosfera::AtmosferaPlugin,
     audio::AudioPlugin,
+    comercio_ui::ComercioUiPlugin,
+    construcao_ui::ConstrucaoUiPlugin,
+    diplomacia_ui::DiplomaciaUiPlugin,
     economia_sim::EconomiaSimPlugin,
     economy::{EconomyPlugin, RecursoMundo},
-    comercio_ui::ComercioUiPlugin,
-    diplomacia_ui::DiplomaciaUiPlugin,
-    construcao_ui::ConstrucaoUiPlugin,
-    mercado_ui::MercadoUiPlugin,
-    jogador::JogadorPlugin,
-    map::MapPlugin,
-    politics::PoliticsPlugin,
-    time::TimePlugin,
-    eventos_ui::EventosPlugin,
-    ui::UiPlugin,
-    rotas_ponte::RotasPontePlugin,
-    visual_construcoes::VisualConstrucoesPlugin,
-    rotulos_pais::RotulosPaisPlugin,
-    tecnologia_ui::TecnologiaUiPlugin,
-    estatisticas::EstatisticasPlugin,
     enciclopedia::EnciclopediaPlugin,
-    personagens_sim::PersonagensPlugin,
+    estatisticas::EstatisticasPlugin,
+    eventos_ui::EventosPlugin,
+    guerra_ia::GuerraIaPlugin,
     guerra_sim::GuerraSimPlugin,
     guerra_ui::GuerraUiPlugin,
-    guerra_ia::GuerraIaPlugin,
+    jogador::JogadorPlugin,
+    map::MapPlugin,
+    mercado_ui::MercadoUiPlugin,
+    personagens_sim::PersonagensPlugin,
+    politics::PoliticsPlugin,
+    rotas_ponte::RotasPontePlugin,
+    rotulos_pais::RotulosPaisPlugin,
+    tecnologia_ui::TecnologiaUiPlugin,
+    time::TimePlugin,
+    ui::UiPlugin,
+    visual_construcoes::VisualConstrucoesPlugin,
 };
 use simulacao::mundo::MundoJogo;
 use std::path::PathBuf;
@@ -48,7 +49,9 @@ fn raiz_projeto() -> PathBuf {
 
 fn main() {
     // Caminho absoluto: o AssetServer resolve caminhos relativos a partir do crate quando roda via cargo.
-    let raiz = raiz_projeto().canonicalize().unwrap_or_else(|_| raiz_projeto());
+    let raiz = raiz_projeto()
+        .canonicalize()
+        .unwrap_or_else(|_| raiz_projeto());
     let (_catalogo_legado, mundo) = MundoJogo::carregar_de_arquivos(
         raiz.join("assets/map/provinces.ron"),
         raiz.join("data/scenario_1945/countries_1945.ron"),
@@ -62,10 +65,17 @@ fn main() {
     .expect("provinces.ron inválido");
 
     App::new()
-        .add_plugins(DefaultPlugins.set(AssetPlugin { file_path: raiz.join("assets").to_string_lossy().into_owned(), ..default() }).set(WindowPlugin {
-            primary_window: Some(plugins::config::ConfigJogo::carregar().janela()),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(AssetPlugin {
+                    file_path: raiz.join("assets").to_string_lossy().into_owned(),
+                    ..default()
+                })
+                .set(WindowPlugin {
+                    primary_window: Some(plugins::config::ConfigJogo::carregar().janela()),
+                    ..default()
+                }),
+        )
         .add_plugins(EguiPlugin::default())
         .insert_resource(RecursoMundo(mundo))
         .insert_resource(plugins::map::RaizProjeto(raiz.clone()))
@@ -74,7 +84,24 @@ fn main() {
             raiz_dados: raiz.join("crates/visual_mapa/assets/visual"),
             ..default()
         })
-        .add_plugins((estado::EstadoPlugin, TimePlugin, EconomyPlugin, EconomiaSimPlugin, MercadoUiPlugin, ComercioUiPlugin, ConstrucaoUiPlugin, PoliticsPlugin, JogadorPlugin, MapPlugin, UiPlugin, AudioPlugin, RotasPontePlugin, VisualConstrucoesPlugin, RotulosPaisPlugin))
+        .add_plugins((
+            estado::EstadoPlugin,
+            TimePlugin,
+            EconomyPlugin,
+            EconomiaSimPlugin,
+            MercadoUiPlugin,
+            ComercioUiPlugin,
+            ConstrucaoUiPlugin,
+            PoliticsPlugin,
+            JogadorPlugin,
+            MapPlugin,
+            UiPlugin,
+            AudioPlugin,
+            RotasPontePlugin,
+            VisualConstrucoesPlugin,
+            RotulosPaisPlugin,
+        ))
+        .add_plugins(AtmosferaPlugin)
         .add_plugins(EventosPlugin)
         .add_plugins(plugins::formacao_sim::FormacaoSimPlugin)
         .add_plugins(plugins::bandeiras_ui::BandeirasPlugin)

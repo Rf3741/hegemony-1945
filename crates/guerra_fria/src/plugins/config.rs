@@ -29,6 +29,15 @@ pub const CANAIS: [(CanalAudio, &str); 5] = [
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum QualidadeAtmosfera {
+    Baixo,
+    #[default]
+    Medio,
+    Alto,
+    Ultra,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ModoTela {
     #[default]
     Janela,
@@ -47,6 +56,12 @@ pub struct ConfigVideo {
     pub limite_fps: u32,
     /// Qualidade dos volumes, sombras e partículas dos objetos do mapa.
     pub qualidade_objetos: visual_mapa::config::QualidadeObjetos,
+    /// Campos legados mantidos para compatibilidade com configurações antigas.
+    pub qualidade_atmosfera: QualidadeAtmosfera,
+    pub ciclo_dia_noite: bool,
+    pub efeito_papel: bool,
+    /// Intensidade visual da noite, mantida em 0..=1 para outros sistemas consumirem.
+    pub intensidade_noite: f32,
 }
 
 impl Default for ConfigVideo {
@@ -58,6 +73,10 @@ impl Default for ConfigVideo {
             escala_ui: 1.0,
             limite_fps: 0,
             qualidade_objetos: default(),
+            qualidade_atmosfera: QualidadeAtmosfera::Medio,
+            ciclo_dia_noite: false,
+            efeito_papel: true,
+            intensidade_noite: 0.65,
         }
     }
 }
@@ -136,18 +155,46 @@ impl QualidadeTerreno {
     ];
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum QualidadeGrafica {
+    Baixo,
+    #[default]
+    Medio,
+    Alto,
+    Ultra,
+}
+
+pub type QualidadeAtmosfera = QualidadeGrafica;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ConfigGraficos {
+    pub qualidade: QualidadeGrafica,
     pub qualidade_terreno: QualidadeTerreno,
     pub hillshade: f32,
     pub ondas: f32,
     pub sombra_costas: f32,
+    pub nuvens: bool,
+    pub dia_noite: bool,
+    pub sombras: bool,
+    pub fumaca: bool,
+    pub agua_animada: bool,
 }
 
 impl Default for ConfigGraficos {
     fn default() -> Self {
-        Self { qualidade_terreno: QualidadeTerreno::Medio, hillshade: 0.42, ondas: 0.08, sombra_costas: 0.55 }
+        Self {
+            qualidade: QualidadeGrafica::Medio,
+            qualidade_terreno: QualidadeTerreno::Medio,
+            hillshade: 0.42,
+            ondas: 0.08,
+            sombra_costas: 0.55,
+            nuvens: true,
+            dia_noite: false,
+            sombras: true,
+            fumaca: true,
+            agua_animada: true,
+        }
     }
 }
 
@@ -198,6 +245,7 @@ impl ConfigJogo {
         self.graficos.hillshade = self.graficos.hillshade.clamp(0.0, 1.0);
         self.graficos.ondas = self.graficos.ondas.clamp(0.0, 0.25);
         self.graficos.sombra_costas = self.graficos.sombra_costas.clamp(0.0, 1.0);
+        self.video.intensidade_noite = self.video.intensidade_noite.clamp(0.0, 1.0);
         for v in &mut self.audio.volumes {
             *v = v.clamp(0.0, 1.0);
         }

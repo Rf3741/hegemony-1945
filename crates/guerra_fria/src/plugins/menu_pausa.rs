@@ -1,6 +1,8 @@
 //! Menu de pausa (Esc), janela de Configurações e botão "Rankings", no estilo do card de país:
 //! papel #E8DEC8, borda vermelha #8C251E, tinta escura.
-use super::config::{CANAIS, ConfigJogo, ModoTela, QualidadeTerreno, RESOLUCOES};
+use super::config::{
+    CANAIS, ConfigJogo, ModoTela, QualidadeGrafica, QualidadeTerreno, RESOLUCOES,
+};
 use super::estatisticas::{AbaLedger, RecursoLedger};
 use super::menu_saves::JanelaSaves;
 use super::menu_ui::TelaMenu;
@@ -26,7 +28,14 @@ pub enum AbaConfig {
 }
 
 impl AbaConfig {
-    const TODAS: [(Self, &'static str); 6] = [(Self::Video, "Vídeo"), (Self::Audio, "Áudio"), (Self::Graficos, "Gráficos"), (Self::Jogo, "Jogo"), (Self::Interface, "Interface"), (Self::Controles, "Controles")];
+    const TODAS: [(Self, &'static str); 6] = [
+        (Self::Video, "Vídeo"),
+        (Self::Audio, "Áudio"),
+        (Self::Graficos, "Gráficos"),
+        (Self::Jogo, "Jogo"),
+        (Self::Interface, "Interface"),
+        (Self::Controles, "Controles"),
+    ];
 }
 
 #[derive(Resource, Default)]
@@ -332,18 +341,6 @@ fn janela_config(
                         }
                     }
                 });
-                linha(ui, "Qualidade dos objetos do mapa", |ui| {
-                    for (q, nome) in [
-                        (visual_mapa::config::QualidadeObjetos::Baixo, "Baixo"),
-                        (visual_mapa::config::QualidadeObjetos::Medio, "Médio"),
-                        (visual_mapa::config::QualidadeObjetos::Alto, "Alto"),
-                        (visual_mapa::config::QualidadeObjetos::Ultra, "Ultra"),
-                    ] {
-                        if botao_menor(ui, nome, c.video.qualidade_objetos == q) {
-                            c.video.qualidade_objetos = q;
-                        }
-                    }
-                });
                 linha(ui, "", |ui| {
                     ui.label(egui::RichText::new("F11 ou Alt+Enter alternam a tela cheia.").size(13.0).color(TINTA_SUAVE));
                 });
@@ -357,6 +354,18 @@ fn janela_config(
                 }
             }
             AbaConfig::Graficos => {
+                linha(ui, "Qualidade geral", |ui| {
+                    for (q, nome) in [
+                        (QualidadeGrafica::Baixo, "Baixo"),
+                        (QualidadeGrafica::Medio, "Médio"),
+                        (QualidadeGrafica::Alto, "Alto"),
+                        (QualidadeGrafica::Ultra, "Ultra"),
+                    ] {
+                        if botao_menor(ui, nome, c.graficos.qualidade == q) {
+                            c.graficos.qualidade = q;
+                        }
+                    }
+                });
                 linha(ui, "Qualidade do terreno", |ui| {
                     for (q, nome) in QualidadeTerreno::TODAS {
                         if botao_menor(ui, nome, c.graficos.qualidade_terreno == q) {
@@ -372,6 +381,16 @@ fn janela_config(
                 });
                 linha(ui, "Sombra das costas", |ui| {
                     ui.add(egui::Slider::new(&mut c.graficos.sombra_costas, 0.0..=1.0).fixed_decimals(2));
+                });
+                linha(ui, "Recursos opcionais", |ui| {
+                    ui.checkbox(&mut c.graficos.nuvens, "nuvens");
+                    ui.checkbox(&mut c.graficos.dia_noite, "dia/noite");
+                    ui.checkbox(&mut c.graficos.sombras, "sombras");
+                    ui.checkbox(&mut c.graficos.fumaca, "fumaça");
+                    ui.checkbox(&mut c.graficos.agua_animada, "água animada");
+                });
+                linha(ui, "Intensidade da noite", |ui| {
+                    ui.add(egui::Slider::new(&mut c.video.intensidade_noite, 0.0..=1.0).fixed_decimals(2));
                 });
                 linha(ui, "", |ui| {
                     ui.label(egui::RichText::new("Baixo mantém o mapa atual; Ultra ativa normais e sombras em resolução cheia.").size(13.0).color(TINTA_SUAVE));
