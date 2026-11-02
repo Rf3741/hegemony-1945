@@ -99,3 +99,31 @@ fn shaders_do_bevy_wesl_ate_naga() {
             .unwrap_or_else(|erro| panic!("{nome}.wesl falhou na validação naga: {erro}"));
     }
 }
+
+/// O shader do terreno lê a textura de IDs e a paleta: os bindings têm de bater com o
+/// `AsBindGroup` de `TerrainMaterial` (crates/guerra_fria/src/plugins/map.rs).
+#[test]
+fn terreno_declara_ids_paleta_e_parametros_batendo_com_o_material_rust() {
+    let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let wesl = fs::read_to_string(raiz.join("assets/shaders/terreno.wesl")).unwrap();
+    let rust = fs::read_to_string(raiz.join("crates/guerra_fria/src/plugins/map.rs")).unwrap();
+    for (binding, nome, atributo) in [
+        (20, "terrain_params", "#[uniform(20)]"),
+        (21, "relief_texture", "#[texture(21)]"),
+        (22, "relief_sampler", "#[sampler(22)]"),
+        (23, "ids_texture", "#[texture(23)]"),
+        (24, "palette_texture", "#[texture(24)]"),
+        (25, "paleta_params", "#[uniform(25)]"),
+    ] {
+        let decl = format!("@binding({binding}) var");
+        let linha = wesl
+            .lines()
+            .find(|l| l.contains(&decl))
+            .unwrap_or_else(|| panic!("terreno.wesl sem @binding({binding})"));
+        assert!(linha.contains(nome), "binding {binding} deveria ser `{nome}`: {linha}");
+        assert!(rust.contains(atributo), "TerrainMaterial sem {atributo}");
+    }
+    // A cor política não pode voltar a depender da textura do sprite (repintura de 11,5 M pixels).
+    assert!(wesl.contains("textureLoad(palette_texture"));
+    assert!(wesl.contains("textureLoad(ids_texture"));
+}

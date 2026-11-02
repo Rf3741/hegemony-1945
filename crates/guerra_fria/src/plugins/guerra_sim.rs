@@ -12,11 +12,9 @@ use super::economia_sim::EconomiaSim;
 use super::economy::RecursoMundo;
 use super::guerra_dados::CatalogoDesignGuerra;
 use super::jogador::PaisJogador;
-use super::map::{CoresMapa, DadosMapa, ImagemMapa, RaizProjeto, RecursoCatalogo, colorir_com_hachura};
+use super::map::{CoresMapa, DadosMapa, ImagemMapa, RaizProjeto, RecursoCatalogo, pintar_paleta};
 use super::time::EventoTickDiario;
-use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use sim_guerra::{
     ArestaRegiao, CatalogoGuerra, ClausulaPaz, Comandante, ConfigGuerra,
     Divisao, Exercito, Guerra, MundoGuerra, PaisMilitar, PosturaOperacional,
@@ -440,29 +438,15 @@ fn repintar_mapa_guerra(
 
     let (Some(cores), Some(dados), Some(imagem)) = (cores, dados, imagem) else { return };
 
-    let (pixels, _) = colorir_com_hachura(
-        &dados.ids,
-        dados.largura,
-        dados.altura,
+    let _ = dados;
+    pintar_paleta(
+        &mut imagens,
+        &imagem,
         &cores.cor_prov,
         &cores.dono_prov,
         &cores.estado_prov,
         Some(&cores.ocupante_cor),
     );
-
-    let mut img = Image::new(
-        Extent3d {
-            width: dados.largura,
-            height: dados.altura,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        pixels,
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::RENDER_WORLD,
-    );
-    img.sampler = bevy::image::ImageSampler::nearest();
-    let _ = imagens.insert(imagem.0.id(), img);
 }
 
 /// Helper para declarar guerra entre atacante e defensor com um casus belli.
