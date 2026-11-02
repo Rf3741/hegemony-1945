@@ -137,6 +137,24 @@ fn diagnostico_mercado() {
 const GRANDES: [&str; 10] = ["usa", "sov", "gbr", "fra", "ger", "jap", "ind", "chi", "bra", "ita"];
 
 #[test]
+fn pib_inicial_1945_dos_maiores_na_faixa_historica() {
+    let m = carregar();
+    let alvos_bilhoes = [
+        ("usa", 297.0), ("gbr", 62.5), ("sov", 60.0), ("ind", 40.0),
+        ("chi", 42.5), ("ger", 27.5), ("fra", 19.0), ("can", 18.0),
+        ("jap", 17.5), ("ita", 17.0), ("bra", 12.0), ("esp", 11.0),
+        ("pol", 10.0), ("nld", 9.0), ("bel", 8.0),
+    ];
+    for (id, alvo) in alvos_bilhoes {
+        let pib = m.obter_pais(id).unwrap().pib_diario * 365.0 / 1e9;
+        assert!(
+            (0.75 * alvo..=1.25 * alvo).contains(&pib),
+            "{id}: PIB inicial {pib:.1} bi, alvo {alvo:.1} bi"
+        );
+    }
+}
+
+#[test]
 fn balanco_1945_estavel_nos_paises_grandes() {
     let mut m = carregar();
     let pib0: Vec<f64> = GRANDES.iter().map(|id| m.obter_pais(id).unwrap().pib_diario * 365.0).collect();

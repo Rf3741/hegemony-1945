@@ -119,7 +119,7 @@
         ),
         PaisBandeiras(
             tag: "GER",
-            base: Variante(id: "base", arquivo: "svg/GER.svg", nome: "Grande Reich Alemão", cor: (85, 85, 95)),
+            base: Variante(id: "base", arquivo: "svg/GER.svg", nome: "Alemanha Ocupada", cor: (85, 85, 95)),
             variantes: [
                 Variante(id: "ger_imperio", arquivo: "svg/ger_imperio.svg", nome: "Reich Alemão", cor: (71, 68, 73), condicao: (categoria_ideologia: ["autoritario_direita"], status: [Independente], exige_nao_ocupado: true), prioridade: 40, historica: true, descricao: "Preto-branco-vermelho (1871-1918/1933). A suástica do período nazista foi omitida de propósito."),
                 Variante(id: "ger_weimar", arquivo: "svg/ger_weimar.svg", nome: "República Alemã", cor: (85, 85, 95), condicao: (forma_governo: ["republica_presidencialista", "republica_parlamentarista"], status: [Independente]), prioridade: 25, historica: true, descricao: "Preto-vermelho-ouro (1919)."),
