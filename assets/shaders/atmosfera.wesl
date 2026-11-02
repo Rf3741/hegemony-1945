@@ -1,4 +1,4 @@
-import package::mesh2d::vertex_output::VertexOutput;
+import bevy_sprite_render::mesh2d::vertex_output::VertexOutput;
 
 struct AtmosferaMaterial {
     dados_a: vec4<f32>,
@@ -6,7 +6,7 @@ struct AtmosferaMaterial {
     dados_c: vec4<f32>,
 }
 
-@group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> material: AtmosferaMaterial;
+@group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> material: AtmosferaMaterial;
 
 fn hash21(p: vec2<f32>) -> f32 {
     let h = dot(p, vec2<f32>(127.1, 311.7));
