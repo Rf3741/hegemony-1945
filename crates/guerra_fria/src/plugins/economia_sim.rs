@@ -626,6 +626,8 @@ pub struct EconomiaSim {
     pub vista: VistaEconomia,
     pendentes: u32,
     comandos: Vec<Comando>,
+    /// Ganhos de produtividade por tecnologias civis concluídas (id do país, ganho relativo), aplicados no próximo lote.
+    ganhos_tec: Vec<(String, f64)>,
     /// País econômico do jogador (None antes da escolha).
     pub pais_id: Option<String>,
     pub mensagens: Vec<String>,
@@ -650,6 +652,12 @@ impl EconomiaSim {
             return;
         }
         self.comandos.push(c);
+    }
+    /// Registra o ganho de produtividade de uma tecnologia civil (produção/sociedade) concluída pelo país `tag`.
+    pub fn registrar_ganho_tecnologico(&mut self, tag: &str, ganho: f64) {
+        if let Some(id) = self.id_pais(tag) {
+            self.ganhos_tec.push((id, ganho));
+        }
     }
     #[allow(dead_code)]
     pub fn ocupada(&self) -> bool {
@@ -753,6 +761,7 @@ fn aguardar_economia(mut commands: Commands, carga: Option<ResMut<CargaEconomia>
                 vista: VistaEconomia::default(),
                 pendentes: 0,
                 comandos: Vec::new(),
+                ganhos_tec: Vec::new(),
                 pais_id: None,
                 mensagens: Vec::new(),
                 ms_por_dia: 0.0,
@@ -812,9 +821,13 @@ fn despachar_interno(eco: &mut EconomiaSim) {
     let dias = eco.pendentes.min(DIAS_POR_LOTE);
     eco.pendentes -= dias;
     let cmds = std::mem::take(&mut eco.comandos);
+    let ganhos = std::mem::take(&mut eco.ganhos_tec);
     let pais = eco.pais_id.clone();
     let mut nucleo = eco.nucleo.take().expect("núcleo presente");
     eco.tarefa = Some(AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move {
+        for (id, g) in ganhos {
+            nucleo.mundo.aplicar_ganho_produtividade(&id, g);
+        }
         let (vista, msgs, ms, obras) = executar_lote(&mut nucleo, pais.as_deref(), cmds, dias);
         (nucleo, vista, msgs, ms, obras)
     }));

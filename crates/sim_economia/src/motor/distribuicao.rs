@@ -141,8 +141,9 @@ pub(crate) fn executar_distribuicao_rendas(
                 }
 
                 let mut receita = 0.0;
+                let escala_prod = if b.cache.financiado_pelo_governo { escala } else { escala * pais.produtividade };
                 for &(g_out, qtd) in b.cache.produtos() {
-                    receita += escala * qtd * precos[g_out as usize];
+                    receita += escala_prod * qtd * precos[g_out as usize];
                 }
 
                 b.custo_insumos_ultimo_tick = custo_insumos;

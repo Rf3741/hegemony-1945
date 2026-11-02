@@ -169,6 +169,7 @@ pub fn gerar_cenario_escala_mundial(
             eficiencia_arrecadacao: 1.0,
             forca_militar_total: 0.0,
             pib_diario: 0.0,
+            produtividade: 1.0,
             mercado_idx: 0,
             provincias_indices: Vec::new(),
             estados_indices: Vec::new(),
@@ -448,6 +449,7 @@ pub fn gerar_cenario_escala_mundial(
                 privado: false,
                 retorno_esperado: 0.0,
                 justificativa: String::new(),
+                niveis: 1,
                 provincia_idx: 0,
                 tipo_predio_idx: 0,
             });

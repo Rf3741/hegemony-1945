@@ -17,17 +17,25 @@ pub(crate) struct LoteMigrante {
 }
 
 /// Taxa líquida anual de crescimento populacional conforme padrão de vida e alfabetização.
+///
+/// Transição demográfica do pós-guerra: a mortalidade cai com a medicina moderna (penicilina, vacinas,
+/// saneamento) antes de a natalidade cair, então o crescimento é máximo em padrões de vida intermediários
+/// (~2%/ano) e menor nos países ricos e alfabetizados (baby boom ocidental ~1%/ano). Abaixo de 5 há fome.
 #[inline]
 pub fn taxa_crescimento_anual_pop(padrao_de_vida: f64, alfabetizacao: f64) -> f64 {
     let sol = padrao_de_vida.clamp(1.0, 99.0);
     let alfa = alfabetizacao.clamp(0.0, 1.0);
     if sol < 5.0 {
-        -0.015 * ((5.0 - sol) / 4.0).clamp(0.0, 1.0)
-    } else if sol <= 22.0 {
-        0.002 + 0.014 * ((sol - 5.0) / 17.0)
-    } else {
-        (0.016 - 0.008 * alfa - 0.0002 * (sol - 22.0)).clamp(0.002, 0.016)
+        return -0.015 * ((5.0 - sol) / 4.0).clamp(0.0, 1.0);
     }
+    let base = if sol <= 12.0 {
+        0.010 + 0.012 * (sol - 5.0) / 7.0
+    } else if sol <= 22.0 {
+        0.022 - 0.006 * (sol - 12.0) / 10.0
+    } else {
+        (0.016 - 0.0002 * (sol - 22.0)).max(0.008)
+    };
+    (base - 0.007 * alfa).clamp(0.002, 0.022)
 }
 
 /// Executa o crescimento demográfico natural e a migração interprovincial.

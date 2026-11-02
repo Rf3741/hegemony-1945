@@ -171,10 +171,13 @@ fn atualizar_entradas(t: &mut TecnologiaSim, eco: &EconomiaSim) {
     }
 }
 
+/// Ganho relativo de produtividade por tecnologia civil concluída (+0,6%).
+const GANHO_PRODUTIVIDADE_TECNOLOGIA: f64 = 0.006;
+
 fn avancar_tecnologia(
     mut leitor: MessageReader<EventoTickDiario>,
     mut t: ResMut<TecnologiaSim>,
-    eco: Res<EconomiaSim>,
+    mut eco: ResMut<EconomiaSim>,
     jogador: Option<Res<PaisJogador>>,
 ) {
     if let Some(j) = jogador {
@@ -203,6 +206,10 @@ fn avancar_tecnologia(
                 t.mundo.escolher_ia(&tag, ano, &e);
             }
             if let Some(feita) = t.mundo.tick_pais(&tag, ano, &e) {
+                // Tecnologia civil (produção/sociedade) eleva a produtividade total dos fatores do país.
+                if t.mundo.catalogo.obter(&feita).is_some_and(|x| matches!(x.ramo, Ramo::Producao | Ramo::Sociedade)) {
+                    eco.registrar_ganho_tecnologico(&tag, GANHO_PRODUTIVIDADE_TECNOLOGIA);
+                }
                 if eh_jogador {
                     let nome = t.mundo.catalogo.obter(&feita).map_or(feita.clone(), |x| x.nome.clone());
                     t.concluidas_jogador.push(nome.clone());
