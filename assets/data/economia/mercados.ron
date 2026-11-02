@@ -229,7 +229,7 @@
     ),
     (
         id: "mercado_chi",
-        nome: "Mercado República da China (Nacionalista)",
+        nome: "Mercado República da China",
         pais_lider_id: "chi",
         precos_atuais: {
             "graos": 20.0,
@@ -1882,7 +1882,7 @@
     ),
     (
         id: "mercado_irn",
-        nome: "Mercado Império do Irã (Sob Ocupação Anglo-Soviética)",
+        nome: "Mercado Império do Irã",
         pais_lider_id: "irn",
         precos_atuais: {
             "graos": 20.0,
@@ -2566,7 +2566,7 @@
     ),
     (
         id: "mercado_bra",
-        nome: "Mercado Estados Unidos do Brasil (Estado Novo)",
+        nome: "Mercado Estados Unidos do Brasil",
         pais_lider_id: "bra",
         precos_atuais: {
             "graos": 20.0,

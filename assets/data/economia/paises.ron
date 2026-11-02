@@ -162,7 +162,7 @@
     (
         id: "chi",
         tag: Some("CHI"),
-        nome: "República da China (Nacionalista)",
+        nome: "República da China",
         mercado_id: "mercado_chi",
         culturas_primarias: ["chinesa_han"],
         religiao_oficial: "confucionismo_e_religiao_chinesa",
@@ -922,7 +922,7 @@
     (
         id: "nor",
         tag: Some("NOR"),
-        nome: "Reino da Noruega (Governo de Quisling / Ocupada)",
+        nome: "Reino da Noruega",
         mercado_id: "mercado_ger",
         culturas_primarias: ["norueguesa"],
         religiao_oficial: "cristianismo_protestante",
@@ -962,7 +962,7 @@
     (
         id: "den",
         tag: Some("DEN"),
-        nome: "Reino da Dinamarca (Sob Ocupação Alemã)",
+        nome: "Reino da Dinamarca",
         mercado_id: "mercado_ger",
         culturas_primarias: ["dinamarquesa"],
         religiao_oficial: "cristianismo_protestante",
@@ -1722,7 +1722,7 @@
     (
         id: "irn",
         tag: Some("IRN"),
-        nome: "Império do Irã (Sob Ocupação Anglo-Soviética)",
+        nome: "Império do Irã",
         mercado_id: "mercado_irn",
         culturas_primarias: ["persa", "azerbaijana", "curda"],
         religiao_oficial: "islamismo_xiita",
@@ -2602,7 +2602,7 @@
     (
         id: "hkg",
         tag: Some("HKG"),
-        nome: "Hong Kong (Sob Ocupação Japonesa)",
+        nome: "Hong Kong",
         mercado_id: "mercado_jap",
         culturas_primarias: ["chinesa_cantonesa"],
         religiao_oficial: "confucionismo_e_religiao_chinesa",
@@ -2722,7 +2722,7 @@
     (
         id: "ins",
         tag: Some("INS"),
-        nome: "Índias Orientais Holandesas (Sob Ocupação Japonesa)",
+        nome: "Índias Orientais Holandesas",
         mercado_id: "mercado_nld",
         culturas_primarias: ["javanesa", "sundanesa"],
         religiao_oficial: "islamismo_sunita",
@@ -2762,7 +2762,7 @@
     (
         id: "mal",
         tag: Some("MAL"),
-        nome: "Malásia Britânica (Sob Ocupação Japonesa)",
+        nome: "Malásia Britânica",
         mercado_id: "mercado_gbr",
         culturas_primarias: ["malaia", "chinesa_cantonesa"],
         religiao_oficial: "islamismo_sunita",
@@ -2842,7 +2842,7 @@
     (
         id: "bru",
         tag: Some("BRU"),
-        nome: "Brunei Britânico (Sob Ocupação Japonesa)",
+        nome: "Brunei Britânico",
         mercado_id: "mercado_gbr",
         culturas_primarias: ["malaia"],
         religiao_oficial: "islamismo_sunita",
@@ -2962,7 +2962,7 @@
     (
         id: "tim",
         tag: Some("TIM"),
-        nome: "Timor Português (Sob Ocupação Japonesa)",
+        nome: "Timor Português",
         mercado_id: "mercado_por",
         culturas_primarias: ["timorense"],
         religiao_oficial: "animismo_tradicional",
@@ -3002,7 +3002,7 @@
     (
         id: "bra",
         tag: Some("BRA"),
-        nome: "Estados Unidos do Brasil (Estado Novo)",
+        nome: "Estados Unidos do Brasil",
         mercado_id: "mercado_bra",
         culturas_primarias: ["brasileira"],
         religiao_oficial: "cristianismo_catolico",

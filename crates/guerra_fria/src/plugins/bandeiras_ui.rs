@@ -137,6 +137,42 @@ pub fn flags_do_pais(tag: &str, d: (i32, u8, u8)) -> Vec<String> {
     FLAGS_DATADAS.iter().filter(|(t, _, de, ate)| *t == tag && d >= *de && d <= *ate).map(|(_, f, _, _)| f.to_string()).collect()
 }
 
+/// Doze países têm outra grafia no catálogo de bandeiras que no legado `simulacao` (BGR→BUL,
+/// HTI→HAI, THA→SIA...). Sem o alias o resolvedor não acha o país e devolve a tag crua como nome.
+fn tag_do_catalogo(tag: &str) -> &str {
+    super::economia_sim::ALIAS_TAGS
+        .iter()
+        .find(|(legado, _)| *legado == tag)
+        .map_or(tag, |(_, cat)| *cat)
+}
+
+/// Estado de aparência de um país, tal como o resolvedor de bandeiras o recebe: a política
+/// (`EntradaBandeira`) mais o que o cenário sabe (ideologia e suserano). A ocupação militar não
+/// entra no nome: ela aparece pela hachura e pela legenda do mapa (`plugins::map`).
+pub fn estado_de_aparencia(
+    tag: &str,
+    ideologia: &str,
+    suserano: Option<&str>,
+    e: &EntradaBandeira,
+    data: (i32, u8, u8),
+) -> EstadoBandeira {
+    EstadoBandeira {
+        ano: data.0,
+        mes: data.1,
+        forma_governo: e.forma_governo.clone(),
+        religiao_estatal: e.religiao_estatal.clone(),
+        ideologia_dominante: ideologia.to_string(),
+        ideologia_partido: e.ideologia_partido.clone(),
+        ideologia_chefe: e.ideologia_chefe.clone(),
+        partido: e.partido.clone(),
+        status: if suserano.is_some() { Status::Colonia } else { Status::Independente },
+        suserano: suserano.map(str::to_string),
+        ocupante: None,
+        guerra_civil: e.guerra_civil,
+        flags: flags_do_pais(tag, data),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn atualizar_bandeiras(
     pol: Res<PoliticaSim>,
@@ -163,22 +199,8 @@ fn atualizar_bandeiras(
     let mut noticias: Vec<String> = Vec::new();
     for e in &entradas {
         let Some(pais) = mundo.0.paises.get(&e.tag) else { continue };
-        let st = EstadoBandeira {
-            ano: d.ano,
-            mes: d.mes,
-            forma_governo: e.forma_governo.clone(),
-            religiao_estatal: e.religiao_estatal.clone(),
-            ideologia_dominante: pais.ideologia.clone(),
-            ideologia_partido: e.ideologia_partido.clone(),
-            ideologia_chefe: e.ideologia_chefe.clone(),
-            partido: e.partido.clone(),
-            status: if pais.suserano.is_some() { Status::Colonia } else { Status::Independente },
-            suserano: pais.suserano.clone(),
-            ocupante: None,
-            guerra_civil: e.guerra_civil,
-            flags: flags_do_pais(&e.tag, data),
-        };
-        let nova = cat.resolver_bandeira(&e.tag, &st);
+        let st = estado_de_aparencia(&e.tag, &pais.ideologia, pais.suserano.as_deref(), e, data);
+        let nova = cat.resolver_bandeira(tag_do_catalogo(&e.tag), &st);
         let antiga = b.0.atual.read().ok().and_then(|m| m.get(&e.tag).cloned());
         if antiga.as_ref().is_some_and(|a| a == &nova) {
             continue;
@@ -262,5 +284,122 @@ mod testes {
             let nome = p.base.arquivo.rsplit('/').next().unwrap().trim_end_matches(".svg");
             assert!(raiz.join(format!("{nome}.png")).exists(), "{nome}");
         }
+    }
+
+    use super::super::politica_sim::NucleoPol;
+    use simulacao::formacao::Formacoes;
+    use simulacao::mundo::MundoJogo;
+    use simulacao::tempo::DataSimulacao;
+    use std::collections::HashMap;
+
+    /// Sufixo que só poderia aparecer com uma ocupação militar em curso.
+    const SUFIXO_OCUPACAO: &str = "(Sob Ocupação";
+
+    /// Cenário real de 1945: mundo do núcleo + política + formáveis/desocupações.
+    struct Cenario {
+        mundo: MundoJogo,
+        entradas: HashMap<String, EntradaBandeira>,
+        form: Formacoes,
+    }
+
+    fn raiz_projeto() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+    }
+
+    fn cenario_1945() -> Cenario {
+        let raiz = raiz_projeto();
+        let (catalogo, mundo) = MundoJogo::carregar_de_arquivos(
+            raiz.join("assets/map/provinces.ron"),
+            raiz.join("data/scenario_1945/countries_1945.ron"),
+            raiz.join("data/scenario_1945/province_owners_1945.ron"),
+        )
+        .expect("cenário 1945");
+        let (pol, _) = NucleoPol::carregar(&raiz.join("assets/data/politica")).expect("política de 1945");
+        let entradas = pol.entradas_bandeira().into_iter().map(|e| (e.tag.clone(), e)).collect();
+        let form = Formacoes::carregar(raiz.join("data/formaveis"), &catalogo).expect("formáveis de 1945");
+        Cenario { mundo, entradas, form }
+    }
+
+    /// Nome exibido (variante vencedora) e se há ocupação ativa sobre cada país na data dada.
+    fn nomes_em(cen: &Cenario, data: (i32, u8, u8)) -> Vec<(String, String, bool)> {
+        let cat = catalogo_embutido();
+        let mut ocupadas: Vec<&String> = Vec::new();
+        for (id, dono) in &cen.mundo.dono_por_provincia {
+            if cen.mundo.controlador_por_provincia.get(id).is_some_and(|c| c != dono) {
+                ocupadas.push(dono);
+            }
+        }
+        cen.mundo
+            .paises
+            .iter()
+            .map(|(tag, pais)| {
+                let e = cen.entradas.get(tag).cloned().unwrap_or_default();
+                let st = estado_de_aparencia(tag, &pais.ideologia, pais.suserano.as_deref(), &e, data);
+                (tag.clone(), cat.resolver_bandeira(tag_do_catalogo(tag), &st).nome, ocupadas.contains(&tag))
+            })
+            .collect()
+    }
+
+    /// Roda desocupações e formações até a data (o que o cliente faz dia a dia).
+    fn avancar_ate(cen: &mut Cenario, data: (i32, u8, u8)) {
+        cen.mundo.data = DataSimulacao::nova(data.0, data.1, data.2);
+        cen.form.processar(&mut cen.mundo);
+    }
+
+    /// O nome nunca traz a ocupação: ela aparece pela hachura e pela legenda do mapa.
+    #[test]
+    fn catalogo_de_nomes_nao_tem_sufixo_de_ocupacao() {
+        let cat = catalogo_embutido();
+        for p in &cat.dados().paises {
+            for v in std::iter::once(&p.base).chain(&p.variantes) {
+                assert!(!v.nome.contains(SUFIXO_OCUPACAO), "{} / {}: {:?}", p.tag, v.id, v.nome);
+            }
+        }
+    }
+
+    /// Em 01/01/1946 e 01/06/1946 nenhum nome exibido traz ocupação — nem o de quem ainda está
+    /// ocupado: a opção foi o nome sem sufixo, com a ocupação mostrada pela hachura e pela legenda.
+    #[test]
+    fn nenhum_nome_de_pais_tem_ocupacao_em_1946() {
+        let mut cen = cenario_1945();
+        for data in [(1946, 1, 1), (1946, 6, 1)] {
+            avancar_ate(&mut cen, data);
+            for (tag, nome, ocupada) in nomes_em(&cen, data) {
+                assert!(!nome.contains(SUFIXO_OCUPACAO), "{tag} (ocupação ativa: {ocupada}): o nome traz {SUFIXO_OCUPACAO:?}; a ocupação se mostra pela hachura e pela legenda do mapa -> {nome}");
+                assert!(!nome.contains("Ocupad"), "{tag}: o nome traz a ocupação embutida; a ocupação se mostra pela hachura e pela legenda do mapa -> {nome}");
+            }
+        }
+        // Irã e Dinamarca: libertados, nome sem sufixo.
+        let nomes: HashMap<String, String> = nomes_em(&cen, (1946, 6, 1)).into_iter().map(|(t, n, _)| (t, n)).collect();
+        assert_eq!(nomes.get("IRN").map(String::as_str), Some("Império do Irã"));
+        assert_eq!(nomes.get("DEN").map(String::as_str), Some("Reino da Dinamarca"));
+    }
+
+    /// Toda entrada política tem variante no catálogo (pela tag do cenário ou pelo alias): sem isso
+    /// o resolvedor devolve a tag crua e o mapa escreve "BGR", "HTI", "THA" no lugar do nome.
+    #[test]
+    fn toda_entrada_politica_tem_variante_no_catalogo() {
+        let cen = cenario_1945();
+        let cat = catalogo_embutido();
+        let sem_flag: Vec<String> = cen
+            .entradas
+            .keys()
+            .filter(|t| cat.pais(tag_do_catalogo(t)).is_none())
+            .cloned()
+            .collect();
+        assert!(sem_flag.is_empty(), "países sem catálogo de bandeiras (o nome vira a tag crua): {sem_flag:?}");
+    }
+
+    #[test]
+    fn nomes_oficiais_dos_governos_de_1945() {
+        let cen = cenario_1945();
+        let nomes: HashMap<String, String> = nomes_em(&cen, (1945, 1, 1)).into_iter().map(|(t, n, _)| (t, n)).collect();
+        assert_eq!(nomes.get("CHI").map(String::as_str), Some("República da China"));
+        assert_eq!(nomes.get("BRA").map(String::as_str), Some("Estados Unidos do Brasil"));
+        assert_eq!(nomes.get("DEN").map(String::as_str), Some("Reino da Dinamarca"));
+        assert_eq!(nomes.get("IRN").map(String::as_str), Some("Império do Irã"));
+        assert_eq!(nomes.get("NOR").map(String::as_str), Some("Reino da Noruega"));
+        let juntas: Vec<&String> = nomes.iter().filter(|(_, n)| n.contains("Junta Militar")).map(|(_, n)| n).collect();
+        assert!(juntas.is_empty(), "governos de 1945 escritos como junta militar: {juntas:?}");
     }
 }

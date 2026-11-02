@@ -169,7 +169,7 @@
     ),
     (
         tag: "CHI",
-        nome: "República da China (Nacionalista)",
+        nome: "República da China",
         ano_cenario: 1945,
         tecnologias_desbloqueadas: [
             "quimica_sintetica_basica",
@@ -636,7 +636,7 @@
     ),
     (
         tag: "NOR",
-        nome: "Reino da Noruega (Governo de Quisling / Ocupada)",
+        nome: "Reino da Noruega",
         ano_cenario: 1945,
         tecnologias_desbloqueadas: [
             "quimica_sintetica_basica",
@@ -663,7 +663,7 @@
     ),
     (
         tag: "DEN",
-        nome: "Reino da Dinamarca (Sob Ocupação Alemã)",
+        nome: "Reino da Dinamarca",
         ano_cenario: 1945,
         tecnologias_desbloqueadas: [
             "quimica_sintetica_basica",
@@ -1152,7 +1152,7 @@
     ),
     (
         tag: "IRN",
-        nome: "Império do Irã (Sob Ocupação Anglo-Soviética)",
+        nome: "Império do Irã",
         ano_cenario: 1945,
         tecnologias_desbloqueadas: [
             "quimica_sintetica_basica",
@@ -1590,7 +1590,7 @@
     ),
     (
         tag: "HKG",
-        nome: "Hong Kong (Sob Ocupação Japonesa)",
+        nome: "Hong Kong",
         ano_cenario: 1945,
         tecnologias_desbloqueadas: [
             "quimica_sintetica_basica",
@@ -1649,7 +1649,7 @@
     ),
     (
         tag: "INS",
-        nome: "Índias Orientais Holandesas (Sob Ocupação Japonesa)",
+        nome: "Índias Orientais Holandesas",
         ano_cenario: 1945,
         tecnologias_desbloqueadas: [
             "quimica_sintetica_basica",
@@ -1664,7 +1664,7 @@
     ),
     (
         tag: "MAL",
-        nome: "Malásia Britânica (Sob Ocupação Japonesa)",
+        nome: "Malásia Britânica",
         ano_cenario: 1945,
         tecnologias_desbloqueadas: [
             "quimica_sintetica_basica",
@@ -1701,7 +1701,7 @@
     ),
     (
         tag: "BRU",
-        nome: "Brunei Britânico (Sob Ocupação Japonesa)",
+        nome: "Brunei Britânico",
         ano_cenario: 1945,
         tecnologias_desbloqueadas: [
             "quimica_sintetica_basica",
@@ -1772,7 +1772,7 @@
     ),
     (
         tag: "TIM",
-        nome: "Timor Português (Sob Ocupação Japonesa)",
+        nome: "Timor Português",
         ano_cenario: 1945,
         tecnologias_desbloqueadas: [
             "quimica_sintetica_basica",

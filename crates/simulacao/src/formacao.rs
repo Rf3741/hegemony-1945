@@ -97,6 +97,21 @@ pub fn parse_data(s: &str) -> Option<DataSimulacao> {
     Some(DataSimulacao::nova(a, m, d))
 }
 
+/// Artigo contraído que acompanha o nome de um país ("União Soviética" -> "da",
+/// "Reino Unido" -> "do", "Estados Unidos da América" -> "dos"). Olha o primeiro termo
+/// (o núcleo do nome) para o número e o último para o gênero.
+fn artigo_pais(nome: &str) -> &'static str {
+    let primeiro = nome.split_whitespace().next().unwrap_or("");
+    let ultimo = nome.split_whitespace().next_back().unwrap_or("");
+    if primeiro.ends_with('s') {
+        "dos"
+    } else if primeiro.ends_with('a') || ultimo.ends_with('a') {
+        "da"
+    } else {
+        "do"
+    }
+}
+
 /// Países que dividem o mesmo prefixo adm1 com outro: separa pelo centroide `(lon, lat)`.
 /// `controlador` é o ocupante atual da província: a RFA nasce das zonas ocidentais (USA, GBR, FRA)
 /// e a RDA da zona soviética; sem zona de ocupação vale o corte geográfico.
@@ -304,15 +319,19 @@ impl Formacoes {
         let mut eventos = Vec::new();
         for (chave, ids) in grupos {
             let dono = mundo.dono_por_provincia[&ids[0]].clone();
+            // Quem está de saída: anotado ANTES de devolver as províncias ao soberano.
+            let mut ocupantes: Vec<String> = Vec::new();
             for id in &ids {
+                if let Some(c) = mundo.controlador_por_provincia.get(id)
+                    && c != &dono
+                    && !ocupantes.contains(c)
+                {
+                    ocupantes.push(c.clone());
+                }
                 mundo.controlador_por_provincia.insert(*id, dono.clone());
             }
+            ocupantes.sort();
             if let Some(pais) = mundo.paises.get(&dono) {
-                let ocupante = ids
-                    .iter()
-                    .find_map(|id| mundo.controlador_por_provincia.get(id))
-                    .cloned()
-                    .unwrap_or_else(|| dono.clone());
                 let territorio = match chave.as_str() {
                     "indochina-1946" => "Indochina",
                     "ira-1946" => "Irã",
@@ -323,11 +342,13 @@ impl Formacoes {
                     "trieste-1954" => "Trieste",
                     _ => "território ocupado",
                 };
-                let nome_ocupante = mundo
-                    .paises
-                    .get(&ocupante)
-                    .map(|p| p.nome.trim_end_matches(" Ocupada").to_string())
-                    .unwrap_or_else(|| ocupante.clone());
+                let nomes_ocupantes: Vec<String> = ocupantes
+                    .iter()
+                    .map(|t| {
+                        let n = mundo.paises.get(t).map_or_else(|| t.clone(), |p| p.nome.clone());
+                        format!("{} {n}", artigo_pais(&n))
+                    })
+                    .collect();
                 let nome_soberano = pais.nome.trim_end_matches(" Ocupada");
                 let adm1_codes: Vec<String> = ids
                     .iter()
@@ -343,7 +364,8 @@ impl Formacoes {
                     adm1: adm1_codes,
                     populacao: pais.populacao_total(),
                     descricao: format!(
-                        "Fim da ocupação de {territorio}: o território volta ao controle de {nome_soberano} (retirada de {nome_ocupante})."
+                        "Fim da ocupação de {territorio}: o território volta ao controle de {nome_soberano} (retirada {}).",
+                        nomes_ocupantes.join(" e ")
                     ),
                     leis_iniciais: BTreeMap::new(),
                     ideologia: pais.ideologia.clone(),

@@ -1833,7 +1833,7 @@
     (
         id: "chi",
         tag: "CHI",
-        nome: "República da China (Nacionalista)",
+        nome: "República da China",
         leis_ativas: {
             "bem_estar_social": "sem_previdencia",
             "cidadania": "cidadania_etnica_nacional",
@@ -6361,7 +6361,7 @@
     (
         id: "nor",
         tag: "NOR",
-        nome: "Reino da Noruega (Governo de Quisling / Ocupada)",
+        nome: "Reino da Noruega",
         leis_ativas: {
             "bem_estar_social": "sem_previdencia",
             "cidadania": "segregacao_apartheid",
@@ -6564,7 +6564,7 @@
         movimentos: [
             (
                 id: "movimento_anticolonial_nor",
-                nome: "Frente de Libertação Nacional (Reino da Noruega (Governo de Quisling / Ocupada))",
+                nome: "Frente de Libertação Nacional (Reino da Noruega)",
                 objetivo: LibertacaoAnticolonial,
                 grupos_apoiadores: ["movimento_anticolonial", "populacao_rural"],
                 apoio: 48.0,
@@ -6592,7 +6592,7 @@
     (
         id: "den",
         tag: "DEN",
-        nome: "Reino da Dinamarca (Sob Ocupação Alemã)",
+        nome: "Reino da Dinamarca",
         leis_ativas: {
             "bem_estar_social": "sem_previdencia",
             "cidadania": "segregacao_apartheid",
@@ -6795,7 +6795,7 @@
         movimentos: [
             (
                 id: "movimento_anticolonial_den",
-                nome: "Frente de Libertação Nacional (Reino da Dinamarca (Sob Ocupação Alemã))",
+                nome: "Frente de Libertação Nacional (Reino da Dinamarca)",
                 objetivo: LibertacaoAnticolonial,
                 grupos_apoiadores: ["movimento_anticolonial", "populacao_rural"],
                 apoio: 48.0,
@@ -11341,7 +11341,7 @@
     (
         id: "irn",
         tag: "IRN",
-        nome: "Império do Irã (Sob Ocupação Anglo-Soviética)",
+        nome: "Império do Irã",
         leis_ativas: {
             "bem_estar_social": "seguridade_rudimentar",
             "cidadania": "cidadania_civica_jus_soli",
@@ -16612,7 +16612,7 @@
     (
         id: "hkg",
         tag: "HKG",
-        nome: "Hong Kong (Sob Ocupação Japonesa)",
+        nome: "Hong Kong",
         leis_ativas: {
             "bem_estar_social": "sem_previdencia",
             "cidadania": "segregacao_apartheid",
@@ -16805,7 +16805,7 @@
         movimentos: [
             (
                 id: "movimento_anticolonial_hkg",
-                nome: "Frente de Libertação Nacional (Hong Kong (Sob Ocupação Japonesa))",
+                nome: "Frente de Libertação Nacional (Hong Kong)",
                 objetivo: LibertacaoAnticolonial,
                 grupos_apoiadores: ["movimento_anticolonial", "populacao_rural"],
                 apoio: 48.0,
@@ -17280,7 +17280,7 @@
     (
         id: "ins",
         tag: "INS",
-        nome: "Índias Orientais Holandesas (Sob Ocupação Japonesa)",
+        nome: "Índias Orientais Holandesas",
         leis_ativas: {
             "bem_estar_social": "sem_previdencia",
             "cidadania": "segregacao_apartheid",
@@ -17501,7 +17501,7 @@
     (
         id: "mal",
         tag: "MAL",
-        nome: "Malásia Britânica (Sob Ocupação Japonesa)",
+        nome: "Malásia Britânica",
         leis_ativas: {
             "bem_estar_social": "sem_previdencia",
             "cidadania": "segregacao_apartheid",
@@ -17694,7 +17694,7 @@
         movimentos: [
             (
                 id: "movimento_anticolonial_mal",
-                nome: "Frente de Libertação Nacional (Malásia Britânica (Sob Ocupação Japonesa))",
+                nome: "Frente de Libertação Nacional (Malásia Britânica)",
                 objetivo: LibertacaoAnticolonial,
                 grupos_apoiadores: ["movimento_anticolonial", "populacao_rural"],
                 apoio: 48.0,
@@ -17953,7 +17953,7 @@
     (
         id: "bru",
         tag: "BRU",
-        nome: "Brunei Britânico (Sob Ocupação Japonesa)",
+        nome: "Brunei Britânico",
         leis_ativas: {
             "bem_estar_social": "sem_previdencia",
             "cidadania": "segregacao_apartheid",
@@ -18146,7 +18146,7 @@
         movimentos: [
             (
                 id: "movimento_anticolonial_bru",
-                nome: "Frente de Libertação Nacional (Brunei Britânico (Sob Ocupação Japonesa))",
+                nome: "Frente de Libertação Nacional (Brunei Britânico)",
                 objetivo: LibertacaoAnticolonial,
                 grupos_apoiadores: ["movimento_anticolonial", "populacao_rural"],
                 apoio: 48.0,
@@ -18616,7 +18616,7 @@
     (
         id: "tim",
         tag: "TIM",
-        nome: "Timor Português (Sob Ocupação Japonesa)",
+        nome: "Timor Português",
         leis_ativas: {
             "bem_estar_social": "sem_previdencia",
             "cidadania": "segregacao_apartheid",
@@ -18809,7 +18809,7 @@
         movimentos: [
             (
                 id: "movimento_anticolonial_tim",
-                nome: "Frente de Libertação Nacional (Timor Português (Sob Ocupação Japonesa))",
+                nome: "Frente de Libertação Nacional (Timor Português)",
                 objetivo: LibertacaoAnticolonial,
                 grupos_apoiadores: ["movimento_anticolonial", "populacao_rural"],
                 apoio: 48.0,
@@ -18837,7 +18837,7 @@
     (
         id: "bra",
         tag: "BRA",
-        nome: "Estados Unidos do Brasil (Estado Novo)",
+        nome: "Estados Unidos do Brasil",
         leis_ativas: {
             "bem_estar_social": "seguridade_rudimentar",
             "cidadania": "cidadania_civica_jus_soli",

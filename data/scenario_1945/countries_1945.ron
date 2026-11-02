@@ -901,7 +901,7 @@
     ),
     (
         tag: "DEN",
-        nome: "Dinamarca",
+        nome: "Reino da Dinamarca",
         cor: (190, 45, 55),
         capital: "Copenhague",
         suserano: None,
@@ -1081,7 +1081,7 @@
     ),
     (
         tag: "IRN",
-        nome: "Irã (Ocupação Anglo-Soviética)",
+        nome: "Império do Irã",
         cor: (75, 145, 85),
         capital: "Teerã",
         suserano: None,
