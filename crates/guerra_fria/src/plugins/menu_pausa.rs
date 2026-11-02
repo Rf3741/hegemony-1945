@@ -1,7 +1,7 @@
 //! Menu de pausa (Esc), janela de Configurações e botão "Rankings", no estilo do card de país:
 //! papel #E8DEC8, borda vermelha #8C251E, tinta escura.
 use super::config::{
-    CANAIS, ConfigJogo, ModoTela, QualidadeGrafica, QualidadeTerreno, RESOLUCOES,
+    CANAIS, ConfigJogo, ModoTela, QualidadeGrafica, RESOLUCOES,
 };
 use super::estatisticas::{AbaLedger, RecursoLedger};
 use super::menu_saves::JanelaSaves;
@@ -363,13 +363,6 @@ fn janela_config(
                     ] {
                         if botao_menor(ui, nome, c.graficos.qualidade == q) {
                             c.graficos.qualidade = q;
-                        }
-                    }
-                });
-                linha(ui, "Qualidade do terreno", |ui| {
-                    for (q, nome) in QualidadeTerreno::TODAS {
-                        if botao_menor(ui, nome, c.graficos.qualidade_terreno == q) {
-                            c.graficos.qualidade_terreno = q;
                         }
                     }
                 });

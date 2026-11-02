@@ -99,7 +99,7 @@ pub(crate) fn materializar_volumes_sistema(
                         1.0,
                     )),
             ));
-            if cfg.qualidade.tem_sombras() {
+            if cfg.qualidade.tem_sombras() && cfg.sombras_ativas {
                 c.spawn((
                     Mesh2d(rec.quad.clone()),
                     MeshMaterial2d(mat_sombra.clone()),
@@ -120,7 +120,7 @@ pub(crate) fn atualizar_intensidade_noite_sistema(
         return;
     }
     for mut v in &mut sombras {
-        *v = if cfg.qualidade.tem_sombras() {
+        *v = if cfg.qualidade.tem_sombras() && cfg.sombras_ativas {
             Visibility::Inherited
         } else {
             Visibility::Hidden

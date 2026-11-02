@@ -3,6 +3,7 @@
 
 use super::config::{ConfigJogo, QualidadeAtmosfera};
 use super::time::RecursoRelogio;
+use visual_mapa::config::ConfiguracaoObjetos;
 use bevy::{
     camera::Hdr,
     core_pipeline::tonemapping::{DebandDither, Tonemapping},
@@ -95,6 +96,7 @@ fn atualizar_atmosfera(
     relogio: Option<Res<RecursoRelogio>>,
     tempo: Res<Time>,
     mut estado: ResMut<AtmosferaEstado>,
+    mut objetos: Option<ResMut<ConfiguracaoObjetos>>,
     mut materiais: ResMut<Assets<AtmosferaMaterial>>,
     camada: Query<&MeshMaterial2d<AtmosferaMaterial>, With<CamadaAtmosfera>>,
     camera: Query<&Projection, With<Camera2d>>,
@@ -105,17 +107,20 @@ fn atualizar_atmosfera(
     let Some(mut material) = materiais.get_mut(handle) else {
         return;
     };
-    let qualidade = cfg.video.qualidade_atmosfera;
+    let qualidade = cfg.graficos.qualidade;
     let nuvens = matches!(
         qualidade,
         QualidadeAtmosfera::Alto | QualidadeAtmosfera::Ultra
-    );
-    let noite_ligada = cfg.video.ciclo_dia_noite && qualidade == QualidadeAtmosfera::Ultra;
+    ) && cfg.graficos.nuvens;
+    let noite_ligada = cfg.graficos.dia_noite || cfg.video.ciclo_dia_noite;
     let (terminador, noite_centro) = relogio.as_deref().map_or((0.0, 0.0), |r| {
         terminador_e_noite(r.data, cfg.video.intensidade_noite)
     });
     estado.terminador = terminador;
     estado.intensidade_noite = if noite_ligada { noite_centro } else { 0.0 };
+    if let Some(objetos) = objetos.as_deref_mut() {
+        objetos.intensidade_noite = estado.intensidade_noite;
+    }
 
     let zoom = camera
         .single()

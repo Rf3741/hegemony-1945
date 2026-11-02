@@ -1002,12 +1002,13 @@ pub fn animar_predios_urbanos_sistema(
 /// Troca dia/noite: texturas das janelas e escurecimento das fachadas.
 pub fn atualizar_noite_sistema(
     eras: Res<GerenciadorEras>,
+    objetos: Res<crate::config::ConfiguracaoObjetos>,
     tex: Option<Res<TexturasJanelas>>,
     mut ultimo: Local<Option<bool>>,
     mut janelas: Query<(&JanelaPredio, &mut Sprite), Without<PredioUrbano>>,
     mut corpos: Query<&mut Sprite, (With<PredioUrbano>, Without<JanelaPredio>)>,
 ) {
-    let noite = eras.modo_noturno;
+    let noite = eras.modo_noturno || objetos.intensidade_noite > 0.1;
     if *ultimo == Some(noite) {
         return;
     }

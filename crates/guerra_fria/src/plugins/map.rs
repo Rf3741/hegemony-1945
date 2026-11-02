@@ -130,12 +130,13 @@ fn atualizar_material_terreno(
     sprites: Query<&SpriteMaterial<TerrainMaterial>>,
 ) {
     let Some(cfg) = cfg else { return };
-    let (hillshade, costa, agua) = match cfg.graficos.qualidade_terreno {
-        super::config::QualidadeTerreno::Baixo => (0.0, 0.0, 0.0),
-        super::config::QualidadeTerreno::Medio => (cfg.graficos.hillshade, 0.0, 0.0),
-        super::config::QualidadeTerreno::Alto => (cfg.graficos.hillshade, 0.0, cfg.graficos.ondas),
-        super::config::QualidadeTerreno::Ultra => (cfg.graficos.hillshade, cfg.graficos.sombra_costas, cfg.graficos.ondas),
+    let (hillshade, costa, agua) = match cfg.graficos.qualidade {
+        super::config::QualidadeGrafica::Baixo => (0.0, 0.0, 0.0),
+        super::config::QualidadeGrafica::Medio => (cfg.graficos.hillshade, 0.0, 0.0),
+        super::config::QualidadeGrafica::Alto => (cfg.graficos.hillshade, 0.0, cfg.graficos.ondas),
+        super::config::QualidadeGrafica::Ultra => (cfg.graficos.hillshade, cfg.graficos.sombra_costas, cfg.graficos.ondas),
     };
+    let agua = if cfg.graficos.agua_animada { agua } else { 0.0 };
     for sprite in &sprites {
         if let Some(mut material) = materiais.get_mut(&sprite.0) {
             material.params = Vec4::new(hillshade, costa, agua, tempo.elapsed_secs());

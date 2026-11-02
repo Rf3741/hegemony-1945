@@ -389,6 +389,7 @@ pub fn emitir_fumaca_predios_sistema(
     }
     if !limites_zoom.as_ref().map_or(true, |lim| lim.fumaca_ativa)
         || !objetos.qualidade.tem_animacao()
+        || !objetos.fumaca_ativa
     {
         return;
     }

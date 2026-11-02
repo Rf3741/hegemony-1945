@@ -35,6 +35,8 @@ pub struct ConfiguracaoObjetos {
     /// Extrusão aparente em unidades de mundo; não altera o limite das cidades.
     pub extrusao: f32,
     pub intensidade_sombra: f32,
+    pub sombras_ativas: bool,
+    pub fumaca_ativa: bool,
     /// Gancho para o ciclo dia/noite, no intervalo 0..=1.
     pub intensidade_noite: f32,
 }
@@ -45,6 +47,8 @@ impl Default for ConfiguracaoObjetos {
             qualidade: QualidadeObjetos::Medio,
             extrusao: 0.22,
             intensidade_sombra: 0.28,
+            sombras_ativas: true,
+            fumaca_ativa: true,
             intensidade_noite: 0.0,
         }
     }

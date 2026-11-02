@@ -57,10 +57,17 @@ fn sincronizar_qualidade_visual_sistema(
     mut objetos: ResMut<ConfiguracaoObjetos>,
 ) {
     let Some(cfg) = cfg else { return };
-    let qualidade = cfg.video.qualidade_objetos;
+    let qualidade = match cfg.graficos.qualidade {
+        super::config::QualidadeGrafica::Baixo => visual_mapa::config::QualidadeObjetos::Baixo,
+        super::config::QualidadeGrafica::Medio => visual_mapa::config::QualidadeObjetos::Medio,
+        super::config::QualidadeGrafica::Alto => visual_mapa::config::QualidadeObjetos::Alto,
+        super::config::QualidadeGrafica::Ultra => visual_mapa::config::QualidadeObjetos::Ultra,
+    };
     if objetos.qualidade != qualidade {
         objetos.qualidade = qualidade;
     }
+    objetos.sombras_ativas = cfg.graficos.sombras;
+    objetos.fumaca_ativa = cfg.graficos.fumaca;
 }
 
 /// Sincroniza o ano contínuo do visual do mapa a partir do relógio do jogo.

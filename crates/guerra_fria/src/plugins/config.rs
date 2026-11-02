@@ -29,13 +29,15 @@ pub const CANAIS: [(CanalAudio, &str); 5] = [
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum QualidadeAtmosfera {
+pub enum QualidadeGrafica {
     Baixo,
     #[default]
     Medio,
     Alto,
     Ultra,
 }
+
+pub type QualidadeAtmosfera = QualidadeGrafica;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ModoTela {
@@ -154,17 +156,6 @@ impl QualidadeTerreno {
         (Self::Ultra, "Ultra"),
     ];
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum QualidadeGrafica {
-    Baixo,
-    #[default]
-    Medio,
-    Alto,
-    Ultra,
-}
-
-pub type QualidadeAtmosfera = QualidadeGrafica;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]

@@ -275,7 +275,10 @@ pub fn emitir_fumaca_sistema(
     mut query: Query<(&mut InstalacaoIndustrial, &Transform)>,
 ) {
     let Some(rec) = rec else { return };
-    if lod.nivel_atual != NivelLod::Local || !objetos.qualidade.tem_animacao() {
+    if lod.nivel_atual != NivelLod::Local
+        || !objetos.qualidade.tem_animacao()
+        || !objetos.fumaca_ativa
+    {
         return;
     }
     let dt = time.delta_secs();
