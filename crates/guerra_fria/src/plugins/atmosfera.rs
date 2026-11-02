@@ -51,7 +51,7 @@ struct AtmosferaMaterial {
 
 impl Material2d for AtmosferaMaterial {
     fn fragment_shader() -> ShaderRef {
-        "shaders/atmosfera.wgsl".into()
+        "shaders/atmosfera.wesl".into()
     }
 
     fn alpha_mode(&self) -> AlphaMode2d {

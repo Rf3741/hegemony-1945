@@ -17,7 +17,7 @@ pub(crate) struct VolumeMaterial {
 
 impl Material2d for VolumeMaterial {
     fn fragment_shader() -> ShaderRef {
-        "shaders/objetos_2d.wgsl".into()
+        "shaders/objetos_2d.wesl".into()
     }
 
     fn alpha_mode(&self) -> AlphaMode2d {

@@ -1,13 +1,13 @@
 // MaterialExtension2d do mapa. Bevy 0.20 chama esta variante modular de WESL
 // (WGSL com imports e shader defs).
-import package::{
+import bevy_sprite_render::{
     mesh2d::vertex_output::VertexOutput,
     sprite_mesh::functions as sprite_functions,
 };
 
-@group(#{MATERIAL_BIND_GROUP}) @binding(20) var<uniform> terrain_params: vec4<f32>;
-@group(#{MATERIAL_BIND_GROUP}) @binding(21) var relief_texture: texture_2d<f32>;
-@group(#{MATERIAL_BIND_GROUP}) @binding(22) var relief_sampler: sampler;
+@group(constants::MATERIAL_BIND_GROUP) @binding(20) var<uniform> terrain_params: vec4<f32>;
+@group(constants::MATERIAL_BIND_GROUP) @binding(21) var relief_texture: texture_2d<f32>;
+@group(constants::MATERIAL_BIND_GROUP) @binding(22) var relief_sampler: sampler;
 
 @fragment
 fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {

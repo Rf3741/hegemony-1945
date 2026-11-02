@@ -18,6 +18,10 @@ serde.workspace = true
 image.workspace = true
 bevy_egui = { workspace = true, optional = true }
 
+[dev-dependencies]
+naga = "30.0.1"
+wesl = "0.6.0"
+
 [[example]]
 name = "demo"
 required-features = ["demo"]

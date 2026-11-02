@@ -50,6 +50,12 @@ pub struct ImagemMapa(pub Handle<Image>);
 #[derive(Resource, Default)]
 pub struct ProvinciaSelecionada(pub u32);
 
+#[derive(Resource, Default)]
+struct LegendaOcupacao {
+    fixada: bool,
+    sobre_ocupacao: bool,
+}
+
 /// Extensão do material de sprite: o mapa continua sendo uma textura RGBA normal, mas
 /// recebe normais/hillshade do relevo sem alterar a textura usada pela seleção.
 #[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
@@ -103,12 +109,14 @@ pub struct MapPlugin;
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ProvinciaSelecionada>()
+            .init_resource::<LegendaOcupacao>()
             .init_resource::<ArrastoCamera>()
             .add_plugins(SpriteMaterialPlugin::<TerrainMaterial>::default())
             .add_systems(Startup, |mut c: Commands| {
                 c.spawn(Camera2d);
             })
             .add_systems(Update, (animar_ondas, atualizar_material_terreno))
+            .add_systems(Update, atualizar_legenda_zonas)
             .add_systems(OnEnter(AppState::Carregando), iniciar_carga)
             .add_systems(Update, aguardar_carga.run_if(in_state(AppState::Carregando)))
             .add_systems(EguiPrimaryContextPass, tela_carregando.run_if(in_state(AppState::Carregando)))
@@ -450,6 +458,7 @@ fn aguardar_carga(
     asset_server: Res<AssetServer>,
     mut proximo: ResMut<NextState<AppState>>,
     economia: Option<Res<super::economia_sim::EconomiaSim>>,
+    cfg: Option<Res<super::config::ConfigJogo>>,
 ) {
     // O menu só abre quando a economia (sim_economia) também terminou de carregar.
     if economia.is_none() {
@@ -474,18 +483,25 @@ fn aguardar_carga(
     );
     imagem.sampler = ImageSampler::nearest();
     let handle = imagens.add(imagem);
-    let material = materiais.add(TerrainMaterial {
-        params: Vec4::new(0.0, 0.0, 0.0, 0.0),
-        relief: asset_server.load("map/relevo.png"),
-    });
+    let material = (cfg.as_ref().map_or(true, |c| c.graficos.qualidade != super::config::QualidadeGrafica::Baixo))
+        .then(|| materiais.add(TerrainMaterial {
+            params: Vec4::new(0.0, 0.0, 0.0, 0.0),
+            relief: asset_server.load("map/relevo.png"),
+        }));
     commands.insert_resource(ImagemMapa(handle.clone()));
     // Três cópias lado a lado para o wrap horizontal.
     for k in [-1.0f32, 0.0, 1.0] {
-        commands.spawn((
-            Sprite::from_image(handle.clone()),
-            SpriteMaterial(material.clone()),
-            Transform::from_xyz(k * saida.largura as f32, 0.0, 0.0).with_scale(Vec3::new(1.0, ESCALA_Y_MAPA, 1.0)),
-        ));
+        let transform = Transform::from_xyz(k * saida.largura as f32, 0.0, 0.0)
+            .with_scale(Vec3::new(1.0, ESCALA_Y_MAPA, 1.0));
+        commands.spawn((Sprite::from_image(handle.clone()), transform));
+        if let Some(material) = material.as_ref() {
+            commands.spawn((
+                Sprite::from_image(handle.clone()),
+                SpriteMaterial(material.clone()),
+                Transform::from_xyz(k * saida.largura as f32, 0.0, 0.01)
+                    .with_scale(Vec3::new(1.0, ESCALA_Y_MAPA, 1.0)),
+            ));
+        }
         commands.spawn((
             Realce { deslocamento: k * saida.largura as f32 },
             Sprite::default(),
@@ -582,38 +598,61 @@ fn animar_ondas(
     }
 }
 
-/// Legenda "Zona de ocupação" (canto inferior esquerdo) enquanto houver províncias ocupadas por zona.
+fn atualizar_legenda_zonas(
+    teclas: Res<ButtonInput<KeyCode>>,
+    mapa: Option<Res<DadosMapa>>,
+    cores: Option<Res<CoresMapa>>,
+    camera: Query<&Transform, With<Camera2d>>,
+    mut estado: ResMut<LegendaOcupacao>,
+) {
+    if teclas.just_pressed(KeyCode::KeyH) {
+        estado.fixada = !estado.fixada;
+    }
+    estado.sobre_ocupacao = false;
+    let (Some(mapa), Some(cores), Ok(camera)) = (mapa, cores, camera.single()) else {
+        return;
+    };
+    if let Some((x, y)) = pixel_do_mundo(
+        Vec2::new(camera.translation.x, camera.translation.y),
+        mapa.largura,
+        mapa.altura,
+    ) {
+        let id = mapa.ids[y as usize * mapa.largura as usize + x as usize] as usize;
+        estado.sobre_ocupacao = cores.ocupante_cor.get(id).is_some_and(Option::is_some);
+    }
+}
+
+/// Legenda "Zona de ocupação" (canto inferior esquerdo) sob demanda ou sobre uma zona ocupada.
 fn legenda_zonas_ocupacao(
     mut contextos: EguiContexts,
     mundo: Res<RecursoMundo>,
     modo: Res<super::hud_mapas::ModoTematico>,
-    tempo: Res<Time>,
-    mut cache: Local<(f32, bool)>,
-    mut ultimo_modo: Local<Option<super::hud_mapas::ModoTematico>>,
+    estado: Res<LegendaOcupacao>,
 ) -> Result {
-    if *modo != super::hud_mapas::ModoTematico::Politico {
+    if *modo != super::hud_mapas::ModoTematico::Politico || (!estado.fixada && !estado.sobre_ocupacao) {
         return Ok(());
     }
-    if tempo.elapsed_secs() - cache.0 > 1.0 || cache.0 == 0.0 || *ultimo_modo != Some(*modo) {
-        cache.0 = tempo.elapsed_secs().max(0.001);
-        *ultimo_modo = Some(*modo);
-        cache.1 = mundo.dono_por_provincia.iter().any(|(id, d)| {
-            matches!(d.as_str(), "GER" | "AUT") && mundo.controlador_por_provincia.get(id).is_some_and(|c| c != d)
-        });
+    let mut ocupantes = std::collections::BTreeSet::new();
+    for (id, dono) in &mundo.dono_por_provincia {
+        if let Some(controlador) = mundo.controlador_por_provincia.get(id)
+            && controlador != dono
+        {
+            ocupantes.insert(controlador.as_str());
+        }
     }
-    if !cache.1 {
+    if ocupantes.is_empty() {
         return Ok(());
     }
     let ctx = contextos.ctx_mut()?;
     egui::Area::new("legenda_zonas".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -88.0]).show(ctx, |ui| {
         egui::Frame::popup(ui.style()).show(ui, |ui| {
-            ui.label(egui::RichText::new("Zona de ocupação (hachura)").strong());
-            for (tag, nome) in [("USA", "Estados Unidos"), ("GBR", "Reino Unido"), ("FRA", "França"), ("SOV", "União Soviética")] {
+            ui.label(egui::RichText::new("Zona de ocupação (hachura) — H fixa").strong());
+            for tag in ocupantes {
                 if let Some(p) = mundo.paises.get(tag) {
                     ui.horizontal(|ui| {
                         let (r, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
                         ui.painter().rect_filled(r, 2.0, egui::Color32::from_rgb(p.cor.0, p.cor.1, p.cor.2));
-                        ui.label(nome);
+                        ui.label(&p.nome);
                     });
                 }
             }

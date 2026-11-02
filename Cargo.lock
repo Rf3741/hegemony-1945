@@ -6151,8 +6151,10 @@ dependencies = [
  "bevy_egui",
  "gf_mapa",
  "image",
+ "naga",
  "ron",
  "serde",
+ "wesl",
 ]
 
 [[package]]
