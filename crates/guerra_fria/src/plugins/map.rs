@@ -5,7 +5,10 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::ImageSampler;
 use bevy::input::mouse::AccumulatedMouseScroll;
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureDimension, TextureFormat};
+use bevy::shader::ShaderRef;
+use bevy::sprite_render::{AlphaMode2d, MaterialExtension2d, SpriteMaterial, SpriteMaterialPlugin};
+use bevy::reflect::TypePath;
 use bevy::window::PrimaryWindow;
 use super::super::estado::AppState;
 use bevy::tasks::{AsyncComputeTaskPool, Task, TaskPool, block_on, futures_lite::future};
@@ -47,6 +50,27 @@ pub struct ImagemMapa(pub Handle<Image>);
 #[derive(Resource, Default)]
 pub struct ProvinciaSelecionada(pub u32);
 
+/// Extensão do material de sprite: o mapa continua sendo uma textura RGBA normal, mas
+/// recebe normais/hillshade do relevo sem alterar a textura usada pela seleção.
+#[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
+struct TerrainMaterial {
+    #[uniform(20)]
+    params: Vec4,
+    #[texture(21)]
+    #[sampler(22)]
+    relief: Handle<Image>,
+}
+
+impl MaterialExtension2d for TerrainMaterial {
+    fn fragment_shader() -> Option<ShaderRef> {
+        Some("shaders/terreno.wesl".into())
+    }
+
+    fn alpha_mode(&self) -> Option<AlphaMode2d> {
+        Some(AlphaMode2d::Blend)
+    }
+}
+
 #[derive(Resource, Default)]
 struct ArrastoCamera {
     /// Escala alvo do zoom suave (0 = ainda não inicializada).
@@ -80,10 +104,11 @@ impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ProvinciaSelecionada>()
             .init_resource::<ArrastoCamera>()
+            .add_plugins(SpriteMaterialPlugin::<TerrainMaterial>::default())
             .add_systems(Startup, |mut c: Commands| {
                 c.spawn(Camera2d);
             })
-            .add_systems(Update, animar_ondas)
+            .add_systems(Update, (animar_ondas, atualizar_material_terreno))
             .add_systems(OnEnter(AppState::Carregando), iniciar_carga)
             .add_systems(Update, aguardar_carga.run_if(in_state(AppState::Carregando)))
             .add_systems(EguiPrimaryContextPass, tela_carregando.run_if(in_state(AppState::Carregando)))
@@ -94,6 +119,27 @@ impl Plugin for MapPlugin {
                     .chain()
                     .run_if(crate::estado::em_partida_ou_menu),
             );
+    }
+
+}
+
+fn atualizar_material_terreno(
+    cfg: Option<Res<super::config::ConfigJogo>>,
+    tempo: Res<Time>,
+    mut materiais: ResMut<Assets<TerrainMaterial>>,
+    sprites: Query<&SpriteMaterial<TerrainMaterial>>,
+) {
+    let Some(cfg) = cfg else { return };
+    let (hillshade, costa, agua) = match cfg.graficos.qualidade_terreno {
+        super::config::QualidadeTerreno::Baixo => (0.0, 0.0, 0.0),
+        super::config::QualidadeTerreno::Medio => (cfg.graficos.hillshade, 0.0, 0.0),
+        super::config::QualidadeTerreno::Alto => (cfg.graficos.hillshade, 0.0, cfg.graficos.ondas),
+        super::config::QualidadeTerreno::Ultra => (cfg.graficos.hillshade, cfg.graficos.sombra_costas, cfg.graficos.ondas),
+    };
+    for sprite in &sprites {
+        if let Some(mut material) = materiais.get_mut(&sprite.0) {
+            material.params = Vec4::new(hillshade, costa, agua, tempo.elapsed_secs());
+        }
     }
 }
 
@@ -399,6 +445,8 @@ fn aguardar_carga(
     mut commands: Commands,
     tarefa: Option<ResMut<TarefaMapa>>,
     mut imagens: ResMut<Assets<Image>>,
+    mut materiais: ResMut<Assets<TerrainMaterial>>,
+    asset_server: Res<AssetServer>,
     mut proximo: ResMut<NextState<AppState>>,
     economia: Option<Res<super::economia_sim::EconomiaSim>>,
 ) {
@@ -425,11 +473,16 @@ fn aguardar_carga(
     );
     imagem.sampler = ImageSampler::nearest();
     let handle = imagens.add(imagem);
+    let material = materiais.add(TerrainMaterial {
+        params: Vec4::new(0.0, 0.0, 0.0, 0.0),
+        relief: asset_server.load("map/relevo.png"),
+    });
     commands.insert_resource(ImagemMapa(handle.clone()));
     // Três cópias lado a lado para o wrap horizontal.
     for k in [-1.0f32, 0.0, 1.0] {
         commands.spawn((
             Sprite::from_image(handle.clone()),
+            SpriteMaterial(material.clone()),
             Transform::from_xyz(k * saida.largura as f32, 0.0, 0.0).with_scale(Vec3::new(1.0, ESCALA_Y_MAPA, 1.0)),
         ));
         commands.spawn((
