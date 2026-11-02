@@ -2101,6 +2101,33 @@ impl MundoEconomico {
 
     /// Reconstrói o mundo (reindexando tudo) a partir do catálogo e do estado salvo.
     pub fn restaurar_estado(catalogo: CatalogoEconomia, e: EstadoEconomiaSalvo) -> ResultadoEconomia<Self> {
+        let provincias_salvas = e.provincias.clone();
+        let importacoes_salvas: BTreeMap<String, BTreeMap<String, f64>> = e
+            .mercados
+            .iter()
+            .map(|m| (m.id.clone(), m.importacoes_liquidas.clone()))
+            .collect();
+        let infraestrutura_salva: BTreeMap<String, (f64, f64, f64, f64, f64, f64, f64, f64, f64, f64)> = e
+            .estados
+            .iter()
+            .map(|est| {
+                (
+                    est.id.clone(),
+                    (
+                        est.acesso_mercado,
+                        est.infraestrutura_capacidade,
+                        est.infraestrutura_uso,
+                        est.penalidade_infraestrutura,
+                        est.urbanizacao,
+                        est.infraestrutura_ferrovias,
+                        est.infraestrutura_rodovias,
+                        est.infraestrutura_portos,
+                        est.infraestrutura_base_terreno,
+                        est.infraestrutura_urbanizacao,
+                    ),
+                )
+            })
+            .collect();
         let mut m = Self::novo(CenarioEconomia {
             data_inicial: e.data,
             config: e.config,
@@ -2113,6 +2140,74 @@ impl MundoEconomico {
             blocos_comerciais: e.blocos_comerciais,
         })?;
         m.dias_decorridos = e.dias_decorridos;
+
+        for (provincia, salva) in m.provincias.iter_mut().zip(provincias_salvas) {
+            provincia.infraestrutura_base = salva.infraestrutura_base;
+            for (pop, pop_salvo) in provincia.pops.iter_mut().zip(salva.pops) {
+                pop.tipo_pop_id = pop_salvo.tipo_pop_id;
+                pop.cultura = pop_salvo.cultura;
+                pop.religiao = pop_salvo.religiao;
+                pop.populacao = pop_salvo.populacao;
+                pop.empregados = pop_salvo.empregados;
+                pop.riqueza_reservas = pop_salvo.riqueza_reservas;
+                pop.padrao_de_vida = pop_salvo.padrao_de_vida;
+                pop.alfabetizacao = pop_salvo.alfabetizacao;
+                pop.renda_ultimo_tick = pop_salvo.renda_ultimo_tick;
+                pop.gasto_consumo_ultimo_tick = pop_salvo.gasto_consumo_ultimo_tick;
+            }
+            provincia.predios = salva.predios;
+            for predio in &mut provincia.predios {
+                compilar_cache_predio(&m.catalogo, predio);
+                for vaga in predio.cache.vagas_mut() {
+                    if let Some(tipo) = m.catalogo.tipos_pop.get(vaga.tipo_pop_idx as usize) {
+                        vaga.empregados = predio.empregados_por_tipo.get(&tipo.id).copied().unwrap_or(0.0);
+                    }
+                }
+            }
+        }
+
+        // `novo` reconstrói os caches para um cenário inicial. Ao carregar, os
+        // derivados serializados pertencem ao último tick salvo e precisam
+        // voltar aos vetores indexados sem passar por outro recálculo.
+        for mercado in &mut m.mercados {
+            for (bem_idx, bem) in m.catalogo.bens.iter().enumerate() {
+                mercado.precos_idx[bem_idx] = mercado.precos_atuais.get(&bem.id).copied().unwrap_or(bem.preco_base);
+                mercado.oferta_idx[bem_idx] = mercado.ordens_venda.get(&bem.id).copied().unwrap_or(0.0);
+                mercado.demanda_idx[bem_idx] = mercado.ordens_compra.get(&bem.id).copied().unwrap_or(0.0);
+                if let Some(importacoes) = importacoes_salvas.get(&mercado.id) {
+                    if let Some(&valor) = importacoes.get(&bem.id) {
+                        mercado.importacoes_liquidas_idx[bem_idx] = valor;
+                    }
+                }
+            }
+        }
+        for estado in &mut m.estados {
+            if let Some(&(
+                acesso,
+                capacidade,
+                uso,
+                penalidade,
+                urbanizacao,
+                ferrovias,
+                rodovias,
+                portos,
+                base_terreno,
+                urbanizacao_infra,
+            )) =
+                infraestrutura_salva.get(&estado.id)
+            {
+                estado.acesso_mercado = acesso;
+                estado.infraestrutura_capacidade = capacidade;
+                estado.infraestrutura_uso = uso;
+                estado.penalidade_infraestrutura = penalidade;
+                estado.urbanizacao = urbanizacao;
+                estado.infraestrutura_ferrovias = ferrovias;
+                estado.infraestrutura_rodovias = rodovias;
+                estado.infraestrutura_portos = portos;
+                estado.infraestrutura_base_terreno = base_terreno;
+                estado.infraestrutura_urbanizacao = urbanizacao_infra;
+            }
+        }
         Ok(m)
     }
 }

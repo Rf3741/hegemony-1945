@@ -475,13 +475,18 @@ mod testes {
         let mut n2 = super::super::economia_sim::Nucleo::carregar(&super::super::economia_sim::dir_economia(&raiz), 0).expect("economia");
         n2.mundo = sim_economia::MundoEconomico::restaurar_estado(n2.catalogo.as_ref().clone(), p2.economia.clone()).expect("restaura");
         let reg = n2.mundo.salvar_estado();
-        // Campos derivados (infraestrutura, importações, ruído de ponto flutuante) são recalculados no
-        // próximo tick; aqui só conferimos que a estrutura e o relógio voltam iguais.
+        fn assert_ron<T: serde::Serialize>(nome: &str, a: &T, b: &T) {
+            assert!(ron::to_string(a).unwrap() == ron::to_string(b).unwrap(), "{nome}");
+        }
+        assert_ron("data", &reg.data, &p2.economia.data);
         assert_eq!(reg.dias_decorridos, p2.economia.dias_decorridos);
-        assert_eq!(reg.mercados.len(), p2.economia.mercados.len());
-        assert_eq!(reg.paises.len(), p2.economia.paises.len());
-        assert_eq!(reg.estados.len(), p2.economia.estados.len());
-        assert_eq!(reg.provincias.len(), p2.economia.provincias.len());
+        assert_ron("config", &reg.config, &p2.economia.config);
+        assert_ron("mercados", &reg.mercados, &p2.economia.mercados);
+        assert_ron("paises", &reg.paises, &p2.economia.paises);
+        assert_ron("estados", &reg.estados, &p2.economia.estados);
+        assert_ron("provincias", &reg.provincias, &p2.economia.provincias);
+        assert_ron("rotas", &reg.rotas_comerciais, &p2.economia.rotas_comerciais);
+        assert_ron("blocos", &reg.blocos_comerciais, &p2.economia.blocos_comerciais);
         // Corrupção é detectada.
         let mut ruim = bytes.clone();
         let n = ruim.len();
