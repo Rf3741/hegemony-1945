@@ -227,7 +227,23 @@ fn invalidar_rotulos(
     mut estado: ResMut<EstadoRotulos>,
     mut commands: Commands,
     rotulos: Query<Entity, With<RotuloPais>>,
+    mut dias: MessageReader<super::time::EventoTickDiario>,
 ) {
+    // Fronteiras só mudam na virada do dia: ordenar e fazer hash de todas as províncias a cada
+    // quadro custava ~2,5 ms por quadro. Fora do dia novo, só conta o debounce pendente.
+    let dia_novo = dias.read().count() > 0;
+    if !dia_novo && estado.assinatura != 0 {
+        if estado.pendente > 0.0 {
+            estado.pendente -= tempo.delta_secs();
+            if estado.pendente <= 0.0 {
+                for ent in &rotulos {
+                    commands.entity(ent).despawn();
+                }
+                commands.remove_resource::<RotulosPaisCriados>();
+            }
+        }
+        return;
+    }
     let mut h = std::collections::hash_map::DefaultHasher::new();
     let mut donos: Vec<_> = mundo.0.dono_por_provincia.iter().collect();
     donos.sort_by_key(|(id, _)| **id);

@@ -26,3 +26,8 @@ sim_politica.workspace = true
 sim_tecnologia.workspace = true
 personagens.workspace = true
 sim_guerra.workspace = true
+
+[features]
+# Perfil de desempenho: grava o tempo de cada sistema em trace-*.json (formato Chrome tracing).
+# Uso: cargo build -p guerra_fria --profile jogo --features perfil (target separado).
+perfil = ["bevy/trace_chrome"]

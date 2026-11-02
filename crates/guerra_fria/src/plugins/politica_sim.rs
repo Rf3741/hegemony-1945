@@ -504,7 +504,16 @@ fn definir_pais(jogador: Option<Res<super::jogador::PaisJogador>>, mut pol: ResM
 }
 
 /// Liga a economia à política: padrão de vida por país e efeitos de leis tributárias nos impostos.
-fn sincronizar_economia(mut pol: ResMut<PoliticaSim>, eco: Option<ResMut<EconomiaSim>>) {
+fn sincronizar_economia(
+    mut pol: ResMut<PoliticaSim>,
+    eco: Option<ResMut<EconomiaSim>>,
+    mut dias: MessageReader<super::time::EventoTickDiario>,
+) {
+    // Leis só mudam na virada do dia; rodar a cada quadro custava ~1,2 ms e marcava os dois
+    // recursos como alterados em todo quadro (disparando a detecção de mudança de outros sistemas).
+    if dias.read().count() == 0 {
+        return;
+    }
     let Some(mut eco) = eco else { return };
     // O motor político tem leis próprias, mas os mesmos IDs também são leis
     // econômicas. Sincronizar todos os países evita que a IA mude apenas a UI.
