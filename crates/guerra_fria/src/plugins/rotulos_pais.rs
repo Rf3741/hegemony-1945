@@ -8,6 +8,7 @@ use super::economy::RecursoMundo;
 use super::map::{CoresMapa, DadosMapa};
 use bevy::prelude::*;
 use std::collections::{HashMap, VecDeque};
+use std::hash::{Hash, Hasher};
 use visual_mapa::EstiloMapa;
 
 const CELULA: usize = 8;
@@ -28,6 +29,12 @@ pub struct TextoPais {
 
 #[derive(Resource)]
 pub struct RotulosPaisCriados;
+
+#[derive(Resource, Default)]
+struct EstadoRotulos {
+    assinatura: u64,
+    pendente: f32,
+}
 
 #[derive(Debug, Clone)]
 pub struct GeoPais {
@@ -214,6 +221,40 @@ fn criar_rotulos(
     info!("rotulos_pais: {criados} nomes de país criados.");
 }
 
+fn invalidar_rotulos(
+    tempo: Res<Time<Real>>,
+    mundo: Res<RecursoMundo>,
+    mut estado: ResMut<EstadoRotulos>,
+    mut commands: Commands,
+    rotulos: Query<Entity, With<RotuloPais>>,
+) {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    let mut donos: Vec<_> = mundo.0.dono_por_provincia.iter().collect();
+    donos.sort_by_key(|(id, _)| **id);
+    donos.hash(&mut h);
+    let mut controladores: Vec<_> = mundo.0.controlador_por_provincia.iter().collect();
+    controladores.sort_by_key(|(id, _)| **id);
+    controladores.hash(&mut h);
+    let assinatura = h.finish();
+    if estado.assinatura == 0 {
+        estado.assinatura = assinatura;
+        return;
+    }
+    if assinatura != estado.assinatura {
+        estado.assinatura = assinatura;
+        estado.pendente = 0.25;
+    }
+    if estado.pendente > 0.0 {
+        estado.pendente -= tempo.delta_secs();
+        if estado.pendente <= 0.0 {
+            for ent in &rotulos {
+                commands.entity(ent).despawn();
+            }
+            commands.remove_resource::<RotulosPaisCriados>();
+        }
+    }
+}
+
 fn atualizar_rotulos(
     estilo: Res<EstiloMapa>,
     camera: Query<&Projection, With<Camera2d>>,
@@ -230,6 +271,7 @@ fn atualizar_rotulos(
     if (escala - *ultimo).abs() < 0.004 * escala && *ultimo != 0.0 {
         return;
     }
+
     *ultimo = escala;
     let t = ((escala - estilo.pais_escala_some) / (estilo.pais_escala_cheio - estilo.pais_escala_some)).clamp(0.0, 1.0);
     let fade = t * t * (3.0 - 2.0 * t);
@@ -242,6 +284,7 @@ fn atualizar_rotulos(
         if *vis != alvo {
             *vis = alvo;
         }
+
         if a > 0.01 {
             for f in filhos.iter() {
                 if let Ok((tp, mut cor)) = textos.get_mut(f) {
@@ -249,6 +292,7 @@ fn atualizar_rotulos(
                     cor.0.set_alpha(al * if tp.contorno { tp.alfa / 0.55 * 0.55 } else { 1.0 });
                 }
             }
+
         }
     }
 }
@@ -260,6 +304,7 @@ impl Plugin for RotulosPaisPlugin {
         app.add_systems(
             Update,
             (
+                invalidar_rotulos,
                 criar_rotulos
                     .run_if(resource_exists::<DadosMapa>)
                     .run_if(resource_exists::<CoresMapa>)
@@ -269,6 +314,7 @@ impl Plugin for RotulosPaisPlugin {
             )
                 .chain(),
         );
+        app.init_resource::<EstadoRotulos>();
     }
 }
 

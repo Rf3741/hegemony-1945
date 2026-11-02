@@ -6,11 +6,12 @@ use super::economy::RecursoMundo;
 use super::eventos_ui::EstadoEv;
 use super::guerra_sim::{DadosGuerra, GuerraSim, acao_declarar_guerra, acao_propor_paz, normalizar_tag};
 use super::jogador::PaisJogador;
+use super::jogador::Notificacoes;
 use super::time::EventoTickDiario;
 use bevy::prelude::*;
 use eventos::Noticia;
 use sim_diplomacia::{Diplomacia, TipoPacto};
-use sim_guerra::PosturaOperacional;
+use sim_guerra::{Divisao, Exercito, PaisMilitar, PosturaOperacional};
 use std::collections::BTreeSet;
 
 /// Memória da IA militar.
@@ -107,6 +108,7 @@ fn tick_ia_guerra(
     mundo: Res<RecursoMundo>,
     jogador: Res<PaisJogador>,
     mut ev: Option<ResMut<EstadoEv>>,
+    mut notificacoes: Option<ResMut<Notificacoes>>,
 ) {
     let n = leitor.read().count();
     if n == 0 {
@@ -129,12 +131,15 @@ fn tick_ia_guerra(
             if diplo.0.tensao < h.gatilho_disparo.condicao_tensao_minima {
                 continue;
             }
-            ia.disparadas.insert(h.id.clone());
+            if h.id == "guerra_civil_chinesa" {
+                criar_rebelde_chines(&mut g);
+            }
             let lado_a: Vec<String> = h.beligerantes_lado_a.iter().map(|b| normalizar_tag(&b.tag)).filter(|t| existe(&g, t)).collect();
             let lado_b: Vec<String> = h.beligerantes_lado_b.iter().map(|b| normalizar_tag(&b.tag)).filter(|t| existe(&g, t)).collect();
             if lado_a.is_empty() || lado_b.is_empty() || em_guerra_com(&g, &lado_a[0], &lado_b[0]) {
                 continue;
             }
+            ia.disparadas.insert(h.id.clone());
             // Lado B é o agressor nos conflitos de invasão (ex.: Coreia do Norte); quando o gatilho é de
             // insurgência ou guerra civil, o lado A é o governo. Usamos o lado B como atacante.
             match acao_declarar_guerra(&mut g, &lado_b[0], &lado_a[0], &h.nome) {
@@ -228,10 +233,79 @@ fn tick_ia_guerra(
     }
 
     if let Some(ev) = ev.as_deref_mut() {
-        for a in avisos {
-            noticia(ev, &mundo, a);
+        for a in &avisos {
+            noticia(ev, &mundo, a.clone());
         }
     }
+    if let Some(mut n) = notificacoes {
+        for a in &avisos {
+            n.push(Notificacoes::mensagem_modelada(a, &jogador.0), mundo.0.data.dia as f64);
+        }
+    }
+}
+
+/// Cria a facção comunista como beligerante militar antes da Guerra Civil Chinesa.
+/// O país político/econômico continua sendo formado pelo evento de 1949; aqui a facção
+/// precisa existir já em 1946 para que o gatilho histórico não seja descartado.
+fn criar_rebelde_chines(g: &mut GuerraSim) {
+    if existe(g, "CCP") {
+        return;
+    }
+    let ids = ["1813", "1828", "1839", "1804", "1811", "1814", "1818"];
+    let regioes: Vec<String> = g
+        .0
+        .cenario
+        .regioes
+        .iter()
+        .filter(|r| ids.iter().any(|id| r.adm1_code == format!("prov_{id}")))
+        .map(|r| r.adm1_code.clone())
+        .collect();
+    let Some(capital) = regioes.first().cloned() else { return };
+    for r in &mut g.0.cenario.regioes {
+        if regioes.contains(&r.adm1_code) {
+            r.dono_tag = "CCP".into();
+            r.controlador_tag = "CCP".into();
+        }
+    }
+    let pais_idx = g.0.cenario.paises.len();
+    g.0.cenario.paises.push(PaisMilitar {
+        tag: "CCP".into(),
+        nome_pt: "Comunistas chineses".into(),
+        capital_adm1: capital.clone(),
+        doutrina_id: "doutrina_padrao".into(),
+        tecnologias_ativas: Vec::new(),
+        cansaco_guerra: 0.0,
+        baixas_totais: 0,
+        populacao_mobilizavel: 8_000_000,
+        estoque_suprimento: 0.8,
+        eficiencia_naval: 0.4,
+    });
+    g.0.mapa_paises.insert("CCP".into(), pais_idx);
+    let div_id = "div_ccp_1".to_string();
+    g.0.cenario.divisoes.push(Divisao {
+        id: div_id.clone(),
+        nome_pt: "Exército Popular de Libertação".into(),
+        pais_tag: "CCP".into(),
+        template_id: "divisao_infantaria_1945".into(),
+        regiao_adm1: capital.clone(),
+        efetivos_atuais: 60_000,
+        equipamento_fracao: 0.8,
+        organizacao: 40.0,
+        moral: 0.9,
+        entrincheiramento: 2.0,
+        suprimento_atual: 0.8,
+        experiencia: 0.4,
+    });
+    g.0.cenario.exercitos.push(Exercito {
+        id: "exe_ccp_1".into(),
+        nome_pt: "Exército Popular de Libertação".into(),
+        pais_tag: "CCP".into(),
+        comandante_id: None,
+        divisoes_ids: vec![div_id],
+        postura: PosturaOperacional::OfensivaEquilibrada,
+        frente_id: None,
+        regiao_objetivo_adm1: None,
+    });
 }
 
 #[cfg(test)]

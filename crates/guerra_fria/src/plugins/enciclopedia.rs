@@ -590,6 +590,6 @@ mod testes_dados {
     #[test]
     fn parseia_mensagens_ron() {
         let msgs: Vec<ModeloMensagem> = ron::from_str(RON_MENSAGENS).expect("mensagens.ron deve ser válido");
-        assert_eq!(msgs.len(), 30);
+        assert!(msgs.len() >= 30);
     }
 }

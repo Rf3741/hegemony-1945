@@ -2,7 +2,7 @@
 
 use super::economy::RecursoMundo;
 use super::guerra_sim::{GuerraSim, PainelGuerra, acao_propor_paz, normalizar_tag};
-use super::jogador::PaisJogador;
+use super::jogador::{Notificacoes, PaisJogador};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use sim_guerra::PosturaOperacional;
@@ -27,6 +27,8 @@ fn tela_guerra(
     mut guerra_sim: ResMut<GuerraSim>,
     mundo: Res<RecursoMundo>,
     jogador: Res<PaisJogador>,
+    mut notificacoes: ResMut<Notificacoes>,
+    tempo: Res<Time<Real>>,
 ) -> Result {
     if !painel.aberto {
         return Ok(());
@@ -113,6 +115,32 @@ fn tela_guerra(
                                     if g.participa(&eu) {
                                         ui.separator();
                                         ui.strong("Tratado de Paz:");
+                                        let vencedor = if g.pontuacao_guerra >= 35.0 {
+                                            g.atacantes.contains(&eu)
+                                        } else if g.pontuacao_guerra <= -35.0 {
+                                            g.defensores.contains(&eu)
+                                        } else {
+                                            false
+                                        };
+                                        if vencedor {
+                                            ui.label("Você venceu: a proposta padrão anexa as regiões ocupadas e exige reparações.");
+                                            if ui.button("Oferecer paz automática (proposta padrão)").clicked() {
+                                                match acao_propor_paz(&mut guerra_sim, &g.id, &eu, true, true) {
+                                                    Ok(tratado) => {
+                                                        painel.mensagem = format!("Paz automática assinada: {} cláusulas.", tratado.clausulas_executadas.len());
+                                                        notificacoes.push(
+                                                            Notificacoes::mensagem_modelada(
+                                                                &format!("PAZ: {} termina.", g.nome_pt),
+                                                                &nome(&eu),
+                                                            ),
+                                                            tempo.elapsed_secs_f64(),
+                                                        );
+                                                        painel.repintar = true;
+                                                    }
+                                                    Err(e) => painel.mensagem = e,
+                                                }
+                                            }
+                                        }
                                         ui.horizontal(|ui| {
                                             ui.checkbox(&mut painel.proposta_anexar, "Anexar províncias ocupadas");
                                             ui.checkbox(&mut painel.proposta_reparacoes, "Exigir reparações de guerra");
@@ -129,6 +157,13 @@ fn tela_guerra(
                                                         painel.mensagem = format!(
                                                             "Tratado de paz assinado com sucesso! Cláusulas executadas: {}",
                                                             tratado.clausulas_executadas.len()
+                                                        );
+                                                        notificacoes.push(
+                                                            Notificacoes::mensagem_modelada(
+                                                                &format!("PAZ: {} termina.", g.nome_pt),
+                                                                &nome(&eu),
+                                                            ),
+                                                            tempo.elapsed_secs_f64(),
                                                         );
                                                         painel.repintar = true;
                                                     }
