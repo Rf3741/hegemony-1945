@@ -405,16 +405,19 @@ mod testes {
         }
     }
 
-    /// Em 01/01/1946 e 01/06/1946 nenhum nome exibido traz ocupação — nem o de quem ainda está
-    /// ocupado: a opção foi o nome sem sufixo, com a ocupação mostrada pela hachura e pela legenda.
+    /// Em 01/01/1946 e 01/06/1946 só quem ainda está sob ocupação histórica (Alemanha, Japão,
+    /// Áustria; ver OCUPACOES_DATADAS) pode mostrar a ocupação no nome; os libertados, não.
     #[test]
     fn nenhum_nome_de_pais_tem_ocupacao_em_1946() {
         let mut cen = cenario_1945();
         for data in [(1946, 1, 1), (1946, 6, 1)] {
             avancar_ate(&mut cen, data);
             for (tag, nome, ocupada) in nomes_em(&cen, data) {
-                assert!(!nome.contains(SUFIXO_OCUPACAO), "{tag} (ocupação ativa: {ocupada}): o nome traz {SUFIXO_OCUPACAO:?}; a ocupação se mostra pela hachura e pela legenda do mapa -> {nome}");
-                assert!(!nome.contains("Ocupad"), "{tag}: o nome traz a ocupação embutida; a ocupação se mostra pela hachura e pela legenda do mapa -> {nome}");
+                if ocupante_historico(&tag, data).is_some() {
+                    continue;
+                }
+                assert!(!nome.contains(SUFIXO_OCUPACAO), "{tag} (ocupação ativa: {ocupada}): o nome traz {SUFIXO_OCUPACAO:?} -> {nome}");
+                assert!(!nome.contains("Ocupad"), "{tag}: o nome traz a ocupação, mas ela já acabou -> {nome}");
             }
         }
         // Irã e Dinamarca: libertados, nome sem sufixo.
@@ -446,8 +449,8 @@ mod testes {
     }
 
     /// Em 01/01/1945 nenhum país mudou de regime, então todos mostram o nome histórico do cenário:
-    /// as regras genéricas de ideologia e os nomes religiosos não podem renomear nada aqui. A
-    /// legenda de ocupação do cenário fica de fora (hachura + legenda do mapa fazem esse papel).
+    /// as regras genéricas de ideologia e os nomes religiosos não podem renomear nada aqui. Os
+    /// ocupados (Alemanha, Japão, Áustria) mostram o nome do cenário com a legenda de ocupação.
     #[test]
     fn em_1945_todos_os_paises_mostram_o_nome_do_cenario() {
         let cen = cenario_1945();
@@ -456,7 +459,12 @@ mod testes {
         let ruins: Vec<String> = nomes
             .iter()
             .filter_map(|(tag, nome, _)| {
-                let esperado = bandeiras_resolver::sem_ocupacao(cenario.get(tag)?);
+                let do_cenario = cenario.get(tag)?;
+                let esperado = if ocupante_historico(tag, (1945, 1, 1)).is_some() {
+                    do_cenario.clone()
+                } else {
+                    bandeiras_resolver::sem_ocupacao(do_cenario)
+                };
                 if *nome == esperado { None } else { Some(format!("{tag}: cenário={esperado:?} exibido={nome:?}")) }
             })
             .collect();
