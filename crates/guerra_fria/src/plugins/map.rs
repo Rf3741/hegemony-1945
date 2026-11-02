@@ -143,27 +143,47 @@ impl Plugin for MapPlugin {
 fn atualizar_material_terreno(
     cfg: Option<Res<super::config::ConfigJogo>>,
     tempo: Res<Time>,
+    paleta: Option<Res<ImagemMapa>>,
+    mut eventos: MessageReader<AssetEvent<Image>>,
     mut materiais: ResMut<Assets<TerrainMaterial>>,
     sprites: Query<&SpriteMaterial<TerrainMaterial>>,
+    mut ultimo: Local<Option<(Vec4, bool)>>,
 ) {
-    // `get_mut` abaixo também marca o material como alterado a cada quadro, o que refaz o bind group
-    // e garante que a textura da paleta recém-reescrita (`pintar_paleta`) seja a vista pelo shader.
-    let (hillshade, costa, agua) = match cfg.as_ref() {
-        None => (0.0, 0.0, 0.0),
+    let (hillshade, costa, agua, completo) = match cfg.as_ref() {
+        None => (0.0, 0.0, 0.0, false),
         Some(cfg) => {
             let g = &cfg.graficos;
-            let (h, c, a) = match g.qualidade {
-                super::config::QualidadeGrafica::Baixo => (0.0, 0.0, 0.0),
-                super::config::QualidadeGrafica::Medio => (g.hillshade, 0.0, 0.0),
-                super::config::QualidadeGrafica::Alto => (g.hillshade, 0.0, g.ondas),
-                super::config::QualidadeGrafica::Ultra => (g.hillshade, g.sombra_costas, g.ondas),
+            let (h, c, a, completo) = match g.qualidade {
+                super::config::QualidadeGrafica::Baixo => (0.0, 0.0, 0.0, false),
+                super::config::QualidadeGrafica::Medio => (g.hillshade, 0.0, 0.0, false),
+                super::config::QualidadeGrafica::Alto => (g.hillshade, 0.0, g.ondas, true),
+                super::config::QualidadeGrafica::Ultra => (g.hillshade, g.sombra_costas, g.ondas, true),
             };
-            (h, c, if g.agua_animada { a } else { 0.0 })
+            (h, c, if g.agua_animada { a } else { 0.0 }, completo)
         }
     };
+    // O tempo só entra quando a água animada está ligada: nos demais casos o material não muda
+    // entre quadros e o bind group não é refeito à toa.
+    let t = if agua > 0.0 { tempo.elapsed_secs() } else { 0.0 };
+    let params = Vec4::new(hillshade, costa, agua, t);
+    // A paleta reescrita (`pintar_paleta`) exige tocar o material uma vez para o bind group
+    // enxergar a nova textura.
+    let mut paleta_mudou = false;
+    if let Some(p) = paleta.as_ref() {
+        for e in eventos.read() {
+            paleta_mudou |= e.is_modified(p.0.id());
+        }
+    } else {
+        eventos.clear();
+    }
+    if !paleta_mudou && *ultimo == Some((params, completo)) {
+        return;
+    }
+    *ultimo = Some((params, completo));
     for sprite in &sprites {
         if let Some(mut material) = materiais.get_mut(&sprite.0) {
-            material.params = Vec4::new(hillshade, costa, agua, tempo.elapsed_secs());
+            material.params = params;
+            material.paleta_params.flags.y = completo as u8 as f32;
         }
     }
 }
@@ -275,13 +295,15 @@ pub fn calcular_caixas(ids: &[u32], w: u32, n: usize) -> Vec<Option<[u32; 4]>> {
 }
 
 /// Textura de IDs (2 bytes/pixel, formato Rg8) lida pelo shader do terreno:
-/// `r = id & 255`; `g = (id >> 8) & 31 | perto << 5 | costa << 6`, onde `perto` indica que há uma
-/// mudança de id a até 3 pixels (a única região onde o shader precisa calcular fronteiras e anéis)
-/// e `costa` (0..=3) é a distância do oceano à terra mais próxima nas quatro direções.
+/// Terra: `r = id & 255`; `g = (id >> 8) & 31 | perto << 5 | fronteira << 6`, onde `fronteira` marca
+/// o pixel que tem vizinho de outro id (a única região onde o modo barato calcula bordas) e `perto`
+/// marca até 3 pixels de uma fronteira (região dos anéis de brilho, só no modo completo).
+/// Oceano: `g = 128` e `r = costa` (0..=3, distância à terra mais próxima nas quatro direções).
 pub fn preparar_ids_gpu(ids: &[u32], w: u32, h: u32) -> Vec<u8> {
     let (wu, hu) = (w as usize, h as usize);
     // Pixels de fronteira: algum vizinho (x com wrap, y sem) tem outro id.
     let mut perto = vec![false; wu * hu];
+    let mut fronteira;
     for y in 0..hu {
         for x in 0..wu {
             let i = y * wu + x;
@@ -297,6 +319,7 @@ pub fn preparar_ids_gpu(ids: &[u32], w: u32, h: u32) -> Vec<u8> {
             }
         }
     }
+    fronteira = perto.clone();
     // Dilata 3 passos (vizinhança de 4): cobre tudo que o shader consulta para o anel de brilho.
     for _ in 0..3 {
         let anterior = perto.clone();
@@ -331,8 +354,13 @@ pub fn preparar_ids_gpu(ids: &[u32], w: u32, h: u32) -> Vec<u8> {
                     }
                 }
             }
-            out[i * 2] = (id & 255) as u8;
-            out[i * 2 + 1] = (((id >> 8) & 31) | ((perto[i] as u32) << 5) | (costa << 6)) as u8;
+            if id == 0 {
+                out[i * 2] = costa as u8;
+                out[i * 2 + 1] = 128 | ((perto[i] as u8) << 5) | ((fronteira[i] as u8) << 6);
+            } else {
+                out[i * 2] = (id & 255) as u8;
+                out[i * 2 + 1] = (((id >> 8) & 31) | ((perto[i] as u32) << 5) | ((fronteira[i] as u32) << 6)) as u8;
+            }
         }
     }
     out
@@ -361,10 +389,14 @@ pub fn bytes_paleta(
         out[o..o + 4].copy_from_slice(&v);
     };
     for id in 0..n.min((altura / 4) * PALETA_LARGURA) {
-        gravar(id, 0, cor_prov.get(id).copied().unwrap_or(COR_OCEANO_RGBA));
+        // Alfa da linha 0: 254 = província ocupada (o shader só lê a linha 1 nesse caso).
+        let mut cor = cor_prov.get(id).copied().unwrap_or(COR_OCEANO_RGBA);
+        cor[3] = 255;
         if let Some(Some(c)) = ocupante_cor.and_then(|o| o.get(id)) {
+            cor[3] = 254;
             gravar(id, 1, [c[0], c[1], c[2], 255]);
         }
+        gravar(id, 0, cor);
         let dono = dono_prov.get(id).copied().unwrap_or(0).min(u16::MAX as u32) as u16;
         let estado = estado_prov.get(id).copied().unwrap_or(0).min(u16::MAX as u32) as u16;
         gravar(id, 2, [dono as u8, (dono >> 8) as u8, estado as u8, (estado >> 8) as u8]);
@@ -1066,6 +1098,7 @@ mod testes {
         pal: &'a [u8],
         w: i32,
         h: i32,
+        completo: bool,
     }
 
     impl EmulaShader<'_> {
@@ -1073,12 +1106,15 @@ mod testes {
             let i = (y * self.w + x.rem_euclid(self.w)) as usize * 2;
             (self.ids[i] as u32, self.ids[i + 1] as u32)
         }
+        fn id_de(a: u32, b: u32) -> u32 {
+            if b & 128 != 0 { 0 } else { a | ((b & 31) << 8) }
+        }
         fn pid(&self, x: i32, y: i32) -> i32 {
             if y < 0 || y >= self.h {
                 return -1;
             }
             let (a, b) = self.raw(x, y);
-            (a | ((b & 31) << 8)) as i32
+            Self::id_de(a, b) as i32
         }
         fn pal(&self, id: u32, linha: usize) -> [u8; 4] {
             let (c, l) = (id as usize % PALETA_LARGURA, (id as usize / PALETA_LARGURA) * 4 + linha);
@@ -1137,15 +1173,15 @@ mod testes {
         }
         fn cor(&self, x: i32, y: i32) -> [u8; 4] {
             let (r, g) = self.raw(x, y);
-            let id = r | ((g & 31) << 8);
-            let perto = (g >> 5) & 1 == 1;
-            let costa = (g >> 6) & 3;
+            let id = Self::id_de(r, g);
+            let perto = if self.completo { (g >> 5) & 1 == 1 } else { (g >> 6) & 1 == 1 };
+            let costa = if id == 0 { r } else { 0 };
             let mut c = [0f32; 3];
             let mut alfa = 255.0f32;
             if id == 0 {
                 let (fx, fy) = (x as f32, y as f32);
                 let lat = ((fy / self.h as f32) - 0.5).abs() * 2.0;
-                let ruido = (fx * 0.021 + fy * 0.013).sin() * 0.5 + (fx * 0.047 - fy * 0.031).sin() * 0.3 + (fx * 0.09 + fy * 0.07).sin() * 0.2;
+                let ruido = if self.completo { (fx * 0.021 + fy * 0.013).sin() * 0.5 + (fx * 0.047 - fy * 0.031).sin() * 0.3 + (fx * 0.09 + fy * 0.07).sin() * 0.2 } else { 0.0 };
                 let f = 1.0 + (0.22 - lat * 0.40) + ruido * 0.045;
                 for k in 0..3 {
                     c[k] = (COR_OCEANO_FUNDO[k] as f32 * f).clamp(0.0, 255.0);
@@ -1159,9 +1195,9 @@ mod testes {
             } else {
                 let pc = self.pal(id, 0);
                 c = [pc[0] as f32, pc[1] as f32, pc[2] as f32];
-                alfa = pc[3] as f32;
-                let oc = self.pal(id, 1);
-                if oc[3] > 0 && (x + y) % 8 < 4 {
+                alfa = 255.0;
+                if pc[3] < 255 && (x + y) % 8 < 4 {
+                    let oc = self.pal(id, 1);
                     c = [oc[0] as f32, oc[1] as f32, oc[2] as f32];
                 }
             }
@@ -1173,6 +1209,7 @@ mod testes {
                 } else if b > 0 {
                     let f = if b == 2 { 0.72 } else { 0.92 };
                     c = c.map(|v| (v * f).floor());
+                } else if !self.completo {
                 } else if self.anel1(x, y) {
                     c = c.map(|v| v + (255.0 - v) * 0.10);
                 } else if self.anel2(x, y) {
@@ -1187,7 +1224,8 @@ mod testes {
         let (ref_px, _) = colorir_com_hachura(ids, w, h, cor_prov, dono, estado, Some(ocup));
         let ids_gpu = preparar_ids_gpu(ids, w, h);
         let pal = bytes_paleta(cor_prov.len(), cor_prov, dono, estado, Some(ocup));
-        let emu = EmulaShader { ids: &ids_gpu, pal: &pal, w: w as i32, h: h as i32 };
+        let emu = EmulaShader { ids: &ids_gpu, pal: &pal, w: w as i32, h: h as i32, completo: true };
+        let barato = EmulaShader { ids: &ids_gpu, pal: &pal, w: w as i32, h: h as i32, completo: false };
         let mut piores = 0i32;
         let mut com_borda = 0usize;
         for y in 0..h as i32 {
@@ -1197,6 +1235,14 @@ mod testes {
                 let r = &ref_px[o..o + 4];
                 if r[..3] == [15, 15, 15] {
                     com_borda += 1;
+                }
+                // Modo barato (Baixo/Médio): fronteiras idênticas; sem anéis de brilho nem ruído do
+                // oceano, o resto só pode diferir por esses efeitos (<= ~10% de clareamento).
+                let b = barato.cor(x, y);
+                let na_borda = emu.borda(x, y) > 0;
+                for k in 0..3 {
+                    let d = (b[k] as i32 - r[k] as i32).abs();
+                    assert!(d <= if na_borda { 3 } else { 26 }, "modo barato ({x},{y}) canal {k}: {b:?} x {r:?}");
                 }
                 for k in 0..4 {
                     let d = (e[k] as i32 - r[k] as i32).abs();
@@ -1262,7 +1308,8 @@ mod testes {
         let gpu = preparar_ids_gpu(&ids, w, h);
         eprintln!("preparar_ids_gpu (uma vez, no carregamento): {:?}", t.elapsed());
         for (i, &id) in ids.iter().enumerate() {
-            assert_eq!(gpu[i * 2] as u32 | ((gpu[i * 2 + 1] as u32 & 31) << 8), id, "pixel {i}");
+            let dec = if gpu[i * 2 + 1] & 128 != 0 { 0 } else { gpu[i * 2] as u32 | ((gpu[i * 2 + 1] as u32 & 31) << 8) };
+            assert_eq!(dec, id, "pixel {i}");
         }
         // A seleção por clique continua usando `DadosMapa.ids` + `pixel_do_mundo`: mesma província
         // que a textura de IDs mostra naquele pixel.
@@ -1270,7 +1317,7 @@ mod testes {
             let pos = Vec2::new(px, py * ESCALA_Y_MAPA);
             let (x, y) = pixel_do_mundo(pos, w, h).unwrap();
             let i = y as usize * w as usize + x as usize;
-            let da_gpu = gpu[i * 2] as u32 | ((gpu[i * 2 + 1] as u32 & 31) << 8);
+            let da_gpu = if gpu[i * 2 + 1] & 128 != 0 { 0 } else { gpu[i * 2] as u32 | ((gpu[i * 2 + 1] as u32 & 31) << 8) };
             assert_eq!(ids[i], da_gpu);
         }
         let caixas = calcular_caixas(&ids, w, ids.iter().copied().max().unwrap() as usize + 1);
@@ -1297,7 +1344,7 @@ mod testes {
         ocup[17] = Some([9, 8, 7, 255]);
         let com_ocup = bytes_paleta(n, &cor, &dono, &estado, Some(&ocup));
         let dif: Vec<usize> = (0..antes.len() / 4).filter(|&i| antes[i * 4..i * 4 + 4] != com_ocup[i * 4..i * 4 + 4]).collect();
-        assert_eq!(dif, vec![PALETA_LARGURA + 17]);
+        assert_eq!(dif, vec![17, PALETA_LARGURA + 17]); // alfa 254 na linha 0 + cor do ocupante na linha 1
     }
 
     #[test]

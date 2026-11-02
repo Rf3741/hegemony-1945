@@ -17,13 +17,15 @@ struct ParamsPaleta {
     // Cores dos setores: URSS, França, Reino Unido, EUA.
     setores: array<vec4<f32>, 4>,
     // x = 1 se o relevo modula a cor política (mesmo tamanho da textura de IDs).
+    // y = 1 no modo completo (Alto/Ultra): anéis de brilho das fronteiras e ruído do oceano.
     flags: vec4<f32>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(20) var<uniform> terrain_params: vec4<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(21) var relief_texture: texture_2d<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(22) var relief_sampler: sampler;
-// Rg8: r = id & 255; g = (id >> 8) & 31 | perto_de_fronteira << 5 | distancia_costa << 6.
+// Rg8, terra: r = id & 255; g = (id >> 8) & 31 | perto_de_fronteira (a 3 px) << 5 | pixel_de_fronteira << 6.
+//      oceano: g bit 7 = 1 e r = distancia_costa (0..3).
 @group(constants::MATERIAL_BIND_GROUP) @binding(23) var ids_texture: texture_2d<f32>;
 // Rgba8, 4096 colunas; por id: linha 0 = cor, 1 = ocupante (a>0), 2 = dono (rg) e estado (ba).
 @group(constants::MATERIAL_BIND_GROUP) @binding(24) var palette_texture: texture_2d<f32>;
@@ -49,6 +51,14 @@ fn dono_estado(id: u32) -> vec2<u32> {
     return vec2<u32>(b8(p.r) | (b8(p.g) << 8u), b8(p.b) | (b8(p.a) << 8u));
 }
 
+// Id da província a partir dos 2 bytes da textura de IDs (oceano = 0).
+fn id_de(raw: vec2<u32>) -> u32 {
+    if ((raw.y & 128u) != 0u) {
+        return 0u;
+    }
+    return raw.x | ((raw.y & 31u) << 8u);
+}
+
 fn raw_ids(x: i32, y: i32, d: vec2<i32>) -> vec2<u32> {
     let xx = ((x % d.x) + d.x) % d.x;
     let t = textureLoad(ids_texture, vec2<i32>(xx, y), 0);
@@ -61,7 +71,7 @@ fn pid(x: i32, y: i32, d: vec2<i32>) -> i32 {
         return -1;
     }
     let r = raw_ids(x, y, d);
-    return i32(r.x | ((r.y & 31u) << 8u));
+    return i32(id_de(r));
 }
 
 // Tipo de fronteira entre `a` (pixel corrente) e `b` (vizinho): 3 = país, 2 = estado, 1 = província.
@@ -127,18 +137,28 @@ fn anel_a_duas_casas(x: i32, y: i32, d: vec2<i32>) -> bool {
 }
 
 // Cor (0..255, espaço sRGB) e alfa do pixel (x, y), igual ao pintor de referência em CPU.
-fn cor_do_pixel(x: i32, y: i32, d: vec2<i32>) -> vec4<f32> {
+fn cor_do_pixel(x: i32, y: i32, d: vec2<i32>, relevo: f32) -> vec4<f32> {
     let raw = raw_ids(x, y, d);
-    let id = raw.x | ((raw.y & 31u) << 8u);
-    let perto = ((raw.y >> 5u) & 1u) == 1u;
-    let costa = (raw.y >> 6u) & 3u;
+    let id = id_de(raw);
+    let completo = paleta_params.flags.y > 0.5;
+    var costa = 0u;
+    var precisa_borda = ((raw.y >> 6u) & 1u) == 1u;
+    if (id == 0u) {
+        costa = raw.x;
+    }
+    if (completo) {
+        precisa_borda = ((raw.y >> 5u) & 1u) == 1u;
+    }
     var c = vec3<f32>(0.0);
     var alfa = 255.0;
     if (id == 0u) {
         let fx = f32(x);
         let fy = f32(y);
         let lat = abs(fy / f32(d.y) - 0.5) * 2.0;
-        let ruido = sin(fx * 0.021 + fy * 0.013) * 0.5 + sin(fx * 0.047 - fy * 0.031) * 0.3 + sin(fx * 0.09 + fy * 0.07) * 0.2;
+        var ruido = 0.0;
+        if (completo) {
+            ruido = sin(fx * 0.021 + fy * 0.013) * 0.5 + sin(fx * 0.047 - fy * 0.031) * 0.3 + sin(fx * 0.09 + fy * 0.07) * 0.2;
+        }
         let f = 1.0 + (0.22 - lat * 0.40) + ruido * 0.045;
         c = clamp(OCEANO_FUNDO * f, vec3<f32>(0.0), vec3<f32>(255.0));
         if (costa > 0u) {
@@ -153,9 +173,11 @@ fn cor_do_pixel(x: i32, y: i32, d: vec2<i32>) -> vec4<f32> {
     } else {
         let pc = pal(id, 0);
         c = floor(pc.rgb * 255.0 + 0.5);
-        alfa = floor(pc.a * 255.0 + 0.5);
-        let oc = pal(id, 1);
-        if (oc.a > 0.5 && ((x + y) % 8) < 4) {
+        // Alfa 254 na paleta = província ocupada (cor do ocupante na linha 1); evita uma leitura por pixel.
+        let ocupada = pc.a < 0.999;
+        alfa = 255.0;
+        if (ocupada && ((x + y) % 8) < 4) {
+            let oc = pal(id, 1);
             c = floor(oc.rgb * 255.0 + 0.5);
             if (paleta_params.berlim.w > 0.5 && id == u32(paleta_params.berlim.x + 0.5)) {
                 let cx = i32(paleta_params.berlim.y + 0.5);
@@ -173,12 +195,12 @@ fn cor_do_pixel(x: i32, y: i32, d: vec2<i32>) -> vec4<f32> {
         }
         if (paleta_params.flags.x > 0.5) {
             // 60% cor do país + 40% cor do país modulada pelo relevo sombreado.
-            let r = textureLoad(relief_texture, vec2<i32>(x, y), 0).r * 255.0;
+            let r = relevo * 255.0;
             let k = clamp(((r - 185.0) / 45.0) + 1.0, 0.3, 1.6);
             c = floor(clamp(c * (0.6 + 0.4 * k), vec3<f32>(0.0), vec3<f32>(255.0)));
         }
     }
-    if (perto) {
+    if (precisa_borda) {
         let b = borda(x, y, d);
         if (b == 3u) {
             c = COR_FRONTEIRA;
@@ -189,6 +211,8 @@ fn cor_do_pixel(x: i32, y: i32, d: vec2<i32>) -> vec4<f32> {
                 f = 0.72;
             }
             c = floor(c * f);
+        } else if (!completo) {
+            // Modo barato: sem anéis de brilho.
         } else if (anel1(x, y, d)) {
             c = c + (vec3<f32>(255.0) - c) * 0.10;
         } else if (anel_a_duas_casas(x, y, d)) {
@@ -198,10 +222,9 @@ fn cor_do_pixel(x: i32, y: i32, d: vec2<i32>) -> vec4<f32> {
     return vec4<f32>(c, alfa);
 }
 
+// Aproximação polinomial barata de sRGB -> linear (erro < 1%), sem pow() por canal.
 fn srgb_para_linear(c: vec3<f32>) -> vec3<f32> {
-    let baixo = c / 12.92;
-    let alto = pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4));
-    return select(alto, baixo, c <= vec3<f32>(0.04045));
+    return c * (c * (c * 0.305306011 + vec3<f32>(0.682171111)) + vec3<f32>(0.012522878));
 }
 
 @fragment
@@ -215,7 +238,7 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
     // Pixel da textura de IDs sob este fragmento (o sprite cobre o mapa inteiro, sem wrap próprio).
     let d = vec2<i32>(textureDimensions(ids_texture));
     let q = clamp(vec2<i32>(floor(mesh.uv * vec2<f32>(d))), vec2<i32>(0), d - vec2<i32>(1));
-    let pintura = cor_do_pixel(q.x, q.y, d);
+    let pintura = cor_do_pixel(q.x, q.y, d, h);
     let base = vec4<f32>(srgb_para_linear(pintura.rgb / 255.0) * tint.rgb, pintura.a / 255.0 * tint.a);
 
     // Sol cartográfico vindo do noroeste: vales ficam ligeiramente mais fechados,
