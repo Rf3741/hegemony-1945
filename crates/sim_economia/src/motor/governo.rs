@@ -132,6 +132,8 @@ pub(crate) fn compilar_cache_predio(
         escala_efetiva_ultimo_tick: 0.0,
         fator_insumos_ultimo_tick: 1.0,
         margem_lucro_ultimo_tick: 0.0,
+        qualidade_local: f64::NAN,
+        bonus_insumo_local: f64::NAN,
     };
 
     Some(())
@@ -455,7 +457,11 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
         let (_, _, cota_priv) = parametros_sistema_economico(&pais.politica_fiscal.lei_sistema_economico_id);
         let pts_totais = (pais.pontos_construcao_base + pontos_construcao_setores_pais[c_idx])
             * pais.mult_eficiencia_construcao_lei;
-        let max_obras_privadas = ((pts_totais * cota_priv) / 20.0).ceil().clamp(1.0, 3.0) as usize;
+        // Obras simultâneas acompanham a capacidade de construção (cada obra absorve no máximo
+        // `pontos_maximos_por_obra_dia` por dia); antes o teto fixo de 3 travava economias grandes.
+        let max_obras_privadas = ((pts_totais * cota_priv) / config.pontos_maximos_por_obra_dia.max(1.0))
+            .ceil()
+            .clamp(1.0, 60.0) as usize;
         let obras_priv_ativas = pais.fila_construcao.iter().filter(|i| i.privado).count();
 
         if config.habilitar_investimento_privado_automatico
@@ -466,7 +472,8 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
             && obras_priv_ativas < max_obras_privadas
             && !pais.orcamento.em_calote
         {
-            tentar_enfileirar_obra_privada(catalogo, mercados, estados, pais, provincias, pts_totais);
+            let vagas_fila = (max_obras_privadas - obras_priv_ativas).min(8);
+            tentar_enfileirar_obra_privada(catalogo, mercados, estados, pais, provincias, vagas_fila);
         }
 
         // 7. Fase (9): conclusão das obras que atingiram 100% dos pontos (o avanço ocorre antes do fechamento fiscal)
@@ -481,12 +488,16 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
                 >= pais.fila_construcao[idx].custo_total_pontos
             {
                 let concluido = pais.fila_construcao.remove(idx);
-                if materializar_nivel_predio(
-                    catalogo,
-                    &mut provincias[concluido.provincia_idx],
-                    concluido.tipo_predio_idx,
-                ) {
-                    obras_concluidas_total += 1;
+                for _ in 0..concluido.niveis.max(1) {
+                    if materializar_nivel_predio(
+                        catalogo,
+                        &mut provincias[concluido.provincia_idx],
+                        concluido.tipo_predio_idx,
+                    ) {
+                        obras_concluidas_total += 1;
+                    } else {
+                        break;
+                    }
                 }
             } else {
                 idx += 1;
@@ -495,6 +506,17 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
     }
 
     obras_concluidas_total
+}
+
+/// Tamanho do lote de obra para o porte do país: economias grandes constroem vários níveis por obra,
+/// senão a fila (e a IA que a preenche) não acompanha a capacidade de construção.
+pub fn tamanho_lote_obra(provincias: &[Provincia], pais: &Pais) -> u32 {
+    let niveis: f64 = pais
+        .provincias_indices
+        .iter()
+        .map(|&p| provincias[p].predios.iter().map(|b| b.nivel as f64).sum::<f64>())
+        .sum();
+    ((niveis / 12_000.0).round() as u32).clamp(1, 24)
 }
 
 /// Receita de materiais consumidos por ponto de construção, conforme a categoria do prédio:
@@ -549,6 +571,22 @@ fn avancar_fila_construcao(
     }
     let num_bens = catalogo.bens.len();
     pais.demanda_obras.resize(num_bens, 0.0);
+    // Materiais por ponto de cada categoria já resolvidos para índices de bens (evita buscas por texto por obra).
+    let mats: [Vec<(usize, f64)>; 7] = [
+        CategoriaPredio::RuralAgricola,
+        CategoriaPredio::Extrativo,
+        CategoriaPredio::Industrial,
+        CategoriaPredio::Infraestrutura,
+        CategoriaPredio::Construcao,
+        CategoriaPredio::Governamental,
+        CategoriaPredio::Militar,
+    ]
+    .map(|c| {
+        materiais_por_ponto(c)
+            .iter()
+            .filter_map(|&(id, q)| catalogo.indice_bens.get(id).map(|&g| (g, q)))
+            .collect()
+    });
 
     let pts_totais = (pais.pontos_construcao_base + pontos_setores) * pais.mult_eficiencia_construcao_lei;
     let (_, _, cota_priv) = parametros_sistema_economico(&pais.politica_fiscal.lei_sistema_economico_id);
@@ -585,15 +623,15 @@ fn avancar_fila_construcao(
             if pts_priv_disp <= 1e-6 || pais.fundo_investimento_privado <= 1.0 {
                 continue;
             }
-            let aplicar_pts = (pts_priv_disp.min(max_por_obra) * fator_material).min(falta);
+            let aplicar_pts = (pts_priv_disp.min(max_por_obra * item.niveis as f64) * fator_material).min(falta);
             if aplicar_pts <= 1e-6 {
                 continue;
             }
 
             let categoria = catalogo.tipos_predio[item.tipo_predio_idx].categoria;
             let mut custo_item = 0.0;
-            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
-                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+            for &(g, qtd) in &mats[categoria as usize] {
+                {
                     custo_item += qtd * aplicar_pts * mercado.precos_idx[g];
                 }
             }
@@ -612,8 +650,8 @@ fn avancar_fila_construcao(
                 pais.fundo_investimento_privado = (pais.fundo_investimento_privado - custo_efetivo).max(0.0);
                 custo_privado += custo_efetivo;
 
-                for &(bem_id, qtd) in materiais_por_ponto(categoria) {
-                    if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                for &(g, qtd) in &mats[categoria as usize] {
+                    {
                         pais.demanda_obras[g] += qtd * aplicar_efetivo;
                     }
                 }
@@ -623,15 +661,15 @@ fn avancar_fila_construcao(
             if pts_est_disp <= 1e-6 || pais.orcamento.em_calote {
                 continue;
             }
-            let aplicar_pts = (pts_est_disp.min(max_por_obra) * fator_material).min(falta);
+            let aplicar_pts = (pts_est_disp.min(max_por_obra * item.niveis as f64) * fator_material).min(falta);
             if aplicar_pts <= 1e-6 {
                 continue;
             }
 
             let categoria = catalogo.tipos_predio[item.tipo_predio_idx].categoria;
             let mut custo_item = 0.0;
-            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
-                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+            for &(g, qtd) in &mats[categoria as usize] {
+                {
                     custo_item += qtd * aplicar_pts * mercado.precos_idx[g];
                 }
             }
@@ -641,8 +679,8 @@ fn avancar_fila_construcao(
             pais.pontos_publicos_ultimo_tick += aplicar_pts;
             custo_publico += custo_item;
 
-            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
-                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+            for &(g, qtd) in &mats[categoria as usize] {
+                {
                     pais.demanda_obras[g] += qtd * aplicar_pts;
                 }
             }
@@ -662,15 +700,15 @@ fn avancar_fila_construcao(
             if falta <= 1e-6 {
                 continue;
             }
-            let aplicar_pts = (pts_priv_disp.min(max_por_obra) * fator_material).min(falta);
+            let aplicar_pts = (pts_priv_disp.min(max_por_obra * item.niveis as f64) * fator_material).min(falta);
             if aplicar_pts <= 1e-6 {
                 continue;
             }
 
             let categoria = catalogo.tipos_predio[item.tipo_predio_idx].categoria;
             let mut custo_item = 0.0;
-            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
-                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+            for &(g, qtd) in &mats[categoria as usize] {
+                {
                     custo_item += qtd * aplicar_pts * mercado.precos_idx[g];
                 }
             }
@@ -680,8 +718,8 @@ fn avancar_fila_construcao(
             pais.pontos_publicos_ultimo_tick += aplicar_pts;
             custo_publico += custo_item;
 
-            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
-                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+            for &(g, qtd) in &mats[categoria as usize] {
+                {
                     pais.demanda_obras[g] += qtd * aplicar_pts;
                 }
             }
@@ -698,15 +736,15 @@ fn avancar_fila_construcao(
             if falta <= 1e-6 {
                 continue;
             }
-            let aplicar_pts = (pts_est_disp.min(max_por_obra) * fator_material).min(falta);
+            let aplicar_pts = (pts_est_disp.min(max_por_obra * item.niveis as f64) * fator_material).min(falta);
             if aplicar_pts <= 1e-6 {
                 continue;
             }
 
             let categoria = catalogo.tipos_predio[item.tipo_predio_idx].categoria;
             let mut custo_item = 0.0;
-            for &(bem_id, qtd) in materiais_por_ponto(categoria) {
-                if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+            for &(g, qtd) in &mats[categoria as usize] {
+                {
                     custo_item += qtd * aplicar_pts * mercado.precos_idx[g];
                 }
             }
@@ -725,8 +763,8 @@ fn avancar_fila_construcao(
                 pais.fundo_investimento_privado = (pais.fundo_investimento_privado - custo_efetivo).max(0.0);
                 custo_privado += custo_efetivo;
 
-                for &(bem_id, qtd) in materiais_por_ponto(categoria) {
-                    if let Some(&g) = catalogo.indice_bens.get(bem_id) {
+                for &(g, qtd) in &mats[categoria as usize] {
+                    {
                         pais.demanda_obras[g] += qtd * aplicar_efetivo;
                     }
                 }
@@ -811,7 +849,7 @@ fn tentar_enfileirar_obra_privada(
     estados: &[Estado],
     pais: &mut Pais,
     provincias: &[Provincia],
-    _pontos_totais: f64,
+    max_novas: usize,
 ) {
     if pais.exige_propriedade_estatal_lei {
         return;
@@ -827,7 +865,8 @@ fn tentar_enfileirar_obra_privada(
     let demandas = &m.demanda_idx;
     let suprimentos = &m.fator_suprimento_idx;
 
-    let mut melhor_escolha: Option<(usize, usize, f64, f64, f64, String)> = None;
+    // (província, tipo, score, custo em pontos, lucro estimado) de todos os candidatos viáveis.
+    let mut candidatos: Vec<(usize, usize, f64, f64, f64)> = Vec::new();
 
     for (tp_idx, padrao) in catalogo.tipos_predio_padrao.iter().enumerate() {
         let def_tipo = &catalogo.tipos_predio[tp_idx];
@@ -943,34 +982,32 @@ fn tentar_enfileirar_obra_privada(
 
             let score = retorno_por_ponto * mult_demanda * mod_infra * mod_labor * mod_qualidade;
 
-            if melhor_escolha.as_ref().is_none_or(|(_, _, best_s, _, _, _)| score > *best_s) {
-                let just = format!(
-                    "Retorno: £{:.0}/dia (margem {:.0}%) | Demanda {:.0}%",
-                    lucro_est,
-                    margem * 100.0,
-                    mult_demanda * 100.0,
-                );
-                melhor_escolha = Some((
-                    p_idx,
-                    tp_idx,
-                    score,
-                    padrao.custo_pontos_construcao,
-                    lucro_est,
-                    just,
-                ));
-            }
+            candidatos.push((p_idx, tp_idx, score, padrao.custo_pontos_construcao, lucro_est));
         }
     }
 
-    if let Some((p_idx, tp_idx, _, custo_pts, lucro_est, just)) = melhor_escolha {
+    let lote = tamanho_lote_obra(provincias, pais);
+    // Os melhores candidatos, no máximo um por província, até `max_novas`.
+    candidatos.sort_by(|a, b| b.2.total_cmp(&a.2).then(a.0.cmp(&b.0)).then(a.1.cmp(&b.1)));
+    let mut escolhidos: Vec<(usize, usize)> = Vec::new();
+    for &(p_idx, tp_idx, _, custo_pts, lucro_est) in &candidatos {
+        if escolhidos.len() >= max_novas.max(1) {
+            break;
+        }
+        if escolhidos.iter().any(|&(p, _)| p == p_idx) {
+            continue;
+        }
+        escolhidos.push((p_idx, tp_idx));
+        let just = format!("Retorno: £{lucro_est:.0}/dia");
         pais.fila_construcao.push(ItemConstrucao {
             provincia_id: provincias[p_idx].id.clone(),
             tipo_predio_id: catalogo.tipos_predio[tp_idx].id.clone(),
             progresso_pontos: 0.0,
-            custo_total_pontos: custo_pts,
+            custo_total_pontos: custo_pts * lote as f64,
             privado: true,
             retorno_esperado: lucro_est,
             justificativa: just,
+            niveis: lote,
             provincia_idx: p_idx,
             tipo_predio_idx: tp_idx,
         });

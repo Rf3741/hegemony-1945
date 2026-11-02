@@ -2,7 +2,7 @@
 //! (legado incluso) com a IA ligada e procura pânicos, NaN, valores absurdos, explosão de estruturas e
 //! vazamento de memória (VmRSS). Escreve o relatório em `docs/qa_partida_longa.md`.
 //!
-//! Uso: cargo run --example partida_longa [-- ANOS] [--sem-relatorio]
+//! Uso: cargo run --example partida_longa [-- ANOS] [--sem-relatorio] [--saida=docs/arquivo.md]
 use eventos::{CatalogoEventos, EstadoEventos, aplicar_opcao, avaliar_dia, escolha_ia};
 use gf_mapa::CatalogoProvincias;
 use ia_paises::IaEconomia;
@@ -19,6 +19,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 const GRANDES: [&str; 8] = ["USA", "SOV", "GBR", "FRA", "CHI", "GER", "JAP", "ITA"];
+const PAISES_TABELA: [&str; 9] = ["USA", "SOV", "GBR", "FRA", "GER", "JAP", "CHI", "IND", "BRA"];
 const SOVIETICOS: [&str; 10] = ["SOV", "POL", "CZE", "HUN", "BUL", "ROM", "YUG", "ALB", "MON", "GDR"];
 
 fn rss_mb() -> f64 {
@@ -76,6 +77,7 @@ fn main() {
     cen.config.modo_cadencia = ModoCadencia::DiarioComAjusteSemanal;
     let mut eco = MundoEconomico::novo(cen).expect("economia");
     let mut ia_eco = IaEconomia::novo();
+    let id_por_tag: BTreeMap<String, String> = eco.paises().iter().filter_map(|p| p.tag.clone().map(|t| (t, p.id.clone()))).collect();
     for _ in 0..90 {
         eco.executar_tick_diario();
     }
@@ -116,6 +118,8 @@ fn main() {
     let mut ach = Achados::default();
     let (mut t_eco, mut t_pol, mut t_dip, mut t_tec, mut t_ev, mut t_leg) = (0.0f64, 0.0, 0.0, 0.0, 0.0, 0.0);
     let mut anuais: Vec<String> = Vec::new();
+    let mut por_pais: Vec<String> = Vec::new();
+    let mut pib_ant = 0.0f64;
     let mut max_estr = BTreeMap::<&str, usize>::new();
     let total_dias = anos as u64 * 365;
     let t_total = Instant::now();
@@ -195,7 +199,14 @@ fn main() {
             for tag in tags {
                 let e = entradas.get(&tag).copied().unwrap_or_default();
                 tec.escolher_ia(&tag, ano, &e);
-                let _ = tec.tick_pais(&tag, ano, &e);
+                if let Some(feita) = tec.tick_pais(&tag, ano, &e) {
+                    // Tecnologia civil (produção/sociedade) eleva a produtividade do país (+0,6%), como na ponte do jogo.
+                    if tec.catalogo.obter(&feita).is_some_and(|x| matches!(x.ramo, sim_tecnologia::Ramo::Producao | sim_tecnologia::Ramo::Sociedade))
+                        && let Some(id) = id_por_tag.get(&tag)
+                    {
+                        eco.aplicar_ganho_produtividade(id, 0.006);
+                    }
+                }
             }
         });
         t_tec += i.elapsed().as_secs_f64();
@@ -300,6 +311,14 @@ fn main() {
             );
             eprintln!("{resumo}");
             anuais.push(resumo);
+            let cresc = if pib_ant > 0.0 { format!("{:+.1}%", (pib / pib_ant - 1.0) * 100.0) } else { "-".into() };
+            pib_ant = pib;
+            let mut linha = format!("| {ano} | {pib:.3e} | {cresc} |");
+            for t in PAISES_TABELA {
+                let v = id_por_tag.get(t).and_then(|id| eco.obter_pais(id)).map_or(0.0, |p| p.pib_diario * 365.0);
+                let _ = write!(linha, " {v:.2e} |");
+            }
+            por_pais.push(linha);
         }
     }
 
@@ -330,6 +349,10 @@ fn main() {
     for l in &anuais {
         let _ = writeln!(r, "{l}");
     }
+    let _ = writeln!(r, "\n## PIB por país (nominal/ano)\n\n| Ano | Mundo | Cresc. | {} |\n|---|---|---|{}", PAISES_TABELA.join(" | "), "---|".repeat(PAISES_TABELA.len()));
+    for l in &por_pais {
+        let _ = writeln!(r, "{l}");
+    }
     let _ = writeln!(r, "\n## Tamanho máximo das estruturas (explosão de entidades)\n");
     for (k, v) in &max_estr {
         let _ = writeln!(r, "- {k}: {v}");
@@ -350,6 +373,7 @@ fn main() {
     }
     println!("{r}");
     if escrever {
-        let _ = std::fs::write(raiz.join("docs/qa_partida_longa.md"), &r);
+        let saida = args.iter().find_map(|a| a.strip_prefix("--saida=")).unwrap_or("docs/qa_partida_longa.md");
+        let _ = std::fs::write(raiz.join(saida), &r);
     }
 }

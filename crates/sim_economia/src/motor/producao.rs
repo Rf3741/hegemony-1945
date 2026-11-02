@@ -144,7 +144,7 @@ pub(crate) fn executar_producao_diaria(
             if num_alimentos > 0 && camponeses_ativos > 0.0 && prov.terra_aravel_livre() > 0 {
                 let cap_camponeses = (prov.terra_aravel_livre() as f64) * 5_000.0;
                 let efetivos = camponeses_ativos.min(cap_camponeses);
-                let excedente_total = (efetivos / 1_000.0) * 0.30 * acesso;
+                let excedente_total = (efetivos / 1_000.0) * 0.30 * acesso * t.paises[ci].1.produtividade;
                 let por_bem = excedente_total / (num_alimentos as f64);
                 for &g_idx in bens_alimento_basico {
                     t.oferta[offset_mercado + g_idx] += por_bem;
@@ -154,6 +154,7 @@ pub(crate) fn executar_producao_diaria(
             // 2b. Prédios formais
             let util_construcao = t.paises[ci].1.utilizacao_construcao_ultimo_tick;
             let sup_mercado = &mercados[m_idx].fator_suprimento_idx;
+            let tfp = t.paises[ci].1.produtividade;
             let mut vagas_abertas_prov = 0.0;
 
             for b in &mut prov.predios {
@@ -192,18 +193,21 @@ pub(crate) fn executar_producao_diaria(
                 };
 
                 let econ_escala = 1.0 + 0.01 * (b.nivel.saturating_sub(1).min(25) as f64);
-                let mult_qualidade = estados[e_idx].fator_qualidade_predio(&catalogo.tipos_predio[b.cache.tipo_idx]);
-                let mult_fabrica = if categoria == CategoriaPredio::Industrial {
-                    let bonus_mercado = if acesso >= 0.90 { 0.03 } else { 0.0 };
-                    let bonus_insumo = if b.cache.insumos().iter().any(|&(g_in, _)| {
-                        let bem_id = &catalogo.bens[g_in as usize].id;
-                        estado_tem_insumo_local(&estados[e_idx], bem_id)
-                    }) {
+                if b.cache.qualidade_local.is_nan() {
+                    b.cache.qualidade_local = estados[e_idx].fator_qualidade_predio(&catalogo.tipos_predio[b.cache.tipo_idx]);
+                    b.cache.bonus_insumo_local = if categoria == CategoriaPredio::Industrial
+                        && b.cache.insumos().iter().any(|&(g_in, _)| {
+                            estado_tem_insumo_local(&estados[e_idx], &catalogo.bens[g_in as usize].id)
+                        }) {
                         0.05
                     } else {
                         0.0
                     };
-                    1.0 + bonus_mercado + bonus_insumo
+                }
+                let mult_qualidade = b.cache.qualidade_local;
+                let mult_fabrica = if categoria == CategoriaPredio::Industrial {
+                    let bonus_mercado = if acesso >= 0.90 { 0.03 } else { 0.0 };
+                    1.0 + bonus_mercado + b.cache.bonus_insumo_local
                 } else {
                     1.0
                 };
@@ -215,8 +219,9 @@ pub(crate) fn executar_producao_diaria(
                 for &(g_in, qtd) in b.cache.insumos() {
                     t.demanda[offset_mercado + (g_in as usize)] += escala * qtd;
                 }
+                let escala_prod = if b.cache.financiado_pelo_governo { escala } else { escala * tfp };
                 for &(g_out, qtd) in b.cache.produtos() {
-                    t.oferta[offset_mercado + (g_out as usize)] += escala * qtd;
+                    t.oferta[offset_mercado + (g_out as usize)] += escala_prod * qtd;
                 }
 
                 let escala_cap = escala_inst * fator_insumos;

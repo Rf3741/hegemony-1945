@@ -34,6 +34,10 @@ fn padrao_terreno() -> String {
     "planicie".to_string()
 }
 
+const fn niveis_obra_padrao() -> u32 {
+    1
+}
+
 const fn pontos_construcao_base_padrao() -> f64 {
     10.0
 }
@@ -127,6 +131,10 @@ pub(crate) struct PredioCompilado {
     pub escala_efetiva_ultimo_tick: f64,
     pub fator_insumos_ultimo_tick: f64,
     pub margem_lucro_ultimo_tick: f64,
+    /// Fator de qualidade do recurso do estado e bônus de insumo local (estáticos por prédio;
+    /// `NAN` = ainda não calculado, preenchido no primeiro tick de produção após compilar o cache).
+    pub qualidade_local: f64,
+    pub bonus_insumo_local: f64,
 }
 
 impl PredioCompilado {
@@ -171,6 +179,8 @@ impl Default for PredioCompilado {
             escala_efetiva_ultimo_tick: 0.0,
             fator_insumos_ultimo_tick: 1.0,
             margem_lucro_ultimo_tick: 0.0,
+            qualidade_local: f64::NAN,
+            bonus_insumo_local: f64::NAN,
         }
     }
 }
@@ -775,6 +785,10 @@ pub struct ItemConstrucao {
     /// Breve justificativa de mercado da decisão do setor privado.
     #[serde(default)]
     pub justificativa: String,
+    /// Níveis entregues pela obra (lote). Economias grandes constroem em lotes: `custo_total_pontos` já
+    /// inclui todos os níveis e o limite diário de pontos por obra escala com este valor.
+    #[serde(default = "niveis_obra_padrao")]
+    pub niveis: u32,
 
     #[serde(skip)]
     pub(crate) provincia_idx: usize,
@@ -830,6 +844,10 @@ pub struct Pais {
     pub forca_militar_total: f64,
     #[serde(default)]
     pub pib_diario: f64,
+    /// Produtividade total dos fatores (índice, 1.0 em 1945): multiplica o produto físico dos prédios
+    /// privados. Cresce com educação (alfabetização) e com o progresso tecnológico do país.
+    #[serde(default = "padrao_um")]
+    pub produtividade: f64,
 
     #[serde(skip)]
     pub(crate) mercado_idx: usize,
@@ -904,6 +922,7 @@ impl Pais {
             eficiencia_arrecadacao: 1.0,
             forca_militar_total: 0.0,
             pib_diario: 0.0,
+            produtividade: 1.0,
             mercado_idx: 0,
             provincias_indices: Vec::new(),
             estados_indices: Vec::new(),

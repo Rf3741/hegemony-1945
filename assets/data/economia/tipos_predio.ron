@@ -622,8 +622,8 @@
         custo_pontos_construcao: 80.0,
         usa_terra_aravel: false,
         recurso_natural_requerido: None,
-        financiado_pelo_governo: false,
+        financiado_pelo_governo: true,
         metodos_permitidos: ["construcao_estrutura_aco", "propriedade_privada", "propriedade_estatal", "propriedade_cooperativa"],
-        metodos_padrao: ["construcao_estrutura_aco", "propriedade_privada"],
+        metodos_padrao: ["construcao_estrutura_aco", "propriedade_estatal"],
     ),
 ]

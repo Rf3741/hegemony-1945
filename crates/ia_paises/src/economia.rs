@@ -7,8 +7,20 @@ use std::collections::BTreeMap;
 /// Histerese: apos mexer em impostos, a IA espera este numero de dias.
 const COOLDOWN_FISCAL: u64 = 90;
 const COOLDOWN_EMERGENCIA: u64 = 30;
-/// Maximo de obras estatais simultaneas na fila.
+/// Maximo (minimo garantido) de obras estatais simultaneas na fila; cresce com a capacidade de construcao.
 const MAX_OBRAS_ESTATAIS: usize = 6;
+/// Meta de niveis do setor de construcao como fracao do total de niveis de predios do pais.
+/// Cada nivel gera ~22 pontos/dia (~70 niveis de predio por ano), logo 0,02% sustenta ~1,5%/ano de expansao.
+const META_CONSTRUCAO: f64 = 0.0002;
+/// Reconstrucao pos-guerra (tag, multiplicador inicial da meta de construcao). O efeito decai
+/// linearmente ate 1,0 em `ANOS_RECONSTRUCAO` anos (Plano Marshall, milagres alemao e japones etc.).
+const RECONSTRUCAO: [(&str, f64); 14] = [
+    ("GER", 2.2), ("JAP", 2.2), ("ITA", 1.6), ("FRA", 1.5), ("GBR", 1.2), ("SOV", 1.4), ("POL", 1.5),
+    ("CZE", 1.4), ("HUN", 1.5), ("NLD", 1.5), ("BEL", 1.5), ("AUT", 1.5), ("FIN", 1.4), ("GRE", 1.3),
+];
+const ANOS_RECONSTRUCAO: f64 = 10.0;
+/// Maximo de obras estatais novas por passo semanal.
+const NOVAS_POR_SEMANA: usize = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PosturaFiscal {
@@ -72,6 +84,8 @@ pub struct IaEconomia {
     /// Provincias por pais (indices em `provincias()`), montado sob demanda.
     indice_provincias: BTreeMap<String, Vec<usize>>,
     n_provincias: usize,
+    /// PIB per capita medio do mundo (atualizado mensalmente); base da convergencia entre paises.
+    pib_pc_mundial: f64,
 }
 
 impl IaEconomia {
@@ -82,6 +96,13 @@ impl IaEconomia {
     /// Executa os passos da IA que vencem hoje. Chamar uma vez por dia, depois do tick da economia.
     pub fn passo_diario(&mut self, mundo: &mut MundoEconomico, ignorar: &[String]) {
         let dia = mundo.dias_decorridos();
+        if dia % 30 == 0 || self.pib_pc_mundial <= 0.0 {
+            let pib: f64 = mundo.paises().iter().map(|p| p.pib_diario).sum();
+            let pop: f64 = mundo.provincias().iter().map(|p| p.populacao_total()).sum();
+            if pop > 0.0 {
+                self.pib_pc_mundial = pib / pop;
+            }
+        }
         let ids: Vec<String> = mundo.paises().iter().map(|p| p.id.clone()).collect();
         for (i, id) in ids.iter().enumerate() {
             if ignorar.iter().any(|x| x == id) {
@@ -155,7 +176,7 @@ impl IaEconomia {
         self.n_provincias = n;
     }
 
-    fn passo_semanal(&mut self, mundo: &mut MundoEconomico, id: &str, _dia: u64) {
+    fn passo_semanal(&mut self, mundo: &mut MundoEconomico, id: &str, dia_atual: u64) {
         self.montar_indice(mundo);
         let Some(p) = mundo.obter_pais(id) else { return };
         let postura = classificar(p);
@@ -164,9 +185,21 @@ impl IaEconomia {
             return;
         }
         let estatais = p.fila_construcao.iter().filter(|i| !i.privado).count();
-        if estatais >= MAX_OBRAS_ESTATAIS {
-            return;
-        }
+        let Some(idx) = self.indice_provincias.get(id).cloned() else { return };
+        let lote = mundo.tamanho_lote_obra(id);
+        // Capacidade teorica de construcao (pontos/dia): base + ~22 pontos por nivel do setor de construcao.
+        let niveis_constr_atual: f64 = idx
+            .iter()
+            .flat_map(|&pi| mundo.provincias()[pi].predios.iter())
+            .filter(|b| mundo.catalogo().tipos_predio.iter().any(|t| t.id == b.tipo_predio_id && t.categoria == CategoriaPredio::Construcao))
+            .map(|b| b.nivel as f64)
+            .sum();
+        let cap_dia = p.pontos_construcao_base + 22.0 * niveis_constr_atual;
+        let obras_paralelas = (cap_dia / (25.0 * lote as f64)).ceil() as usize;
+        let max_estatais = MAX_OBRAS_ESTATAIS.max(2 * obras_paralelas).min(80);
+        let novas_semana = NOVAS_POR_SEMANA.max((7.0 * cap_dia / (130.0 * lote as f64)).ceil() as usize).min(40);
+        // Fila cheia: so o setor de construcao (gargalo do crescimento) ainda entra.
+        let fila_cheia = estatais >= max_estatais;
         // Teto de gasto com construcao estatal por postura (fracao da receita).
         let receita = p.orcamento.receita_total().max(1.0);
         let teto = match postura {
@@ -178,17 +211,44 @@ impl IaEconomia {
         if p.orcamento.gasto_construcao + p.orcamento.gasto_obras_materiais > teto * receita {
             return;
         }
-        let Some(idx) = self.indice_provincias.get(id).cloned() else { return };
         let cat = mundo.catalogo();
+        // Ritmo de expansao do pais: convergencia (pobres crescem mais, ricos menos) e reconstrucao.
+        let pop_pais: f64 = idx.iter().map(|&pi| mundo.provincias()[pi].populacao_total()).sum();
+        let pc_rel = if pop_pais > 0.0 && self.pib_pc_mundial > 0.0 {
+            (p.pib_diario / pop_pais / self.pib_pc_mundial).max(0.05)
+        } else {
+            1.0
+        };
+        let fator_convergencia = pc_rel.powf(-0.5).clamp(0.45, 1.5);
+        let anos = dia_atual as f64 / 365.0;
+        let fator_recon = p
+            .tag
+            .as_deref()
+            .and_then(|t| RECONSTRUCAO.iter().find(|(x, _)| *x == t))
+            .map_or(1.0, |&(_, m)| 1.0 + (m - 1.0) * (1.0 - anos / ANOS_RECONSTRUCAO).max(0.0));
+        let meta = META_CONSTRUCAO * fator_convergencia * fator_recon;
+        // Niveis do setor de construcao ja a caminho (na fila) contam: evita empilhar projetos que nunca terminam.
+        let a_caminho_constr: f64 = p
+            .fila_construcao
+            .iter()
+            .filter(|i| cat.tipos_predio.iter().any(|t| t.id == i.tipo_predio_id && t.categoria == CategoriaPredio::Construcao))
+            .map(|i| i.niveis as f64)
+            .sum();
 
         // Retorno medio por nivel de cada tipo de predio produtivo ja existente no pais.
         let mut retorno: BTreeMap<usize, (f64, f64)> = BTreeMap::new();
+        let mut niveis_total = 0.0;
+        let mut niveis_construcao = 0.0;
         for &pi in &idx {
             for b in &mundo.provincias()[pi].predios {
                 if let Some(ti) = cat.tipos_predio.iter().position(|t| t.id == b.tipo_predio_id) {
                     let e = retorno.entry(ti).or_default();
                     e.0 += b.lucro_ultimo_tick;
                     e.1 += b.nivel as f64;
+                    niveis_total += b.nivel as f64;
+                    if cat.tipos_predio[ti].categoria == CategoriaPredio::Construcao {
+                        niveis_construcao += b.nivel as f64;
+                    }
                 }
             }
         }
@@ -203,7 +263,14 @@ impl IaEconomia {
                     if burocracia_sobra || burocracia_falta <= 0.0 { continue }
                     (250.0 * burocracia_falta).clamp(25.0, 150.0)
                 }
-                CategoriaPredio::Militar | CategoriaPredio::Construcao => continue,
+                _ if fila_cheia && t.categoria != CategoriaPredio::Construcao => continue,
+                CategoriaPredio::Militar => continue,
+                CategoriaPredio::Construcao => {
+                    // Capacidade de construcao proporcional ao tamanho da economia (gargalo do crescimento).
+                    let falta = meta * niveis_total.max(100.0) - niveis_construcao;
+                    if falta - a_caminho_constr <= 0.0 { continue }
+                    500.0
+                }
                 CategoriaPredio::Infraestrutura => 0.0, // decidido por estado, abaixo
                 _ => {
                     if !postura.permite_obras_de_retorno() { continue }
@@ -243,16 +310,44 @@ impl IaEconomia {
                 && s > 5.0
             {
                 cands.push((s, ti, pi));
+                if t.categoria == CategoriaPredio::Construcao {
+                    // Varios niveis de uma vez (a mesma provincia comporta); nao contam no limite semanal.
+                    let falta = meta * niveis_total.max(100.0) - niveis_construcao - a_caminho_constr;
+                    for _ in 1..((falta / lote as f64).ceil() as usize).min(4) {
+                        cands.push((s, ti, pi));
+                    }
+                }
             }
         }
         cands.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)));
-        // Tenta os melhores candidatos ate um ser aceito (a provincia pode nao comportar).
-        for (_, ti, pi) in cands.into_iter().take(6) {
+        // Tenta os melhores candidatos (a provincia pode nao comportar), ate `NOVAS_POR_SEMANA` aceitos.
+        let mut aceitas = 0;
+        for (_, ti, pi) in cands.into_iter().take(16 + novas_semana) {
             let tipo = mundo.catalogo().tipos_predio[ti].id.clone();
             let prov = mundo.provincias()[pi].id.clone();
-            if mundo.enfileirar_construcao(id, &prov, &tipo, false).is_ok() {
+            if mundo.enfileirar_construcao_lote(id, &prov, &tipo, false, lote).is_ok() {
+                let ids_constr: Vec<String> = mundo
+                    .catalogo()
+                    .tipos_predio
+                    .iter()
+                    .filter(|t| t.categoria == CategoriaPredio::Construcao)
+                    .map(|t| t.id.clone())
+                    .collect();
                 self.obras_enfileiradas += 1;
-                break;
+                // Obras do setor de construcao furam a fila: elas multiplicam a capacidade de todas as outras.
+                if mundo.catalogo().tipos_predio[ti].categoria == CategoriaPredio::Construcao
+                    && let Some(p) = mundo.obter_pais_mut(id)
+                    && let Some(item) = p.fila_construcao.pop()
+                {
+                    // Na frente das demais obras, mas atras das obras de construcao ja enfileiradas (sem inanicao).
+                    let pos = p.fila_construcao.iter().take_while(|i| ids_constr.contains(&i.tipo_predio_id)).count();
+                    p.fila_construcao.insert(pos, item);
+                    continue;
+                }
+                aceitas += 1;
+                if aceitas >= novas_semana {
+                    break;
+                }
             }
         }
     }

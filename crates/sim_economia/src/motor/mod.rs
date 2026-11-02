@@ -545,8 +545,10 @@ impl MundoEconomico {
                     })?;
                 item.provincia_idx = p_idx;
                 item.tipo_predio_idx = tp_idx;
+                item.niveis = item.niveis.max(1);
                 if item.custo_total_pontos <= 0.0 {
-                    item.custo_total_pontos = catalogo.tipos_predio[tp_idx].custo_pontos_construcao;
+                    item.custo_total_pontos =
+                        catalogo.tipos_predio[tp_idx].custo_pontos_construcao * item.niveis as f64;
                 }
                 item.progresso_pontos = item.progresso_pontos.clamp(0.0, item.custo_total_pontos);
             }
@@ -899,6 +901,7 @@ impl MundoEconomico {
         self.dias_decorridos = proximo_dia_num;
         self.cobrar_pedagios_canais();
         self.aplicar_turismo_diario();
+        self.atualizar_produtividade();
         self.data_atual.avancar_dia();
 
         let pib_mundial_diario = self.paises.iter().map(|p| p.pib_diario).sum();
@@ -910,6 +913,49 @@ impl MundoEconomico {
             pib_mundial_diario,
             populacao_mundial,
             obras_concluidas,
+        }
+    }
+
+    /// Progresso técnico endógeno (a cada 30 dias): a produtividade total dos fatores de cada país cresce
+    /// ~0,2%/ano de base (aprendizado na prática), mais até ~0,8%/ano conforme a alfabetização média
+    /// (capital humano), mais um bônus de convergência (difusão de tecnologia da fronteira: até ~0,8%/ano
+    /// para quem tem renda per capita bem abaixo da líder). Em linha com a contabilidade do crescimento
+    /// dos anos 1950. Ganhos de tecnologias pesquisadas entram à parte, por `aplicar_ganho_produtividade`.
+    fn atualizar_produtividade(&mut self) {
+        if !self.dias_decorridos.is_multiple_of(30) {
+            return;
+        }
+        let n = self.paises.len();
+        let mut pop = vec![0.0f64; n];
+        let mut alfa = vec![0.0f64; n];
+        for prov in &self.provincias {
+            for p in &prov.pops {
+                pop[prov.pais_idx] += p.populacao;
+                alfa[prov.pais_idx] += p.populacao * p.alfabetizacao;
+            }
+        }
+        // Fronteira: maior PIB per capita entre os países com pelo menos 5 milhões de habitantes.
+        let fronteira = self
+            .paises
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| pop[*i] > 5.0e6)
+            .map(|(i, p)| p.pib_diario / pop[i])
+            .fold(0.0f64, f64::max);
+        for (i, pais) in self.paises.iter_mut().enumerate() {
+            let a = if pop[i] > 0.0 { alfa[i] / pop[i] } else { 0.3 };
+            let pc = if pop[i] > 0.0 { pais.pib_diario / pop[i] } else { 0.0 };
+            let convergencia = if pc > 0.0 && fronteira > 0.0 { (fronteira / pc).ln().clamp(0.0, 2.0) * 0.004 } else { 0.0 };
+            let g_ano = 0.002 + 0.008 * a.clamp(0.0, 1.0) + convergencia;
+            pais.produtividade *= 1.0 + g_ano * 30.0 / 365.0;
+        }
+    }
+
+    /// Soma um ganho relativo (ex.: 0.02 = +2%) à produtividade do país, p.ex. ao concluir uma tecnologia
+    /// civil de produção ou de sociedade.
+    pub fn aplicar_ganho_produtividade(&mut self, pais_id: &str, ganho: f64) {
+        if let Some(&c) = self.indice_paises.get(pais_id) {
+            self.paises[c].produtividade *= 1.0 + ganho.clamp(0.0, 0.5);
         }
     }
 
@@ -1083,6 +1129,7 @@ impl MundoEconomico {
         self.dias_decorridos = proximo_dia_num;
         self.cobrar_pedagios_canais();
         self.aplicar_turismo_diario();
+        self.atualizar_produtividade();
         self.data_atual.avancar_dia();
 
         let pib_mundial_diario = self.paises.iter().map(|p| p.pib_diario).sum();
@@ -1131,6 +1178,25 @@ impl MundoEconomico {
         tipo_predio_id: &str,
         privado: bool,
     ) -> ResultadoEconomia<()> {
+        self.enfileirar_construcao_lote(pais_id, provincia_id, tipo_predio_id, privado, 1)
+    }
+
+    /// Tamanho de lote de obra adequado ao porte do país (1 nível para economias pequenas).
+    pub fn tamanho_lote_obra(&self, pais_id: &str) -> u32 {
+        let Some(&c_idx) = self.indice_paises.get(pais_id) else { return 1 };
+        governo::tamanho_lote_obra(&self.provincias, &self.paises[c_idx])
+    }
+
+    /// Enfileira uma obra que entrega `niveis` níveis de uma vez (lote), pelo custo de `niveis` obras.
+    pub fn enfileirar_construcao_lote(
+        &mut self,
+        pais_id: &str,
+        provincia_id: &str,
+        tipo_predio_id: &str,
+        privado: bool,
+        niveis: u32,
+    ) -> ResultadoEconomia<()> {
+        let niveis = niveis.max(1);
         let &c_idx =
             self.indice_paises
                 .get(pais_id)
@@ -1186,10 +1252,11 @@ impl MundoEconomico {
             provincia_id: provincia_id.to_string(),
             tipo_predio_id: tipo_predio_id.to_string(),
             progresso_pontos: 0.0,
-            custo_total_pontos: def.custo_pontos_construcao,
+            custo_total_pontos: def.custo_pontos_construcao * niveis as f64,
             privado,
             retorno_esperado: 0.0,
             justificativa: String::new(),
+            niveis,
             provincia_idx: p_idx,
             tipo_predio_idx: tp_idx,
         });
