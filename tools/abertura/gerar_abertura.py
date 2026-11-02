@@ -298,14 +298,14 @@ def carimbo(im, cx, cy, w, h, q):
     gasto = Image.new("L", (cw, ch), 255)
     gd = ImageDraw.Draw(gasto)
     rng = np.random.default_rng(7719)
-    for _ in range(520):
+    for _ in range(170):
         x, y = int(rng.integers(0, cw)), int(rng.integers(0, ch))
         r = int(rng.integers(1, 5))
-        gd.ellipse((x - r, y - r, x + r, y + r), fill=int(rng.integers(40, 200)))
-    for _ in range(18):
+        gd.ellipse((x - r, y - r, x + r, y + r), fill=int(rng.integers(90, 220)))
+    for _ in range(6):
         y = int(rng.integers(pad - 10, ch - pad + 10))
         gd.line((pad - 14, y, cw - pad + 14, y + int(rng.integers(-12, 12))),
-                fill=int(rng.integers(30, 130)), width=int(rng.integers(2, 8)))
+                fill=int(rng.integers(120, 200)), width=int(rng.integers(2, 5)))
     stamp.putalpha(ImageChops.multiply(stamp.getchannel("A"), gasto))
 
     escala = 1.30 - 0.30 * q
@@ -363,7 +363,7 @@ def cartaz(t):
                 font=font(26), fill=CREME, anchor="mm")
     if t >= 8.5:
         q = min(1.0, (t - 8.5) / .3)
-        carimbo(im, 640, 562, 576, 104, q)
+        carimbo(im, 640, 540, 680, 150, q)
     # Papel, granulação e vinheta.
     arr = np.asarray(im, dtype=np.int16)
     arr += rng.normal(0, 3.2, (H, W, 1)).astype(np.int16)
