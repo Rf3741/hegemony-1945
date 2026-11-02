@@ -985,11 +985,17 @@ mod testes_plugin {
         assert!(!catalogo.provincias.is_empty(), "catálogo de províncias vazio");
         // Dono e controlador por província, inicializados do dono do estado.
         assert_eq!(mundo.dono_por_provincia.len(), catalogo.provincias.len());
-        // Só a Alemanha e a Áustria começam ocupadas (controlador = ocupante da zona).
+        // As ocupações iniciais ficam restritas às zonas históricas do cenário.
         for (id, dono) in &mundo.dono_por_provincia {
             let ctrl = &mundo.controlador_por_provincia[id];
             if ctrl != dono {
-                assert!(matches!(dono.as_str(), "GER" | "AUT"), "{id}: {dono} controlado por {ctrl}");
+                assert!(
+                    matches!(
+                        dono.as_str(),
+                        "GER" | "AUT" | "KOR" | "JAP" | "FIC" | "IRN" | "CHI" | "DEN" | "ITA" | "PER"
+                    ),
+                    "{id}: {dono} controlado por {ctrl}"
+                );
                 assert!(matches!(ctrl.as_str(), "USA" | "GBR" | "FRA" | "SOV"));
             }
         }

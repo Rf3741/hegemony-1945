@@ -119,7 +119,8 @@ pub struct Formacoes {
     formaveis: Vec<Formavel>,
     independencias: Vec<Independencia>,
     feitos: BTreeSet<String>,
-    /// id da província -> (prefixo adm1, centroide)
+    transicoes_feitas: BTreeSet<String>,
+    /// id da província -> (código adm1 completo, centroide)
     indice: HashMap<u32, (String, (f32, f32))>,
 }
 
@@ -182,7 +183,13 @@ impl Formacoes {
             f.formacao.origem_tags = novas;
         }
         formaveis.sort_by_key(|f| parse_data(&f.formacao.data_historica));
-        Self { formaveis: std::mem::take(formaveis), independencias, feitos: BTreeSet::new(), indice }
+        Self {
+            formaveis: std::mem::take(formaveis),
+            independencias,
+            feitos: BTreeSet::new(),
+            transicoes_feitas: BTreeSet::new(),
+            indice,
+        }
     }
 
     /// Igual a `novo`, mas a partir de qualquer catálogo: `(id, adm1_code, (lon, lat))`.
@@ -192,7 +199,7 @@ impl Formacoes {
         provincias: impl Iterator<Item = (u32, &'a str, (f32, f32))>,
     ) -> Self {
         let indice = provincias
-            .map(|(id, adm1, c)| (id, (adm1.split('-').next().unwrap_or("").to_string(), c)))
+            .map(|(id, adm1, c)| (id, (adm1.to_string(), c)))
             .collect();
         Self::montar(&mut formaveis, independencias, indice)
     }
@@ -208,7 +215,7 @@ impl Formacoes {
     /// Aplica tudo o que já passou da data histórica. Devolve os eventos em ordem cronológica.
     pub fn processar(&mut self, mundo: &mut MundoJogo) -> Vec<EventoFormacao> {
         let hoje = mundo.data;
-        let mut eventos = Vec::new();
+        let mut eventos = self.processar_transicoes(mundo);
         let mut itens: Vec<(DataSimulacao, bool, usize)> = Vec::new();
         for (i, f) in self.formaveis.iter().enumerate() {
             if let Some(d) = parse_data(&f.formacao.data_historica)
@@ -245,6 +252,75 @@ impl Formacoes {
         eventos
     }
 
+    fn processar_transicoes(&mut self, mundo: &mut MundoJogo) -> Vec<EventoFormacao> {
+        let hoje = mundo.data;
+        let mut grupos: BTreeMap<String, Vec<u32>> = BTreeMap::new();
+        let mut adicionar = |chave: &str, data: DataSimulacao, dono: &str, pred: &dyn Fn(&str, (f32, f32)) -> bool| {
+            if hoje < data || self.transicoes_feitas.contains(chave) {
+                return;
+            }
+            let ids: Vec<u32> = mundo
+                .dono_por_provincia
+                .iter()
+                .filter_map(|(id, atual)| {
+                    if atual != dono {
+                        return None;
+                    }
+                    let (codigo, centroide) = self.indice.get(id)?;
+                    pred(codigo, *centroide).then_some(*id)
+                })
+                .filter(|id| mundo.controlador_por_provincia.get(id).is_some_and(|c| c != dono))
+                .collect();
+            if !ids.is_empty() {
+                grupos.insert(chave.to_string(), ids);
+            }
+            self.transicoes_feitas.insert(chave.to_string());
+        };
+
+        adicionar("indochina-1946", DataSimulacao::nova(1946, 1, 1), "FIC", &|code, _| {
+            matches!(code.split_once('-'), Some(("VNM" | "LAO" | "KHM", _)))
+        });
+        adicionar("ira-1946", DataSimulacao::nova(1946, 1, 1), "IRN", &|_, _| true);
+        adicionar("manchuria-1946", DataSimulacao::nova(1946, 5, 1), "CHI", &|code, _| {
+            matches!(code, "CHN-1813" | "CHN-1828" | "CHN-1839")
+        });
+        adicionar("bornholm-1946", DataSimulacao::nova(1946, 4, 5), "DEN", &|code, _| {
+            code == "DNK-3417"
+        });
+        adicionar("japao-1952", DataSimulacao::nova(1952, 4, 28), "JAP", &|code, _| {
+            code.starts_with("JPN-") && code != "JPN-3502"
+        });
+        adicionar("okinawa-1972", DataSimulacao::nova(1972, 5, 15), "JAP", &|code, _| {
+            code == "JPN-3502"
+        });
+        adicionar("trieste-1954", DataSimulacao::nova(1954, 10, 26), "PER", &|code, _| {
+            code == "ITA-5458"
+        });
+
+        let mut eventos = Vec::new();
+        for (chave, ids) in grupos {
+            let dono = mundo.dono_por_provincia[&ids[0]].clone();
+            for id in &ids {
+                mundo.controlador_por_provincia.insert(*id, dono.clone());
+            }
+            if let Some(pais) = mundo.paises.get(&dono) {
+                eventos.push(EventoFormacao {
+                    tag: dono,
+                    nome: format!("Desocupação histórica: {chave}"),
+                    data: hoje,
+                    tipo: "desocupacao".to_string(),
+                    origens: Vec::new(),
+                    provincias: ids,
+                    populacao: pais.populacao_total(),
+                    descricao: "As forças de ocupação retiram-se e o controle retorna à autoridade de jure.".to_string(),
+                    pais_novo: false,
+                    independencia: false,
+                });
+            }
+        }
+        eventos
+    }
+
     fn aplicar_formacao(
         &self,
         mundo: &mut MundoJogo,
@@ -259,7 +335,9 @@ impl Formacoes {
                 **dono != f.tag
                     && b.origem_tags.contains(dono)
                     && self.indice.get(id).is_some_and(|(pref, c)| {
-                        b.prefixos_adm1.contains(pref)
+                        b.prefixos_adm1
+                            .iter()
+                            .any(|prefixo| pref == prefixo || pref.starts_with(&format!("{prefixo}-")))
                             && pertence_ao_lado(
                                 &f.tag,
                                 *c,
