@@ -170,7 +170,7 @@ fn ajustar_camera_atmosfera(
             Option<&Bloom>,
             Option<&Hdr>,
         ),
-        With<Camera2d>,
+        (With<Camera2d>, Without<CamadaAtmosfera>),
     >,
     mut camada: Query<(&mut Transform, &mut Visibility), With<CamadaAtmosfera>>,
     mut commands: Commands,
