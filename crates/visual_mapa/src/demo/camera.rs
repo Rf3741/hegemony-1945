@@ -48,17 +48,20 @@ pub fn controlar_camera_sistema(
         let vel = cam.velocidade_pan * ortho.scale * dt;
         let mut mov = Vec2::ZERO;
 
-        if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-            mov.x -= vel;
-        }
-        if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-            mov.x += vel;
-        }
-        if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
-            mov.y += vel;
-        }
-        if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
-            mov.y -= vel;
+        let modificador = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight, KeyCode::AltLeft, KeyCode::AltRight]);
+        if !modificador {
+            if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
+                mov.x -= vel;
+            }
+            if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
+                mov.x += vel;
+            }
+            if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
+                mov.y += vel;
+            }
+            if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
+                mov.y -= vel;
+            }
         }
 
         transform.translation.x = (transform.translation.x + mov.x).clamp(-cam.limite.x, cam.limite.x);
