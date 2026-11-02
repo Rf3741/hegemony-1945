@@ -37,7 +37,6 @@ impl Plugin for UiPlugin {
 
 fn barra_superior(
     mut contextos: EguiContexts,
-    mut relogio: ResMut<RecursoRelogio>,
     camada_visivel: Option<Res<visual_mapa::CamadaConstrucoesVisivel>>,
     mut janela_saves: ResMut<super::menu_saves::JanelaSaves>,
 ) -> Result {
@@ -56,10 +55,6 @@ fn barra_superior(
                 ui.separator();
             }
             ui.weak("?").on_hover_text("Espaço: pausa | +/−: velocidade | WASD: mover | scroll: zoom | V: construções | M: modos de mapa | 1-9: painéis | Ctrl+S/L: salvar/carregar");
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                widget_relogio(ui, &mut relogio);
-                super::tutorial_guiado::alvo(ui.ctx(), "relogio", ui.min_rect());
-            });
         });
     });
     Ok(())
@@ -105,6 +100,7 @@ fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) {
 
 fn barra_hud(
     mut contextos: EguiContexts,
+    mut relogio: ResMut<RecursoRelogio>,
     jogador: Option<Res<PaisJogador>>,
     mundo: Res<RecursoMundo>,
     eco: Option<Res<EconomiaSim>>,
@@ -118,6 +114,10 @@ fn barra_hud(
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
     egui::Panel::top("barra_hud").show(&mut raiz, |ui| {
         hud_pais(ui, p, &eco, &mut painel.aberto, &mut mercado.aberto, &mut comercio.aberto, &mut constr.aberta);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            widget_relogio(ui, &mut relogio);
+            super::tutorial_guiado::alvo(ui.ctx(), "relogio", ui.min_rect());
+        });
         super::tutorial_guiado::alvo(ui.ctx(), "hud", ui.min_rect());
     });
     Ok(())
