@@ -17,6 +17,8 @@ pub struct EstiloMapa {
     pub max_icones_por_estado: usize,
     /// Nomes de cidades só com escala abaixo disto (zoom de país para dentro).
     pub cidades_escala_max: f32,
+    /// Diâmetro máximo, em pixels de tela, dos detalhes de uma cidade no zoom local.
+    pub cidades_detalhe_max_px: f32,
     /// Estradas/ferrovias só com escala abaixo disto.
     pub rotas_escala_max: f32,
     /// Largura dos rios em pixels de tela (principais / menores).
@@ -55,6 +57,7 @@ impl Default for EstiloMapa {
             construcoes_escala_max: 0.30,
             max_icones_por_estado: 3,
             cidades_escala_max: 1.4,
+            cidades_detalhe_max_px: 56.0,
             rotas_escala_max: 0.50,
             rios_px_principal: 1.0,
             rios_px_menor: 0.6,
