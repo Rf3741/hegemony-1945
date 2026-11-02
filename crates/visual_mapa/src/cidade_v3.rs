@@ -51,9 +51,9 @@ pub fn raio_marcador_px(nivel: u8, capital: bool) -> f32 {
     if capital { r + 0.7 } else { r }
 }
 
-/// Tamanho do texto em pixels de tela conforme o zoom (diminui ao afastar).
+/// Tamanho do texto em pixels de tela conforme o zoom (menor no zoom próximo).
 pub fn tamanho_rotulo_px(escala_camera: f32) -> f32 {
-    (11.5 * (1.0 / escala_camera.max(0.05)).powf(0.30)).clamp(7.0, 15.0)
+    (11.5 * escala_camera.max(0.05).powf(0.18)).clamp(7.0, 12.0)
 }
 
 /// Nível mínimo para a cidade ter rótulo no zoom dado (a colisão filtra o resto).
@@ -158,6 +158,19 @@ fn predios_no_nivel(nivel: u8) -> u32 {
 /// Raio (mundo) da mancha urbana por nível.
 pub fn raio_urbano(nivel: u8) -> f32 {
     1.6 + 1.05 * nivel.clamp(1, 8) as f32
+}
+
+/// Diâmetro de referência da mancha urbana detalhada, em unidades de mundo.
+///
+/// Inclui ruas e o anel de prédios além do disco-base. A escala da raiz é ajustada
+/// por zoom para que esse diâmetro nunca ultrapasse o teto em pixels de tela.
+pub fn diametro_detalhe_mundo(nivel: u8) -> f32 {
+    raio_urbano(nivel.saturating_add(2).min(8)) * 3.0
+}
+
+/// Escala da raiz dos detalhes, limitada ao tamanho configurado para a tela.
+pub fn escala_detalhe_cidade(nivel: u8, escala_camera: f32, estilo: &crate::estilo::EstiloMapa) -> f32 {
+    (estilo.cidades_detalhe_max_px.max(1.0) * escala_camera.max(0.01) / diametro_detalhe_mundo(nivel)).min(1.0)
 }
 
 /// Gera os prédios dos níveis `1..=ate_nivel`. Varia por bloco e era (0..=4).
@@ -716,6 +729,7 @@ pub fn materializar_detalhes_sistema(
     mut commands: Commands,
     lod: Res<EstadoLod>,
     eras: Res<GerenciadorEras>,
+    estilo: Res<crate::estilo::EstiloMapa>,
     tex: Option<Res<TexturasJanelas>>,
     camera: Query<(&Transform, &Projection), With<Camera2d>>,
     janela: Query<&Window, With<PrimaryWindow>>,
@@ -731,6 +745,12 @@ pub fn materializar_detalhes_sistema(
     for (ent, c, ger) in &cidades {
         if !c.existe || (c.posicao_mundo - centro).abs().cmpgt(meia).any() {
             continue;
+        }
+        let escala_detalhe = escala_detalhe_cidade(c.nivel_atual_inteiro, escala, &estilo);
+        if let Some(g) = ger {
+            commands
+                .entity(g.raiz)
+                .insert(Transform::from_xyz(0.0, 0.0, 1.0).with_scale(Vec3::splat(escala_detalhe)));
         }
         match ger {
             Some(g) if g.nivel >= c.nivel_atual_inteiro && g.era == c.era_idx => continue,
@@ -765,7 +785,12 @@ pub fn materializar_detalhes_sistema(
                 let mut raiz = Entity::PLACEHOLDER;
                 let mut base = Entity::PLACEHOLDER;
                 commands.entity(ent).with_children(|p| {
-                    let mut r = p.spawn((Transform::from_xyz(0.0, 0.0, 1.0), Visibility::default(), RaizDetalhes, DetalheLod));
+                    let mut r = p.spawn((
+                        Transform::from_xyz(0.0, 0.0, 1.0).with_scale(Vec3::splat(escala_detalhe)),
+                        Visibility::default(),
+                        RaizDetalhes,
+                        DetalheLod,
+                    ));
                     raiz = r.id();
                     r.with_children(|rp| {
                         if let Some(t) = t {
@@ -960,8 +985,8 @@ mod tests {
     }
 
     #[test]
-    fn rotulo_diminui_ao_afastar() {
-        assert!(tamanho_rotulo_px(3.0) < tamanho_rotulo_px(0.3));
+    fn rotulo_fica_menor_no_zoom_proximo() {
+        assert!(tamanho_rotulo_px(0.3) < tamanho_rotulo_px(3.0));
         assert!(tamanho_rotulo_px(4.0) >= 7.0 && tamanho_rotulo_px(0.1) <= 15.0);
     }
 
@@ -995,5 +1020,20 @@ mod tests {
         assert!(!tm.is_empty());
         // determinístico
         assert_eq!(gerar_layout("x", 5, BlocoVisual::Sovietica, 1).len(), gerar_layout("x", 5, BlocoVisual::Sovietica, 1).len());
+    }
+
+    #[test]
+    fn teto_de_detalhe_em_pixels_nao_cresce_com_zoom() {
+        let estilo = crate::estilo::EstiloMapa::default();
+        let teto = estilo.cidades_detalhe_max_px;
+        for escala_camera in [0.8, 0.4, 0.2, 0.1] {
+            let escala = escala_detalhe_cidade(8, escala_camera, &estilo);
+            let diametro_tela = diametro_detalhe_mundo(8) * escala / escala_camera;
+            assert!(diametro_tela <= teto + 1e-4, "{diametro_tela} > {teto}");
+        }
+        assert!(
+            escala_detalhe_cidade(8, 0.1, &estilo) < escala_detalhe_cidade(8, 0.8, &estilo),
+            "a raiz deve encolher no zoom máximo"
+        );
     }
 }
