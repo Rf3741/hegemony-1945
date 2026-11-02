@@ -273,7 +273,11 @@ impl MundoJogo {
         let mut controlador_por_provincia = dono_por_provincia.clone();
         for prov in &catalogo.provincias {
             let dono = dono_por_provincia.get(&prov.id).map(String::as_str).unwrap_or("");
-            if let Some(ocupante) = zona_ocupacao_1945(&prov.adm1_code, dono) {
+            if let Some(ocupante) = zona_ocupacao_1945_com_centroid(
+                &prov.adm1_code,
+                dono,
+                prov.centroide,
+            ) {
                 controlador_por_provincia.insert(prov.id, ocupante.to_string());
             }
         }
@@ -670,6 +674,17 @@ fn ler_ron<T: serde::de::DeserializeOwned>(caminho: &Path, contexto: &str) -> Re
 /// Áustria: SOV (Baixa Áustria, Burgenland, Viena), USA (Salzburgo, Alta Áustria),
 /// GBR (Estíria, Caríntia), FRA (Tirol, Vorarlberg).
 pub fn zona_ocupacao_1945(adm1_code: &str, dono: &str) -> Option<&'static str> {
+    zona_ocupacao_1945_com_centroid(adm1_code, dono, (0.0, 0.0))
+}
+
+/// Variante usada pelo carregamento do mapa: as partilhas que seguem um paralelo precisam
+/// do centroide da província, enquanto a função pública acima continua útil para consultas
+/// por região.
+pub fn zona_ocupacao_1945_com_centroid(
+    adm1_code: &str,
+    dono: &str,
+    centroide: (f32, f32),
+) -> Option<&'static str> {
     match (dono, adm1_code) {
         ("GER", "DEU-1591" | "DEU-1574" | "DEU-1575") => Some("USA"),
         ("GER", "DEU-1579" | "DEU-1578" | "DEU-1576" | "DEU-1572") => Some("GBR"),
@@ -681,6 +696,22 @@ pub fn zona_ocupacao_1945(adm1_code: &str, dono: &str) -> Option<&'static str> {
         ("AUT", "AUT-2327" | "AUT-2326") => Some("USA"),
         ("AUT", "AUT-2323" | "AUT-2325") => Some("GBR"),
         ("AUT", "AUT-2329" | "AUT-2320") => Some("FRA"),
+        ("KOR", code) if code.starts_with("KOR-") => {
+            Some(if centroide.1 >= 38.0 { "SOV" } else { "USA" })
+        }
+        ("KOR", code) if code.starts_with("PRK-") => Some("SOV"),
+        ("JAP", code) if code.starts_with("JPN-") => Some("USA"),
+        ("FIC", code) if matches!(code.split_once('-'), Some(("VNM" | "LAO" | "KHM", _))) => {
+            Some(if centroide.1 >= 16.0 { "CHI" } else { "GBR" })
+        }
+        ("IRN", _) => Some(if centroide.1 >= 35.5 { "SOV" } else { "GBR" }),
+        ("CHI", "CHN-1813" | "CHN-1828" | "CHN-1839") => Some("SOV"),
+        ("DEN", "DNK-3417") => Some("SOV"),
+        ("ITA", code) if code.starts_with("LBY-") || code.starts_with("ERI-") || code.starts_with("SOM-") => {
+            Some(if code.starts_with("LBY-") && centroide.0 < 15.0 { "FRA" } else { "GBR" })
+        }
+        ("PER", "ITA-5458") => Some("GBR"),
+        ("GER", "RUS-2324") => Some("SOV"),
         _ => None,
     }
 }
