@@ -6,6 +6,7 @@
 
 use super::diplomacia_ui::{DiploSim, PainelDiplomacia};
 use super::economy::RecursoMundo;
+use super::enciclopedia;
 use super::eventos_ui::EstadoEv;
 use super::jogador::{PaisJogador, Notificacoes};
 use super::map::{CoresMapa, RaizProjeto, RecursoCatalogo};
@@ -23,6 +24,8 @@ pub struct FormacaoSim {
     pub nucleo: Formacoes,
     /// Avisos aguardando o jogador (o primeiro é exibido).
     pub avisos: Vec<EventoFormacao>,
+    pub economia_pendentes: Vec<EventoFormacao>,
+    pub politica_pendentes: Vec<EventoFormacao>,
     retomar: bool,
 }
 
@@ -54,7 +57,13 @@ fn carregar(mut commands: Commands, raiz: Option<Res<RaizProjeto>>, catalogo: Op
     match res {
         Ok(nucleo) => {
             info!("formacao: {} formáveis carregados", nucleo.formaveis().len());
-            commands.insert_resource(FormacaoSim { nucleo, avisos: Vec::new(), retomar: false });
+            commands.insert_resource(FormacaoSim {
+                nucleo,
+                avisos: Vec::new(),
+                economia_pendentes: Vec::new(),
+                politica_pendentes: Vec::new(),
+                retomar: false,
+            });
         }
         Err(e) => error!("formacao: falha ao carregar: {e}"),
     }
@@ -114,6 +123,8 @@ fn tick_formacao(
         }
         // Aviso ao jogador: só para países que ele "vê" (todos), com pausa.
         form.avisos.push(e.clone());
+        form.economia_pendentes.push(e.clone());
+        form.politica_pendentes.push(e.clone());
         let texto = if e.independencia {
             super::enciclopedia::texto_notificacao(
                 "msg_independencia",

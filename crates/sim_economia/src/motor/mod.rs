@@ -105,6 +105,142 @@ pub struct MundoEconomico {
 }
 
 impl MundoEconomico {
+    /// Materializa um país criado pelo motor territorial no cenário econômico.
+    ///
+    /// As províncias já existem no cenário econômico; somente a titularidade,
+    /// os estados e o mercado precisam ser reindexados.
+    pub fn adicionar_pais_formado(
+        &mut self,
+        tag: &str,
+        nome: &str,
+        origens: &[String],
+        adm1: &[String],
+    ) -> ResultadoEconomia<()> {
+        let id = tag.to_ascii_lowercase();
+        if self.indice_paises.contains_key(&id) {
+            return Ok(());
+        }
+        let mercado_id = format!("mercado_{id}");
+        let mut provincias_movidas = Vec::new();
+        for (idx, provincia) in self.provincias.iter().enumerate() {
+            let Some(codigo) = provincia.codigo_externo.as_deref() else { continue };
+            let prefixo = codigo.split('-').next().unwrap_or_default();
+            let dono_tag = self.paises.get(provincia.pais_idx).and_then(|p| p.tag.as_deref()).unwrap_or_default();
+            if origens.iter().any(|o| o == dono_tag) && adm1.iter().any(|a| a == prefixo) {
+                provincias_movidas.push(idx);
+            }
+        }
+        if provincias_movidas.is_empty() {
+            return Ok(());
+        }
+        let pop = provincias_movidas.iter().map(|&i| self.provincias[i].populacao_total()).sum::<f64>();
+        let pib = provincias_movidas.iter().map(|&i| {
+            self.provincias[i].predios.iter().map(|b| (b.receita_ultimo_tick - b.custo_insumos_ultimo_tick).max(0.0)).sum::<f64>()
+        }).sum::<f64>().max(pop * 0.02);
+        self.mercados.push(Mercado {
+            id: mercado_id.clone(),
+            nome: format!("Mercado Nacional ({nome})"),
+            pais_lider_id: id.clone(),
+            precos_atuais: BTreeMap::new(),
+            ordens_venda: BTreeMap::new(),
+            ordens_compra: BTreeMap::new(),
+            importacoes_liquidas: BTreeMap::new(),
+            pais_lider_idx: 0,
+            precos_idx: Vec::new(),
+            oferta_idx: Vec::new(),
+            demanda_idx: Vec::new(),
+            fator_suprimento_idx: Vec::new(),
+            importacoes_liquidas_idx: Vec::new(),
+        });
+        self.paises.push(Pais::novo_dinamico(&id, tag, nome, &mercado_id, pib * 0.04));
+        let novo_idx = self.paises.len() - 1;
+        for &idx in &provincias_movidas {
+            self.provincias[idx].pais_id = id.clone();
+            self.provincias[idx].pais_idx = novo_idx;
+        }
+        let estados_movidos: Vec<usize> = self
+            .estados
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, estado)| {
+                let ps = &estado.provincias_indices;
+                (!ps.is_empty() && ps.iter().all(|p| provincias_movidas.contains(p))).then_some(idx)
+            })
+            .collect();
+        for idx in estados_movidos {
+            self.estados[idx].pais_id = id.clone();
+            self.estados[idx].pais_idx = novo_idx;
+        }
+        self.reindexar_pos_formacao()?;
+        Ok(())
+    }
+
+    fn reindexar_pos_formacao(&mut self) -> ResultadoEconomia<()> {
+        let n_paises = self.paises.len();
+        let n_bens = self.catalogo.bens.len();
+        let n_mercados = self.mercados.len();
+        self.turismo.receita_receptiva.resize(n_paises, 0.0);
+        self.turismo.gasto_emissivo.resize(n_paises, 0.0);
+        self.turismo.fator_seguranca.resize(n_paises, 1.0);
+        self.buffers.proxima_oferta.resize(n_mercados * n_bens, 0.0);
+        self.buffers.proxima_demanda.resize(n_mercados * n_bens, 0.0);
+        self.buffers.importacoes_liquidas.resize(n_mercados * n_bens, 0.0);
+        self.buffers.pontos_construcao_setores_pais.resize(n_paises, 0.0);
+        self.buffers.pop_incorporada_pais.resize(n_paises, 0.0);
+        self.buffers.reservas_predios_pais.resize(n_paises, 0.0);
+        self.buffers.dividendos_cap_pais.resize(n_paises, 0.0);
+        self.buffers.dividendos_ari_pais.resize(n_paises, 0.0);
+        self.buffers.pop_cap_pais.resize(n_paises, 0.0);
+        self.buffers.pop_ari_pais.resize(n_paises, 0.0);
+        self.buffers.cestas_pais.resize_with(n_paises, || std::array::from_fn(|_| CestaNecessidadeCompilada::default()));
+        self.buffers.demanda_necessidade_pais.resize(n_paises, [0.0; NUM_NECESSIDADES]);
+        self.indice_mercados.clear();
+        self.indice_paises.clear();
+        self.indice_estados.clear();
+        for (idx, mercado) in self.mercados.iter_mut().enumerate() {
+            self.indice_mercados.insert(mercado.id.clone(), idx);
+            mercado.pais_lider_idx = 0;
+            mercado.precos_idx = vec![0.0; self.catalogo.bens.len()];
+            mercado.oferta_idx = vec![0.0; self.catalogo.bens.len()];
+            mercado.demanda_idx = vec![0.0; self.catalogo.bens.len()];
+            mercado.fator_suprimento_idx = vec![1.0; self.catalogo.bens.len()];
+            mercado.importacoes_liquidas_idx = vec![0.0; self.catalogo.bens.len()];
+        }
+        for (idx, pais) in self.paises.iter_mut().enumerate() {
+            self.indice_paises.insert(pais.id.clone(), idx);
+            pais.provincias_indices.clear();
+            pais.estados_indices.clear();
+            pais.mercado_idx = *self.indice_mercados.get(&pais.mercado_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+                origem_entidade: "Pais", origem_id: pais.id.clone(), alvo_entidade: "Mercado", alvo_id: pais.mercado_id.clone(),
+            })?;
+            pais.aliquota_consumo_por_bem = vec![0.0; self.catalogo.bens.len()];
+        }
+        for mercado in &mut self.mercados {
+            mercado.pais_lider_idx = *self.indice_paises.get(&mercado.pais_lider_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+                origem_entidade: "Mercado", origem_id: mercado.id.clone(), alvo_entidade: "Pais", alvo_id: mercado.pais_lider_id.clone(),
+            })?;
+        }
+        for (idx, estado) in self.estados.iter_mut().enumerate() {
+            estado.pais_idx = *self.indice_paises.get(&estado.pais_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+                origem_entidade: "Estado", origem_id: estado.id.clone(), alvo_entidade: "Pais", alvo_id: estado.pais_id.clone(),
+            })?;
+            estado.provincias_indices.clear();
+            self.indice_estados.insert(estado.id.clone(), idx);
+            self.paises[estado.pais_idx].estados_indices.push(idx);
+        }
+        for (idx, provincia) in self.provincias.iter_mut().enumerate() {
+            provincia.pais_idx = *self.indice_paises.get(&provincia.pais_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+                origem_entidade: "Provincia", origem_id: provincia.id.clone(), alvo_entidade: "Pais", alvo_id: provincia.pais_id.clone(),
+            })?;
+            provincia.estado_idx = *self.indice_estados.get(&provincia.estado_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+                origem_entidade: "Provincia", origem_id: provincia.id.clone(), alvo_entidade: "Estado", alvo_id: provincia.estado_id.clone(),
+            })?;
+            provincia.mercado_idx = self.paises[provincia.pais_idx].mercado_idx;
+            self.estados[provincia.estado_idx].provincias_indices.push(idx);
+            self.paises[provincia.pais_idx].provincias_indices.push(idx);
+        }
+        Ok(())
+    }
     /// Constrói, valida todas as referências cruzadas e pré-indexa um `MundoEconomico`
     /// a partir de um `CenarioEconomia`.
     pub fn novo(mut cenario: CenarioEconomia) -> ResultadoEconomia<Self> {

@@ -80,18 +80,25 @@ fn carregar(mut commands: Commands, raiz: Res<RaizProjeto>) {
     }
 }
 
-/// Uma vez, quando a política está pronta: define os líderes de 1945 em todos os países.
+/// Define os líderes de 1945 também para países que surgiram durante a partida.
 fn sincronizar_inicial(mut el: ResMut<ElencoRes>, mut pol: ResMut<PoliticaSim>) {
-    if el.sincronizado || pol.nucleo.is_none() {
+    if pol.nucleo.is_none() {
         return;
     }
-    el.sincronizado = true;
-    let paises: Vec<String> = el.elenco.paises().into_iter().map(String::from).collect();
+    let paises: Vec<String> = pol
+        .nucleo
+        .as_ref()
+        .map(|n| n.mundo.paises().iter().map(|p| p.tag.clone()).collect())
+        .unwrap_or_default();
     for p in paises {
+        if el.sincronizado && el.aplicado.contains_key(&p) {
+            continue;
+        }
         for c in el.comandos_pais(&p, INICIO) {
             pol.enviar(c);
         }
     }
+    el.sincronizado = true;
 }
 
 fn avancar(

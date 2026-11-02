@@ -20,10 +20,14 @@ pub mod radicalismo;
 
 use crate::catalogo::CatalogoPolitica;
 use crate::entidades::crise::SinalGuerraCivil;
+use crate::entidades::grupo_interesse::InstanciaGrupoInteresse;
+use crate::entidades::lider::LiderPolitico;
+use crate::entidades::partido::InstanciaPartido;
 use crate::entidades::pais::PaisPolitica;
+use crate::entidades::pop::PopPolitica;
 use crate::erro::{ErroPolitica, ResultadoPolitica, validar_id_snake_case};
 use crate::rng::RngDeterministico;
-use crate::tipos::DataJogo;
+use crate::tipos::{DataJogo, Estrato, PapelGrupoInteresse, StatusClout, HumorGrupoInteresse};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -51,6 +55,69 @@ pub struct MundoPolitico {
 }
 
 impl MundoPolitico {
+    /// Insere uma nação surgida na descolonização com um estado político jogável.
+    pub fn adicionar_pais_formado(
+        &mut self,
+        tag: &str,
+        nome: &str,
+        populacao: u64,
+        leis: &BTreeMap<String, String>,
+        ideologia: &str,
+    ) -> ResultadoPolitica<()> {
+        if self.paises.iter().any(|p| p.tag == tag) {
+            return Ok(());
+        }
+        let id = tag.to_ascii_lowercase();
+        let ideologia = if self.catalogo.ideologias.contains_key(ideologia) {
+            ideologia.to_string()
+        } else {
+            self.catalogo.ideologias.keys().next().cloned().unwrap_or_else(|| "nacionalismo_republicano".into())
+        };
+        let mut pais = PaisPolitica::novo(&id, tag, nome)?;
+        pais.leis_ativas = leis
+            .iter()
+            .filter_map(|(categoria, lei)| {
+                let categoria = match categoria.as_str() {
+                    "governo" => "forma_governo",
+                    "sistema_tributario" => "tributacao",
+                    "saude_e_educacao" => "saude",
+                    "exercito" => "policia_seguranca",
+                    outro => outro,
+                };
+                self.catalogo.categorias_leis.get(categoria)
+                    .filter(|c| c.leis.iter().any(|l| l.id == *lei))
+                    .map(|_| (categoria.to_string(), lei.clone()))
+            })
+            .collect();
+        if pais.leis_ativas.is_empty() {
+            pais.leis_ativas.insert("forma_governo".into(), "republica_presidencialista".into());
+            pais.leis_ativas.insert("sistema_eleitoral".into(), "sufragio_universal".into());
+        }
+        pais.pops.push(PopPolitica::novo("camponeses", "local", "religiao_local", Estrato::Baixo, populacao as f64, 8.0, 0.25));
+        pais.culturas_primarias.push("local".into());
+        for (i, def) in self.catalogo.grupos_interesse.values().take(3).enumerate() {
+            let papel = if i == 0 { PapelGrupoInteresse::NoGoverno } else { PapelGrupoInteresse::NaOposicao };
+            let mut gi = InstanciaGrupoInteresse::novo(def.id.clone(), def.nome.clone(), papel);
+            gi.clout = if i == 0 { 0.5 } else { 0.25 };
+            gi.status = if i == 0 { StatusClout::Poderoso } else { StatusClout::Influente };
+            gi.humor = HumorGrupoInteresse::Neutro;
+            pais.grupos_interesse.insert(def.id.clone(), gi);
+        }
+        for (i, arq) in self.catalogo.arquetipos_partido.values().take(2).enumerate() {
+            let mut partido = InstanciaPartido::novo(format!("{tag}_{}", arq.id.to_ascii_lowercase()), arq.nome.clone(), arq.id.clone());
+            partido.grupos_membros = pais.grupos_interesse.keys().skip(i).take(1).cloned().collect();
+            pais.partidos.insert(partido.id.clone(), partido);
+        }
+        let lider = LiderPolitico::novo(format!("lider_{id}"), nome, &ideologia, 55.0, 1.0, 1920);
+        pais.chefe_de_estado = Some(lider.clone());
+        pais.chefe_de_governo = Some(lider);
+        pais.gi_chefe_estado = pais.grupos_interesse.keys().next().cloned();
+        let idx = self.paises.len();
+        self.indice_paises.insert(id, idx);
+        self.paises.push(pais);
+        Ok(())
+    }
+
     /// Inicializa e valida um novo mundo político determinístico a partir de uma semente.
     pub fn novo(
         catalogo: CatalogoPolitica,

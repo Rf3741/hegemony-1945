@@ -12,15 +12,26 @@ use super::economy::RecursoMundo;
 use super::time::EventoTickDiario;
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, TaskPool, block_on, futures_lite::future};
-use sim_politica::{CatalogoPolitica, LiderPolitico, CenarioPolitica, DataJogo, MundoPolitico, PaisPolitica, TipoCrisePolitica};
+use sim_politica::{CatalogoPolitica, InstanciaPartido, LiderPolitico, CenarioPolitica, DataJogo, MundoPolitico, PaisPolitica, TipoCrisePolitica};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
+use serde::Deserialize;
 
 const MAX_ATRASO_DIAS: u32 = 120;
 const DIAS_POR_LOTE: u32 = 30;
 const SEMENTE: u64 = 1945;
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename = "Partido")]
+struct PartidoExtra {
+    id: String,
+    nome: String,
+    pais: String,
+    ideologia: String,
+    lider_inicial: String,
+}
 
 /// Ação do jogador sobre a política (aplicada antes do próximo lote).
 #[derive(Debug, Clone)]
@@ -48,6 +59,7 @@ pub struct NucleoPol {
     base_pops: BTreeMap<String, Vec<f64>>,
     /// IA dos países (propõe leis para todos os países que não são do jogador).
     ia: ia_paises::IaPolitica,
+    extras_partidos: BTreeMap<String, Vec<PartidoExtra>>,
 }
 
 /// Resultado de um lote: mensagens e efeitos sobre a economia (categoria, lei antiga, lei nova).
@@ -62,12 +74,50 @@ pub struct SaidaPol {
 }
 
 impl NucleoPol {
+    pub fn aplicar_formacao(&mut self, e: &simulacao::formacao::EventoFormacao) -> Result<(), String> {
+        if !e.pais_novo {
+            return Ok(());
+        }
+        self.mundo
+            .adicionar_pais_formado(&e.tag, &e.nome, e.populacao, &e.leis_iniciais, &e.ideologia)
+            .map_err(|e| e.to_string())?;
+        if let Some(extras) = self.extras_partidos.get(&e.tag).cloned() {
+            let arquetipos = self.mundo.catalogo().arquetipos_partido.clone();
+            if let Some(pais) = self.mundo.pais_mut(&e.tag.to_ascii_lowercase()) {
+                for extra in extras {
+                    let arq = arquetipos.values()
+                        .find(|a| a.ideologias_afins.iter().any(|i| i == &extra.ideologia))
+                        .map(|a| a.id.clone())
+                        .or_else(|| arquetipos.values().next().map(|a| a.id.clone()))
+                        .unwrap_or_else(|| extra.ideologia.clone());
+                    let mut partido = InstanciaPartido::novo(extra.id.clone(), extra.nome.clone(), arq);
+                    partido.grupos_membros = pais.grupos_interesse.keys().take(1).cloned().collect();
+                    pais.partidos.insert(extra.id.clone(), partido);
+                    let lider = LiderPolitico::novo(&extra.lider_inicial, &extra.nome, &extra.ideologia, 60.0, 1.0, 1920);
+                    pais.chefe_de_estado = Some(lider.clone());
+                    pais.chefe_de_governo = Some(lider);
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn carregar(dir: &Path) -> Result<(Self, Arc<CatalogoPolitica>), String> {
         let cen = CenarioPolitica::carregar_diretorio(dir).map_err(|e| e.to_string())?;
         let mundo = MundoPolitico::novo(cen.catalogo, cen.paises, SEMENTE).map_err(|e| e.to_string())?;
         let base_pops = mundo.paises().iter().map(|p| (p.id.clone(), p.pops.iter().map(|x| x.padrao_de_vida).collect())).collect();
         let cat = Arc::new(mundo.catalogo().clone());
-        Ok((Self { mundo, base_eco: BTreeMap::new(), base_pops, ia: ia_paises::IaPolitica::novo() }, cat))
+        let extras_partidos = ron::from_str::<Vec<PartidoExtra>>(
+            &std::fs::read_to_string(dir.join("partidos_extra_formaveis.ron"))
+                .map_err(|e| format!("partidos_extra_formaveis.ron: {e}"))?,
+        )
+            .map_err(|e| format!("partidos_extra_formaveis.ron inválido: {e}"))?
+            .into_iter()
+            .fold(BTreeMap::<String, Vec<PartidoExtra>>::new(), |mut acc, p| {
+                acc.entry(p.pais.clone()).or_default().push(p);
+                acc
+            });
+        Ok((Self { mundo, base_eco: BTreeMap::new(), base_pops, ia: ia_paises::IaPolitica::novo(), extras_partidos }, cat))
     }
 
     /// Escala o padrão de vida das pops conforme a evolução do padrão de vida econômico (tag -> padrão).
@@ -284,7 +334,7 @@ impl Plugin for PoliticaSimPlugin {
             .add_systems(Update, aguardar_carga.run_if(in_state(crate::estado::AppState::Carregando)))
             .add_systems(
                 Update,
-                (acumular_dias, definir_pais, sincronizar_economia, recolher, despachar).chain().run_if(resource_exists::<PoliticaSim>),
+                (acumular_dias, definir_pais, sincronizar_economia, recolher, aplicar_formacoes_politica, despachar).chain().run_if(resource_exists::<PoliticaSim>),
             );
     }
 }
@@ -297,6 +347,25 @@ fn iniciar_carga(mut commands: Commands, raiz: Res<super::map::RaizProjeto>) {
     let dir = dir_politica(&raiz.0);
     let t = AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move { NucleoPol::carregar(&dir) });
     commands.insert_resource(CargaPolitica(t));
+}
+
+fn aplicar_formacoes_politica(form: Option<ResMut<super::formacao_sim::FormacaoSim>>, mut pol: ResMut<PoliticaSim>) {
+    let Some(mut form) = form else { return };
+    let Some(mut nucleo) = pol.nucleo.take() else { return };
+    let eventos = std::mem::take(&mut form.politica_pendentes);
+    let mut integrados = 0;
+    for evento in eventos {
+        if let Err(e) = nucleo.aplicar_formacao(&evento) {
+            error!("política: falha ao integrar {}: {e}", evento.tag);
+        } else {
+            integrados += 1;
+        }
+    }
+    pol.nucleo = Some(nucleo);
+    if integrados > 0 {
+        pol.vista.tag.clear();
+        pol.versao_bandeiras = pol.versao_bandeiras.wrapping_add(integrados);
+    }
 }
 
 fn aguardar_carga(mut commands: Commands, carga: Option<ResMut<CargaPolitica>>) {
@@ -466,5 +535,32 @@ mod testes {
         let _ = executar_lote(&mut n, "USA", vec![], 5, &pv2);
         assert!(s.vista.pais.is_some());
         assert!(r.is_ok(), "{r:?}");
+    }
+
+    #[test]
+    fn pais_formado_tem_politica_partidos_e_populacao() {
+        let (mut n, _) = NucleoPol::carregar(&dir()).unwrap();
+        let e = simulacao::formacao::EventoFormacao {
+            tag: "PAK".into(),
+            nome: "Paquistão".into(),
+            data: simulacao::tempo::DataSimulacao::nova(1947, 8, 14),
+            tipo: "partilha".into(),
+            origens: vec!["IND".into()],
+            provincias: Vec::new(),
+            adm1: vec!["PAK".into()],
+            populacao: 70_000_000,
+            descricao: String::new(),
+            leis_iniciais: BTreeMap::new(),
+            ideologia: "nacionalismo_republicano".into(),
+            pais_novo: true,
+            independencia: false,
+        };
+        n.aplicar_formacao(&e).unwrap();
+        let p = n.mundo.paises().iter().find(|p| p.tag == "PAK").unwrap();
+        assert!(p.populacao_total() > 0.0);
+        assert!(!p.grupos_interesse.is_empty());
+        assert!(!p.partidos.is_empty());
+        assert!(p.partidos.contains_key("pak_liga_muculmana"));
+        assert!(p.chefe_de_estado.is_some());
     }
 }
