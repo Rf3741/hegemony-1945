@@ -408,7 +408,8 @@ impl Clima {
     /// Faixa (relativa a `assets/`) do clima. Ver `assets/musica/CREDITOS.md`.
     pub fn arquivo(self) -> &'static str {
         match self {
-            Self::Menu | Self::Paz => "musica/menu_dvorak_largo.ogg",
+            Self::Menu => "musica/menu_dvorak_largo.ogg",
+            Self::Paz => "musica/paz_beethoven_pastoral.ogg",
             Self::Tensao => "musica/tensao_grieg_mountain_king.ogg",
             Self::Crise => "musica/crise_holst_mars.ogg",
         }
