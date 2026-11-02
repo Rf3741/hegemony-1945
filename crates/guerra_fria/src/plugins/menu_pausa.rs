@@ -1,6 +1,6 @@
 //! Menu de pausa (Esc), janela de Configurações e botão "Rankings", no estilo do card de país:
 //! papel #E8DEC8, borda vermelha #8C251E, tinta escura.
-use super::config::{CANAIS, ConfigJogo, ModoTela, RESOLUCOES};
+use super::config::{CANAIS, ConfigJogo, ModoTela, QualidadeTerreno, RESOLUCOES};
 use super::estatisticas::{AbaLedger, RecursoLedger};
 use super::menu_saves::JanelaSaves;
 use super::menu_ui::TelaMenu;
@@ -19,13 +19,14 @@ pub enum AbaConfig {
     #[default]
     Video,
     Audio,
+    Graficos,
     Jogo,
     Interface,
     Controles,
 }
 
 impl AbaConfig {
-    const TODAS: [(Self, &'static str); 5] = [(Self::Video, "Vídeo"), (Self::Audio, "Áudio"), (Self::Jogo, "Jogo"), (Self::Interface, "Interface"), (Self::Controles, "Controles")];
+    const TODAS: [(Self, &'static str); 6] = [(Self::Video, "Vídeo"), (Self::Audio, "Áudio"), (Self::Graficos, "Gráficos"), (Self::Jogo, "Jogo"), (Self::Interface, "Interface"), (Self::Controles, "Controles")];
 }
 
 #[derive(Resource, Default)]
@@ -283,6 +284,27 @@ fn janela_config(mut contextos: EguiContexts, mut j: ResMut<JanelaConfig>, mut c
                         ui.checkbox(&mut c.audio.mudos[i], "mudo");
                     });
                 }
+            }
+            AbaConfig::Graficos => {
+                linha(ui, "Qualidade do terreno", |ui| {
+                    for (q, nome) in QualidadeTerreno::TODAS {
+                        if botao_menor(ui, nome, c.graficos.qualidade_terreno == q) {
+                            c.graficos.qualidade_terreno = q;
+                        }
+                    }
+                });
+                linha(ui, "Hillshade", |ui| {
+                    ui.add(egui::Slider::new(&mut c.graficos.hillshade, 0.0..=1.0).fixed_decimals(2));
+                });
+                linha(ui, "Ondas e brilho da água", |ui| {
+                    ui.add(egui::Slider::new(&mut c.graficos.ondas, 0.0..=0.25).fixed_decimals(2));
+                });
+                linha(ui, "Sombra das costas", |ui| {
+                    ui.add(egui::Slider::new(&mut c.graficos.sombra_costas, 0.0..=1.0).fixed_decimals(2));
+                });
+                linha(ui, "", |ui| {
+                    ui.label(egui::RichText::new("Baixo mantém o mapa atual; Ultra ativa normais e sombras em resolução cheia.").size(13.0).color(TINTA_SUAVE));
+                });
             }
             AbaConfig::Jogo => {
                 linha(ui, "Velocidade inicial", |ui| {

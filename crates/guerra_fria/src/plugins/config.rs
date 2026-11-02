@@ -91,6 +91,39 @@ impl Default for ConfigInterface {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum QualidadeTerreno {
+    Baixo,
+    #[default]
+    Medio,
+    Alto,
+    Ultra,
+}
+
+impl QualidadeTerreno {
+    pub const TODAS: [(Self, &'static str); 4] = [
+        (Self::Baixo, "Baixo"),
+        (Self::Medio, "Médio"),
+        (Self::Alto, "Alto"),
+        (Self::Ultra, "Ultra"),
+    ];
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ConfigGraficos {
+    pub qualidade_terreno: QualidadeTerreno,
+    pub hillshade: f32,
+    pub ondas: f32,
+    pub sombra_costas: f32,
+}
+
+impl Default for ConfigGraficos {
+    fn default() -> Self {
+        Self { qualidade_terreno: QualidadeTerreno::Medio, hillshade: 0.42, ondas: 0.08, sombra_costas: 0.55 }
+    }
+}
+
 #[derive(Resource, Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct ConfigJogo {
@@ -98,6 +131,7 @@ pub struct ConfigJogo {
     pub audio: ConfigAudioUsuario,
     pub partida: ConfigPartida,
     pub interface: ConfigInterface,
+    pub graficos: ConfigGraficos,
 }
 
 pub fn caminho_config() -> PathBuf {
@@ -130,6 +164,9 @@ impl ConfigJogo {
         self.partida.velocidade_inicial = self.partida.velocidade_inicial.clamp(1, 5);
         self.video.resolucao.0 = self.video.resolucao.0.clamp(800, 7680);
         self.video.resolucao.1 = self.video.resolucao.1.clamp(600, 4320);
+        self.graficos.hillshade = self.graficos.hillshade.clamp(0.0, 1.0);
+        self.graficos.ondas = self.graficos.ondas.clamp(0.0, 0.25);
+        self.graficos.sombra_costas = self.graficos.sombra_costas.clamp(0.0, 1.0);
         for v in &mut self.audio.volumes {
             *v = v.clamp(0.0, 1.0);
         }
