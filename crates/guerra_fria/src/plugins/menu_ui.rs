@@ -111,6 +111,99 @@ pub fn desenhar_fundo(ctx: &egui::Context, fundo: &mut Option<egui::TextureHandl
     pintor.rect_filled(tela, 0.0, egui::Color32::from_black_alpha(90));
 }
 
+/// Vinheta vetorial da Guerra Fria usada enquanto os dados do mapa são carregados.
+pub fn desenhar_animacao_carregamento(ctx: &egui::Context, segundos: f32) {
+    let tela = ctx.viewport_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("animacao_carregamento")));
+    let centro = tela.center();
+    let escala = (tela.width() / 1200.0).clamp(0.65, 1.25);
+    let tremor = (segundos * 2.8).sin() * 1.4 * escala;
+    let bandeira = egui::vec2(150.0 * escala, 92.0 * escala);
+    let y_bandeiras = centro.y - 72.0 * escala;
+    let esquerda = egui::Rect::from_center_size(egui::pos2(centro.x - 250.0 * escala + tremor, y_bandeiras), bandeira);
+    let direita = egui::Rect::from_center_size(egui::pos2(centro.x + 250.0 * escala - tremor, y_bandeiras), bandeira);
+
+    painter.rect_filled(
+        egui::Rect::from_center_size(egui::pos2(centro.x, centro.y - 20.0 * escala), egui::vec2(760.0 * escala, 300.0 * escala)),
+        8.0,
+        egui::Color32::from_rgba_unmultiplied(35, 29, 23, 105),
+    );
+    desenhar_bandeira_usa(&painter, esquerda);
+    desenhar_bandeira_urss(&painter, direita);
+    desenhar_missil(&painter, tela, segundos, false, escala);
+    desenhar_missil(&painter, tela, segundos + 2.7, true, escala);
+    ctx.request_repaint();
+}
+
+fn desenhar_bandeira_usa(painter: &egui::Painter, rect: egui::Rect) {
+    let azul = egui::Color32::from_rgb(25, 55, 96);
+    let vermelho = egui::Color32::from_rgb(151, 42, 34);
+    painter.rect_filled(rect, 2.0, egui::Color32::from_rgb(235, 222, 194));
+    painter.rect_stroke(rect, 2.0, egui::Stroke::new(2.0, vermelho), egui::StrokeKind::Inside);
+    for i in 0..7 {
+        let y = rect.top() + rect.height() * (i as f32 + 0.5) / 7.0;
+        painter.line_segment([egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)], egui::Stroke::new(rect.height() / 14.0, vermelho));
+    }
+    let canton = egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.left() + rect.width() * 0.43, rect.top() + rect.height() * 0.55));
+    painter.rect_filled(canton, 0.0, azul);
+    for row in 0..3 {
+        for col in 0..4 {
+            painter.circle_filled(
+                egui::pos2(canton.left() + 7.0 + col as f32 * canton.width() / 4.0, canton.top() + 7.0 + row as f32 * canton.height() / 3.0),
+                1.6,
+                egui::Color32::from_rgb(239, 226, 190),
+            );
+        }
+    }
+    painter.text(rect.center_top() + egui::vec2(0.0, -22.0), egui::Align2::CENTER_CENTER, "EUA", egui::FontId::proportional(14.0), egui::Color32::from_rgb(235, 222, 194));
+}
+
+fn desenhar_bandeira_urss(painter: &egui::Painter, rect: egui::Rect) {
+    let vermelho = egui::Color32::from_rgb(157, 38, 31);
+    let dourado = egui::Color32::from_rgb(239, 196, 74);
+    painter.rect_filled(rect, 2.0, vermelho);
+    painter.rect_stroke(rect, 2.0, egui::Stroke::new(2.0, egui::Color32::from_rgb(235, 222, 194)), egui::StrokeKind::Inside);
+    let c = rect.center();
+    painter.circle_filled(c, rect.height() * 0.13, dourado);
+    painter.line_segment([c - egui::vec2(0.0, 25.0), c + egui::vec2(0.0, 18.0)], egui::Stroke::new(4.0, dourado));
+    painter.line_segment([c - egui::vec2(18.0, 8.0), c + egui::vec2(18.0, 8.0)], egui::Stroke::new(4.0, dourado));
+    let mut foice = Vec::with_capacity(13);
+    for i in 0..13 {
+        let a = std::f32::consts::PI * 0.25 + std::f32::consts::PI * 1.5 * i as f32 / 12.0;
+        foice.push(egui::pos2(c.x + 22.0 * a.cos(), c.y - 3.0 + 22.0 * a.sin()));
+    }
+    painter.add(egui::Shape::line(foice, egui::Stroke::new(3.0, dourado)));
+    painter.text(rect.center_top() + egui::vec2(0.0, -22.0), egui::Align2::CENTER_CENTER, "URSS", egui::FontId::proportional(14.0), egui::Color32::from_rgb(239, 196, 74));
+}
+
+fn desenhar_missil(painter: &egui::Painter, tela: egui::Rect, segundos: f32, direita: bool, escala: f32) {
+    let progresso = (segundos * 0.16).rem_euclid(1.0);
+    let (inicio_x, fim_x) = if direita { (tela.right() * 0.88, tela.right() * 0.58) } else { (tela.left() + tela.width() * 0.12, tela.left() + tela.width() * 0.42) };
+    let inicio = egui::pos2(inicio_x, tela.bottom() + 24.0);
+    let cor = if direita { egui::Color32::from_rgb(218, 83, 61) } else { egui::Color32::from_rgb(92, 130, 170) };
+    let ponto = |p: f32| {
+        egui::pos2(
+            inicio.x + (fim_x - inicio.x) * p,
+            inicio.y - tela.height() * 0.52 * p - tela.height() * 0.26 * (std::f32::consts::PI * p).sin(),
+        )
+    };
+    let mut anterior = ponto(progresso);
+    for i in 1..=12 {
+        let p = (progresso - i as f32 * 0.018).rem_euclid(1.0);
+        let atual = ponto(p);
+        let alpha = (150.0 * (1.0 - i as f32 / 13.0)) as u8;
+        painter.line_segment([anterior, atual], egui::Stroke::new(3.0 * escala, egui::Color32::from_rgba_unmultiplied(cor.r(), cor.g(), cor.b(), alpha)));
+        anterior = atual;
+    }
+    let p = ponto(progresso);
+    let direcao = egui::vec2(if direita { 0.7 } else { -0.7 }, -1.0).normalized();
+    let lateral = egui::vec2(-direcao.y, direcao.x);
+    let base = p - direcao * 18.0 * escala;
+    painter.line_segment([base, p + direcao * 10.0 * escala], egui::Stroke::new(6.0 * escala, cor));
+    painter.add(egui::Shape::convex_polygon(vec![p + direcao * 17.0 * escala, base + lateral * 7.0 * escala, base - lateral * 7.0 * escala], cor, egui::Stroke::NONE));
+    painter.line_segment([base - direcao * 15.0 * escala, base - direcao * 26.0 * escala], egui::Stroke::new(5.0 * escala, egui::Color32::from_rgb(237, 177, 64)));
+}
+
 trait CorBranca {
     fn from_white(a: u8) -> egui::Color32;
 }

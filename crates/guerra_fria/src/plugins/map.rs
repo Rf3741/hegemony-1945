@@ -564,6 +564,7 @@ fn legenda_zonas_ocupacao(
 
 fn tela_carregando(mut contextos: EguiContexts, tempo: Res<Time>, dicas: Res<super::menu_ui::Dicas>) -> Result {
     let ctx = contextos.ctx_mut()?;
+    super::menu_ui::desenhar_animacao_carregamento(ctx, tempo.elapsed_secs());
     if let Some(d) = super::menu_ui::dica_atual(&dicas.0, tempo.elapsed_secs()) {
         egui::Area::new("dica_carregando".into()).anchor(egui::Align2::CENTER_BOTTOM, [0.0, -60.0]).show(ctx, |ui| {
             ui.set_max_width(640.0);
