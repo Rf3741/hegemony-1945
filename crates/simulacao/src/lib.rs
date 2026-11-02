@@ -5,8 +5,10 @@
 //! - Projeção cartográfica de Miller, codificação RGB bijetiva de províncias e esquema do cenário 1945 (`mapa`);
 //! - Pops, 26 bens, 23 prédios, mercados por oferta/demanda, impostos, orçamento e dívida (`economia`);
 //! - 7 categorias institucionais de leis, 11 grupos de interesse, legitimidade, eleições e esferas EUA/URSS (`politica`);
-//! - Orquestração diária do mundo (`mundo`).
+//! - Orquestração diária do mundo (`mundo`);
+//! - Concordância de artigo com o nome dos países das mensagens (`artigo`).
 
+pub mod artigo;
 pub mod economia;
 pub mod erro;
 pub mod formacao;

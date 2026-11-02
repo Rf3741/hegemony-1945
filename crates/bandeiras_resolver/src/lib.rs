@@ -3,6 +3,14 @@
 //! `resolver_bandeira(tag, &EstadoPais) -> VarianteBandeira` escolhe, entre as variantes de
 //! `variantes.ron`, a de condicao MAIS ESPECIFICA (mais campos exigidos); empate -> maior
 //! `prioridade`; novo empate -> a primeira declarada. Sem nenhuma que case, devolve a base.
+//!
+//! Gates de sanidade sobre os nomes (o catalogo e gerado e contem regras genericas que casariam
+//! com qualquer pais):
+//! * variante que exige a lei de religiao de estado so vale com o grupo religioso no governo;
+//! * regra so de ideologia (sem lei/status/evento) so vale apos mudanca real de regime e com a
+//!   ideologia do partido no poder;
+//! * enquanto `mudanca_regime` e falso, o nome mostrado e o nome historico do cenário, sem a
+//!   legenda de ocupação (que vai na hachura e na legenda do mapa).
 
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -90,6 +98,14 @@ pub struct EstadoPais {
     pub suserano: Option<String>,
     pub ocupante: Option<String>,
     pub guerra_civil: bool,
+    /// O grupo religioso (clero) participa do governo: condição para variantes teocráticas.
+    pub grupo_religioso_no_poder: bool,
+    /// Houve mudança real de regime desde o início do cenário (revolução, golpe, nova lei de
+    /// forma de governo ou novo partido no poder). As regras genéricas de ideologia só valem aqui.
+    pub mudanca_regime: bool,
+    /// Nome histórico do cenário (`data/scenario_1945/countries_1945.ron`). Enquanto
+    /// `mudanca_regime` é falso, é este nome que aparece: nada foi mudado no país.
+    pub nome_cenario: String,
     /// marcadores de eventos (ex.: "rfa", "uniao_arabe", "reunificacao_alema")
     pub flags: Vec<String>,
 }
@@ -134,6 +150,36 @@ impl Condicao {
             + usize::from(self.exige_nao_ocupado)
             + usize::from(self.exige_guerra_civil)
     }
+
+    /// Regra pura de ideologia (sem lei, sem status, sem evento): é genérica, vale para qualquer
+    /// país e por isso só pode renomear depois de uma mudança real de regime.
+    fn so_ideologia(&self) -> bool {
+        !self.categoria_ideologia.is_empty()
+            && self.forma_governo.is_empty()
+            && self.status.is_empty()
+            && self.religiao_estatal.is_empty()
+            && self.flags.is_empty()
+            && self.partido.is_empty()
+            && !self.exige_ocupado
+            && !self.exige_nao_ocupado
+            && !self.exige_guerra_civil
+    }
+
+    /// Exige a lei de religião de estado: nome teocrático/religioso.
+    fn exige_religiao_de_estado(&self) -> bool {
+        !self.religiao_estatal.is_empty()
+    }
+}
+
+/// Nome do cenário sem a legenda de ocupação: a ocupação se mostra pela hachura e pela legenda do
+/// mapa, nunca no nome (`"Alemanha Ocupada (Conselho de Controle)"` → `"Alemanha"`). Nomes que não
+/// falam de ocupação passam como estão, inclusive os que trazem um qualifier entre parênteses.
+pub fn sem_ocupacao(nome: &str) -> String {
+    if !nome.contains("Ocupad") {
+        return nome.to_string();
+    }
+    let ate_par = nome.split_once(" (").map_or(nome, |(a, _)| a);
+    ate_par.replace("Ocupada", "").replace("Ocupado", "").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 impl Catalogo {
@@ -160,8 +206,22 @@ impl Catalogo {
         &self.dados
     }
 
-    fn casa(&self, c: &Condicao, e: &EstadoPais) -> bool {
-        let cat = self.dados.categorias_ideologia.get(e.ideologia_efetiva()).map(String::as_str);
+    fn casa(&self, v: &Variante, e: &EstadoPais) -> bool {
+        let c = &v.condicao;
+        // Nome religioso ("Estado Teocrático", "República Islâmica", "Emirado"): além da lei de
+        // religião de estado, o grupo religioso tem de dominar o governo.
+        if c.exige_religiao_de_estado() && !e.grupo_religioso_no_poder {
+            return false;
+        }
+        // Regra genérica de ideologia ("República Social", "República Revolucionária", "República
+        // Popular"): vale só com mudança real de regime e com a ideologia do partido no poder, nunca
+        // pela crença pessoal do chefe de Estado ou pelo rótulo estático do cenário. As variantes
+        // históricas (declaradas por país) já são escolha do autor do catálogo.
+        if !v.historica && c.so_ideologia() {
+            return e.mudanca_regime
+                && e.ideologia_partido.as_deref().is_some_and(|ideo| self.categoria(ideo).is_some_and(|k| c.categoria_ideologia.iter().any(|x| x == k)));
+        }
+        let cat = self.categoria(e.ideologia_efetiva());
         (c.forma_governo.is_empty() || c.forma_governo.contains(&e.forma_governo))
             && (c.categoria_ideologia.is_empty() || cat.is_some_and(|k| c.categoria_ideologia.iter().any(|x| x == k)))
             && (c.status.is_empty() || c.status.contains(&e.status))
@@ -173,12 +233,16 @@ impl Catalogo {
             && (!c.exige_guerra_civil || e.guerra_civil)
     }
 
+    fn categoria(&self, ideologia: &str) -> Option<&str> {
+        self.dados.categorias_ideologia.get(ideologia).map(String::as_str)
+    }
+
     pub fn resolver_bandeira(&self, tag: &str, e: &EstadoPais) -> VarianteBandeira {
         let Some(p) = self.pais(tag) else {
             return VarianteBandeira {
                 id: "desconhecida".into(),
                 arquivo: String::new(),
-                nome: tag.into(),
+                nome: if e.nome_cenario.is_empty() { tag.into() } else { sem_ocupacao(&e.nome_cenario) },
                 cor: (128, 128, 128),
                 sobreposicao: Sobreposicao::Nenhuma,
                 tag_cantao: None,
@@ -188,7 +252,7 @@ impl Catalogo {
         };
         let mut melhor: Option<(&Variante, (usize, i32))> = None;
         for v in &p.variantes {
-            if !self.casa(&v.condicao, e) {
+            if !self.casa(v, e) {
                 continue;
             }
             let chave = (v.condicao.especificidade(), v.prioridade);
@@ -200,6 +264,14 @@ impl Catalogo {
             Some((v, _)) => (v, false),
             None => (&p.base, true),
         };
+        // Enquanto o país está com o regime com que nasceu no cenário, o nome mostrado é o do
+        // cenário, sem a legenda de ocupação. Exceção: variantes ligadas a um marco datado (flag de
+        // evento), que valem na data.
+        let nome = if e.mudanca_regime || e.nome_cenario.is_empty() || !v.condicao.flags.is_empty() {
+            v.nome.clone()
+        } else {
+            sem_ocupacao(&e.nome_cenario)
+        };
         let tag_cantao = match v.sobreposicao {
             Sobreposicao::CantaoSuserano => e.suserano.clone(),
             Sobreposicao::CantaoOcupante => e.ocupante.clone(),
@@ -208,7 +280,7 @@ impl Catalogo {
         VarianteBandeira {
             id: v.id.clone(),
             arquivo: v.arquivo.clone(),
-            nome: v.nome.clone(),
+            nome,
             cor: v.cor,
             sobreposicao: v.sobreposicao,
             tag_cantao,

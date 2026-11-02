@@ -12,7 +12,7 @@ use super::economy::RecursoMundo;
 use super::time::EventoTickDiario;
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, TaskPool, block_on, futures_lite::future};
-use sim_politica::{CatalogoPolitica, InstanciaPartido, LiderPolitico, CenarioPolitica, DataJogo, MundoPolitico, PaisPolitica, TipoCrisePolitica};
+use sim_politica::{CatalogoPolitica, InstanciaPartido, LiderPolitico, PapelGrupoInteresse, CenarioPolitica, DataJogo, MundoPolitico, PaisPolitica, TipoCrisePolitica};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -57,9 +57,21 @@ pub struct NucleoPol {
     base_eco: BTreeMap<String, f64>,
     /// Padrão de vida político original das pops, por id de país.
     base_pops: BTreeMap<String, Vec<f64>>,
+    /// Assinatura do regime com que cada país começou (forma de governo, religião de estado e
+    /// partido no poder). Diferir dela é que conta como mudança real de regime para os nomes.
+    assinatura_inicial: BTreeMap<String, AssinaturaRegime>,
     /// IA dos países (propõe leis para todos os países que não são do jogador).
     ia: ia_paises::IaPolitica,
     extras_partidos: BTreeMap<String, Vec<PartidoExtra>>,
+}
+
+/// O que define o regime de um país para os nomes dinâmicos.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AssinaturaRegime {
+    forma_governo: String,
+    religiao_estatal: String,
+    /// Arquétipo do partido que sustenta o governo (coalizão majoritária).
+    partido_no_poder: Option<String>,
 }
 
 /// Resultado de um lote: mensagens e efeitos sobre a economia (categoria, lei antiga, lei nova).
@@ -107,6 +119,10 @@ impl NucleoPol {
         let mundo = MundoPolitico::novo(cen.catalogo, cen.paises, SEMENTE).map_err(|e| e.to_string())?;
         let base_pops = mundo.paises().iter().map(|p| (p.id.clone(), p.pops.iter().map(|x| x.padrao_de_vida).collect())).collect();
         let cat = Arc::new(mundo.catalogo().clone());
+        // A referência de "regime que não mudou" é a do cenário de 1945, capturada já aqui: salva e
+        // recarregada a partida, a linha de base continua sendo o regime inicial, não o carregado.
+        let assinatura_inicial: BTreeMap<String, AssinaturaRegime> =
+            mundo.paises().iter().map(|p| (tag_legado(&p.tag), assinatura_de(p))).collect();
         let extras_partidos = ron::from_str::<Vec<PartidoExtra>>(
             &std::fs::read_to_string(dir.join("partidos_extra_formaveis.ron"))
                 .map_err(|e| format!("partidos_extra_formaveis.ron: {e}"))?,
@@ -117,7 +133,7 @@ impl NucleoPol {
                 acc.entry(p.pais.clone()).or_default().push(p);
                 acc
             });
-        Ok((Self { mundo, base_eco: BTreeMap::new(), base_pops, ia: ia_paises::IaPolitica::novo(), extras_partidos }, cat))
+        Ok((Self { mundo, base_eco: BTreeMap::new(), base_pops, assinatura_inicial, ia: ia_paises::IaPolitica::novo(), extras_partidos }, cat))
     }
 
     /// Escala o padrão de vida das pops conforme a evolução do padrão de vida econômico (tag -> padrão).
@@ -210,23 +226,53 @@ impl NucleoPol {
     }
 
     /// Resumo político de cada país para o resolvedor de bandeiras.
-    pub fn entradas_bandeira(&self) -> Vec<super::bandeiras_ui::EntradaBandeira> {
+    ///
+    /// `mudanca_regime` é a diferença entre a assinatura do regime de agora e a do dia em que o
+    /// país entrou na partida; sem ela, as regras genéricas de ideologia do catálogo renomeariam
+    /// países que não mudaram nada (a França de de Gaulle virava "República Revolucionária").
+    pub fn entradas_bandeira(&mut self) -> Vec<super::bandeiras_ui::EntradaBandeira> {
+        let lidos = self.leituras_regime();
+        let mut saida = Vec::with_capacity(lidos.len());
+        for (tag, assinatura, crise_de_regime, mut entrada) in lidos {
+            let mudanca = match self.assinatura_inicial.get(&tag) {
+                Some(inicial) => *inicial != assinatura,
+                None => {
+                    self.assinatura_inicial.insert(tag.clone(), assinatura);
+                    false
+                }
+            };
+            entrada.mudanca_regime = mudanca || crise_de_regime || entrada.guerra_civil;
+            saida.push(entrada);
+        }
+        saida
+    }
+
+    /// Estado de regime de cada país: assinatura, crise em curso e a entrada para as bandeiras.
+    fn leituras_regime(&self) -> Vec<(String, AssinaturaRegime, bool, super::bandeiras_ui::EntradaBandeira)> {
         let cat = self.mundo.catalogo();
         self.mundo
             .paises()
             .iter()
             .map(|p| {
-                let venc = p.ultima_eleicao.as_ref().and_then(|e| e.partido_vencedor_id.as_ref()).and_then(|v| p.partidos.get(v));
-                let ideologia_partido = venc.and_then(|v| cat.arquetipos_partido.get(&v.arquetipo_id)).and_then(|a| a.ideologias_afins.first().cloned());
-                super::bandeiras_ui::EntradaBandeira {
-                    tag: tag_legado(&p.tag),
-                    forma_governo: p.leis_ativas.get("forma_governo").cloned().unwrap_or_default(),
-                    religiao_estatal: p.leis_ativas.get("religiao_estatal").cloned().unwrap_or_default(),
+                let tag = tag_legado(&p.tag);
+                let no_poder = partido_no_poder(p);
+                let ideologia_partido = no_poder
+                    .and_then(|v| cat.arquetipos_partido.get(&v.arquetipo_id))
+                    .and_then(|a| a.ideologias_afins.first().cloned());
+                let crise_de_regime = p.crises_ativas.iter().any(|c| !c.resolvida && matches!(c.tipo_crise, TipoCrisePolitica::GolpeMilitar | TipoCrisePolitica::Revolucao));
+                let assinatura = assinatura_de(p);
+                let entrada = super::bandeiras_ui::EntradaBandeira {
+                    tag: tag.clone(),
+                    forma_governo: assinatura.forma_governo.clone(),
+                    religiao_estatal: assinatura.religiao_estatal.clone(),
                     ideologia_partido,
                     ideologia_chefe: p.chefe_de_estado.as_ref().map(|l| l.ideologia_id.clone()),
-                    partido: venc.map(|v| v.arquetipo_id.clone()),
+                    partido: no_poder.map(|v| v.arquetipo_id.clone()),
                     guerra_civil: p.crises_ativas.iter().any(|c| !c.resolvida && c.tipo_crise == TipoCrisePolitica::Revolucao),
-                }
+                    grupo_religioso_no_poder: clero_domina_o_governo(p),
+                    mudanca_regime: false,
+                };
+                (tag, assinatura, crise_de_regime, entrada)
             })
             .collect()
     }
@@ -238,6 +284,55 @@ impl NucleoPol {
 
 fn crises_graves(p: &PaisPolitica) -> Vec<(String, TipoCrisePolitica)> {
     p.crises_ativas.iter().filter(|c| !c.resolvida && c.tipo_crise != TipoCrisePolitica::Greve).map(|c| (c.id.clone(), c.tipo_crise)).collect()
+}
+
+/// O que o país precisa trocar para contar como mudança real de regime (forma de governo, lei de
+/// religião de estado ou o partido que sustenta o governo).
+fn assinatura_de(p: &PaisPolitica) -> AssinaturaRegime {
+    AssinaturaRegime {
+        forma_governo: p.leis_ativas.get("forma_governo").cloned().unwrap_or_default(),
+        religiao_estatal: p.leis_ativas.get("religiao_estatal").cloned().unwrap_or_default(),
+        partido_no_poder: partido_no_poder(p).map(|v| v.arquetipo_id.clone()),
+    }
+}
+
+/// Partido que sustenta o governo: o que agrega os grupos de interesse com papel `NoGoverno`
+/// (mais poder acumulado, desempate por cadeiras). Sem coalizão montada, o vencedor da última
+/// eleição. É isto que conta como "ideologia no poder" — não a crença pessoal do chefe de Estado.
+fn partido_no_poder(p: &PaisPolitica) -> Option<&InstanciaPartido> {
+    let no_governo: Vec<&String> = p.grupos_interesse.iter().filter(|(_, g)| g.papel == PapelGrupoInteresse::NoGoverno).map(|(id, _)| id).collect();
+    let por_coalizao = p
+        .partidos
+        .values()
+        .filter_map(|part| {
+            let forca: f64 = part
+                .grupos_membros
+                .iter()
+                .filter(|g| no_governo.contains(g))
+                .map(|g| p.grupos_interesse.get(g).map_or(0.0, |gi| gi.clout))
+                .sum();
+            (forca > 0.0).then(|| (forca, part.cadeiras_parlamento, part))
+        })
+        .max_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    por_coalizao.map(|(_, _, part)| part).or_else(|| {
+        p.ultima_eleicao
+            .as_ref()
+            .and_then(|e| e.partido_vencedor_id.as_ref())
+            .and_then(|v| p.partidos.get(v))
+    })
+}
+
+/// O grupo religioso domina o governo: está na coalizão de governo e nenhum outro grupo da
+/// coalizão tem mais poder que ele. É a condição dos nomes teocráticos/religiosos.
+fn clero_domina_o_governo(p: &PaisPolitica) -> bool {
+    let Some(clero) = p.grupos_interesse.get("clero") else { return false };
+    if clero.papel != PapelGrupoInteresse::NoGoverno {
+        return false;
+    }
+    p.grupos_interesse
+        .values()
+        .filter(|g| g.papel == PapelGrupoInteresse::NoGoverno)
+        .all(|g| g.clout <= clero.clout)
 }
 
 /// Aplica comandos, sincroniza a economia, avança `dias` e monta a vista.
