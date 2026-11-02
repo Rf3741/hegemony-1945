@@ -2241,6 +2241,7 @@ impl MundoEconomico {
     /// Reconstrói o mundo (reindexando tudo) a partir do catálogo e do estado salvo.
     pub fn restaurar_estado(catalogo: CatalogoEconomia, e: EstadoEconomiaSalvo) -> ResultadoEconomia<Self> {
         let provincias_salvas = e.provincias.clone();
+        let paises_salvos = e.paises.clone();
         let importacoes_salvas: BTreeMap<String, BTreeMap<String, f64>> = e
             .mercados
             .iter()
@@ -2279,6 +2280,24 @@ impl MundoEconomico {
             blocos_comerciais: e.blocos_comerciais,
         })?;
         m.dias_decorridos = e.dias_decorridos;
+
+        // Restaurar países: `novo` modifica campos serializados (ex.: pontos_construcao_base *= 2, orçamento).
+        for (pais, salvo) in m.paises.iter_mut().zip(paises_salvos) {
+            *pais = salvo;
+        }
+        // Reindexar países após restaurar (índices foram perdidos na atribuição).
+        m.indice_paises.clear();
+        for (idx, pais) in m.paises.iter_mut().enumerate() {
+            m.indice_paises.insert(pais.id.clone(), idx);
+            pais.mercado_idx = *m.indice_mercados.get(&pais.mercado_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
+                origem_entidade: "Pais", origem_id: pais.id.clone(), alvo_entidade: "Mercado", alvo_id: pais.mercado_id.clone(),
+            })?;
+            pais.aliquota_consumo_por_bem = vec![0.0; m.catalogo.bens.len()];
+        }
+        // Recompilar cache fiscal para preencher campos derivados (mult_eficiencia_construcao_lei, etc.).
+        for pais in &mut m.paises {
+            compilar_cache_fiscal_pais(&m.catalogo, pais)?;
+        }
 
         for (provincia, salva) in m.provincias.iter_mut().zip(provincias_salvas) {
             provincia.infraestrutura_base = salva.infraestrutura_base;

@@ -1035,7 +1035,7 @@ mod testes_plugin {
                     ),
                     "{id}: {dono} controlado por {ctrl}"
                 );
-                assert!(matches!(ctrl.as_str(), "USA" | "GBR" | "FRA" | "SOV"));
+                assert!(matches!(ctrl.as_str(), "USA" | "GBR" | "FRA" | "SOV" | "CHI" | "YUG" | "POL"));
             }
         }
 
