@@ -182,6 +182,12 @@ pub fn sem_ocupacao(nome: &str) -> String {
     ate_par.replace("Ocupada", "").replace("Ocupado", "").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Nome do cenário para mostrar: com a legenda de ocupação ("Alemanha Ocupada", "Japão Ocupado")
+/// enquanto o país tem ocupante, e sem ela depois da desocupação.
+fn nome_de_cenario(e: &EstadoPais) -> String {
+    if e.ocupante.is_some() { e.nome_cenario.clone() } else { sem_ocupacao(&e.nome_cenario) }
+}
+
 impl Catalogo {
     pub fn de_str(texto: &str) -> Result<Self, ron::error::SpannedError> {
         let dados: Dados = ron::from_str(texto)?;
@@ -242,7 +248,7 @@ impl Catalogo {
             return VarianteBandeira {
                 id: "desconhecida".into(),
                 arquivo: String::new(),
-                nome: if e.nome_cenario.is_empty() { tag.into() } else { sem_ocupacao(&e.nome_cenario) },
+                nome: if e.nome_cenario.is_empty() { tag.into() } else { nome_de_cenario(e) },
                 cor: (128, 128, 128),
                 sobreposicao: Sobreposicao::Nenhuma,
                 tag_cantao: None,
@@ -265,12 +271,12 @@ impl Catalogo {
             None => (&p.base, true),
         };
         // Enquanto o país está com o regime com que nasceu no cenário, o nome mostrado é o do
-        // cenário, sem a legenda de ocupação. Exceção: variantes ligadas a um marco datado (flag de
-        // evento), que valem na data.
+        // cenário; a legenda de ocupação só sai quando não há mais ocupante. Exceção: variantes
+        // ligadas a um marco datado (flag de evento), que valem na data.
         let nome = if e.mudanca_regime || e.nome_cenario.is_empty() || !v.condicao.flags.is_empty() {
             v.nome.clone()
         } else {
-            sem_ocupacao(&e.nome_cenario)
+            nome_de_cenario(e)
         };
         let tag_cantao = match v.sobreposicao {
             Sobreposicao::CantaoSuserano => e.suserano.clone(),

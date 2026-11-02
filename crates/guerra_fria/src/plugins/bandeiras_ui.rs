@@ -141,6 +141,22 @@ pub fn flags_do_pais(tag: &str, d: (i32, u8, u8)) -> Vec<String> {
     FLAGS_DATADAS.iter().filter(|(t, _, de, ate)| *t == tag && d >= *de && d <= *ate).map(|(_, f, _, _)| f.to_string()).collect()
 }
 
+/// Ocupações aliadas que dão nome ao país no cenário ("Alemanha Ocupada", "Japão Ocupado",
+/// "Áustria Ocupada"): (tag, ocupante principal, de, até). Enquanto valem, o nome mantém a legenda.
+const OCUPACOES_DATADAS: &[(&str, &str, (i32, u8, u8), (i32, u8, u8))] = &[
+    // Até a Lei Fundamental e a criação da RFA/RDA.
+    ("GER", "USA", (1945, 1, 1), (1949, 5, 23)),
+    // Até o Tratado de São Francisco.
+    ("JAP", "USA", (1945, 1, 1), (1952, 4, 28)),
+    // Até o Tratado de Estado austríaco.
+    ("AUT", "USA", (1945, 1, 1), (1955, 7, 27)),
+];
+
+/// Ocupante histórico do país na data, se ainda ocupado.
+pub fn ocupante_historico(tag: &str, d: (i32, u8, u8)) -> Option<&'static str> {
+    OCUPACOES_DATADAS.iter().find(|(t, _, de, ate)| *t == tag && d >= *de && d <= *ate).map(|(_, o, _, _)| *o)
+}
+
 /// Doze países têm outra grafia no catálogo de bandeiras que no legado `simulacao` (BGR→BUL,
 /// HTI→HAI, THA→SIA...). Sem o alias o resolvedor não acha o país e devolve a tag crua como nome.
 fn tag_do_catalogo(tag: &str) -> &str {
@@ -172,7 +188,7 @@ pub fn estado_de_aparencia(
         partido: e.partido.clone(),
         status: if suserano.is_some() { Status::Colonia } else { Status::Independente },
         suserano: suserano.map(str::to_string),
-        ocupante: None,
+        ocupante: ocupante_historico(tag, data).map(str::to_string),
         guerra_civil: e.guerra_civil,
         grupo_religioso_no_poder: e.grupo_religioso_no_poder,
         mudanca_regime: e.mudanca_regime,
