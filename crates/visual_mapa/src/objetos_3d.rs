@@ -3,7 +3,6 @@
 use crate::cidade_v3::PredioUrbano;
 use crate::config::{ConfiguracaoObjetos, QualidadeObjetos};
 use crate::industria::InstalacaoIndustrial;
-use crate::trafego::NavioVisual;
 use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
@@ -51,12 +50,25 @@ pub(crate) fn materializar_volumes_sistema(
     mut materiais: ResMut<Assets<VolumeMaterial>>,
     predios: Query<(Entity, &Transform, Option<&VolumeAplicado>), With<PredioUrbano>>,
     industrias: Query<(Entity, &Transform, Option<&VolumeAplicado>), With<InstalacaoIndustrial>>,
-    navios: Query<(Entity, &Transform, Option<&VolumeAplicado>), With<NavioVisual>>,
+    mut cache: Local<Option<[Handle<VolumeMaterial>; 3]>>,
 ) {
     let Some(rec) = rec else { return };
     if cfg.qualidade == QualidadeObjetos::Baixo {
         return;
     }
+    // Só trabalha quando há objeto novo (antes criava 3 materiais por quadro, para sempre).
+    let mut novos = predios
+        .iter()
+        .chain(industrias.iter())
+        .filter(|(_, _, aplicado)| aplicado.is_none())
+        .peekable();
+    if novos.peek().is_none() {
+        return;
+    }
+    if cfg.is_changed() {
+        *cache = None;
+    }
+    let [mat_face, mat_topo, mat_sombra] = cache.get_or_insert_with(|| {
     let mat_face = materiais.add(VolumeMaterial {
         color: LinearRgba::new(0.20, 0.24, 0.30, 0.72),
     });
@@ -71,11 +83,12 @@ pub(crate) fn materializar_volumes_sistema(
             cfg.intensidade_sombra.clamp(0.0, 1.0) * 0.65,
         ),
     });
+    [mat_face, mat_topo, mat_sombra]
+    }).clone();
 
-    for (entity, tr, aplicado) in predios.iter().chain(industrias.iter()).chain(navios.iter()) {
-        if aplicado.is_some() {
-            continue;
-        }
+    // Navios ficam de fora: são filhos girados ao longo da rota e o volume virava uma cruz
+    // gigante por cima do mar (escala do pai aplicada duas vezes).
+    for (entity, tr, _) in novos {
         commands.entity(entity).insert(VolumeAplicado);
         let escala = tr.scale;
         commands.entity(entity).with_children(|c| {

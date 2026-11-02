@@ -72,6 +72,10 @@ fn main() -> AppExit {
     if let Some(qualidade) = opcoes.qualidade {
         config.graficos.qualidade = qualidade;
     }
+    // No smoke o FPS é medido sem V-Sync (com ele, o teto é a taxa do monitor).
+    if opcoes.smoke_ativo() {
+        config.video.vsync = false;
+    }
 
     let mut app = App::new();
     app.add_plugins(

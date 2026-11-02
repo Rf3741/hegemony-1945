@@ -39,6 +39,8 @@ pub struct OpcoesCli {
     pub captura: Option<PathBuf>,
     pub qualidade: Option<QualidadeGrafica>,
     pub painel: Option<u8>,
+    /// Velocidade do relógio no smoke: 0 = pausado, 1..=5; `None` = máxima (5).
+    pub velocidade: Option<u8>,
 }
 
 impl OpcoesCli {
@@ -81,6 +83,14 @@ where
             }
             "--painel" => {
                 op.painel = Some(painel(&valor()?)?);
+                i += 2;
+            }
+            "--velocidade" => {
+                let v: u8 = valor()?.parse().map_err(|_| "--velocidade exige 0 a 5".to_string())?;
+                if v > 5 {
+                    return Err("--velocidade exige 0 a 5".to_string());
+                }
+                op.velocidade = Some(v);
                 i += 2;
             }
             other if other.starts_with('-') => {
@@ -197,9 +207,22 @@ fn lancar_relogio(mut relogio: ResMut<RecursoRelogio>) {
 }
 
 /// Eventos e formações pausam o tempo; a partida de smoke precisa dele correndo.
-fn manter_relogio_no_maximo(mut relogio: ResMut<RecursoRelogio>) {
-    if relogio.pausado || relogio.velocidade != VelocidadeJogo::V5 {
-        relogio.definir_velocidade(VelocidadeJogo::V5);
+/// Mantém o relógio na velocidade pedida (`--velocidade`, padrão a máxima; 0 = pausado), para
+/// separar o custo da simulação do custo de desenho nas medições de FPS.
+fn manter_relogio_no_maximo(op: Res<OpcoesCli>, mut relogio: ResMut<RecursoRelogio>) {
+    let alvo = match op.velocidade.unwrap_or(5) {
+        0 => {
+            relogio.pausado = true;
+            return;
+        }
+        1 => VelocidadeJogo::V1,
+        2 => VelocidadeJogo::V2,
+        3 => VelocidadeJogo::V3,
+        4 => VelocidadeJogo::V4,
+        _ => VelocidadeJogo::V5,
+    };
+    if relogio.pausado || relogio.velocidade != alvo {
+        relogio.definir_velocidade(alvo);
         relogio.pausado = false;
     }
 }
