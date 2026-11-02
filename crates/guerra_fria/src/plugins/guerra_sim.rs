@@ -22,7 +22,7 @@ use sim_guerra::{
     Divisao, Exercito, Guerra, MundoGuerra, PaisMilitar, PosturaOperacional,
     PropostaPaz, RegiaoMapa, TratadoPazAssinado,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Recurso ECS que encapsula o motor determinístico `sim_guerra`.
 #[derive(Resource)]
@@ -315,14 +315,22 @@ fn tick_guerra(
     mut mundo: ResMut<RecursoMundo>,
     mut cores: Option<ResMut<CoresMapa>>,
     mut painel: ResMut<PainelGuerra>,
-    eco: Option<ResMut<EconomiaSim>>,
+    mut eco: Option<ResMut<EconomiaSim>>,
 ) {
     let Some(guerra) = guerra_sim.as_deref_mut() else { return };
     for _ in eventos.read() {
+        let em_guerra: HashSet<String> = guerra
+            .0
+            .guerras()
+            .iter()
+            .filter(|g| g.ativa)
+            .flat_map(|g| g.atacantes.iter().chain(&g.defensores))
+            .map(|tag| normalizar_tag(tag))
+            .collect();
         let rel = guerra.0.executar_tick_diario();
 
         // 1. Consumo simples de bens militares e impacto no tesouro
-        if eco.is_some() {
+        if let Some(eco) = eco.as_mut() {
             for pais in guerra.0.cenario.paises.iter_mut() {
                 let divs_ativas = guerra.0.cenario.divisoes.iter().filter(|d| d.pais_tag == pais.tag && d.efetivos_atuais > 0).count();
                 if divs_ativas > 0 {
@@ -334,6 +342,25 @@ fn tick_guerra(
                             pais.estoque_suprimento = (pais.estoque_suprimento - 0.005).max(0.40);
                         } else {
                             pais.estoque_suprimento = (pais.estoque_suprimento + 0.01).min(1.0);
+                        }
+                    }
+                    if let Some(nucleo) = eco.nucleo.as_mut() {
+                        let riscos: Vec<(String, f64)> = nucleo
+                            .mundo
+                            .paises()
+                            .iter()
+                            .map(|p| {
+                                let risco = p
+                                    .tag
+                                    .as_deref()
+                                    .map(normalizar_tag)
+                                    .filter(|tag| em_guerra.contains(tag))
+                                    .map_or(0.0, |_| 0.8);
+                                (p.id.clone(), risco)
+                            })
+                            .collect();
+                        for (id, risco) in riscos {
+                            nucleo.mundo.definir_risco_turismo(&id, risco);
                         }
                     }
                 }

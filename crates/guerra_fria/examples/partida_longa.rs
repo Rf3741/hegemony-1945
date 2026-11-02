@@ -5,6 +5,7 @@
 //! Uso: cargo run --example partida_longa [-- ANOS] [--sem-relatorio]
 use eventos::{CatalogoEventos, EstadoEventos, aplicar_opcao, avaliar_dia, escolha_ia};
 use gf_mapa::CatalogoProvincias;
+use ia_paises::IaEconomia;
 use sim_diplomacia::{Bloco, Diplomacia, InfoPais};
 use sim_economia::{CenarioEconomia, ModoCadencia, MundoEconomico};
 use sim_politica::{CenarioPolitica, MundoPolitico};
@@ -74,6 +75,7 @@ fn main() {
     let mut cen = CenarioEconomia::carregar_diretorio(&raiz.join("assets/data/economia")).expect("cenário economia");
     cen.config.modo_cadencia = ModoCadencia::DiarioComAjusteSemanal;
     let mut eco = MundoEconomico::novo(cen).expect("economia");
+    let mut ia_eco = IaEconomia::novo();
     for _ in 0..90 {
         eco.executar_tick_diario();
     }
@@ -141,6 +143,7 @@ fn main() {
         let i = Instant::now();
         guarda!("economia", ds, {
             eco.executar_tick_diario();
+            ia_eco.passo_diario(&mut eco, &[]);
         });
         t_eco += i.elapsed().as_secs_f64();
 

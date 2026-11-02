@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 const COOLDOWN_FISCAL: u64 = 90;
 const COOLDOWN_EMERGENCIA: u64 = 30;
 /// Maximo de obras estatais simultaneas na fila.
-const MAX_OBRAS_ESTATAIS: usize = 3;
+const MAX_OBRAS_ESTATAIS: usize = 6;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PosturaFiscal {
@@ -118,15 +118,15 @@ impl IaEconomia {
             }
             PosturaFiscal::EquilibrioSustentado => {}
             PosturaFiscal::AjusteModerado => {
-                pf.aliquota_imposto_renda_alto = (pf.aliquota_imposto_renda_alto + 0.05).min(0.70);
-                pf.aliquota_imposto_dividendos = (pf.aliquota_imposto_dividendos + 0.05).min(0.60);
-                pf.aliquota_consumo_geral = (pf.aliquota_consumo_geral + 0.03).min(0.30);
+                pf.aliquota_imposto_renda_alto = (pf.aliquota_imposto_renda_alto + 0.02).min(0.70);
+                pf.aliquota_imposto_dividendos = (pf.aliquota_imposto_dividendos + 0.02).min(0.60);
+                pf.aliquota_consumo_geral = (pf.aliquota_consumo_geral + 0.01).min(0.30);
             }
             PosturaFiscal::AusteridadeSevera | PosturaFiscal::EmergenciaAntiCalote => {
                 for a in [&mut pf.aliquota_imposto_renda_baixo, &mut pf.aliquota_imposto_renda_medio, &mut pf.aliquota_imposto_renda_alto, &mut pf.aliquota_imposto_dividendos] {
-                    *a = (*a + 0.08).min(0.75);
+                    *a = (*a + 0.04).min(0.75);
                 }
-                pf.aliquota_consumo_geral = (pf.aliquota_consumo_geral + 0.05).min(0.35);
+                pf.aliquota_consumo_geral = (pf.aliquota_consumo_geral + 0.02).min(0.35);
             }
         }
         let depois = (pf.aliquota_imposto_renda_baixo, pf.aliquota_imposto_renda_medio, pf.aliquota_imposto_renda_alto, pf.aliquota_imposto_dividendos, pf.aliquota_consumo_geral);
@@ -207,10 +207,18 @@ impl IaEconomia {
                 CategoriaPredio::Infraestrutura => 0.0, // decidido por estado, abaixo
                 _ => {
                     if !postura.permite_obras_de_retorno() { continue }
-                    let Some(&(l, n)) = retorno.get(&ti) else { continue };
-                    if n <= 0.0 { continue }
-                    // Complementa o privado: so o estado constroi o que e muito rentavel ou estrategico.
-                    let s = (l / n / t.custo_pontos_construcao.max(1.0) * 500.0).clamp(-50.0, 100.0);
+                    // Setores já presentes são priorizados pelo lucro; setores novos recebem
+                    // capital semente para evitar que a economia fique presa na composição de 1945.
+                    let s = if let Some(&(l, n)) = retorno.get(&ti) {
+                        if n <= 0.0 { continue }
+                        (l / n / t.custo_pontos_construcao.max(1.0) * 500.0).clamp(-50.0, 100.0)
+                    } else {
+                        match t.categoria {
+                            CategoriaPredio::Industrial | CategoriaPredio::Extrativo | CategoriaPredio::RuralAgricola => 18.0,
+                            CategoriaPredio::Infraestrutura => 12.0,
+                            _ => 0.0,
+                        }
+                    };
                     if s <= 5.0 { continue }
                     s
                 }
