@@ -1,5 +1,5 @@
 //! Camada jogável: país do jogador, HUD, painel do país (1), ranking e notificações.
-use super::enciclopedia::{dica_com, dica_conceito};
+use super::enciclopedia::{dica_com, dica_conceito, texto_notificacao};
 use super::economia_sim::{Comando, EconomiaSim, VistaBem, VistaEconomia};
 use super::economy::RecursoMundo;
 use super::mercado_ui::Icones;
@@ -50,6 +50,71 @@ impl Notificacoes {
     /// Textos novos desde a última chamada (usado pelo áudio).
     pub fn drenar_novas(&mut self) -> Vec<String> {
         std::mem::take(&mut self.1)
+    }
+
+    /// Converte as mensagens legadas dos simuladores em modelos da enciclopédia.
+    pub fn mensagem_modelada(texto: &str, pais: &str) -> String {
+        if texto == "Obra concluída!" {
+            return texto_notificacao(
+                "msg_predio_inaugurado",
+                &[
+                    ("provincia", "território nacional".into()),
+                    ("predio", "novo empreendimento".into()),
+                    ("pais", pais.into()),
+                    ("bem_produzido", "bens industriais".into()),
+                ],
+                texto,
+            );
+        }
+        if let Some(lei) = texto.strip_prefix("Lei aprovada: ") {
+            return texto_notificacao(
+                "msg_lei_aprovada",
+                &[
+                    ("pais", pais.into()),
+                    ("lei", lei.into()),
+                    ("grupo_favorecido", "a coalizão governista".into()),
+                    ("grupo_opositor", "a oposição parlamentar".into()),
+                ],
+                texto,
+            );
+        }
+        if texto.starts_with("Eleição realizada") {
+            let candidato = texto.split_once("vitória de ").map_or("-", |(_, v)| v);
+            return texto_notificacao(
+                "msg_eleicoes_presidenciais",
+                &[
+                    ("pais", pais.into()),
+                    ("candidato_vencedor", candidato.into()),
+                    ("partido_vencedor", candidato.into()),
+                    ("percentual_votos", "maioria".into()),
+                ],
+                texto,
+            );
+        }
+        if let Some(resto) = texto.strip_prefix("GUERRA: ").or_else(|| texto.strip_prefix("GUERRA CIVIL ")) {
+            return texto_notificacao(
+                "msg_guerra_deflagrada",
+                &[
+                    ("guerra", "Conflito internacional".into()),
+                    ("agressor", pais.into()),
+                    ("defensor", "nação adversária".into()),
+                    ("contexto", resto.into()),
+                ],
+                texto,
+            );
+        }
+        if let Some(resto) = texto.strip_prefix("PAZ: ") {
+            return texto_notificacao(
+                "msg_paz_assinada",
+                &[
+                    ("guerra", "conflito internacional".into()),
+                    ("proponente", pais.into()),
+                    ("termos", resto.into()),
+                ],
+                texto,
+            );
+        }
+        texto.to_string()
     }
     pub fn push(&mut self, texto: impl Into<String>, agora: f64) {
         let texto = texto.into();
@@ -228,19 +293,19 @@ fn detectar_eventos(
     let agora = tempo.elapsed_secs_f64();
     if let Some(pol) = pol.as_mut() {
         for m in pol.mensagens.drain(..) {
-            notas.push(m, agora);
+            notas.push(Notificacoes::mensagem_modelada(&m, &p.nome), agora);
         }
     }
     let (mut obras, mut calote) = (ant.obras_na_fila, ant.calote);
     if let Some(eco) = eco.as_mut() {
         for m in eco.mensagens.drain(..) {
-            notas.push(m, agora);
+            notas.push(Notificacoes::mensagem_modelada(&m, &p.nome), agora);
         }
         if let Some(pe) = &eco.vista.pais {
             obras = pe.fila_construcao.len();
             calote = pe.orcamento.em_calote;
             if ant.tag == jogador.0 && obras < ant.obras_na_fila {
-                notas.push("Obra concluída!", agora);
+                notas.push(Notificacoes::mensagem_modelada("Obra concluída!", &p.nome), agora);
             }
             if ant.tag == jogador.0 && calote && !ant.calote {
                 let juros = format!("{:.1}", pe.orcamento.taxa_juros_efetiva_anual * 100.0);
@@ -1547,4 +1612,3 @@ mod testes {
         assert!(texto.contains("Alvo: Nacional (5 níveis)"));
     }
 }
-

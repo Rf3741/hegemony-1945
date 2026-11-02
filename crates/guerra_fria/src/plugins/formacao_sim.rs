@@ -7,7 +7,7 @@
 use super::diplomacia_ui::{DiploSim, PainelDiplomacia};
 use super::economy::RecursoMundo;
 use super::eventos_ui::EstadoEv;
-use super::jogador::PaisJogador;
+use super::jogador::{PaisJogador, Notificacoes};
 use super::map::{CoresMapa, RaizProjeto, RecursoCatalogo};
 use super::rotulos_pais::{RotuloPais, RotulosPaisCriados};
 use super::time::{EventoTickDiario, RecursoRelogio};
@@ -82,6 +82,8 @@ fn tick_formacao(
     jogador: Res<PaisJogador>,
     rotulos: Query<Entity, With<RotuloPais>>,
     mut commands: Commands,
+    mut notificacoes: ResMut<Notificacoes>,
+    tempo: Res<Time<Real>>,
 ) {
     if leitor.read().count() == 0 {
         return;
@@ -112,6 +114,20 @@ fn tick_formacao(
         }
         // Aviso ao jogador: só para países que ele "vê" (todos), com pausa.
         form.avisos.push(e.clone());
+        let texto = if e.independencia {
+            super::enciclopedia::texto_notificacao(
+                "msg_independencia",
+                &[("pais", e.nome.clone()), ("metropole", e.origens.first().cloned().unwrap_or_else(|| "a antiga metrópole".into()))],
+                &texto_noticia(e),
+            )
+        } else {
+            super::enciclopedia::texto_notificacao(
+                "msg_evento_historico",
+                &[("titulo", e.nome.clone()), ("descricao", texto_noticia(e))],
+                &texto_noticia(e),
+            )
+        };
+        notificacoes.push(Notificacoes::mensagem_modelada(&texto, &e.nome), tempo.elapsed_secs_f64());
     }
     if let Some(mut p) = painel {
         p.repintar = true;
