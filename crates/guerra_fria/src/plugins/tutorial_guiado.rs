@@ -102,7 +102,7 @@ pub static PASSOS: [Passo; 18] = [
         objetivo: "Clique na Califórnia.",
         alvo: Alvo::Provincia("Califórnia"),
         teclas: &[],
-        cond: Cond::Auto(|a, _| a.prov_usa),
+        cond: Cond::Auto(|a, b| a.prov_usa && a.prov_id != b.prov_id),
     },
     Passo {
         titulo: "A barra de status (HUD)",
