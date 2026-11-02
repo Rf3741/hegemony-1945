@@ -3,11 +3,9 @@
 use super::economia_sim::{Comando, EconomiaSim};
 use super::economy::RecursoMundo;
 use super::jogador::PaisJogador;
-use super::map::{CoresMapa, DadosMapa, ImagemMapa, colorir};
+use super::map::{CoresMapa, DadosMapa, ImagemMapa, pintar_paleta};
 use super::time::EventoTickDiario;
-use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use sim_diplomacia::{Acao, Bloco, Diplomacia, Esfera, InfoPais};
 use simulacao::mapa::AlinhamentoGeopolitico;
@@ -128,7 +126,7 @@ fn repintar_mapa(
     }
     painel.repintar = false;
     painel.dias_desde_pintura = 0;
-    let (Some(d), Some(cores), Some(dados), Some(imagem)) = (d, cores, dados, imagem) else { return };
+    let (Some(d), Some(cores), Some(_), Some(imagem)) = (d, cores, dados, imagem) else { return };
     let mut cor_prov = cores.cor_prov.clone();
     if painel.mapa_esferas {
         for (id, tag) in &mundo.0.dono_por_provincia {
@@ -138,16 +136,7 @@ fn repintar_mapa(
             }
         }
     }
-    let (pixels, _) = colorir(&dados.ids, dados.largura, dados.altura, &cor_prov, &cores.dono_prov, &cores.estado_prov);
-    let mut img = Image::new(
-        Extent3d { width: dados.largura, height: dados.altura, depth_or_array_layers: 1 },
-        TextureDimension::D2,
-        pixels,
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::RENDER_WORLD,
-    );
-    img.sampler = bevy::image::ImageSampler::nearest();
-    let _ = imagens.insert(imagem.0.id(), img);
+    pintar_paleta(&mut imagens, &imagem, &cor_prov, &cores.dono_prov, &cores.estado_prov, None);
 }
 
 fn cor_egui(e: Esfera) -> egui::Color32 {

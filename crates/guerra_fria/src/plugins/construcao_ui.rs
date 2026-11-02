@@ -6,7 +6,7 @@
 //! (`ConstrucaoUi::pedidos`), que o sistema `aplicar_pedidos` converte em `Comando::Construir`.
 use super::economia_sim::{Comando, EconomiaSim, VistaEconomia};
 use super::jogador::{calcular_custo_materiais_obra, calcular_lucratividade_esperada, fmt_din};
-use super::map::{CoresMapa, DadosMapa, ImagemMapa, ProvinciaSelecionada, RecursoCatalogo, colorir};
+use super::map::{CoresMapa, DadosMapa, ImagemMapa, ProvinciaSelecionada, RecursoCatalogo, pintar_paleta};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use sim_economia::{CategoriaPredio, Estado, Provincia, TipoPredio};
@@ -652,10 +652,8 @@ fn repintar_mapa(
             }
         }
     }
-    let (pixels, _) = colorir(&dados.ids, dados.largura, dados.altura, &cor_prov, &cores.dono_prov, &cores.estado_prov);
-    if let Some(mut img) = imagens.get_mut(&imagem.0) {
-        img.data = Some(pixels);
-    }
+    let _ = dados;
+    pintar_paleta(&mut imagens, &imagem, &cor_prov, &cores.dono_prov, &cores.estado_prov, None);
 }
 
 pub struct ConstrucaoUiPlugin;

@@ -3,15 +3,13 @@ use super::diplomacia_ui::{DiploSim, PainelDiplomacia};
 use super::economia_sim::EconomiaSim;
 use super::economy::RecursoMundo;
 use super::jogador::PaisJogador;
-use super::map::{CoresMapa, DadosMapa, ImagemMapa, RaizProjeto, RecursoCatalogo, colorir};
+use super::map::{CoresMapa, DadosMapa, ImagemMapa, RaizProjeto, RecursoCatalogo, pintar_paleta};
 use super::mapa_provincial::{Escala, Metrica, PesosProvincias};
 use super::politica_sim::PoliticaSim;
 use super::tecnologia_ui::TecnologiaSim;
 use super::time::{EventoTickDiario, RecursoRelogio};
 use super::ui::ui_raiz;
-use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use simulacao::mundo::EstadoPais;
 
@@ -216,20 +214,7 @@ fn repintar_tematico(
             });
         }
     }
-    let (pixels, _) = colorir(&dados.ids, dados.largura, dados.altura, &cor_prov, &cores.dono_prov, &cores.estado_prov);
-    if let Some(mut img) = imagens.get_mut(&imagem.0) {
-        img.data = Some(pixels);
-    } else {
-        let mut img = Image::new(
-            Extent3d { width: dados.largura, height: dados.altura, depth_or_array_layers: 1 },
-            TextureDimension::D2,
-            pixels,
-            TextureFormat::Rgba8UnormSrgb,
-            RenderAssetUsages::RENDER_WORLD,
-        );
-        img.sampler = bevy::image::ImageSampler::nearest();
-        let _ = imagens.insert(imagem.0.id(), img);
-    }
+    pintar_paleta(&mut imagens, &imagem, &cor_prov, &cores.dono_prov, &cores.estado_prov, None);
 }
 
 /// Escala em uso no mapa (para a legenda).

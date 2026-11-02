@@ -5,7 +5,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::ImageSampler;
 use bevy::input::mouse::AccumulatedMouseScroll;
 use bevy::prelude::*;
-use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureDimension, TextureFormat};
+use bevy::render::render_resource::{AsBindGroup, Extent3d, ShaderType, TextureDimension, TextureFormat};
 use bevy::shader::ShaderRef;
 use bevy::sprite_render::{AlphaMode2d, MaterialExtension2d, SpriteMaterial, SpriteMaterialPlugin};
 use bevy::reflect::TypePath;
@@ -42,7 +42,9 @@ pub struct CoresMapa {
     pub ocupante_cor: Vec<Option<[u8; 4]>>,
 }
 
-/// Imagem (textura) do mapa exibida.
+/// Paleta do mapa na GPU (textura pequena: uma cor/ocupante/dono/estado por província).
+/// Repintar o mapa = reescrever só esta imagem com [`pintar_paleta`]; o shader do terreno
+/// (`assets/shaders/terreno.wesl`) resolve cada pixel pelo id da província.
 #[derive(Resource)]
 pub struct ImagemMapa(pub Handle<Image>);
 
@@ -56,15 +58,33 @@ struct LegendaOcupacao {
     sobre_ocupacao: bool,
 }
 
-/// Extensão do material de sprite: o mapa continua sendo uma textura RGBA normal, mas
-/// recebe normais/hillshade do relevo sem alterar a textura usada pela seleção.
+/// Parâmetros estáticos da paleta (setores de Berlim e flag do relevo). Layout = `ParamsPaleta` no shader.
+#[derive(ShaderType, Debug, Clone, Default)]
+pub struct ParamsPaleta {
+    /// x = id de Berlim, y/z = centro em pixels, w = 1 se há setores de ocupação.
+    pub berlim: Vec4,
+    /// Cores dos setores (URSS, França, Reino Unido, EUA), RGBA 0..1.
+    pub setores: [Vec4; 4],
+    /// x = 1 se o relevo modula a cor política.
+    pub flags: Vec4,
+}
+
+/// Extensão do material de sprite: o mapa é desenhado a partir de uma textura de IDs de província
+/// (gerada uma vez) + uma paleta pequena; o shader aplica relevo/hillshade, fronteiras, hachura de
+/// ocupação e oceano. A seleção por clique continua lendo `DadosMapa.ids` na CPU.
 #[derive(Asset, AsBindGroup, TypePath, Debug, Clone)]
-struct TerrainMaterial {
+pub struct TerrainMaterial {
     #[uniform(20)]
     params: Vec4,
     #[texture(21)]
     #[sampler(22)]
     relief: Handle<Image>,
+    #[texture(23)]
+    ids: Handle<Image>,
+    #[texture(24)]
+    paleta: Handle<Image>,
+    #[uniform(25)]
+    paleta_params: ParamsPaleta,
 }
 
 impl MaterialExtension2d for TerrainMaterial {
@@ -89,20 +109,10 @@ struct ArrastoCamera {
 
 const COR_OCEANO_RGBA: [u8; 4] = [28, 58, 96, 255];
 /// Oceano aberto (mais profundo) e brilho da costa.
+#[cfg(test)]
 const COR_OCEANO_FUNDO: [u8; 4] = [16, 38, 70, 255];
+#[cfg(test)]
 const COR_COSTA: [u8; 3] = [70, 130, 175];
-
-/// Relevo sombreado (cinza, mesmo tamanho do provinces.png), carregado de `assets/map/relevo.png`.
-static RELEVO: std::sync::OnceLock<Option<Vec<u8>>> = std::sync::OnceLock::new();
-
-fn relevo_para(w: u32, h: u32, base: Option<&std::path::Path>) -> Option<&'static [u8]> {
-    let r = RELEVO.get_or_init(|| {
-        let p = base?.parent()?.join("relevo.png");
-        let img = image::open(p).ok()?.to_luma8();
-        (img.dimensions() == (w, h)).then(|| img.into_raw())
-    });
-    r.as_deref().filter(|v| v.len() == (w * h) as usize)
-}
 
 pub struct MapPlugin;
 
@@ -136,14 +146,21 @@ fn atualizar_material_terreno(
     mut materiais: ResMut<Assets<TerrainMaterial>>,
     sprites: Query<&SpriteMaterial<TerrainMaterial>>,
 ) {
-    let Some(cfg) = cfg else { return };
-    let (hillshade, costa, agua) = match cfg.graficos.qualidade {
-        super::config::QualidadeGrafica::Baixo => (0.0, 0.0, 0.0),
-        super::config::QualidadeGrafica::Medio => (cfg.graficos.hillshade, 0.0, 0.0),
-        super::config::QualidadeGrafica::Alto => (cfg.graficos.hillshade, 0.0, cfg.graficos.ondas),
-        super::config::QualidadeGrafica::Ultra => (cfg.graficos.hillshade, cfg.graficos.sombra_costas, cfg.graficos.ondas),
+    // `get_mut` abaixo também marca o material como alterado a cada quadro, o que refaz o bind group
+    // e garante que a textura da paleta recém-reescrita (`pintar_paleta`) seja a vista pelo shader.
+    let (hillshade, costa, agua) = match cfg.as_ref() {
+        None => (0.0, 0.0, 0.0),
+        Some(cfg) => {
+            let g = &cfg.graficos;
+            let (h, c, a) = match g.qualidade {
+                super::config::QualidadeGrafica::Baixo => (0.0, 0.0, 0.0),
+                super::config::QualidadeGrafica::Medio => (g.hillshade, 0.0, 0.0),
+                super::config::QualidadeGrafica::Alto => (g.hillshade, 0.0, g.ondas),
+                super::config::QualidadeGrafica::Ultra => (g.hillshade, g.sombra_costas, g.ondas),
+            };
+            (h, c, if g.agua_animada { a } else { 0.0 })
+        }
     };
-    let agua = if cfg.graficos.agua_animada { agua } else { 0.0 };
     for sprite in &sprites {
         if let Some(mut material) = materiais.get_mut(&sprite.0) {
             material.params = Vec4::new(hillshade, costa, agua, tempo.elapsed_secs());
@@ -179,7 +196,10 @@ pub struct SaidaMapa {
     pub largura: u32,
     pub altura: u32,
     pub ids: Vec<u32>,
-    pub pixels: Vec<u8>,
+    /// Textura de IDs para a GPU (Rg8, ver [`preparar_ids_gpu`]).
+    pub ids_gpu: Vec<u8>,
+    /// Maior id de província presente na imagem.
+    pub id_max: u32,
     /// Caixa delimitadora por id: [x_min, y_min, x_max, y_max] (inclusive).
     pub caixas: Vec<Option<[u32; 4]>>,
 }
@@ -213,7 +233,8 @@ pub fn pixel_do_mundo(pos: Vec2, largura: u32, altura: u32) -> Option<(u32, u32)
     Some((px.min(largura - 1), py as u32))
 }
 
-/// Gera ids, pixels coloridos (com bordas) e caixas delimitadoras. Função pura.
+/// Lê o PNG de províncias e gera ids, textura de IDs para a GPU e caixas delimitadoras. Função pura.
+/// Não pinta nada: a cor vem da paleta (ver [`bytes_paleta`]) e é resolvida no shader.
 pub fn gerar_mapa(ent: &EntradaMapa) -> Result<SaidaMapa, String> {
     let img = image::open(&ent.caminho_png).map_err(|e| e.to_string())?.to_rgb8();
     let (w, h) = img.dimensions();
@@ -221,13 +242,155 @@ pub fn gerar_mapa(ent: &EntradaMapa) -> Result<SaidaMapa, String> {
         .pixels()
         .map(|p| id_de_cor_provincia((p[0], p[1], p[2])).unwrap_or(0))
         .collect();
-    relevo_para(w, h, Some(&ent.caminho_png));
-    let (pixels, caixas) =
-        colorir_com_hachura(&ids, w, h, &ent.cor_prov, &ent.dono_prov, &ent.estado_prov, Some(&ent.ocupante_cor));
-    Ok(SaidaMapa { largura: w, altura: h, ids, pixels, caixas })
+    let id_max = ids.iter().copied().max().unwrap_or(0);
+    if id_max > ID_MAX_GPU {
+        return Err(format!("id de província {id_max} não cabe na textura de IDs (máx. {ID_MAX_GPU})"));
+    }
+    let caixas = calcular_caixas(&ids, w, ent.cor_prov.len().max(id_max as usize + 1));
+    let ids_gpu = preparar_ids_gpu(&ids, w, h);
+    Ok(SaidaMapa { largura: w, altura: h, ids, ids_gpu, id_max, caixas })
+}
+
+/// Maior id de província que a textura de IDs da GPU comporta (13 bits).
+pub const ID_MAX_GPU: u32 = 8191;
+/// Colunas da textura de paleta (as províncias ocupam `id % 4096`, bloco de 4 linhas por `id / 4096`).
+pub const PALETA_LARGURA: usize = 4096;
+
+/// Caixa delimitadora [x_min, y_min, x_max, y_max] (inclusive) por id de província.
+pub fn calcular_caixas(ids: &[u32], w: u32, n: usize) -> Vec<Option<[u32; 4]>> {
+    let mut caixas: Vec<Option<[u32; 4]>> = vec![None; n];
+    for (i, &id) in ids.iter().enumerate() {
+        if id == 0 {
+            continue;
+        }
+        let (xu, yu) = ((i as u32) % w, (i as u32) / w);
+        if let Some(slot) = caixas.get_mut(id as usize) {
+            *slot = Some(match *slot {
+                None => [xu, yu, xu, yu],
+                Some([a, b, c, d]) => [a.min(xu), b.min(yu), c.max(xu), d.max(yu)],
+            });
+        }
+    }
+    caixas
+}
+
+/// Textura de IDs (2 bytes/pixel, formato Rg8) lida pelo shader do terreno:
+/// `r = id & 255`; `g = (id >> 8) & 31 | perto << 5 | costa << 6`, onde `perto` indica que há uma
+/// mudança de id a até 3 pixels (a única região onde o shader precisa calcular fronteiras e anéis)
+/// e `costa` (0..=3) é a distância do oceano à terra mais próxima nas quatro direções.
+pub fn preparar_ids_gpu(ids: &[u32], w: u32, h: u32) -> Vec<u8> {
+    let (wu, hu) = (w as usize, h as usize);
+    // Pixels de fronteira: algum vizinho (x com wrap, y sem) tem outro id.
+    let mut perto = vec![false; wu * hu];
+    for y in 0..hu {
+        for x in 0..wu {
+            let i = y * wu + x;
+            let id = ids[i];
+            let dir = y * wu + (x + 1) % wu;
+            if ids[dir] != id {
+                perto[i] = true;
+                perto[dir] = true;
+            }
+            if y + 1 < hu && ids[i + wu] != id {
+                perto[i] = true;
+                perto[i + wu] = true;
+            }
+        }
+    }
+    // Dilata 3 passos (vizinhança de 4): cobre tudo que o shader consulta para o anel de brilho.
+    for _ in 0..3 {
+        let anterior = perto.clone();
+        for y in 0..hu {
+            for x in 0..wu {
+                let i = y * wu + x;
+                if anterior[i] {
+                    continue;
+                }
+                perto[i] = anterior[y * wu + (x + 1) % wu]
+                    || anterior[y * wu + (x + wu - 1) % wu]
+                    || (y + 1 < hu && anterior[i + wu])
+                    || (y > 0 && anterior[i - wu]);
+            }
+        }
+    }
+    let mut out = vec![0u8; wu * hu * 2];
+    for y in 0..hu {
+        for x in 0..wu {
+            let i = y * wu + x;
+            let id = ids[i].min(ID_MAX_GPU);
+            let mut costa = 0u32;
+            if id == 0 {
+                'costa: for r in 1..=3i32 {
+                    for (dx, dy) in [(r, 0), (-r, 0), (0, r), (0, -r)] {
+                        let nx = (x as i32 + dx).rem_euclid(wu as i32) as usize;
+                        let ny = y as i32 + dy;
+                        if ny >= 0 && (ny as usize) < hu && ids[ny as usize * wu + nx] != 0 {
+                            costa = r as u32;
+                            break 'costa;
+                        }
+                    }
+                }
+            }
+            out[i * 2] = (id & 255) as u8;
+            out[i * 2 + 1] = (((id >> 8) & 31) | ((perto[i] as u32) << 5) | (costa << 6)) as u8;
+        }
+    }
+    out
+}
+
+/// Altura (em linhas) da textura de paleta para `n` províncias.
+pub fn altura_paleta(n: usize) -> usize {
+    n.div_ceil(PALETA_LARGURA).max(1) * 4
+}
+
+/// Bytes RGBA8 da paleta para `n` ids. Por id: linha 0 = cor; linha 1 = cor do ocupante (alfa 255
+/// se há ocupação, 0 se não); linha 2 = dono (r,g = u16 little-endian) e estado (b,a).
+/// É isto, alguns KB, que muda quando o mapa é repintado; a textura de IDs nunca muda.
+pub fn bytes_paleta(
+    n: usize,
+    cor_prov: &[[u8; 4]],
+    dono_prov: &[u32],
+    estado_prov: &[u32],
+    ocupante_cor: Option<&[Option<[u8; 4]>]>,
+) -> Vec<u8> {
+    let altura = altura_paleta(n);
+    let mut out = vec![0u8; PALETA_LARGURA * altura * 4];
+    let mut gravar = |id: usize, linha: usize, v: [u8; 4]| {
+        let y = (id / PALETA_LARGURA) * 4 + linha;
+        let o = (y * PALETA_LARGURA + id % PALETA_LARGURA) * 4;
+        out[o..o + 4].copy_from_slice(&v);
+    };
+    for id in 0..n.min((altura / 4) * PALETA_LARGURA) {
+        gravar(id, 0, cor_prov.get(id).copied().unwrap_or(COR_OCEANO_RGBA));
+        if let Some(Some(c)) = ocupante_cor.and_then(|o| o.get(id)) {
+            gravar(id, 1, [c[0], c[1], c[2], 255]);
+        }
+        let dono = dono_prov.get(id).copied().unwrap_or(0).min(u16::MAX as u32) as u16;
+        let estado = estado_prov.get(id).copied().unwrap_or(0).min(u16::MAX as u32) as u16;
+        gravar(id, 2, [dono as u8, (dono >> 8) as u8, estado as u8, (estado >> 8) as u8]);
+    }
+    out
+}
+
+/// Repinta o mapa: reescreve só a paleta (sem tocar na textura de IDs nem nos pixels do mapa).
+/// Custa microssegundos, contra ~600 ms da repintura antiga da textura de 11,5 M pixels.
+pub fn pintar_paleta(
+    imagens: &mut Assets<Image>,
+    paleta: &ImagemMapa,
+    cor_prov: &[[u8; 4]],
+    dono_prov: &[u32],
+    estado_prov: &[u32],
+    ocupante_cor: Option<&[Option<[u8; 4]>]>,
+) {
+    let Some(mut img) = imagens.get_mut(&paleta.0) else { return };
+    let n = (img.texture_descriptor.size.height as usize / 4) * PALETA_LARGURA;
+    img.data = Some(bytes_paleta(n, cor_prov, dono_prov, estado_prov, ocupante_cor));
 }
 
 /// Colore o mapa (cor do dono + bordas de país/província) e calcula as caixas.
+/// Pintor de REFERÊNCIA em CPU (sem o relevo, que só existe no shader): o jogo usa o shader do
+/// terreno; isto serve aos testes de equivalência.
+#[cfg(test)]
 pub fn colorir(
     ids: &[u32],
     w: u32,
@@ -240,6 +403,7 @@ pub fn colorir(
 }
 
 /// Colore o mapa com suporte a hachura listrada para províncias ocupadas por forças inimigas.
+#[cfg(test)]
 pub fn colorir_com_hachura(
     ids: &[u32],
     w: u32,
@@ -251,7 +415,6 @@ pub fn colorir_com_hachura(
 ) -> (Vec<u8>, Vec<Option<[u32; 4]>>) {
     let (wu, hu) = (w as usize, h as usize);
     let dono = |id: u32| dono_prov.get(id as usize).copied().unwrap_or(0);
-    let relevo = RELEVO.get().and_then(|r| r.as_deref()).filter(|v| v.len() == wu * hu);
     let estado = |id: u32| estado_prov.get(id as usize).copied().unwrap_or(0);
     let mut caixas: Vec<Option<[u32; 4]>> = vec![None; cor_prov.len()];
     let mut dados = vec![0u8; wu * hu * 4];
@@ -273,14 +436,6 @@ pub fn colorir_com_hachura(
                                 c = b.cores[k];
                             }
                         }
-                    }
-                }
-                if let Some(r) = relevo {
-                    // 60% cor do país + 40% cor do país modulada pelo relevo sombreado.
-                    let k = (((r[i] as f32 - 185.0) / 45.0) + 1.0).clamp(0.3, 1.6);
-                    let f = 0.6 + 0.4 * k;
-                    for ch in c.iter_mut().take(3) {
-                        *ch = (*ch as f32 * f).clamp(0.0, 255.0) as u8;
                     }
                 }
             } else {
@@ -345,10 +500,12 @@ pub fn colorir_com_hachura(
 }
 
 /// Cor da fronteira entre países (escura, quase preta).
+#[cfg(test)]
 const COR_FRONTEIRA_PAIS: [u8; 4] = [15, 15, 15, 255];
 
 /// Pinta fronteiras: países = linha escura de 2 px com brilho (clareamento) de 2 px na cor do
 /// país por dentro; províncias/estados = linha sutil de 1 px (cor do país escurecida).
+#[cfg(test)]
 fn aplicar_bordas(dados: &mut [u8], borda: &[u8], ids: &[u32], w: usize, h: usize) {
     let viz = |i: usize| -> [Option<usize>; 4] {
         let (x, y) = (i % w, i / w);
@@ -458,6 +615,8 @@ fn aguardar_carga(
     economia: Option<Res<super::economia_sim::EconomiaSim>>,
     cfg: Option<Res<super::config::ConfigJogo>>,
     mut abertura: ResMut<super::abertura::CarregamentoPronto>,
+    cores: Option<Res<CoresMapa>>,
+    raiz: Option<Res<RaizProjeto>>,
 ) {
     // O menu só abre quando a economia (sim_economia) também terminou de carregar.
     if economia.is_none() {
@@ -473,34 +632,85 @@ fn aguardar_carga(
             return;
         }
     };
-    let mut imagem = Image::new(
+    // Textura de IDs (fixa) + paleta (única coisa que muda ao repintar o mapa).
+    let mut ids_img = Image::new(
         Extent3d { width: saida.largura, height: saida.altura, depth_or_array_layers: 1 },
         TextureDimension::D2,
-        saida.pixels,
+        saida.ids_gpu,
+        TextureFormat::Rg8Unorm,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    ids_img.sampler = ImageSampler::nearest();
+    let ids_handle = imagens.add(ids_img);
+    let n_paleta = (saida.id_max as usize + 1).max(cores.as_ref().map_or(0, |c| c.cor_prov.len()));
+    let mut paleta_img = Image::new(
+        Extent3d { width: PALETA_LARGURA as u32, height: altura_paleta(n_paleta) as u32, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        match cores.as_ref() {
+            Some(c) => bytes_paleta(n_paleta, &c.cor_prov, &c.dono_prov, &c.estado_prov, Some(&c.ocupante_cor)),
+            None => bytes_paleta(n_paleta, &[], &[], &[], None),
+        },
+        TextureFormat::Rgba8Unorm,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    paleta_img.sampler = ImageSampler::nearest();
+    let paleta_handle = imagens.add(paleta_img);
+    // Sprite-base: um pixel branco (só fornece tingimento/alfa); o mapa em si vem do shader.
+    let mut branco = Image::new(
+        Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        vec![255, 255, 255, 255],
         TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::RENDER_WORLD,
     );
-    imagem.sampler = ImageSampler::nearest();
-    let handle = imagens.add(imagem);
-    let material = (cfg.as_ref().map_or(true, |c| c.graficos.qualidade != super::config::QualidadeGrafica::Baixo))
-        .then(|| materiais.add(TerrainMaterial {
-            params: Vec4::new(0.0, 0.0, 0.0, 0.0),
-            relief: asset_server.load("map/relevo.png"),
-        }));
-    commands.insert_resource(ImagemMapa(handle.clone()));
+    branco.sampler = ImageSampler::nearest();
+    let branco_handle = imagens.add(branco);
+    // Relevo: só modula a cor política se existir e tiver o mesmo tamanho da textura de IDs.
+    let caminho_relevo = raiz.as_ref().map(|r| r.0.join("assets/map/relevo.png"));
+    let relevo_ok = caminho_relevo
+        .as_ref()
+        .and_then(|c| image::image_dimensions(c).ok())
+        .is_some_and(|d| d == (saida.largura, saida.altura));
+    let relevo = if caminho_relevo.as_ref().is_some_and(|c| c.exists()) {
+        asset_server.load("map/relevo.png")
+    } else {
+        let mut cinza = Image::new(
+            Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+            TextureDimension::D2,
+            vec![128],
+            TextureFormat::R8Unorm,
+            RenderAssetUsages::RENDER_WORLD,
+        );
+        cinza.sampler = ImageSampler::linear();
+        imagens.add(cinza)
+    };
+    let mut paleta_params = ParamsPaleta { flags: Vec4::new(relevo_ok as u8 as f32, 0.0, 0.0, 0.0), ..default() };
+    if let Some(b) = SETORES_BERLIM.get() {
+        paleta_params.berlim = Vec4::new(b.id as f32, b.centro_px.0 as f32, b.centro_px.1 as f32, 1.0);
+        for (k, c) in b.cores.iter().enumerate() {
+            paleta_params.setores[k] = Vec4::new(c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, 1.0);
+        }
+    }
+    let material = materiais.add(TerrainMaterial {
+        params: Vec4::new(0.0, 0.0, 0.0, 0.0),
+        relief: relevo,
+        ids: ids_handle,
+        paleta: paleta_handle.clone(),
+        paleta_params,
+    });
+    commands.insert_resource(ImagemMapa(paleta_handle));
     // Três cópias lado a lado para o wrap horizontal.
     for k in [-1.0f32, 0.0, 1.0] {
-        let transform = Transform::from_xyz(k * saida.largura as f32, 0.0, 0.0)
-            .with_scale(Vec3::new(1.0, ESCALA_Y_MAPA, 1.0));
-        commands.spawn((Sprite::from_image(handle.clone()), transform));
-        if let Some(material) = material.as_ref() {
-            commands.spawn((
-                Sprite::from_image(handle.clone()),
-                SpriteMaterial(material.clone()),
-                Transform::from_xyz(k * saida.largura as f32, 0.0, 0.01)
-                    .with_scale(Vec3::new(1.0, ESCALA_Y_MAPA, 1.0)),
-            ));
-        }
+        commands.spawn((
+            Sprite {
+                image: branco_handle.clone(),
+                custom_size: Some(Vec2::new(saida.largura as f32, saida.altura as f32)),
+                ..default()
+            },
+            SpriteMaterial(material.clone()),
+            Transform::from_xyz(k * saida.largura as f32, 0.0, 0.0)
+                .with_scale(Vec3::new(1.0, ESCALA_Y_MAPA, 1.0)),
+        ));
         commands.spawn((
             Realce { deslocamento: k * saida.largura as f32 },
             Sprite::default(),
@@ -831,7 +1041,7 @@ mod testes {
         let t = std::time::Instant::now();
         let s = gerar_mapa(&ent).unwrap();
         eprintln!("gerar_mapa: {:?}", t.elapsed());
-        assert_eq!(s.pixels.len(), (s.largura * s.altura * 4) as usize);
+        assert_eq!(s.ids_gpu.len(), (s.largura * s.altura * 2) as usize);
         let com_caixa = s.caixas.iter().flatten().count();
         assert!(com_caixa > 6000, "{com_caixa}");
     }
@@ -843,5 +1053,280 @@ mod testes {
         assert_eq!(r[3], 90);
         assert_eq!(r[7], 0);
         assert_eq!(r[11], 90);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Paleta na GPU: equivalência com o pintor de referência, isolamento e tempo de repintura.
+    // ---------------------------------------------------------------------------------------
+
+    /// Transcrição em Rust, linha a linha, das funções de `assets/shaders/terreno.wesl` (sem relevo
+    /// nem setores de Berlim), lendo SÓ a textura de IDs e a paleta como o shader faz.
+    struct EmulaShader<'a> {
+        ids: &'a [u8],
+        pal: &'a [u8],
+        w: i32,
+        h: i32,
+    }
+
+    impl EmulaShader<'_> {
+        fn raw(&self, x: i32, y: i32) -> (u32, u32) {
+            let i = (y * self.w + x.rem_euclid(self.w)) as usize * 2;
+            (self.ids[i] as u32, self.ids[i + 1] as u32)
+        }
+        fn pid(&self, x: i32, y: i32) -> i32 {
+            if y < 0 || y >= self.h {
+                return -1;
+            }
+            let (a, b) = self.raw(x, y);
+            (a | ((b & 31) << 8)) as i32
+        }
+        fn pal(&self, id: u32, linha: usize) -> [u8; 4] {
+            let (c, l) = (id as usize % PALETA_LARGURA, (id as usize / PALETA_LARGURA) * 4 + linha);
+            let o = (l * PALETA_LARGURA + c) * 4;
+            [self.pal[o], self.pal[o + 1], self.pal[o + 2], self.pal[o + 3]]
+        }
+        fn dono_estado(&self, id: u32) -> (u32, u32) {
+            let p = self.pal(id, 2);
+            (p[0] as u32 | (p[1] as u32) << 8, p[2] as u32 | (p[3] as u32) << 8)
+        }
+        fn tipo(&self, a: u32, b: u32) -> u32 {
+            let (da, db) = (self.dono_estado(a), self.dono_estado(b));
+            if b == 0 || db.0 != da.0 {
+                3
+            } else if db.1 != da.1 {
+                2
+            } else {
+                1
+            }
+        }
+        fn borda(&self, x: i32, y: i32) -> u32 {
+            let id = self.pid(x, y) as u32;
+            let mut m = 0;
+            let dir = self.pid(x + 1, y) as u32;
+            if dir != id {
+                m = m.max(self.tipo(id, dir));
+            }
+            let esq = self.pid(x - 1, y) as u32;
+            if esq != id {
+                m = m.max(self.tipo(esq, id));
+            }
+            let bai = self.pid(x, y + 1);
+            if bai >= 0 && bai as u32 != id {
+                m = m.max(self.tipo(id, bai as u32));
+            }
+            let cim = self.pid(x, y - 1);
+            if cim >= 0 && cim as u32 != id {
+                m = m.max(self.tipo(cim as u32, id));
+            }
+            m
+        }
+        fn borda_pais(&self, x: i32, y: i32) -> bool {
+            y >= 0 && y < self.h && self.borda(x, y) == 3
+        }
+        fn anel1(&self, x: i32, y: i32) -> bool {
+            if y < 0 || y >= self.h || self.pid(x, y) == 0 || self.borda(x, y) == 3 {
+                return false;
+            }
+            self.borda_pais(x + 1, y) || self.borda_pais(x - 1, y) || self.borda_pais(x, y + 1) || self.borda_pais(x, y - 1)
+        }
+        fn anel2(&self, x: i32, y: i32) -> bool {
+            if self.pid(x, y) == 0 || self.borda(x, y) == 3 || self.anel1(x, y) {
+                return false;
+            }
+            self.anel1(x + 1, y) || self.anel1(x - 1, y) || self.anel1(x, y + 1) || self.anel1(x, y - 1)
+        }
+        fn cor(&self, x: i32, y: i32) -> [u8; 4] {
+            let (r, g) = self.raw(x, y);
+            let id = r | ((g & 31) << 8);
+            let perto = (g >> 5) & 1 == 1;
+            let costa = (g >> 6) & 3;
+            let mut c = [0f32; 3];
+            let mut alfa = 255.0f32;
+            if id == 0 {
+                let (fx, fy) = (x as f32, y as f32);
+                let lat = ((fy / self.h as f32) - 0.5).abs() * 2.0;
+                let ruido = (fx * 0.021 + fy * 0.013).sin() * 0.5 + (fx * 0.047 - fy * 0.031).sin() * 0.3 + (fx * 0.09 + fy * 0.07).sin() * 0.2;
+                let f = 1.0 + (0.22 - lat * 0.40) + ruido * 0.045;
+                for k in 0..3 {
+                    c[k] = (COR_OCEANO_FUNDO[k] as f32 * f).clamp(0.0, 255.0);
+                }
+                if costa > 0 {
+                    let t = [0.55, 0.30, 0.14][costa as usize - 1];
+                    for k in 0..3 {
+                        c[k] += (COR_COSTA[k] as f32 - c[k]) * t;
+                    }
+                }
+            } else {
+                let pc = self.pal(id, 0);
+                c = [pc[0] as f32, pc[1] as f32, pc[2] as f32];
+                alfa = pc[3] as f32;
+                let oc = self.pal(id, 1);
+                if oc[3] > 0 && (x + y) % 8 < 4 {
+                    c = [oc[0] as f32, oc[1] as f32, oc[2] as f32];
+                }
+            }
+            if perto {
+                let b = self.borda(x, y);
+                if b == 3 {
+                    c = [15.0; 3];
+                    alfa = 255.0;
+                } else if b > 0 {
+                    let f = if b == 2 { 0.72 } else { 0.92 };
+                    c = c.map(|v| (v * f).floor());
+                } else if self.anel1(x, y) {
+                    c = c.map(|v| v + (255.0 - v) * 0.10);
+                } else if self.anel2(x, y) {
+                    c = c.map(|v| v + (255.0 - v) * 0.04);
+                }
+            }
+            [c[0] as u8, c[1] as u8, c[2] as u8, alfa as u8]
+        }
+    }
+
+    fn comparar_emulacao_com_referencia(ids: &[u32], w: u32, h: u32, cor_prov: &[[u8; 4]], dono: &[u32], estado: &[u32], ocup: &[Option<[u8; 4]>]) {
+        let (ref_px, _) = colorir_com_hachura(ids, w, h, cor_prov, dono, estado, Some(ocup));
+        let ids_gpu = preparar_ids_gpu(ids, w, h);
+        let pal = bytes_paleta(cor_prov.len(), cor_prov, dono, estado, Some(ocup));
+        let emu = EmulaShader { ids: &ids_gpu, pal: &pal, w: w as i32, h: h as i32 };
+        let mut piores = 0i32;
+        let mut com_borda = 0usize;
+        for y in 0..h as i32 {
+            for x in 0..w as i32 {
+                let e = emu.cor(x, y);
+                let o = (y as usize * w as usize + x as usize) * 4;
+                let r = &ref_px[o..o + 4];
+                if r[..3] == [15, 15, 15] {
+                    com_borda += 1;
+                }
+                for k in 0..4 {
+                    let d = (e[k] as i32 - r[k] as i32).abs();
+                    piores = piores.max(d);
+                    assert!(d <= 3, "pixel ({x},{y}) canal {k}: emulado {e:?} x referência {r:?}");
+                }
+            }
+        }
+        assert!(com_borda > 0, "o recorte precisa ter fronteiras de país");
+        eprintln!("emulação x referência: pior diferença por canal = {piores}");
+    }
+
+    #[test]
+    fn shader_emulado_igual_ao_pintor_de_referencia_sintetico() {
+        // Mapa pequeno com wrap, oceano, costa, países, estados e ocupação.
+        let (w, h) = (48u32, 30u32);
+        let mut ids = vec![0u32; (w * h) as usize];
+        for y in 0..h {
+            for x in 0..w {
+                // blocos de 8x6 com ids 1..: ruído de oceano em alguns blocos
+                let bloco = (x / 8) + (y / 6) * 6;
+                ids[(y * w + x) as usize] = if bloco % 5 == 0 { 0 } else { bloco + 1 };
+            }
+        }
+        let n = 64;
+        let cor: Vec<[u8; 4]> = (0..n).map(|i| [(i * 37 % 256) as u8, (i * 91 % 256) as u8, (i * 53 % 256) as u8, 255]).collect();
+        let dono: Vec<u32> = (0..n as u32).map(|i| (i / 3) % 4 + u32::from(i > 0 && i % 7 != 0)).collect();
+        let estado: Vec<u32> = (0..n as u32).map(|i| i / 2).collect();
+        let ocup: Vec<Option<[u8; 4]>> = (0..n).map(|i| (i % 4 == 2).then_some([250, 10, 10, 255])).collect();
+        comparar_emulacao_com_referencia(&ids, w, h, &cor, &dono, &estado, &ocup);
+    }
+
+    #[test]
+    fn shader_emulado_igual_ao_pintor_de_referencia_no_mapa_real() {
+        let raiz = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let img = image::open(raiz.join("assets/map/provinces.png")).unwrap().to_rgb8();
+        let (w, h) = img.dimensions();
+        // Recorte de 520x340 em torno da Europa/Mediterrâneo (costa, fronteiras e ilhas).
+        let (x0, y0, cw, ch) = (w / 2 - 60, h / 4, 520u32, 340u32);
+        let mut ids = Vec::new();
+        for y in y0..y0 + ch {
+            for x in x0..x0 + cw {
+                let p = img.get_pixel(x, y);
+                ids.push(id_de_cor_provincia((p[0], p[1], p[2])).unwrap_or(0));
+            }
+        }
+        let n = ids.iter().copied().max().unwrap() as usize + 1;
+        let cor: Vec<[u8; 4]> = (0..n).map(|i| [(i * 37 % 256) as u8, (i * 91 % 256) as u8, (i * 53 % 256) as u8, 255]).collect();
+        let dono: Vec<u32> = (0..n as u32).map(|i| (i / 9) % 11 + 1).collect();
+        let estado: Vec<u32> = (0..n as u32).map(|i| i / 3 + 1).collect();
+        let ocup: Vec<Option<[u8; 4]>> = (0..n).map(|i| (i % 13 == 0).then_some([30, 200, 60, 255])).collect();
+        comparar_emulacao_com_referencia(&ids, cw, ch, &cor, &dono, &estado, &ocup);
+    }
+
+    #[test]
+    fn preparar_ids_gpu_preserva_o_id_de_cada_pixel_para_a_selecao() {
+        let raiz = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let img = image::open(raiz.join("assets/map/provinces.png")).unwrap().to_rgb8();
+        let (w, h) = img.dimensions();
+        let ids: Vec<u32> = img.pixels().map(|p| id_de_cor_provincia((p[0], p[1], p[2])).unwrap_or(0)).collect();
+        assert!(ids.iter().copied().max().unwrap() <= ID_MAX_GPU);
+        let t = std::time::Instant::now();
+        let gpu = preparar_ids_gpu(&ids, w, h);
+        eprintln!("preparar_ids_gpu (uma vez, no carregamento): {:?}", t.elapsed());
+        for (i, &id) in ids.iter().enumerate() {
+            assert_eq!(gpu[i * 2] as u32 | ((gpu[i * 2 + 1] as u32 & 31) << 8), id, "pixel {i}");
+        }
+        // A seleção por clique continua usando `DadosMapa.ids` + `pixel_do_mundo`: mesma província
+        // que a textura de IDs mostra naquele pixel.
+        for (px, py) in [(0.0, 0.0), (12.0, -40.0), (-900.0, 250.0), (1500.0, -300.0)] {
+            let pos = Vec2::new(px, py * ESCALA_Y_MAPA);
+            let (x, y) = pixel_do_mundo(pos, w, h).unwrap();
+            let i = y as usize * w as usize + x as usize;
+            let da_gpu = gpu[i * 2] as u32 | ((gpu[i * 2 + 1] as u32 & 31) << 8);
+            assert_eq!(ids[i], da_gpu);
+        }
+        let caixas = calcular_caixas(&ids, w, ids.iter().copied().max().unwrap() as usize + 1);
+        assert!(caixas.iter().flatten().count() > 6000);
+    }
+
+    #[test]
+    fn paleta_muda_a_cor_de_uma_provincia_sem_tocar_nas_outras() {
+        let n = 7741;
+        let cor: Vec<[u8; 4]> = (0..n).map(|i| [(i % 251) as u8, (i % 241) as u8, (i % 239) as u8, 255]).collect();
+        let dono: Vec<u32> = (0..n as u32).map(|i| i % 190).collect();
+        let estado: Vec<u32> = (0..n as u32).map(|i| i / 5).collect();
+        let antes = bytes_paleta(n, &cor, &dono, &estado, None);
+        let mut cor2 = cor.clone();
+        cor2[5000] = [1, 2, 3, 255];
+        let depois = bytes_paleta(n, &cor2, &dono, &estado, None);
+        let diferentes: Vec<usize> = (0..antes.len() / 4).filter(|&i| antes[i * 4..i * 4 + 4] != depois[i * 4..i * 4 + 4]).collect();
+        // Uma única célula: id 5000 -> coluna 5000 % 4096, linha (5000 / 4096) * 4 + 0.
+        assert_eq!(diferentes, vec![4 * PALETA_LARGURA + 5000 % PALETA_LARGURA]);
+        let o = diferentes[0] * 4;
+        assert_eq!(&depois[o..o + 4], &[1, 2, 3, 255]);
+        // Dono/estado e ocupante se codificam em células próprias e não vazam para a cor.
+        let mut ocup = vec![None; n];
+        ocup[17] = Some([9, 8, 7, 255]);
+        let com_ocup = bytes_paleta(n, &cor, &dono, &estado, Some(&ocup));
+        let dif: Vec<usize> = (0..antes.len() / 4).filter(|&i| antes[i * 4..i * 4 + 4] != com_ocup[i * 4..i * 4 + 4]).collect();
+        assert_eq!(dif, vec![PALETA_LARGURA + 17]);
+    }
+
+    #[test]
+    fn repintar_a_paleta_leva_microssegundos_e_nao_mexe_na_textura_de_ids() {
+        // 11,5 M pixels de IDs ficam fixos; repintar = só a paleta de ~7,7 mil províncias.
+        let n = 7741;
+        let cor: Vec<[u8; 4]> = (0..n).map(|i| [(i % 251) as u8, 10, 20, 255]).collect();
+        let dono: Vec<u32> = vec![1; n];
+        let estado: Vec<u32> = vec![2; n];
+        let ocup = vec![None; n];
+        let mut imagens = Assets::<Image>::default();
+        let handle = imagens.add(Image::new(
+            Extent3d { width: PALETA_LARGURA as u32, height: altura_paleta(n) as u32, depth_or_array_layers: 1 },
+            TextureDimension::D2,
+            bytes_paleta(n, &cor, &dono, &estado, None),
+            TextureFormat::Rgba8Unorm,
+            RenderAssetUsages::RENDER_WORLD,
+        ));
+        let paleta = ImagemMapa(handle.clone());
+        let mut melhor = std::time::Duration::MAX;
+        for k in 0..20u8 {
+            let cor_k: Vec<[u8; 4]> = cor.iter().map(|c| [c[0].wrapping_add(k), c[1], c[2], 255]).collect();
+            let t = std::time::Instant::now();
+            pintar_paleta(&mut imagens, &paleta, &cor_k, &dono, &estado, Some(&ocup));
+            melhor = melhor.min(t.elapsed());
+        }
+        eprintln!("repintura via paleta: {melhor:?} (antes: ~600-690 ms)");
+        assert!(melhor.as_millis() < 5, "repintura da paleta levou {melhor:?}");
+        let img = imagens.get(&handle).unwrap();
+        assert_eq!(img.data.as_ref().unwrap().len(), PALETA_LARGURA * altura_paleta(n) * 4);
     }
 }
