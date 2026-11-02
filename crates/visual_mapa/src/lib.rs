@@ -23,6 +23,7 @@ pub mod linhas;
 pub mod lod;
 pub mod mapa;
 pub mod mapeamento;
+pub mod objetos_3d;
 pub mod predio;
 pub mod projecao;
 pub mod rios;
@@ -35,11 +36,14 @@ pub mod transporte;
 pub mod demo;
 
 use bevy::prelude::*;
+use bevy::sprite_render::Material2dPlugin;
 
 pub use atlas::AtlasVisual;
 pub use cenario::carregar_cenario_1945;
 pub use cidade::{CidadeVisual, IndiceEntidades, RotuloNomeCidade};
-pub use config::{CamadaConstrucoesVisivel, VisualMapaConfig};
+pub use config::{
+    CamadaConstrucoesVisivel, ConfiguracaoObjetos, QualidadeObjetos, VisualMapaConfig,
+};
 pub use entrada::{
     AnoVisual, BlocoVisual, CidadeDemograficaEntrada, CidadeEntrada, ConexaoEntrada,
     EntradaEconomiaVisual, EntradaVisual, FonteEconomiaVisual, InstalacaoEntrada,
@@ -76,6 +80,7 @@ pub struct VisualMapaPlugin;
 impl Plugin for VisualMapaPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<VisualMapaConfig>()
+            .init_resource::<ConfiguracaoObjetos>()
             .init_resource::<CamadaConstrucoesVisivel>()
             .init_resource::<LimitesZoomVisual>()
             .init_resource::<AnoVisual>()
@@ -88,6 +93,7 @@ impl Plugin for VisualMapaPlugin {
             .init_resource::<IndiceEntidadesEconomia>()
             .init_resource::<AtlasVisual>()
             .init_resource::<CatalogoMapeamentoPredios>()
+            .add_plugins(Material2dPlugin::<objetos_3d::VolumeMaterial>::default())
             .init_resource::<estilo::EstiloMapa>()
             .init_resource::<rios::ConfigRios>()
             .init_resource::<rotas::ConfigRotas>()
@@ -111,6 +117,7 @@ impl Plugin for VisualMapaPlugin {
                     carregar_arte_sistema,
                     industria::criar_recursos_fumaca,
                     predio::setup_recursos_predios,
+                    objetos_3d::criar_recursos_objetos_3d,
                 ),
             )
             .add_systems(
@@ -145,13 +152,18 @@ impl Plugin for VisualMapaPlugin {
                     predio::emitir_fumaca_predios_sistema,
                     predio::alternar_camada_construcoes_sistema,
                     lod::atualizar_lod_sistema,
+                    objetos_3d::materializar_volumes_sistema,
+                    objetos_3d::atualizar_intensidade_noite_sistema,
                 )
                     .in_set(VisualMapaSet::Animar)
                     .after(VisualMapaSet::Sincronizar),
             )
             .add_systems(
                 Startup,
-                (cidade_v3::carregar_fonte_rotulos_sistema, cidade_v3::criar_texturas_janelas_sistema),
+                (
+                    cidade_v3::carregar_fonte_rotulos_sistema,
+                    cidade_v3::criar_texturas_janelas_sistema,
+                ),
             )
             .add_systems(
                 Update,

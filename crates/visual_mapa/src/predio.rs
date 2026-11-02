@@ -7,6 +7,7 @@
 //! - Integração com LOD: prédios econômicos visíveis apenas em `NivelLod::Local`.
 
 use crate::atlas::AtlasVisual;
+use crate::config::ConfiguracaoObjetos;
 use crate::config::VisualMapaConfig;
 use crate::entrada::{AnoVisual, BlocoVisual, EntradaEconomiaVisual, PredioEconomiaEntrada};
 use crate::era::{GerenciadorEras, indice_era_para_ano};
@@ -96,7 +97,9 @@ pub fn setup_recursos_predios(
     commands.insert_resource(RecursosPredios {
         mesh_quad: meshes.add(Rectangle::new(1.0, 1.0)),
         mesh_badge: meshes.add(Circle::new(7.0)),
-        mat_badge_fundo: materials.add(ColorMaterial::from_color(Color::srgba(0.12, 0.16, 0.22, 0.90))),
+        mat_badge_fundo: materials.add(ColorMaterial::from_color(Color::srgba(
+            0.12, 0.16, 0.22, 0.90,
+        ))),
         mat_badge_borda: materials.add(ColorMaterial::from_color(Color::srgb(0.95, 0.75, 0.25))),
     });
 }
@@ -122,7 +125,9 @@ pub fn sincronizar_economia_sistema(
     let max_tipos = estilo.map_or(3, |e| e.max_icones_por_estado.max(1));
     let era_global = indice_era_para_ano(ano.0);
     let primeira_carga = indice.predios.is_empty();
-    let zoom_perto = estado_lod.as_ref().map_or(true, |lod| lod.nivel_atual == NivelLod::Local);
+    let zoom_perto = estado_lod
+        .as_ref()
+        .map_or(true, |lod| lod.nivel_atual == NivelLod::Local);
 
     // 1. Agrupar prédios por estado
     let mut por_estado: HashMap<&str, Vec<&PredioEconomiaEntrada>> = HashMap::new();
@@ -142,7 +147,9 @@ pub fn sincronizar_economia_sistema(
             let (lon, lat) = p_com_pos.posicao.unwrap();
             cfg.projecao.geo_para_mundo(lon, lat)
         } else {
-            let hash = estado_id.bytes().fold(0u32, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
+            let hash = estado_id
+                .bytes()
+                .fold(0u32, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
             let lon = ((hash % 360) as f32) - 180.0;
             let lat = (((hash / 360) % 140) as f32) - 70.0;
             cfg.projecao.geo_para_mundo(lon, lat)
@@ -168,14 +175,23 @@ pub fn sincronizar_economia_sistema(
                     Visibility::Hidden,
                 ))
                 .id();
-            indice.agregados_estado.insert(estado_id.to_string(), ent_badge);
+            indice
+                .agregados_estado
+                .insert(estado_id.to_string(), ent_badge);
         }
 
         // 3. Agregação por estado e tipo (Feedback 6: um sprite representativo por tipo com nível total como tamanho)
-        let mut por_tipo: HashMap<String, (u32, f32, String, BlocoVisual, Option<(f32, f32)>)> = HashMap::new();
+        let mut por_tipo: HashMap<String, (u32, f32, String, BlocoVisual, Option<(f32, f32)>)> =
+            HashMap::new();
         for p in &lista {
             let bloco = p.bloco.unwrap_or_else(|| BlocoVisual::de_pais(&p.pais_tag));
-            let entry = por_tipo.entry(p.tipo.clone()).or_insert((0, 0.0, p.pais_tag.clone(), bloco, p.posicao));
+            let entry = por_tipo.entry(p.tipo.clone()).or_insert((
+                0,
+                0.0,
+                p.pais_tag.clone(),
+                bloco,
+                p.posicao,
+            ));
             entry.0 += p.nivel;
             entry.1 += p.producao * (p.nivel as f32);
             if entry.4.is_none() && p.posicao.is_some() {
@@ -187,7 +203,9 @@ pub fn sincronizar_economia_sistema(
         tipos_ordenados.sort_by(|a, b| b.1.0.cmp(&a.1.0).then_with(|| a.0.cmp(&b.0)));
 
         // Limite de entidades: só os N tipos mais fortes de cada estado ganham ícone.
-        for (k, (tipo, (soma_niveis, soma_prod, pais_tag, bloco, pos_tipo))) in tipos_ordenados.into_iter().take(max_tipos).enumerate() {
+        for (k, (tipo, (soma_niveis, soma_prod, pais_tag, bloco, pos_tipo))) in
+            tipos_ordenados.into_iter().take(max_tipos).enumerate()
+        {
             let offset = calcular_offset_espiral(k, cfg.espacamento_predios);
             let pos_mundo = if let Some((lon, lat)) = pos_tipo {
                 cfg.projecao.geo_para_mundo(lon, lat) + offset * 0.4
@@ -195,7 +213,11 @@ pub fn sincronizar_economia_sistema(
                 centro_mundo + offset
             };
 
-            let producao_media = if soma_niveis > 0 { soma_prod / (soma_niveis as f32) } else { 1.0 };
+            let producao_media = if soma_niveis > 0 {
+                soma_prod / (soma_niveis as f32)
+            } else {
+                1.0
+            };
             let era_idx = era_global.min(4);
             let tam = tamanho_sprite_predio(soma_niveis, cfg.escala_sprites);
             let id_agregado = format!("{}:{}", estado_id, tipo);
@@ -217,7 +239,11 @@ pub fn sincronizar_economia_sistema(
             } else {
                 let emite_fumaca = catalogo.emite_fumaca(&tipo);
                 let tipo_fumaca = catalogo.tipo_fumaca(&tipo).map(String::from);
-                let escala_inicial = if primeira_carga || !zoom_perto { 1.0 } else { 0.0 };
+                let escala_inicial = if primeira_carga || !zoom_perto {
+                    1.0
+                } else {
+                    0.0
+                };
 
                 let comp_predio = PredioVisual {
                     id: id_agregado.clone(),
@@ -239,7 +265,8 @@ pub fn sincronizar_economia_sistema(
 
                 let mut cmd = commands.spawn((
                     comp_predio,
-                    Transform::from_translation(pos_mundo.extend(6.0)).with_scale(Vec3::splat(escala_inicial)),
+                    Transform::from_translation(pos_mundo.extend(6.0))
+                        .with_scale(Vec3::splat(escala_inicial)),
                     DetalheLod,
                     Visibility::Hidden,
                 ));
@@ -259,10 +286,7 @@ pub fn sincronizar_economia_sistema(
                     // Fallback Procedural
                     let cor = catalogo.cor_procedural(&tipo);
                     let mat = materials.add(ColorMaterial::from_color(cor));
-                    cmd.insert((
-                        Mesh2d(rec.mesh_quad.clone()),
-                        MeshMaterial2d(mat),
-                    ));
+                    cmd.insert((Mesh2d(rec.mesh_quad.clone()), MeshMaterial2d(mat)));
                 }
 
                 let id_ent = cmd.id();
@@ -350,16 +374,22 @@ pub fn emitir_fumaca_predios_sistema(
     estado_lod: Option<Res<crate::lod::EstadoLod>>,
     limites_zoom: Option<Res<crate::lod::LimitesZoomVisual>>,
     rec_fumaca: Option<Res<RecursosFumaca>>,
+    objetos: Res<ConfiguracaoObjetos>,
     mut query: Query<(&mut PredioVisual, &Transform)>,
 ) {
     if !camada.map_or(true, |c| c.0) {
         return;
     }
     // Fumaça: SÓ no zoom de perto (Local)
-    if !estado_lod.as_ref().map_or(true, |lod| lod.nivel_atual == NivelLod::Local) {
+    if !estado_lod
+        .as_ref()
+        .map_or(true, |lod| lod.nivel_atual == NivelLod::Local)
+    {
         return;
     }
-    if !limites_zoom.as_ref().map_or(true, |lim| lim.fumaca_ativa) {
+    if !limites_zoom.as_ref().map_or(true, |lim| lim.fumaca_ativa)
+        || !objetos.qualidade.tem_animacao()
+    {
         return;
     }
     let Some(rec) = rec_fumaca else { return };
@@ -399,8 +429,20 @@ pub fn alternar_camada_construcoes_sistema(
     teclas: Option<Res<ButtonInput<KeyCode>>>,
     mut camada: ResMut<crate::config::CamadaConstrucoesVisivel>,
     estado_lod: Res<crate::lod::EstadoLod>,
-    mut query_detalhes: Query<&mut Visibility, (With<crate::lod::DetalheLod>, Without<crate::lod::MarcadorLod>)>,
-    mut query_marcadores: Query<&mut Visibility, (With<crate::lod::MarcadorLod>, Without<crate::lod::DetalheLod>)>,
+    mut query_detalhes: Query<
+        &mut Visibility,
+        (
+            With<crate::lod::DetalheLod>,
+            Without<crate::lod::MarcadorLod>,
+        ),
+    >,
+    mut query_marcadores: Query<
+        &mut Visibility,
+        (
+            With<crate::lod::MarcadorLod>,
+            Without<crate::lod::DetalheLod>,
+        ),
+    >,
 ) {
     let Some(teclas) = teclas else { return };
     if teclas.just_pressed(KeyCode::KeyV) {
@@ -433,7 +475,10 @@ mod tests {
                 assert!(pos.length() > 0.0);
             }
             for &outra in &posicoes {
-                assert!((pos - outra).length() > 1.0, "Sobreposição entre prédios na espiral!");
+                assert!(
+                    (pos - outra).length() > 1.0,
+                    "Sobreposição entre prédios na espiral!"
+                );
             }
             posicoes.push(pos);
         }

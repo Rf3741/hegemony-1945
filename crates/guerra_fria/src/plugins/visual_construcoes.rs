@@ -12,12 +12,13 @@ use super::map::{RaizProjeto, RecursoCatalogo};
 use super::time::RecursoRelogio;
 use bevy::prelude::*;
 use std::collections::HashMap;
+use visual_mapa::config::ConfiguracaoObjetos;
+use visual_mapa::VisualMapaPlugin;
 use visual_mapa::cenario::carregar_cidades_cenario;
 use visual_mapa::entrada::{
-    AnoVisual, BlocoVisual, CidadeEntrada, EntradaEconomiaVisual,
-    EntradaVisual, PredioEconomiaEntrada, populacao_urbana_para_nivel,
+    AnoVisual, BlocoVisual, CidadeEntrada, EntradaEconomiaVisual, EntradaVisual,
+    PredioEconomiaEntrada, populacao_urbana_para_nivel,
 };
-use visual_mapa::VisualMapaPlugin;
 
 /// Estado interno da ponte entre a economia e o mapa visual.
 #[derive(Resource, Default)]
@@ -44,9 +45,21 @@ impl Plugin for VisualConstrucoesPlugin {
                         .after(EconomiaSimSet::Recolher)
                         .before(EconomiaSimSet::Despachar),
                     sincronizar_relogio_visual_sistema,
+                    sincronizar_qualidade_visual_sistema,
                 )
                     .run_if(resource_exists::<EconomiaSim>),
             );
+    }
+}
+
+fn sincronizar_qualidade_visual_sistema(
+    cfg: Option<Res<super::config::ConfigJogo>>,
+    mut objetos: ResMut<ConfiguracaoObjetos>,
+) {
+    let Some(cfg) = cfg else { return };
+    let qualidade = cfg.video.qualidade_objetos;
+    if objetos.qualidade != qualidade {
+        objetos.qualidade = qualidade;
     }
 }
 
@@ -82,7 +95,8 @@ pub fn sincronizar_dados_construcoes_sistema(
 ) {
     let Some(ref nucleo) = eco.nucleo else { return };
     let precisa = !estado.inicializado
-        || (eco.versao_construcao != estado.ultima_versao_construcao && tempo.elapsed_secs() - estado.ultima_extracao >= 2.0);
+        || (eco.versao_construcao != estado.ultima_versao_construcao
+            && tempo.elapsed_secs() - estado.ultima_extracao >= 2.0);
     if !precisa {
         return;
     }
@@ -175,7 +189,12 @@ pub fn atualizar_predios_de_mundo(
     let tags: HashMap<&str, String> = mundo
         .paises()
         .iter()
-        .map(|p| (p.id.as_str(), p.tag.clone().unwrap_or_else(|| p.id.to_uppercase())))
+        .map(|p| {
+            (
+                p.id.as_str(),
+                p.tag.clone().unwrap_or_else(|| p.id.to_uppercase()),
+            )
+        })
         .collect();
 
     for prov in mundo.provincias() {
@@ -279,13 +298,19 @@ mod tests {
         assert!(vis.0, "Camada deve iniciar ativa por padrão");
 
         // Simula pressão da tecla V
-        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::KeyV);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::KeyV);
         app.update();
         let vis = app.world().resource::<CamadaConstrucoesVisivel>();
         assert!(!vis.0, "Tecla V deve desativar a camada visual");
 
-        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().release(KeyCode::KeyV);
-        app.world_mut().resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::KeyV);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .release(KeyCode::KeyV);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::KeyV);
         app.update();
         let vis = app.world().resource::<CamadaConstrucoesVisivel>();
         assert!(vis.0, "Tecla V novamente deve reativar a camada visual");

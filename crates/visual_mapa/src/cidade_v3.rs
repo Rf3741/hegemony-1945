@@ -142,10 +142,15 @@ pub struct LayoutPredio {
 struct Lcg(u64);
 impl Lcg {
     fn novo(id: &str, extra: u64) -> Self {
-        Self(id.bytes().fold(1945u64 ^ extra, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)))
+        Self(id.bytes().fold(1945u64 ^ extra, |a, b| {
+            a.wrapping_mul(31).wrapping_add(b as u64)
+        }))
     }
     fn f(&mut self) -> f32 {
-        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         ((self.0 >> 33) as u32 as f32) / (u32::MAX >> 1) as f32
     }
 }
@@ -169,8 +174,14 @@ pub fn diametro_detalhe_mundo(nivel: u8) -> f32 {
 }
 
 /// Escala da raiz dos detalhes, limitada ao tamanho configurado para a tela.
-pub fn escala_detalhe_cidade(nivel: u8, escala_camera: f32, estilo: &crate::estilo::EstiloMapa) -> f32 {
-    (estilo.cidades_detalhe_max_px.max(1.0) * escala_camera.max(0.01) / diametro_detalhe_mundo(nivel)).min(1.0)
+pub fn escala_detalhe_cidade(
+    nivel: u8,
+    escala_camera: f32,
+    estilo: &crate::estilo::EstiloMapa,
+) -> f32 {
+    (estilo.cidades_detalhe_max_px.max(1.0) * escala_camera.max(0.01)
+        / diametro_detalhe_mundo(nivel))
+    .min(1.0)
 }
 
 /// Gera os prédios dos níveis `1..=ate_nivel`. Varia por bloco e era (0..=4).
@@ -179,7 +190,8 @@ pub fn gerar_layout(id: &str, ate_nivel: u8, bloco: BlocoVisual, era: usize) -> 
     let mut v = Vec::new();
     for nivel in 1..=ate_nivel.min(8) {
         for _ in 0..predios_no_nivel(nivel) {
-            let r = raio_urbano(nivel) * (0.35 + 0.65 * rng.f()) + if nivel > 1 { 0.8 } else { 0.0 };
+            let r =
+                raio_urbano(nivel) * (0.35 + 0.65 * rng.f()) + if nivel > 1 { 0.8 } else { 0.0 };
             let a = rng.f() * std::f32::consts::TAU;
             let offset = Vec2::new(r * a.cos() * 1.15, r * a.sin() * 0.62);
             // Centro mais alto: tipo cresce com (nivel, proximidade do centro).
@@ -213,7 +225,13 @@ pub fn gerar_layout(id: &str, ate_nivel: u8, bloco: BlocoVisual, era: usize) -> 
                 BlocoVisual::Ocidental => {}
             }
             let industrial = era <= 2 && matches!(tipo, TipoPredio::Bloco | TipoPredio::Medio);
-            let chamine = industrial && rng.f() < if bloco == BlocoVisual::Ocidental { 0.20 } else { 0.28 };
+            let chamine = industrial
+                && rng.f()
+                    < if bloco == BlocoVisual::Ocidental {
+                        0.20
+                    } else {
+                        0.28
+                    };
             v.push(LayoutPredio {
                 offset,
                 tamanho: Vec2::new(w, h),
@@ -234,14 +252,20 @@ pub fn cor_fachada(bloco: BlocoVisual, era: usize, tipo: TipoPredio, semente: f3
     let (r, g, b) = match bloco {
         BlocoVisual::Ocidental => match tipo {
             TipoPredio::Casa => (0.66 + 0.10 * t, 0.46 + 0.08 * t, 0.38), // tijolo
-            TipoPredio::Medio | TipoPredio::Bloco => (0.62 + 0.12 * t, 0.58 + 0.10 * t, 0.52 + 0.08 * t), // pedra
+            TipoPredio::Medio | TipoPredio::Bloco => {
+                (0.62 + 0.12 * t, 0.58 + 0.10 * t, 0.52 + 0.08 * t)
+            } // pedra
             // vidro azulado conforme a era avança
             _ => (0.60 - 0.18 * e, 0.62 - 0.04 * e + 0.06 * t, 0.66 + 0.14 * e),
         },
         BlocoVisual::Sovietica => match tipo {
             TipoPredio::Casa => (0.62 + 0.08 * t, 0.58, 0.50),
             // painéis de concreto em tons pastel
-            TipoPredio::Medio | TipoPredio::Bloco => (0.72 + 0.08 * t, 0.70 + 0.06 * t - 0.1 * e, 0.60 + 0.05 * (1.0 - t)),
+            TipoPredio::Medio | TipoPredio::Bloco => (
+                0.72 + 0.08 * t,
+                0.70 + 0.06 * t - 0.1 * e,
+                0.60 + 0.05 * (1.0 - t),
+            ),
             _ => (0.66 + 0.06 * t, 0.64, 0.56), // torres "bolo de casamento"
         },
         BlocoVisual::TerceiroMundo => match tipo {
@@ -266,7 +290,11 @@ fn cor_telhado(c: Color, bloco: BlocoVisual, tipo: TipoPredio) -> Color {
     if matches!(tipo, TipoPredio::Casa) && bloco != BlocoVisual::Sovietica {
         return Color::srgb(0.55, 0.28, 0.22); // telha
     }
-    Color::srgb((s.red * 0.72).min(1.0), (s.green * 0.72).min(1.0), (s.blue * 0.74).min(1.0))
+    Color::srgb(
+        (s.red * 0.72).min(1.0),
+        (s.green * 0.72).min(1.0),
+        (s.blue * 0.74).min(1.0),
+    )
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -377,7 +405,11 @@ fn imagem_janelas(cols: u32, linhas: u32, cor: [u8; 4], semente: u64, acesas: f3
         }
     }
     let mut img = Image::new(
-        Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+        Extent3d {
+            width: w,
+            height: h,
+            depth_or_array_layers: 1,
+        },
         TextureDimension::D2,
         dados,
         TextureFormat::Rgba8UnormSrgb,
@@ -393,19 +425,36 @@ pub fn criar_texturas_janelas_sistema(
     meshes: Option<ResMut<Assets<Mesh>>>,
     materiais: Option<ResMut<Assets<ColorMaterial>>>,
 ) {
-    let (Some(mut imagens), Some(mut meshes), Some(mut materiais)) = (imagens, meshes, materiais) else { return };
+    let (Some(mut imagens), Some(mut meshes), Some(mut materiais)) = (imagens, meshes, materiais)
+    else {
+        return;
+    };
     let formas = [(2, 2), (3, 5), (3, 9)];
     let dia = std::array::from_fn(|i| {
-        imagens.add(imagem_janelas(formas[i].0, formas[i].1, [40, 55, 80, 150], 11 + i as u64, 1.0))
+        imagens.add(imagem_janelas(
+            formas[i].0,
+            formas[i].1,
+            [40, 55, 80, 150],
+            11 + i as u64,
+            1.0,
+        ))
     });
     let noite = std::array::from_fn(|i| {
-        imagens.add(imagem_janelas(formas[i].0, formas[i].1, [255, 214, 120, 255], 91 + i as u64, 0.62))
+        imagens.add(imagem_janelas(
+            formas[i].0,
+            formas[i].1,
+            [255, 214, 120, 255],
+            91 + i as u64,
+            0.62,
+        ))
     });
     commands.insert_resource(TexturasJanelas {
         dia,
         noite,
         base_cidade: meshes.add(Ellipse::new(0.5, 0.32)),
-        mat_base: materiais.add(ColorMaterial::from_color(Color::srgba(0.55, 0.50, 0.40, 0.38))),
+        mat_base: materiais.add(ColorMaterial::from_color(Color::srgba(
+            0.55, 0.50, 0.40, 0.38,
+        ))),
     });
 }
 
@@ -431,7 +480,11 @@ pub fn fundacao_nome_sistema(
     let mut renomeadas: HashMap<Entity, String> = HashMap::new();
     for (ent, mut c, mut vis) in &mut cidades {
         let existe = existe_no_ano(c.ano_fundacao, ano.0);
-        let alvo = if existe { Visibility::Inherited } else { Visibility::Hidden };
+        let alvo = if existe {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
         if *vis != alvo {
             *vis = alvo;
         }
@@ -468,7 +521,10 @@ pub fn fundacao_nome_sistema(
 }
 
 /// Tecla N alterna dia/noite (luzes das cidades).
-pub fn alternar_noite_sistema(teclas: Option<Res<ButtonInput<KeyCode>>>, mut eras: ResMut<GerenciadorEras>) {
+pub fn alternar_noite_sistema(
+    teclas: Option<Res<ButtonInput<KeyCode>>>,
+    mut eras: ResMut<GerenciadorEras>,
+) {
     if let Some(t) = teclas {
         if t.just_pressed(KeyCode::KeyN) {
             eras.modo_noturno = !eras.modo_noturno;
@@ -496,10 +552,14 @@ pub fn ajustar_marcadores_sistema(
     cidades: Query<&CidadeVisual>,
     mut marcadores: Query<(&ChildOf, &mut Transform), (With<MarcadorLod>, Without<Camera2d>)>,
 ) {
-    let Some((_, escala)) = escala_da_camera(&camera) else { return };
+    let Some((_, escala)) = escala_da_camera(&camera) else {
+        return;
+    };
     let raio_mesh = 2.5 * cfg.escala_sprites;
     for (pai, mut tr) in &mut marcadores {
-        let Ok(c) = cidades.get(pai.parent()) else { continue };
+        let Ok(c) = cidades.get(pai.parent()) else {
+            continue;
+        };
         let px = raio_marcador_px(c.nivel_atual_inteiro, c.eh_capital);
         let s = px * escala / raio_mesh;
         if (tr.scale.x - s).abs() > 1e-4 {
@@ -518,16 +578,24 @@ pub fn layout_rotulos_sistema(
     camera: Query<(&Transform, &Projection), With<Camera2d>>,
     janela: Query<&Window, With<PrimaryWindow>>,
     cidades: Query<&CidadeVisual>,
-    mut rotulos: Query<(Entity, &ChildOf, &mut Visibility, &mut Transform), (With<RotuloNomeCidade>, Without<Camera2d>)>,
+    mut rotulos: Query<
+        (Entity, &ChildOf, &mut Visibility, &mut Transform),
+        (With<RotuloNomeCidade>, Without<Camera2d>),
+    >,
 ) {
     *acumulado += time.delta_secs();
     if *acumulado < 0.12 {
         return;
     }
     *acumulado = 0.0;
-    let Some((centro, escala)) = escala_da_camera(&camera) else { return };
+    let Some((centro, escala)) = escala_da_camera(&camera) else {
+        return;
+    };
     let visivel = camada.map_or(true, |c| c.0) && escala < estilo.cidades_escala_max;
-    let (largura, altura) = janela.single().map(|w| (w.width(), w.height())).unwrap_or((1600.0, 900.0));
+    let (largura, altura) = janela
+        .single()
+        .map(|w| (w.width(), w.height()))
+        .unwrap_or((1600.0, 900.0));
     let px = tamanho_rotulo_px(escala);
     let nivel_min = nivel_min_rotulo(escala);
     let margem = 80.0;
@@ -536,7 +604,9 @@ pub fn layout_rotulos_sistema(
     // (prioridade, rótulo, retângulo em tela, deslocamento vertical em tela)
     let mut cands: Vec<(f32, Entity, RetTela, f32)> = Vec::new();
     for (ent, pai, _, _) in rotulos.iter() {
-        let Ok(c) = cidades.get(pai.parent()) else { continue };
+        let Ok(c) = cidades.get(pai.parent()) else {
+            continue;
+        };
         if !visivel || !c.existe || c.nivel_atual_inteiro < nivel_min && !(global && c.eh_capital) {
             continue;
         }
@@ -547,8 +617,14 @@ pub fn layout_rotulos_sistema(
         let raio = raio_marcador_px(c.nivel_atual_inteiro, c.eh_capital);
         let desloc = raio + px * 0.62;
         let largura_txt = c.nome.chars().count() as f32 * px * 0.52 + 4.0;
-        let ret = RetTela { cx: rel.x, cy: rel.y - desloc, hw: largura_txt * 0.5, hh: px * 0.6 };
-        let prio = c.populacao as f32 * if c.eh_capital { 1.4 } else { 1.0 } + c.nivel_atual_inteiro as f32 * 1000.0;
+        let ret = RetTela {
+            cx: rel.x,
+            cy: rel.y - desloc,
+            hw: largura_txt * 0.5,
+            hh: px * 0.6,
+        };
+        let prio = c.populacao as f32 * if c.eh_capital { 1.4 } else { 1.0 }
+            + c.nivel_atual_inteiro as f32 * 1000.0;
         cands.push((prio, ent, ret, desloc));
     }
     cands.sort_by(|a, b| b.0.total_cmp(&a.0));
@@ -587,7 +663,15 @@ fn variante_janela(tipo: TipoPredio) -> usize {
     }
 }
 
-fn spawn_predio(p: &mut ChildSpawnerCommands, l: &LayoutPredio, bloco: BlocoVisual, era: usize, noite: bool, tex: Option<&TexturasJanelas>, crescer: bool) {
+fn spawn_predio(
+    p: &mut ChildSpawnerCommands,
+    l: &LayoutPredio,
+    bloco: BlocoVisual,
+    era: usize,
+    noite: bool,
+    tex: Option<&TexturasJanelas>,
+    crescer: bool,
+) {
     let cor = cor_fachada(bloco, era, l.tipo, l.semente);
     let z = 1.0 - l.offset.y * 0.02;
     let v = variante_janela(l.tipo);
@@ -596,33 +680,58 @@ fn spawn_predio(p: &mut ChildSpawnerCommands, l: &LayoutPredio, bloco: BlocoVisu
     p.spawn((
         Sprite::from_color(tinta, Vec2::new(l.tamanho.x, l.tamanho.y)),
         Anchor::BOTTOM_CENTER,
-        Transform::from_translation(l.offset.extend(z)).with_scale(Vec3::new(1.0, g.max(0.001), 1.0)),
-        PredioUrbano { nivel_req: l.nivel_req, crescimento: g, alvo: 1.0 },
+        Transform::from_translation(l.offset.extend(z)).with_scale(Vec3::new(
+            1.0,
+            g.max(0.001),
+            1.0,
+        )),
+        PredioUrbano {
+            nivel_req: l.nivel_req,
+            crescimento: g,
+            alvo: 1.0,
+        },
         Visibility::default(),
     ))
     .with_children(|b| {
         // telhado / topo
         let h_telhado = (l.tamanho.y * 0.08).clamp(0.15, 0.5);
         b.spawn((
-            Sprite::from_color(cor_telhado(cor, bloco, l.tipo), Vec2::new(l.tamanho.x * 1.06, h_telhado)),
+            Sprite::from_color(
+                cor_telhado(cor, bloco, l.tipo),
+                Vec2::new(l.tamanho.x * 1.06, h_telhado),
+            ),
             Anchor::BOTTOM_CENTER,
             Transform::from_xyz(0.0, l.tamanho.y, 0.01),
         ));
         // sombra lateral (profundidade)
         b.spawn((
-            Sprite::from_color(Color::srgba(0.0, 0.0, 0.05, 0.22), Vec2::new(l.tamanho.x * 0.28, l.tamanho.y)),
+            Sprite::from_color(
+                Color::srgba(0.0, 0.0, 0.05, 0.22),
+                Vec2::new(l.tamanho.x * 0.28, l.tamanho.y),
+            ),
             Anchor::BOTTOM_RIGHT,
             Transform::from_xyz(l.tamanho.x * 0.5, 0.0, 0.01),
         ));
         // janelas (dia: vidro escuro; noite: luzes acesas)
         if let Some(t) = tex {
-            let img = if noite { t.noite[v].clone() } else { t.dia[v].clone() };
+            let img = if noite {
+                t.noite[v].clone()
+            } else {
+                t.dia[v].clone()
+            };
             let mut s = Sprite::from_image(img);
             s.custom_size = Some(Vec2::new(l.tamanho.x * 0.84, (l.tamanho.y * 0.86).max(0.5)));
-            b.spawn((s, Anchor::BOTTOM_CENTER, Transform::from_xyz(0.0, l.tamanho.y * 0.05, 0.02), JanelaPredio { variante: v }));
+            b.spawn((
+                s,
+                Anchor::BOTTOM_CENTER,
+                Transform::from_xyz(0.0, l.tamanho.y * 0.05, 0.02),
+                JanelaPredio { variante: v },
+            ));
         }
         // torre soviética: pináculo
-        if bloco == BlocoVisual::Sovietica && matches!(l.tipo, TipoPredio::Torre | TipoPredio::ArranhaCeu) {
+        if bloco == BlocoVisual::Sovietica
+            && matches!(l.tipo, TipoPredio::Torre | TipoPredio::ArranhaCeu)
+        {
             b.spawn((
                 Sprite::from_color(Color::srgb(0.80, 0.72, 0.40), Vec2::new(0.22, 1.6)),
                 Anchor::BOTTOM_CENTER,
@@ -642,7 +751,10 @@ fn spawn_predio(p: &mut ChildSpawnerCommands, l: &LayoutPredio, bloco: BlocoVisu
                 Sprite::from_color(Color::srgb(0.30, 0.27, 0.26), Vec2::new(0.36, 1.5)),
                 Anchor::BOTTOM_CENTER,
                 Transform::from_xyz(l.tamanho.x * 0.25, l.tamanho.y, 0.015),
-                Chamine { acumulador: l.semente * 3.0, ritmo: 0.35 + l.semente * 0.5 },
+                Chamine {
+                    acumulador: l.semente * 3.0,
+                    ritmo: 0.35 + l.semente * 0.5,
+                },
             ));
         }
     });
@@ -671,8 +783,17 @@ fn spawn_estradas_e_trafego(p: &mut ChildSpawnerCommands, id: &str, nivel: u8, e
         ));
         let n_carros = 1 + (nivel as usize + 1) / 3;
         for k in 0..n_carros {
-            let cores_cedo = [Color::srgb(0.1, 0.1, 0.12), Color::srgb(0.35, 0.12, 0.10), Color::srgb(0.25, 0.28, 0.20)];
-            let cores_tarde = [Color::srgb(0.85, 0.20, 0.18), Color::srgb(0.95, 0.85, 0.30), Color::srgb(0.25, 0.45, 0.80), Color::srgb(0.9, 0.9, 0.92)];
+            let cores_cedo = [
+                Color::srgb(0.1, 0.1, 0.12),
+                Color::srgb(0.35, 0.12, 0.10),
+                Color::srgb(0.25, 0.28, 0.20),
+            ];
+            let cores_tarde = [
+                Color::srgb(0.85, 0.20, 0.18),
+                Color::srgb(0.95, 0.85, 0.30),
+                Color::srgb(0.25, 0.45, 0.80),
+                Color::srgb(0.9, 0.9, 0.92),
+            ];
             let cor = if era <= 1 {
                 cores_cedo[((rng.f() * 3.0) as usize).min(2)]
             } else {
@@ -682,7 +803,12 @@ fn spawn_estradas_e_trafego(p: &mut ChildSpawnerCommands, id: &str, nivel: u8, e
             p.spawn((
                 Sprite::from_color(cor, Vec2::new(0.55, 0.28)),
                 Transform::from_translation(aa.extend(0.5)).with_rotation(rot),
-                Veiculo { a: aa, b: bb, fase: rng.f(), vel: 0.05 + rng.f() * 0.07 },
+                Veiculo {
+                    a: aa,
+                    b: bb,
+                    fase: rng.f(),
+                    vel: 0.05 + rng.f() * 0.07,
+                },
             ));
         }
     }
@@ -712,12 +838,20 @@ fn spawn_guindastes(p: &mut ChildSpawnerCommands, id: &str, nivel: u8) {
                 Sprite::from_color(Color::srgb(0.80, 0.55, 0.12), Vec2::new(len, 0.22)),
                 Anchor::CENTER_LEFT,
                 Transform::from_xyz(0.0, alt, 0.01),
-                JibGuindaste { fase: rng.f() * 6.28, vel: 0.35 + rng.f() * 0.3, comprimento: len },
+                JibGuindaste {
+                    fase: rng.f() * 6.28,
+                    vel: 0.35 + rng.f() * 0.3,
+                    comprimento: len,
+                },
             ));
             g.spawn((
                 Sprite::from_color(Color::srgb(0.25, 0.45, 0.60), Vec2::new(0.55, 0.32)),
                 Transform::from_xyz(0.0, alt - 0.9, 0.02),
-                CargaGuindaste { fase: rng.f() * 6.28, vel: 0.35 + rng.f() * 0.3, comprimento: len },
+                CargaGuindaste {
+                    fase: rng.f() * 6.28,
+                    vel: 0.35 + rng.f() * 0.3,
+                    comprimento: len,
+                },
             ));
         });
     }
@@ -738,8 +872,13 @@ pub fn materializar_detalhes_sistema(
     if lod.nivel_atual != NivelLod::Local {
         return;
     }
-    let Some((centro, escala)) = escala_da_camera(&camera) else { return };
-    let (w, h) = janela.single().map(|w| (w.width(), w.height())).unwrap_or((1600.0, 900.0));
+    let Some((centro, escala)) = escala_da_camera(&camera) else {
+        return;
+    };
+    let (w, h) = janela
+        .single()
+        .map(|w| (w.width(), w.height()))
+        .unwrap_or((1600.0, 900.0));
     let meia = Vec2::new(w, h) * 0.5 * escala + Vec2::splat(40.0);
     let mut feitos = 0;
     for (ent, c, ger) in &cidades {
@@ -756,10 +895,11 @@ pub fn materializar_detalhes_sistema(
             Some(g) if g.nivel >= c.nivel_atual_inteiro && g.era == c.era_idx => continue,
             Some(g) if g.era == c.era_idx => {
                 // Cresceu: acrescenta os prédios dos novos níveis, com animação de brotar.
-                let novos: Vec<LayoutPredio> = gerar_layout(&c.id, c.nivel_atual_inteiro, c.bloco, c.era_idx)
-                    .into_iter()
-                    .filter(|l| l.nivel_req > g.nivel)
-                    .collect();
+                let novos: Vec<LayoutPredio> =
+                    gerar_layout(&c.id, c.nivel_atual_inteiro, c.bloco, c.era_idx)
+                        .into_iter()
+                        .filter(|l| l.nivel_req > g.nivel)
+                        .collect();
                 let (bloco, era, noite) = (c.bloco, c.era_idx, eras.modo_noturno);
                 let t = tex.as_deref();
                 commands.entity(g.raiz).with_children(|p| {
@@ -767,8 +907,16 @@ pub fn materializar_detalhes_sistema(
                         spawn_predio(p, l, bloco, era, noite, t, true);
                     }
                 });
-                commands.entity(g.base).insert(Transform::from_xyz(0.0, 0.0, 0.0).with_scale(base_escala(c.nivel_atual_inteiro)));
-                commands.entity(ent).insert(DetalhesGerados { raiz: g.raiz, nivel: c.nivel_atual_inteiro, era: g.era, base: g.base });
+                commands.entity(g.base).insert(
+                    Transform::from_xyz(0.0, 0.0, 0.0)
+                        .with_scale(base_escala(c.nivel_atual_inteiro)),
+                );
+                commands.entity(ent).insert(DetalhesGerados {
+                    raiz: g.raiz,
+                    nivel: c.nivel_atual_inteiro,
+                    era: g.era,
+                    base: g.base,
+                });
             }
             outro => {
                 if let Some(g) = outro {
@@ -780,7 +928,13 @@ pub fn materializar_detalhes_sistema(
                 feitos += 1;
                 let nivel = c.nivel_atual_inteiro;
                 let layout = gerar_layout(&c.id, nivel, c.bloco, c.era_idx);
-                let (bloco, era, noite, id, porto) = (c.bloco, c.era_idx, eras.modo_noturno, c.id.clone(), c.eh_porto);
+                let (bloco, era, noite, id, porto) = (
+                    c.bloco,
+                    c.era_idx,
+                    eras.modo_noturno,
+                    c.id.clone(),
+                    c.eh_porto,
+                );
                 let t = tex.as_deref();
                 let mut raiz = Entity::PLACEHOLDER;
                 let mut base = Entity::PLACEHOLDER;
@@ -798,7 +952,8 @@ pub fn materializar_detalhes_sistema(
                                 .spawn((
                                     Mesh2d(t.base_cidade.clone()),
                                     MeshMaterial2d(t.mat_base.clone()),
-                                    Transform::from_xyz(0.0, 0.0, 0.05).with_scale(base_escala(nivel)),
+                                    Transform::from_xyz(0.0, 0.0, 0.05)
+                                        .with_scale(base_escala(nivel)),
                                 ))
                                 .id();
                         }
@@ -811,7 +966,12 @@ pub fn materializar_detalhes_sistema(
                         }
                     });
                 });
-                commands.entity(ent).insert(DetalhesGerados { raiz, nivel, era, base });
+                commands.entity(ent).insert(DetalhesGerados {
+                    raiz,
+                    nivel,
+                    era,
+                    base,
+                });
             }
         }
     }
@@ -823,7 +983,10 @@ fn base_escala(nivel: u8) -> Vec3 {
 }
 
 /// Brotar dos prédios novos.
-pub fn animar_predios_urbanos_sistema(time: Res<Time>, mut q: Query<(&mut PredioUrbano, &mut Transform)>) {
+pub fn animar_predios_urbanos_sistema(
+    time: Res<Time>,
+    mut q: Query<(&mut PredioUrbano, &mut Transform)>,
+) {
     let dt = time.delta_secs();
     for (mut p, mut tr) in &mut q {
         if (p.crescimento - p.alvo).abs() > 0.002 {
@@ -851,14 +1014,26 @@ pub fn atualizar_noite_sistema(
     *ultimo = Some(noite);
     let Some(t) = tex else { return };
     for (j, mut s) in &mut janelas {
-        s.image = if noite { t.noite[j.variante].clone() } else { t.dia[j.variante].clone() };
+        s.image = if noite {
+            t.noite[j.variante].clone()
+        } else {
+            t.dia[j.variante].clone()
+        };
     }
     for mut s in &mut corpos {
         let c = s.color.to_srgba();
         s.color = if noite {
-            Color::srgb(c.red * 0.45, c.green * 0.45, (c.blue * 0.45 + 0.04).min(1.0))
+            Color::srgb(
+                c.red * 0.45,
+                c.green * 0.45,
+                (c.blue * 0.45 + 0.04).min(1.0),
+            )
         } else {
-            Color::srgb((c.red / 0.45).min(1.0), (c.green / 0.45).min(1.0), ((c.blue - 0.04) / 0.45).clamp(0.0, 1.0))
+            Color::srgb(
+                (c.red / 0.45).min(1.0),
+                (c.green / 0.45).min(1.0),
+                ((c.blue - 0.04) / 0.45).clamp(0.0, 1.0),
+            )
         };
     }
 }
@@ -868,21 +1043,31 @@ pub fn emitir_fumaca_urbana_sistema(
     mut commands: Commands,
     time: Res<Time>,
     lod: Res<EstadoLod>,
+    objetos: Res<crate::config::ConfiguracaoObjetos>,
     eras: Res<GerenciadorEras>,
     camera: Query<(&Transform, &Projection), With<Camera2d>>,
     janela: Query<&Window, With<PrimaryWindow>>,
     existentes: Query<(), With<FumacaUrbana>>,
     mut chamines: Query<(&GlobalTransform, &mut Chamine, &Sprite)>,
 ) {
-    if lod.nivel_atual != NivelLod::Local {
+    if lod.nivel_atual != NivelLod::Local || !objetos.qualidade.tem_animacao() {
         return;
     }
-    let Some((centro, escala)) = escala_da_camera(&camera) else { return };
-    let (w, h) = janela.single().map(|w| (w.width(), w.height())).unwrap_or((1600.0, 900.0));
+    let Some((centro, escala)) = escala_da_camera(&camera) else {
+        return;
+    };
+    let (w, h) = janela
+        .single()
+        .map(|w| (w.width(), w.height()))
+        .unwrap_or((1600.0, 900.0));
     let meia = Vec2::new(w, h) * 0.5 * escala + Vec2::splat(30.0);
     let mut total = existentes.iter().count();
     let dt = time.delta_secs();
-    let cor = if eras.modo_noturno { Color::srgba(0.55, 0.57, 0.66, 0.30) } else { Color::srgba(0.82, 0.82, 0.84, 0.38) };
+    let cor = if eras.modo_noturno {
+        Color::srgba(0.55, 0.57, 0.66, 0.30)
+    } else {
+        Color::srgba(0.82, 0.82, 0.84, 0.38)
+    };
     for (gt, mut ch, sp) in &mut chamines {
         if total >= MAX_FUMACA_URBANA {
             break;
@@ -899,7 +1084,12 @@ pub fn emitir_fumaca_urbana_sistema(
             commands.spawn((
                 Sprite::from_color(cor, Vec2::splat(0.4)),
                 Transform::from_translation(topo),
-                FumacaUrbana { idade: 0.0, vida: 3.0 + j * 2.0, vel: Vec2::new(0.25 + j * 0.2, 0.55), tam0: 0.4 },
+                FumacaUrbana {
+                    idade: 0.0,
+                    vida: 3.0 + j * 2.0,
+                    vel: Vec2::new(0.25 + j * 0.2, 0.55),
+                    tam0: 0.4,
+                },
             ));
             total += 1;
         }
@@ -938,7 +1128,10 @@ pub fn animar_porto_e_trafego_sistema(
     lod: Res<EstadoLod>,
     mut jibs: Query<(&JibGuindaste, &mut Transform), (Without<CargaGuindaste>, Without<Veiculo>)>,
     mut cargas: Query<(&CargaGuindaste, &mut Transform), (Without<JibGuindaste>, Without<Veiculo>)>,
-    mut veiculos: Query<(&Veiculo, &mut Transform), (Without<JibGuindaste>, Without<CargaGuindaste>)>,
+    mut veiculos: Query<
+        (&Veiculo, &mut Transform),
+        (Without<JibGuindaste>, Without<CargaGuindaste>),
+    >,
 ) {
     if lod.nivel_atual != NivelLod::Local {
         return;
@@ -979,7 +1172,10 @@ mod tests {
         let m = vec![(1961u16, "Volgogrado".to_string())];
         assert_eq!(nome_no_ano("Stalingrado", &m, 1950.0), "Stalingrado");
         assert_eq!(nome_no_ano("Stalingrado", &m, 1961.5), "Volgogrado");
-        let m2 = vec![(1924u16, "Leningrado".to_string()), (1991, "São Petersburgo".to_string())];
+        let m2 = vec![
+            (1924u16, "Leningrado".to_string()),
+            (1991, "São Petersburgo".to_string()),
+        ];
         assert_eq!(nome_no_ano("Petrogrado", &m2, 1945.0), "Leningrado");
         assert_eq!(nome_no_ano("Petrogrado", &m2, 1992.0), "São Petersburgo");
     }
@@ -998,9 +1194,24 @@ mod tests {
 
     #[test]
     fn colisao_esconde_o_menos_prioritario() {
-        let a = RetTela { cx: 0.0, cy: 0.0, hw: 30.0, hh: 6.0 };
-        let b = RetTela { cx: 20.0, cy: 3.0, hw: 30.0, hh: 6.0 };
-        let c = RetTela { cx: 200.0, cy: 0.0, hw: 30.0, hh: 6.0 };
+        let a = RetTela {
+            cx: 0.0,
+            cy: 0.0,
+            hw: 30.0,
+            hh: 6.0,
+        };
+        let b = RetTela {
+            cx: 20.0,
+            cy: 3.0,
+            hw: 30.0,
+            hh: 6.0,
+        };
+        let c = RetTela {
+            cx: 200.0,
+            cy: 0.0,
+            hw: 30.0,
+            hh: 6.0,
+        };
         assert_eq!(escolher_sem_colisao(&[a, b, c], 10), vec![0, 2]);
         assert_eq!(escolher_sem_colisao(&[a, b, c], 1), vec![0]);
     }
@@ -1014,12 +1225,21 @@ mod tests {
         assert!(pequeno.iter().all(|l| l.tipo != TipoPredio::ArranhaCeu));
         let tm = gerar_layout("x", 8, BlocoVisual::TerceiroMundo, 0);
         assert_ne!(
-            format!("{:?}", cor_fachada(BlocoVisual::Sovietica, 0, TipoPredio::Bloco, 0.5)),
-            format!("{:?}", cor_fachada(BlocoVisual::TerceiroMundo, 0, TipoPredio::Casa, 0.5))
+            format!(
+                "{:?}",
+                cor_fachada(BlocoVisual::Sovietica, 0, TipoPredio::Bloco, 0.5)
+            ),
+            format!(
+                "{:?}",
+                cor_fachada(BlocoVisual::TerceiroMundo, 0, TipoPredio::Casa, 0.5)
+            )
         );
         assert!(!tm.is_empty());
         // determinístico
-        assert_eq!(gerar_layout("x", 5, BlocoVisual::Sovietica, 1).len(), gerar_layout("x", 5, BlocoVisual::Sovietica, 1).len());
+        assert_eq!(
+            gerar_layout("x", 5, BlocoVisual::Sovietica, 1).len(),
+            gerar_layout("x", 5, BlocoVisual::Sovietica, 1).len()
+        );
     }
 
     #[test]

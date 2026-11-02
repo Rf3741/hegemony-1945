@@ -2,6 +2,7 @@
 
 use crate::atlas::AtlasVisual;
 use crate::cidade::IndiceEntidades;
+use crate::config::ConfiguracaoObjetos;
 use crate::config::VisualMapaConfig;
 use crate::entrada::{AnoVisual, EntradaVisual};
 use crate::era::{GerenciadorEras, indice_era_para_ano};
@@ -42,17 +43,20 @@ impl CategoriaIndustria {
     /// Cor representativa do ícone industrial.
     pub fn cor_icone(&self) -> Color {
         match self {
-            Self::Fabrica => Color::srgb(0.75, 0.45, 0.25),      // Terracota industrial
-            Self::Mina => Color::srgb(0.40, 0.42, 0.45),         // Cinza ardósia / carvão
+            Self::Fabrica => Color::srgb(0.75, 0.45, 0.25), // Terracota industrial
+            Self::Mina => Color::srgb(0.40, 0.42, 0.45),    // Cinza ardósia / carvão
             Self::PocoPetroleo => Color::srgb(0.18, 0.20, 0.22), // Preto betume
-            Self::Usina => Color::srgb(0.85, 0.70, 0.20),        // Amarelo energia elétrica
-            Self::Porto => Color::srgb(0.20, 0.55, 0.75),        // Azul marinho portuário
+            Self::Usina => Color::srgb(0.85, 0.70, 0.20),   // Amarelo energia elétrica
+            Self::Porto => Color::srgb(0.20, 0.55, 0.75),   // Azul marinho portuário
         }
     }
 
     /// Retorna se esta categoria de indústria possui chaminés ativas emissoras de fumaça.
     pub fn emite_fumaca(&self) -> bool {
-        matches!(self, Self::Fabrica | Self::Mina | Self::Usina | Self::PocoPetroleo)
+        matches!(
+            self,
+            Self::Fabrica | Self::Mina | Self::Usina | Self::PocoPetroleo
+        )
     }
 }
 
@@ -97,7 +101,9 @@ pub fn criar_recursos_fumaca(
 ) {
     commands.insert_resource(RecursosFumaca {
         mesh: meshes.add(Circle::new(1.0)),
-        material: materials.add(ColorMaterial::from_color(Color::srgba(0.85, 0.85, 0.88, 0.30))),
+        material: materials.add(ColorMaterial::from_color(Color::srgba(
+            0.85, 0.85, 0.88, 0.30,
+        ))),
     });
 }
 
@@ -121,11 +127,17 @@ pub fn sincronizar_industrias_sistema(
 ) {
     let (mesh, mats) = recursos.get_or_insert_with(|| {
         let cats = [
-            CategoriaIndustria::Fabrica, CategoriaIndustria::Mina, CategoriaIndustria::PocoPetroleo,
-            CategoriaIndustria::Usina, CategoriaIndustria::Porto,
+            CategoriaIndustria::Fabrica,
+            CategoriaIndustria::Mina,
+            CategoriaIndustria::PocoPetroleo,
+            CategoriaIndustria::Usina,
+            CategoriaIndustria::Porto,
         ];
         (
-            meshes.add(Rectangle::new(6.0 * cfg.escala_sprites, 6.0 * cfg.escala_sprites)),
+            meshes.add(Rectangle::new(
+                6.0 * cfg.escala_sprites,
+                6.0 * cfg.escala_sprites,
+            )),
             cats.map(|c| materials.add(ColorMaterial::from_color(c.cor_icone()))),
         )
     });
@@ -135,7 +147,11 @@ pub fn sincronizar_industrias_sistema(
             if let Ok(mut v) = query.get_mut(e) {
                 v.nivel = i.nivel;
                 v.ativa = i.ativa;
-                v.producao_relativa = if i.ativa { i.producao.clamp(0.0, 1.0) } else { 0.0 };
+                v.producao_relativa = if i.ativa {
+                    i.producao.clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
                 v.taxa_poluicao = i.poluicao;
                 v.era_local = i.era;
             }
@@ -152,20 +168,29 @@ pub fn sincronizar_industrias_sistema(
             ativa: i.ativa,
             era_local: i.era,
             era_idx: i.era.unwrap_or(0).min(4),
-            producao_relativa: if i.ativa { i.producao.clamp(0.0, 1.0) } else { 0.0 },
+            producao_relativa: if i.ativa {
+                i.producao.clamp(0.0, 1.0)
+            } else {
+                0.0
+            },
             taxa_poluicao: i.poluicao,
             escala_animada: if i.ativa { 1.0 } else { 0.0 },
             timer_emissao_fumaca: 0.0,
         };
-        let tr = Transform::from_translation(pos.extend(14.0))
-            .with_scale(if i.ativa { Vec3::ONE } else { Vec3::ZERO });
+        let tr = Transform::from_translation(pos.extend(14.0)).with_scale(if i.ativa {
+            Vec3::ONE
+        } else {
+            Vec3::ZERO
+        });
         let sprite = atlas
             .carregado
             .as_ref()
             .and_then(|a| a.indice.indice_industria(&i.tipo, inst.era_idx))
             .and_then(|k| atlas.sprite(k, tamanho_sprite_industria(i.nivel, cfg.escala_sprites)));
         let id_ent = if let Some(sprite) = sprite {
-            commands.spawn((sprite, tr, inst, Visibility::default())).id()
+            commands
+                .spawn((sprite, tr, inst, Visibility::default()))
+                .id()
         } else {
             let m = match cat {
                 CategoriaIndustria::Fabrica => 0,
@@ -174,7 +199,15 @@ pub fn sincronizar_industrias_sistema(
                 CategoriaIndustria::Usina => 3,
                 CategoriaIndustria::Porto => 4,
             };
-            commands.spawn((Mesh2d(mesh.clone()), MeshMaterial2d(mats[m].clone()), tr, inst, Visibility::default())).id()
+            commands
+                .spawn((
+                    Mesh2d(mesh.clone()),
+                    MeshMaterial2d(mats[m].clone()),
+                    tr,
+                    inst,
+                    Visibility::default(),
+                ))
+                .id()
         };
         indice.instalacoes.insert(i.id.clone(), id_ent);
         novas += 1;
@@ -190,11 +223,19 @@ pub fn atualizar_industrias_sistema(
     time: Res<Time>,
     atlas: Res<AtlasVisual>,
     eras: Res<GerenciadorEras>,
-    mut query: Query<(&mut InstalacaoIndustrial, &mut Transform, Option<&mut Sprite>)>,
+    mut query: Query<(
+        &mut InstalacaoIndustrial,
+        &mut Transform,
+        Option<&mut Sprite>,
+    )>,
 ) {
     let dt = time.delta_secs();
     let era_global = indice_era_para_ano(ano.0);
-    let tinta = if eras.modo_noturno { Color::srgb(0.6, 0.65, 0.85) } else { Color::WHITE };
+    let tinta = if eras.modo_noturno {
+        Color::srgb(0.6, 0.65, 0.85)
+    } else {
+        Color::WHITE
+    };
     for (mut ind, mut tr, sprite) in &mut query {
         let alvo = if ind.ativa { 1.0 } else { 0.0 };
         if (ind.escala_animada - alvo).abs() > 0.001 {
@@ -227,13 +268,14 @@ pub fn emitir_fumaca_sistema(
     mut commands: Commands,
     time: Res<Time>,
     lod: Res<EstadoLod>,
+    objetos: Res<ConfiguracaoObjetos>,
     eras: Res<GerenciadorEras>,
     rec: Option<Res<RecursosFumaca>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut query: Query<(&mut InstalacaoIndustrial, &Transform)>,
 ) {
     let Some(rec) = rec else { return };
-    if lod.nivel_atual != NivelLod::Local {
+    if lod.nivel_atual != NivelLod::Local || !objetos.qualidade.tem_animacao() {
         return;
     }
     let dt = time.delta_secs();
@@ -244,7 +286,10 @@ pub fn emitir_fumaca_sistema(
         }
     }
     for (mut ind, transform) in &mut query {
-        if ind.escala_animada < 0.5 || !ind.categoria.emite_fumaca() || ind.producao_relativa <= 0.05 {
+        if ind.escala_animada < 0.5
+            || !ind.categoria.emite_fumaca()
+            || ind.producao_relativa <= 0.05
+        {
             continue;
         }
         ind.timer_emissao_fumaca += dt;
@@ -308,9 +353,18 @@ mod tests {
     #[test]
     fn categoria_industria() {
         assert_eq!(CategoriaIndustria::de_str("mina"), CategoriaIndustria::Mina);
-        assert_eq!(CategoriaIndustria::de_str("porto"), CategoriaIndustria::Porto);
-        assert_eq!(CategoriaIndustria::de_str("usina_nuclear"), CategoriaIndustria::Usina);
-        assert_eq!(CategoriaIndustria::de_str("refinaria"), CategoriaIndustria::PocoPetroleo);
+        assert_eq!(
+            CategoriaIndustria::de_str("porto"),
+            CategoriaIndustria::Porto
+        );
+        assert_eq!(
+            CategoriaIndustria::de_str("usina_nuclear"),
+            CategoriaIndustria::Usina
+        );
+        assert_eq!(
+            CategoriaIndustria::de_str("refinaria"),
+            CategoriaIndustria::PocoPetroleo
+        );
         assert!(CategoriaIndustria::Fabrica.emite_fumaca());
         assert!(!CategoriaIndustria::Porto.emite_fumaca());
     }

@@ -3,7 +3,52 @@
 use crate::dados::raiz_dados_padrao;
 use crate::projecao::ProjecaoMapa;
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+/// Nível de detalhe dos objetos do mapa.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum QualidadeObjetos {
+    Baixo,
+    #[default]
+    Medio,
+    Alto,
+    Ultra,
+}
+
+impl QualidadeObjetos {
+    pub fn tem_faces(self) -> bool {
+        !matches!(self, Self::Baixo)
+    }
+    pub fn tem_sombras(self) -> bool {
+        matches!(self, Self::Alto | Self::Ultra)
+    }
+    pub fn tem_animacao(self) -> bool {
+        matches!(self, Self::Ultra)
+    }
+}
+
+/// Parâmetros visuais compartilhados pelos objetos pseudo-3D.
+#[derive(Resource, Debug, Clone)]
+pub struct ConfiguracaoObjetos {
+    pub qualidade: QualidadeObjetos,
+    /// Extrusão aparente em unidades de mundo; não altera o limite das cidades.
+    pub extrusao: f32,
+    pub intensidade_sombra: f32,
+    /// Gancho para o ciclo dia/noite, no intervalo 0..=1.
+    pub intensidade_noite: f32,
+}
+
+impl Default for ConfiguracaoObjetos {
+    fn default() -> Self {
+        Self {
+            qualidade: QualidadeObjetos::Medio,
+            extrusao: 0.22,
+            intensidade_sombra: 0.28,
+            intensidade_noite: 0.0,
+        }
+    }
+}
 
 /// Configuração (insira ANTES de adicionar o plugin para sobrescrever o padrão).
 #[derive(Resource, Debug, Clone)]
