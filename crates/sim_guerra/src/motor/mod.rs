@@ -6,6 +6,7 @@ pub mod ocupacao;
 pub mod paz;
 pub mod pontuacao;
 pub mod suprimento;
+pub mod territorio;
 
 use crate::catalogo::CatalogoGuerra;
 use crate::cenario::CenarioGuerra;
@@ -18,6 +19,7 @@ use combate::RelatorioBatalha;
 use paz::{AvaliacaoPaz, PropostaPaz, TratadoPazAssinado};
 use std::collections::HashMap;
 use suprimento::BuffersSuprimento;
+use territorio::CacheTerritorial;
 
 /// Relatório sintético das ocorrências em um único tick diário da simulação.
 #[derive(Debug, Clone, Default)]
@@ -43,6 +45,8 @@ pub struct MundoGuerra {
     pub mapa_comandantes: HashMap<String, usize>,
     pub custos_terreno_por_regiao: Vec<f64>,
     pub buffers_suprimento: BuffersSuprimento,
+    /// Cache de posse territorial; use `invalidar_cache_territorial` ao editar regiões à mão.
+    pub territorio: CacheTerritorial,
     pub proximo_frente_id: u32,
     pub frentes_ativas: Vec<Frente>,
     pub historico_tratados: Vec<TratadoPazAssinado>,
@@ -112,6 +116,7 @@ impl MundoGuerra {
             mapa_comandantes,
             custos_terreno_por_regiao,
             buffers_suprimento,
+            territorio: CacheTerritorial::default(),
             proximo_frente_id,
             frentes_ativas: Vec::new(),
             historico_tratados: Vec::new(),
@@ -124,6 +129,10 @@ impl MundoGuerra {
         self.cenario.data_inicial.avancar_dia();
         let data = self.cenario.data_inicial;
 
+        // Território só muda por conquistas/tratados: o cache sobrevive entre dias de paz
+        self.territorio
+            .garantir(&self.cenario.regioes, &self.cenario.paises);
+
         // 2. Calcula suprimento logístico das fontes para todas as divisões
         suprimento::calcular_suprimentos_mundo(
             &self.cenario.regioes,
@@ -133,6 +142,7 @@ impl MundoGuerra {
             &self.mapa_regioes,
             &self.mapa_paises,
             &self.custos_terreno_por_regiao,
+            &self.territorio,
             &mut self.buffers_suprimento,
         );
 
@@ -167,6 +177,12 @@ impl MundoGuerra {
             &self.mapa_comandantes,
         );
 
+        if detalhes_batalhas.iter().any(|b| b.regiao_conquistada) {
+            self.territorio.invalidar();
+        }
+        self.territorio
+            .garantir(&self.cenario.regioes, &self.cenario.paises);
+
         // 5. Recuperação de organização, moral e acúmulo de entrincheiramento fora de combate
         for div in self.cenario.divisoes.iter_mut() {
             if div.efetivos_atuais == 0 {
@@ -198,6 +214,7 @@ impl MundoGuerra {
             &mut self.cenario.guerras,
             &self.cenario.config,
             &self.mapa_regioes,
+            &self.territorio,
         );
 
         // 7. Atualiza pontuação de guerra e cansaço de guerra
@@ -218,6 +235,9 @@ impl MundoGuerra {
             &self.mapa_regioes,
         );
         let n_tratados = novos_tratados.len();
+        if n_tratados > 0 {
+            self.territorio.invalidar();
+        }
         self.historico_tratados.extend(novos_tratados);
 
         let mut baixas_dia = 0u32;
@@ -270,6 +290,7 @@ impl MundoGuerra {
             &self.mapa_regioes,
         )?;
 
+        self.territorio.invalidar();
         self.historico_tratados.push(tratado.clone());
         Ok(tratado)
     }
@@ -341,6 +362,11 @@ impl MundoGuerra {
         });
 
         Ok(guerra_id)
+    }
+
+    /// Descarta o cache de posse territorial (chame após alterar donos/controladores à mão).
+    pub fn invalidar_cache_territorial(&mut self) {
+        self.territorio.invalidar();
     }
 
     // Acessores de conveniência

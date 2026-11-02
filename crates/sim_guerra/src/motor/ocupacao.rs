@@ -1,6 +1,7 @@
 //! Controle territorial, ocupação militar, resistência civil e condições de capitulação.
 
 use crate::entidades::{ConfigGuerra, Guerra, PaisMilitar, RegiaoMapa};
+use super::territorio::CacheTerritorial;
 use std::collections::HashMap;
 
 /// Estatísticas de ocupação territorial e pontos de vitória de um país.
@@ -20,6 +21,7 @@ pub fn atualizar_ocupacao_e_capitulacoes(
     guerras: &mut [Guerra],
     config: &ConfigGuerra,
     mapa_regioes: &HashMap<String, usize>,
+    territorio: &CacheTerritorial,
 ) -> HashMap<String, StatusTerritorialPais> {
     let mut status_map: HashMap<String, StatusTerritorialPais> =
         HashMap::with_capacity(paises.len());
@@ -44,12 +46,19 @@ pub fn atualizar_ocupacao_e_capitulacoes(
         );
     }
 
-    // 2. Soma pontos de vitória legítimos e sob controle
-    for reg in regioes.iter_mut() {
-        if let Some(st) = status_map.get_mut(&reg.dono_tag) {
-            st.total_pontos_vitoria += reg.pontos_vitoria;
-            if reg.controlador_tag == reg.dono_tag {
-                st.pontos_controlados += reg.pontos_vitoria;
+    // 2. Soma pontos de vitória legítimos e sob controle (donos/controladores via cache inteiro).
+    // A ordem de soma por país é a ordem das regiões, como na versão baseada em String.
+    let n_paises = paises.len();
+    let mut total_pv = vec![0.0f64; n_paises];
+    let mut ctrl_pv = vec![0.0f64; n_paises];
+    for (r, reg) in regioes.iter_mut().enumerate() {
+        let dono = territorio.dono[r];
+        let ocupada = territorio.ctrl[r] != dono;
+        if (dono as usize) < n_paises {
+            let p = dono as usize;
+            total_pv[p] += reg.pontos_vitoria;
+            if !ocupada {
+                ctrl_pv[p] += reg.pontos_vitoria;
                 // Em território soberano, resistência decai
                 reg.resistencia_ocupacao = (reg.resistencia_ocupacao - 0.02).max(0.0);
             } else {
@@ -59,8 +68,14 @@ pub fn atualizar_ocupacao_e_capitulacoes(
         }
 
         // Recuperação natural lenta de destruição em tempos de paz local
-        if !reg.esta_ocupada() && reg.destruicao_guerra > 0.0 {
+        if !ocupada && reg.destruicao_guerra > 0.0 {
             reg.destruicao_guerra = (reg.destruicao_guerra - 0.0008).max(0.0);
+        }
+    }
+    for (i, pais) in paises.iter().enumerate() {
+        if let Some(st) = status_map.get_mut(&pais.tag) {
+            st.total_pontos_vitoria = total_pv[i];
+            st.pontos_controlados = ctrl_pv[i];
         }
     }
 
