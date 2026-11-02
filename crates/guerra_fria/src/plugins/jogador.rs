@@ -42,9 +42,9 @@ pub struct PainelPais {
     pub filtro_texto_predios: String,
 }
 
-/// Mensagens recentes (texto, instante em segundos de relógio real).
+/// Mensagens recentes (texto, instante em segundos de relógio real, repetições).
 #[derive(Resource, Default)]
-pub struct Notificacoes(Vec<(String, f64)>, Vec<String>);
+pub struct Notificacoes(Vec<(String, f64, u32)>, Vec<String>);
 
 impl Notificacoes {
     /// Textos novos desde a última chamada (usado pelo áudio).
@@ -54,12 +54,16 @@ impl Notificacoes {
 
     /// Converte as mensagens legadas dos simuladores em modelos da enciclopédia.
     pub fn mensagem_modelada(texto: &str, pais: &str) -> String {
-        if texto == "Obra concluída!" {
+        if texto == "Obra concluída!" || texto.starts_with("Obra concluída: ") {
+            let (predio, provincia) = texto
+                .strip_prefix("Obra concluída: ")
+                .and_then(|s| s.split_once(" em "))
+                .map_or(("novo empreendimento", "território nacional"), |(p, pr)| (p, pr));
             return texto_notificacao(
                 "msg_predio_inaugurado",
                 &[
-                    ("provincia", "território nacional".into()),
-                    ("predio", "novo empreendimento".into()),
+                    ("provincia", provincia.into()),
+                    ("predio", predio.into()),
                     ("pais", pais.into()),
                     ("bem_produzido", "bens industriais".into()),
                 ],
@@ -119,7 +123,13 @@ impl Notificacoes {
     pub fn push(&mut self, texto: impl Into<String>, agora: f64) {
         let texto = texto.into();
         self.1.push(texto.clone());
-        self.0.push((texto, agora));
+        self.0.retain(|(_, instante, _)| agora - *instante < 6.0);
+        if let Some((_, instante, repeticoes)) = self.0.iter_mut().find(|(t, _, _)| *t == texto) {
+            *instante = agora;
+            *repeticoes += 1;
+            return;
+        }
+        self.0.push((texto, agora, 1));
         if self.0.len() > 40 {
             self.0.remove(0);
         }
@@ -296,17 +306,14 @@ fn detectar_eventos(
             notas.push(Notificacoes::mensagem_modelada(&m, &p.nome), agora);
         }
     }
-    let (mut obras, mut calote) = (ant.obras_na_fila, ant.calote);
+    let mut calote = ant.calote;
     if let Some(eco) = eco.as_mut() {
         for m in eco.mensagens.drain(..) {
             notas.push(Notificacoes::mensagem_modelada(&m, &p.nome), agora);
         }
         if let Some(pe) = &eco.vista.pais {
-            obras = pe.fila_construcao.len();
+            ant.obras_na_fila = pe.fila_construcao.len();
             calote = pe.orcamento.em_calote;
-            if ant.tag == jogador.0 && obras < ant.obras_na_fila {
-                notas.push(Notificacoes::mensagem_modelada("Obra concluída!", &p.nome), agora);
-            }
             if ant.tag == jogador.0 && calote && !ant.calote {
                 let juros = format!("{:.1}", pe.orcamento.taxa_juros_efetiva_anual * 100.0);
                 let txt = super::enciclopedia::texto_notificacao("msg_tesouro_insolvente", &[("pais", p.nome.clone()), ("taxa_juros", juros)], "Calote soberano: dívida acima do limite de crédito!");
@@ -314,7 +321,7 @@ fn detectar_eventos(
             }
         }
     }
-    ant.obras_na_fila = obras;
+
     ant.calote = calote;
     let negativo = calote;
     if ant.tag == jogador.0 {
@@ -330,14 +337,18 @@ fn detectar_eventos(
 
 fn toasts(mut contextos: EguiContexts, tempo: Res<Time<Real>>, mut notas: ResMut<Notificacoes>) -> Result {
     let agora = tempo.elapsed_secs_f64();
-    notas.0.retain(|(_, t)| agora - t < 8.0);
+    notas.0.retain(|(_, t, _)| agora - t < 6.0);
     if notas.0.is_empty() {
         return Ok(());
     }
     egui::Area::new("toasts".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(contextos.ctx_mut()?, |ui| {
-        for (txt, _) in notas.0.iter().rev().take(5) {
+        for (txt, _, repeticoes) in notas.0.iter().rev().take(3) {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
-                ui.label(txt);
+                ui.label(if *repeticoes > 1 {
+                    format!("{txt} ×{repeticoes}")
+                } else {
+                    txt.clone()
+                });
             });
         }
     });

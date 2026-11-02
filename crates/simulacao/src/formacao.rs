@@ -308,20 +308,43 @@ impl Formacoes {
                 mundo.controlador_por_provincia.insert(*id, dono.clone());
             }
             if let Some(pais) = mundo.paises.get(&dono) {
+                let ocupante = ids
+                    .iter()
+                    .find_map(|id| mundo.controlador_por_provincia.get(id))
+                    .cloned()
+                    .unwrap_or_else(|| dono.clone());
+                let territorio = match chave.as_str() {
+                    "indochina-1946" => "Indochina",
+                    "ira-1946" => "Irã",
+                    "manchuria-1946" => "Manchúria",
+                    "bornholm-1946" => "Bornholm",
+                    "japao-1952" => "Japão",
+                    "okinawa-1972" => "Okinawa",
+                    "trieste-1954" => "Trieste",
+                    _ => "território ocupado",
+                };
+                let nome_ocupante = mundo
+                    .paises
+                    .get(&ocupante)
+                    .map(|p| p.nome.trim_end_matches(" Ocupada").to_string())
+                    .unwrap_or_else(|| ocupante.clone());
+                let nome_soberano = pais.nome.trim_end_matches(" Ocupada");
                 let adm1_codes: Vec<String> = ids
                     .iter()
                     .filter_map(|id| self.indice.get(id).map(|(pref, _)| pref.clone()))
                     .collect();
                 eventos.push(EventoFormacao {
                     tag: dono.clone(),
-                    nome: format!("Desocupação histórica: {chave}"),
+                    nome: territorio.to_string(),
                     data: hoje,
                     tipo: "desocupacao".to_string(),
                     origens: Vec::new(),
                     provincias: ids.clone(),
                     adm1: adm1_codes,
                     populacao: pais.populacao_total(),
-                    descricao: "As forças de ocupação retiram-se e o controle retorna à autoridade de jure.".to_string(),
+                    descricao: format!(
+                        "Fim da ocupação de {territorio}: o território volta ao controle de {nome_soberano} (retirada de {nome_ocupante})."
+                    ),
                     leis_iniciais: BTreeMap::new(),
                     ideologia: pais.ideologia.clone(),
                     pais_novo: false,
@@ -343,17 +366,19 @@ impl Formacoes {
             .dono_por_provincia
             .iter()
             .filter(|(id, dono)| {
-                **dono != f.tag
-                    && b.origem_tags.contains(dono)
-                    && self.indice.get(id).is_some_and(|(pref, c)| {
-                        b.prefixos_adm1
-                            .iter()
-                            .any(|prefixo| pref == prefixo || pref.starts_with(&format!("{prefixo}-")))
-                            && pertence_ao_lado(
-                                &f.tag,
-                                *c,
-                                mundo.controlador_por_provincia.get(id).map(String::as_str),
-                            )
+                    self.indice.get(id).is_some_and(|(pref, c)| {
+                        let dono_elegivel = **dono == f.tag
+                            || (b.origem_tags.contains(dono)
+                                && pertence_ao_lado(
+                                    &f.tag,
+                                    *c,
+                                    mundo.controlador_por_provincia.get(id).map(String::as_str),
+                                ));
+                        dono_elegivel
+                            &&
+                            b.prefixos_adm1
+                                .iter()
+                                .any(|prefixo| pref == prefixo || pref.starts_with(&format!("{prefixo}-")))
                     })
             })
             .map(|(id, _)| *id)
@@ -621,5 +646,21 @@ mod testes {
         assert!(ev.iter().any(|e| e.tag == "GDR"));
         assert!(mundo.paises["FRG"].provincias_ids.len() > 0);
         assert!(mundo.paises["GDR"].provincias_ids.len() > 0);
+    }
+
+    #[test]
+    fn nenhum_pais_historico_novo_nasce_sem_provincias() {
+        let (_c, mut mundo, mut f) = carregar();
+        mundo.data = DataSimulacao::nova(1991, 12, 31);
+        for evento in f.processar(&mut mundo) {
+            if evento.pais_novo {
+                assert!(
+                    !evento.provincias.is_empty(),
+                    "{} ({}) nasceu sem províncias",
+                    evento.nome,
+                    evento.tag
+                );
+            }
+        }
     }
 }
