@@ -86,34 +86,36 @@ fn tela_comercio(
     let r = &v.resumo_comercio;
     let mut comandos = Vec::new();
 
-    egui::Window::new("Comércio Internacional (3)")
+    ui_refinada::janela_estilo_menu("COMÉRCIO INTERNACIONAL (3)")
         .open(&mut aberto)
         .default_size([960.0, 640.0])
         .show(ctx, |ui| {
+            ui_refinada::decorar_janela(ui);
+            ui_refinada::cabecalho_painel(ui, "COMÉRCIO INTERNACIONAL (3)");
             // =========================================================================
             // PAINEL SUPERIOR: INDICADORES MACROECONÔMICOS DE COMÉRCIO
             // =========================================================================
             ui.horizontal_wrapped(|ui| {
                 ui.group(|ui| {
                     ui.label("Exportações:");
-                    ui.colored_label(egui::Color32::LIGHT_GREEN, fmt_din(r.total_exportacoes_valor));
+                    ui.colored_label(ui_refinada::menu::SUCESSO, fmt_din(r.total_exportacoes_valor));
                 });
                 ui.group(|ui| {
                     ui.label("Importações:");
-                    ui.colored_label(egui::Color32::from_rgb(230, 160, 90), fmt_din(r.total_importacoes_valor));
+                    ui.colored_label(ui_refinada::menu::AVISO, fmt_din(r.total_importacoes_valor));
                 });
                 ui.group(|ui| {
                     ui.label("Saldo Comercial:");
                     let cor_saldo = if r.saldo_comercial >= 0.0 {
-                        egui::Color32::LIGHT_GREEN
+                        ui_refinada::menu::SUCESSO
                     } else {
-                        egui::Color32::LIGHT_RED
+                        ui_refinada::menu::PERIGO
                     };
                     ui.colored_label(cor_saldo, fmt_din(r.saldo_comercial));
                 });
                 ui.group(|ui| {
                     ui.label("Receita de Tarifas:");
-                    ui.colored_label(egui::Color32::LIGHT_BLUE, fmt_din(r.receita_tarifas_total));
+                    ui.colored_label(ui_refinada::menu::INFO, fmt_din(r.receita_tarifas_total));
                 });
                 ui.group(|ui| {
                     ui.label("Abertura Comercial:");
@@ -130,14 +132,14 @@ fn tela_comercio(
                 if let Some(bloco_nome) = &r.bloco_nome {
                     let (status_txt, cor_bloco) = if r.bloco_id.as_deref() == Some("bloco_sovietico") {
                         if r.comecon_ativo {
-                            ("★ COMECON Ativo (Mercado Integrado Socialista)", egui::Color32::LIGHT_GREEN)
+                            ("★ COMECON Ativo (Mercado Integrado Socialista)", ui_refinada::menu::SUCESSO)
                         } else {
-                            ("🔒 Mercados Fechados até o COMECON", egui::Color32::LIGHT_RED)
+                            ("🔒 Mercados Fechados até o COMECON", ui_refinada::menu::PERIGO)
                         }
                     } else if r.bloco_fechado {
-                        ("🔒 Mercado Fechado", egui::Color32::LIGHT_RED)
+                        ("🔒 Mercado Fechado", ui_refinada::menu::PERIGO)
                     } else {
-                        ("🌐 Mercado Aberto / GATT", egui::Color32::LIGHT_BLUE)
+                        ("🌐 Mercado Aberto / GATT", ui_refinada::menu::INFO)
                     };
 
                     ui.label(format!("Bloco Econômico: {bloco_nome}"));
@@ -150,7 +152,7 @@ fn tela_comercio(
                         } else {
                             "★ Ativar Integração COMECON (1949)"
                         };
-                        if ui.button(btn_txt).clicked() {
+                        if ui_refinada::botao_estilo_secundario(ui, btn_txt).clicked() {
                             comandos.push(Comando::AlternarComecon);
                         }
                     }
@@ -165,16 +167,16 @@ fn tela_comercio(
             // ABAS DE NAVEGAÇÃO
             // =========================================================================
             ui.horizontal(|ui| {
-                if ui.selectable_label(painel.aba == AbaComercio::RotasAtivas, "🛳 Rotas Comerciais Ativas").clicked() {
+                if ui_refinada::aba_estilo_menu(ui, painel.aba == AbaComercio::RotasAtivas, "🛳 Rotas Ativas") {
                     painel.aba = AbaComercio::RotasAtivas;
                 }
-                if ui.selectable_label(painel.aba == AbaComercio::NovaRota, "➕ Estabelecer Nova Rota").clicked() {
+                if ui_refinada::aba_estilo_menu(ui, painel.aba == AbaComercio::NovaRota, "➕ Nova Rota") {
                     painel.aba = AbaComercio::NovaRota;
                 }
-                if ui.selectable_label(painel.aba == AbaComercio::TarifasEAbertura, "⚖ Tarifas e Abertura").clicked() {
+                if ui_refinada::aba_estilo_menu(ui, painel.aba == AbaComercio::TarifasEAbertura, "⚖ Tarifas") {
                     painel.aba = AbaComercio::TarifasEAbertura;
                 }
-                if ui.selectable_label(painel.aba == AbaComercio::AcordosEBlocos, "🤝 Acordos Bilaterais e Blocos").clicked() {
+                if ui_refinada::aba_estilo_menu(ui, painel.aba == AbaComercio::AcordosEBlocos, "🤝 Acordos e Blocos") {
                     painel.aba = AbaComercio::AcordosEBlocos;
                 }
             });
@@ -249,9 +251,9 @@ fn render_rotas_ativas(
                 for rota in &v.rotas_comerciais {
                     let tipo_rotulo = if rota.eh_exportacao { "Exportação" } else { "Importação" };
                     let tipo_cor = if rota.eh_exportacao {
-                        egui::Color32::LIGHT_GREEN
+                        ui_refinada::menu::SUCESSO
                     } else {
-                        egui::Color32::from_rgb(230, 160, 90)
+                        ui_refinada::menu::AVISO
                     };
                     ui.colored_label(tipo_cor, tipo_rotulo);
 
@@ -263,7 +265,7 @@ fn render_rotas_ativas(
                     ui.horizontal(|ui| {
                         ui.label(&rota.parceiro_pais_nome);
                         if rota.tem_acordo {
-                            ui.colored_label(egui::Color32::LIGHT_BLUE, "(Acordo)");
+                            ui.colored_label(ui_refinada::menu::INFO, "(Acordo)");
                         }
                     });
 
@@ -274,16 +276,16 @@ fn render_rotas_ativas(
                     let margem = rota.preco_destino / (1.0 + rota.tarifa_destino)
                         - (rota.preco_origem * (1.0 + rota.tarifa_origem));
                     let cor_margem = if margem >= 0.0 {
-                        egui::Color32::LIGHT_GREEN
+                        ui_refinada::menu::SUCESSO
                     } else {
-                        egui::Color32::LIGHT_RED
+                        ui_refinada::menu::PERIGO
                     };
                     ui.colored_label(cor_margem, fmt_din(margem));
 
                     let cor_lucro = if rota.lucro_ultimo_tick >= 0.0 {
-                        egui::Color32::LIGHT_GREEN
+                        ui_refinada::menu::SUCESSO
                     } else {
-                        egui::Color32::LIGHT_RED
+                        ui_refinada::menu::PERIGO
                     };
                     ui.colored_label(cor_lucro, fmt_din(rota.lucro_ultimo_tick));
 
@@ -410,14 +412,14 @@ fn render_nova_rota(
 
             if !parc.permitido_comercio {
                 if let Some(razao) = &parc.razao_bloqueio {
-                    ui.colored_label(egui::Color32::LIGHT_RED, format!("⚠ Comércio Bloqueado: {razao}"));
+                    ui.colored_label(ui_refinada::menu::PERIGO, format!("⚠ Comércio Bloqueado: {razao}"));
                     ui.label("Assine um acordo comercial prévio na aba '🤝 Acordos Bilaterais' para liberar o comércio com este país.");
                 }
             } else {
                 if parc.tem_acordo {
-                    ui.colored_label(egui::Color32::LIGHT_BLUE, "✓ Acordo Comercial Ativo: 85% de desconto nas tarifas alfandegárias.");
+                    ui.colored_label(ui_refinada::menu::INFO, "✓ Acordo Comercial Ativo: 85% de desconto nas tarifas alfandegárias.");
                 }
-                if ui.button("Confirmar e Abrir Rota Comercial").clicked() {
+                if ui_refinada::botao_estilo_menu(ui, "Confirmar e Abrir Rota Comercial").clicked() {
                     comandos.push(Comando::CriarRota {
                         bem_id: painel.nova_rota_bem.clone(),
                         parceiro_id: painel.nova_rota_parceiro.clone(),
@@ -630,9 +632,9 @@ fn render_acordos_e_blocos(
 
         ui.label(format!("• Seu Bloco Atual: {}", v.resumo_comercio.bloco_nome.as_deref().unwrap_or("Não Alinhado")));
         if v.resumo_comercio.bloco_fechado {
-            ui.colored_label(egui::Color32::LIGHT_RED, "• Status do Bloco: FECHADO para o comércio exterior capitalista sem acordo bilateral.");
+            ui.colored_label(ui_refinada::menu::PERIGO, "• Status do Bloco: FECHADO para o comércio exterior capitalista sem acordo bilateral.");
         } else {
-            ui.colored_label(egui::Color32::LIGHT_GREEN, "• Status do Bloco: ABERTO ao comércio internacional.");
+            ui.colored_label(ui_refinada::menu::SUCESSO, "• Status do Bloco: ABERTO ao comércio internacional.");
         }
 
         if v.resumo_comercio.bloco_id.as_deref() == Some("bloco_sovietico") {
@@ -649,7 +651,7 @@ fn render_acordos_e_blocos(
             };
             ui.horizontal(|ui| {
                 ui.strong("Situação:");
-                ui.colored_label(if v.resumo_comercio.comecon_ativo { egui::Color32::LIGHT_GREEN } else { egui::Color32::YELLOW }, status_comecon);
+                ui.colored_label(if v.resumo_comercio.comecon_ativo { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::AVISO }, status_comecon);
             });
 
             let btn_txt = if v.resumo_comercio.comecon_ativo {

@@ -260,30 +260,30 @@ fn alternar_mercado(teclas: Res<ButtonInput<KeyCode>>, mut p: ResMut<PainelMerca
 /// Cor de variação percentual (alta = verde, baixa = vermelho, estável = cinza).
 pub fn cor_variacao(v: f64) -> egui::Color32 {
     if v > 0.005 {
-        egui::Color32::from_rgb(90, 220, 110)
+        ui_refinada::menu::SUCESSO
     } else if v < -0.005 {
-        egui::Color32::from_rgb(240, 95, 85)
+        ui_refinada::menu::PERIGO
     } else {
-        egui::Color32::from_rgb(170, 175, 185)
+        ui_refinada::menu::TINTA_SUAVE
     }
 }
 
 /// Cor do preço de mercado em relação ao preço base.
 pub fn cor_preco_relativo(preco: f64, preco_base: f64) -> egui::Color32 {
     if preco_base <= 0.0 {
-        return egui::Color32::WHITE;
+        return ui_refinada::menu::TINTA;
     }
     let r = preco / preco_base;
     if r > 1.25 {
-        egui::Color32::from_rgb(255, 95, 80) // Vermelho: muito caro / escassez severa
+        ui_refinada::menu::PERIGO // Vermelho: muito caro / escassez severa
     } else if r > 1.05 {
-        egui::Color32::from_rgb(255, 180, 75) // Dourado/laranja: caro / escassez
+        ui_refinada::menu::AVISO // Dourado/laranja: caro / escassez
     } else if r < 0.75 {
-        egui::Color32::from_rgb(80, 175, 255) // Azul: muito barato / excesso severo
+        ui_refinada::menu::AZUL_MARINHO // Azul: muito barato / excesso severo
     } else if r < 0.95 {
-        egui::Color32::from_rgb(100, 215, 180) // Ciano/verde claro: barato / excesso
+        ui_refinada::menu::SUCESSO // Verde escuro: barato / excesso
     } else {
-        egui::Color32::from_rgb(220, 220, 225) // Equilibrado
+        ui_refinada::menu::TINTA // Equilibrado
     }
 }
 
@@ -340,7 +340,7 @@ pub fn desenhar_sparkline(
     let slice = &serie[inicio..];
 
     let painter = ui.painter();
-    painter.rect_filled(rect, 2.0, egui::Color32::from_black_alpha(45));
+    painter.rect_filled(rect, 2.0, ui_refinada::menu::PAPEL_ALT);
 
     if slice.len() >= 2 {
         let mut min_val = f32::INFINITY;
@@ -358,11 +358,11 @@ pub fn desenhar_sparkline(
         let primeiro = slice[0];
         let ultimo = slice[slice.len() - 1];
         let cor = if ultimo > primeiro * 1.005 {
-            egui::Color32::from_rgb(90, 220, 110) // Alta: verde
+            ui_refinada::menu::SUCESSO // Alta: verde escuro
         } else if ultimo < primeiro * 0.995 {
-            egui::Color32::from_rgb(240, 95, 85) // Baixa: vermelho
+            ui_refinada::menu::PERIGO // Baixa: vermelho escuro
         } else {
-            egui::Color32::from_rgb(170, 175, 185) // Neutro: cinza
+            ui_refinada::menu::TINTA_SUAVE // Neutro: tinta suave
         };
 
         let pad_y = 2.0;
@@ -406,11 +406,11 @@ pub enum EstadoMercado {
 impl EstadoMercado {
     pub fn cor(self) -> egui::Color32 {
         match self {
-            Self::EscassezCritica => egui::Color32::from_rgb(255, 80, 70),
-            Self::EscassezModerada => egui::Color32::from_rgb(255, 175, 70),
-            Self::Equilibrado => egui::Color32::from_rgb(90, 210, 120),
-            Self::ExcessoModerado => egui::Color32::from_rgb(100, 180, 255),
-            Self::ExcessoSevero => egui::Color32::from_rgb(80, 130, 240),
+            Self::EscassezCritica => ui_refinada::menu::PERIGO,
+            Self::EscassezModerada => ui_refinada::menu::AVISO,
+            Self::Equilibrado => ui_refinada::menu::SUCESSO,
+            Self::ExcessoModerado => ui_refinada::menu::INFO,
+            Self::ExcessoSevero => ui_refinada::menu::AZUL_MARINHO,
         }
     }
 }
@@ -629,11 +629,13 @@ fn tela_mercado(
     let mut aberto = true;
     let v = &eco.vista;
 
-    egui::Window::new("🏛 Mercado Global & Nacional (2)")
+    ui_refinada::janela_estilo_menu("MERCADO GLOBAL & NACIONAL (2)")
         .open(&mut aberto)
         .default_size([1240.0, 700.0])
         .resizable(true)
         .show(ctx, |ui| {
+            ui_refinada::decorar_janela(ui);
+            ui_refinada::cabecalho_painel(ui, "MERCADO GLOBAL & NACIONAL (2)");
             if v.bens.is_empty() {
                 ui.label("Aguardando os primeiros dados do motor econômico...");
                 return;
@@ -664,7 +666,7 @@ fn tela_mercado(
                 ui.label(
                     egui::RichText::new("💡 Dica: Clique nas colunas para ordenar (▲/▼). Clique num bem para inspecionar.")
                         .italics()
-                        .color(egui::Color32::from_rgb(170, 180, 195)),
+                        .color(ui_refinada::menu::TINTA_SUAVE),
                 );
                 if resp_busca.changed() && painel.selecionado.is_some() {
                     // Mantém seleção se ainda estiver visível
@@ -680,7 +682,7 @@ fn tela_mercado(
                         v.bens.iter().filter(|b| f.aceita(b.categoria)).count()
                     };
                     let rotulo = format!("{} {} ({contagem})", f.icone(), f.nome());
-                    if ui.selectable_label(painel.filtro == f, rotulo).clicked() {
+                    if ui_refinada::aba_estilo_menu(ui, painel.filtro == f, &rotulo) {
                         painel.filtro = f;
                     }
                 }
@@ -861,11 +863,11 @@ fn tela_mercado(
                                 // Coluna 8: Saldo Comercial (Líquido)
                                 let s = b.saldo_comercial;
                                 let (txt, cor_saldo) = if s > 1.0 {
-                                    (format!("+{} (Imp)", fmt_qtd(s)), egui::Color32::from_rgb(110, 190, 255))
+                                    (format!("+{} (Imp)", fmt_qtd(s)), ui_refinada::menu::INFO)
                                 } else if s < -1.0 {
-                                    (format!("{} (Exp)", fmt_qtd(s)), egui::Color32::from_rgb(255, 205, 100))
+                                    (format!("{} (Exp)", fmt_qtd(s)), ui_refinada::menu::AVISO)
                                 } else {
-                                    ("Equilibrado".to_string(), egui::Color32::from_rgb(160, 165, 175))
+                                    ("Equilibrado".to_string(), ui_refinada::menu::TINTA_SUAVE)
                                 };
                                 let lbl_saldo = ui.colored_label(cor_saldo, txt);
                                 lbl_saldo.on_hover_ui(|ui| render_tooltip_diagnostico(ui, b));
@@ -935,12 +937,12 @@ fn detalhe_bem(
             ui.vertical(|ui| {
                 ui.heading(&b.nome);
                 ui.horizontal(|ui| {
-                    ui.colored_label(egui::Color32::from_rgb(180, 200, 220), nome_categoria(b.categoria));
+                    ui.colored_label(ui_refinada::menu::TINTA_SUAVE, nome_categoria(b.categoria));
                     ui.separator();
                     if b.comercializavel {
-                        ui.colored_label(egui::Color32::from_rgb(110, 210, 140), "🌐 Comercializável Globalmente");
+                        ui.colored_label(ui_refinada::menu::SUCESSO, "🌐 Comercializável Globalmente");
                     } else {
-                        ui.colored_label(egui::Color32::from_rgb(220, 160, 90), "🔒 Bem Local (Intransferível)");
+                        ui.colored_label(ui_refinada::menu::AVISO, "🔒 Bem Local (Intransferível)");
                     }
                 });
             });
@@ -975,11 +977,11 @@ fn detalhe_bem(
             ui.label("Saldo Comercial:");
             let s = b.saldo_comercial;
             if s > 1.0 {
-                ui.colored_label(egui::Color32::from_rgb(110, 190, 255), format!("+{} (Importa)", fmt_qtd(s)));
+                ui.colored_label(ui_refinada::menu::INFO, format!("+{} (Importa)", fmt_qtd(s)));
             } else if s < -1.0 {
-                ui.colored_label(egui::Color32::from_rgb(255, 205, 100), format!("{} (Exporta)", fmt_qtd(s)));
+                ui.colored_label(ui_refinada::menu::AVISO, format!("{} (Exporta)", fmt_qtd(s)));
             } else {
-                ui.colored_label(egui::Color32::GRAY, "Equilibrado");
+                ui.colored_label(ui_refinada::menu::TINTA_SUAVE, "Equilibrado");
             }
 
             ui.label("Variação 30d (Mun.):");
@@ -1055,19 +1057,19 @@ fn detalhe_bem(
             .show(ui, |pu| {
                 pu.line(
                     Line::new("Preço Mundial", serie_pts(slice_mun))
-                        .color(egui::Color32::from_rgb(245, 205, 90))
+                        .color(ui_refinada::menu::OURO)
                         .width(2.0),
                 );
                 pu.line(
                     Line::new("Seu Mercado", serie_pts(slice_nac))
-                        .color(egui::Color32::from_rgb(100, 180, 250))
+                        .color(ui_refinada::menu::AZUL_MARINHO)
                         .width(2.0),
                 );
                 let x0 = inicio as f64;
                 let x1 = num_dias.max(inicio + 1) as f64;
                 pu.line(
                     Line::new("Preço Base", PlotPoints::from(vec![[x0, b.preco_base], [x1, b.preco_base]]))
-                        .color(egui::Color32::from_rgb(160, 160, 165))
+                        .color(ui_refinada::menu::TINTA_SUAVE)
                         .style(LineStyle::Dashed { length: 5.0 })
                         .width(1.0),
                 );
@@ -1137,9 +1139,9 @@ fn detalhe_bem(
                             icones.mostrar(ui, &t.id, 18.0);
                             ui.strong(&t.nome);
                             if niv > 0 {
-                                ui.colored_label(egui::Color32::from_rgb(100, 220, 120), format!("[🏛 Nível {niv}]"));
+                                ui.colored_label(ui_refinada::menu::SUCESSO, format!("[🏛 Nível {niv}]"));
                             } else {
-                                ui.colored_label(egui::Color32::GRAY, "[⚪ 0 no país]");
+                                ui.colored_label(ui_refinada::menu::TINTA_SUAVE, "[⚪ 0 no país]");
                             }
                         });
                         for (mnome, qtd) in mets {
@@ -1175,9 +1177,9 @@ fn detalhe_bem(
                             icones.mostrar(ui, &t.id, 18.0);
                             ui.strong(&t.nome);
                             if niv > 0 {
-                                ui.colored_label(egui::Color32::from_rgb(100, 220, 120), format!("[🏛 Nível {niv}]"));
+                                ui.colored_label(ui_refinada::menu::SUCESSO, format!("[🏛 Nível {niv}]"));
                             } else {
-                                ui.colored_label(egui::Color32::GRAY, "[⚪ 0 no país]");
+                                ui.colored_label(ui_refinada::menu::TINTA_SUAVE, "[⚪ 0 no país]");
                             }
                         });
                         for (mnome, qtd) in mets {
