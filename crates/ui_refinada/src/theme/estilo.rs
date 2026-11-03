@@ -1,90 +1,116 @@
-//! Estilo visual de gabinete de guerra (1945) para egui.
-//! Baseado nas especificações de `design/1_identidade/ESTILO.md`.
+//! Estilo visual de gabinete de guerra e menu (1945) para egui.
+//! Paleta em papel creme envelhecido, borda vermelha dupla, cartões e fontes de época.
 
 use bevy_egui::egui::{
     style::{Spacing, WidgetVisuals, Widgets},
-    Margin,
-    Color32, CornerRadius, FontData, FontDefinitions, FontFamily, Stroke, Style, Vec2, Visuals,
+    Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Margin, Stroke, Style,
+    TextStyle, Vec2, Visuals,
 };
 
-use super::paleta::{blocos, dossie_papel, superficies, texto};
+use super::paleta::menu;
 
-/// Configura o tema de Gabinete de Guerra 1945 para o `egui::Visuals`.
+/// Configura o tema unificado de Cartaz/Gabinete 1945 para o `egui::Visuals`:
+/// papel envelhecido creme (#E8DEC8), borda vermelha (#8C251E), tinta carvão (#171614)
+/// e widgets em cartões com alto contraste e linhas de tabela alternadas suaves.
 pub fn cold_war_visuals() -> Visuals {
-    let mut visuals = Visuals::dark();
+    let mut visuals = Visuals::light();
 
-    // 1. Cores de Superfície e Fundo
-    visuals.panel_fill = superficies::BG_BASE;
-    visuals.window_fill = superficies::BG_BASE;
-    visuals.extreme_bg_color = superficies::BG_SURFACE_SUBTLE;
-    visuals.faint_bg_color = superficies::BG_SURFACE;
-    visuals.code_bg_color = superficies::BG_VOID;
+    // 1. Cores de Superfície e Fundo (Papel creme envelhecido)
+    visuals.panel_fill = menu::PAPEL;
+    visuals.window_fill = menu::PAPEL;
+    visuals.extreme_bg_color = menu::PAPEL_CLARO;
+    visuals.faint_bg_color = menu::PAPEL_ALT; // Usado por egui::Grid::striped(true) e tabelas
+    visuals.code_bg_color = menu::PAPEL_CARD;
 
-    // 2. Geometria Seca e Reta (Estética 1945)
+    // 2. Geometria Seca e Reta com Borda Vermelha (Estética 1945)
     visuals.window_corner_radius = CornerRadius::ZERO;
     visuals.menu_corner_radius = CornerRadius::ZERO;
-    visuals.window_stroke = Stroke::new(1.0, superficies::BORDER_MEDIUM);
+    visuals.window_stroke = Stroke::new(2.0, menu::VERMELHO);
+    visuals.window_shadow = egui::Shadow {
+        offset: [4, 6],
+        blur: 14,
+        spread: 0,
+        color: Color32::from_black_alpha(85),
+    };
 
-    // 3. Estilo de Widgets (Botões, Checkboxes, Sliders)
+    // 3. Tipografia: tinta escura legível sobre creme
+    visuals.override_text_color = Some(menu::TINTA);
+
+    // 4. Estilo de Widgets (Botões, Checkboxes, Sliders, Caixas)
     visuals.widgets = Widgets {
         noninteractive: WidgetVisuals {
-            bg_fill: superficies::BG_SURFACE,
-            weak_bg_fill: superficies::BG_SURFACE,
-            bg_stroke: Stroke::new(1.0, superficies::BORDER_SUBTLE),
+            bg_fill: menu::PAPEL_CARD,
+            weak_bg_fill: menu::PAPEL,
+            bg_stroke: Stroke::new(1.0, menu::PAPEL_BORDA),
             corner_radius: CornerRadius::ZERO,
-            fg_stroke: Stroke::new(1.0, texto::SECUNDARIO),
+            fg_stroke: Stroke::new(1.0, menu::TINTA),
             expansion: 0.0,
         },
         inactive: WidgetVisuals {
-            bg_fill: superficies::BG_SURFACE,
-            weak_bg_fill: superficies::BG_BASE,
-            bg_stroke: Stroke::new(1.0, superficies::BORDER_MEDIUM),
-            corner_radius: CornerRadius::same(1),
-            fg_stroke: Stroke::new(1.0, texto::PRIMARIO),
+            bg_fill: menu::PAPEL_CARD,
+            weak_bg_fill: menu::PAPEL_CARD,
+            bg_stroke: Stroke::new(1.2, menu::VERMELHO),
+            corner_radius: CornerRadius::ZERO,
+            fg_stroke: Stroke::new(1.0, menu::TINTA),
             expansion: 0.0,
         },
         hovered: WidgetVisuals {
-            bg_fill: superficies::BG_SURFACE_ELEVATED,
-            weak_bg_fill: superficies::BG_SURFACE_ELEVATED,
-            bg_stroke: Stroke::new(1.0, superficies::BORDER_STRONG),
-            corner_radius: CornerRadius::same(1),
-            fg_stroke: Stroke::new(1.0, Color32::WHITE),
+            bg_fill: menu::VERMELHO_HOVER,
+            weak_bg_fill: menu::VERMELHO_HOVER,
+            bg_stroke: Stroke::new(1.5, menu::TINTA),
+            corner_radius: CornerRadius::ZERO,
+            fg_stroke: Stroke::new(1.5, menu::PAPEL),
             expansion: 1.0,
         },
         active: WidgetVisuals {
-            bg_fill: superficies::BG_SURFACE_SUBTLE,
-            weak_bg_fill: superficies::BG_SURFACE_SUBTLE,
-            bg_stroke: Stroke::new(1.5, texto::OURO_DESTAQUE),
+            bg_fill: menu::VERMELHO_ATIVO,
+            weak_bg_fill: menu::VERMELHO_ATIVO,
+            bg_stroke: Stroke::new(2.0, menu::TINTA),
             corner_radius: CornerRadius::ZERO,
-            fg_stroke: Stroke::new(1.5, texto::OURO_DESTAQUE),
+            fg_stroke: Stroke::new(1.5, menu::PAPEL),
             expansion: -0.5,
         },
         open: WidgetVisuals {
-            bg_fill: superficies::BG_SURFACE_ELEVATED,
-            weak_bg_fill: superficies::BG_SURFACE_ELEVATED,
-            bg_stroke: Stroke::new(1.0, superficies::BORDER_STRONG),
+            bg_fill: menu::PAPEL_ALT,
+            weak_bg_fill: menu::PAPEL_ALT,
+            bg_stroke: Stroke::new(1.5, menu::VERMELHO),
             corner_radius: CornerRadius::ZERO,
-            fg_stroke: Stroke::new(1.0, texto::PRIMARIO),
+            fg_stroke: Stroke::new(1.0, menu::TINTA),
             expansion: 0.0,
         },
     };
 
-    // 4. Seleção e Destaques
-    visuals.selection.bg_fill = blocos::OCIDENTAL_PRIMARIA;
-    visuals.selection.stroke = Stroke::new(1.0, blocos::OCIDENTAL_REALCE);
+    // 5. Seleção e Destaques
+    visuals.selection.bg_fill = menu::VERMELHO;
+    visuals.selection.stroke = Stroke::new(1.0, menu::TINTA);
+    visuals.slider_trailing_fill = true;
+
+    // 6. Tooltips e Janelas Flutuantes
+    visuals.popup_shadow = egui::Shadow {
+        offset: [2, 4],
+        blur: 8,
+        spread: 0,
+        color: Color32::from_black_alpha(75),
+    };
 
     visuals
 }
 
-/// Configuração de espaçamento industrial rígido para egui.
+/// Configuração de estilo e espaçamento para egui.
 #[allow(clippy::field_reassign_with_default)]
 pub fn cold_war_style() -> Style {
     let mut style = Style::default();
     style.visuals = cold_war_visuals();
 
+    // Fonte para títulos principais (segura contra contextos sem Oswald carregado)
+    style.text_styles.insert(
+        TextStyle::Heading,
+        FontId::new(20.0, FontFamily::Proportional),
+    );
+
     style.spacing = Spacing {
         item_spacing: Vec2::new(8.0, 6.0),
-        window_margin: Margin::same(10),
+        window_margin: Margin::same(14),
         button_padding: Vec2::new(10.0, 5.0),
         indent: 14.0,
         interact_size: Vec2::new(40.0, 24.0),
@@ -93,7 +119,7 @@ pub fn cold_war_style() -> Style {
         text_edit_width: 200.0,
         icon_width: 16.0,
         icon_spacing: 6.0,
-        tooltip_width: 360.0,
+        tooltip_width: 380.0,
         ..Default::default()
     };
 
@@ -137,39 +163,214 @@ pub fn setup_cold_war_fonts(ctx: &egui::Context) {
     if let Some(mono) = fonts.families.get_mut(&FontFamily::Monospace) {
         mono.insert(0, "CourierPrime".to_owned());
     }
+    fonts.families.insert(FontFamily::Name("Oswald".into()), vec!["Oswald".to_owned()]);
+    fonts.families.insert(FontFamily::Name("SpecialElite".into()), vec!["SpecialElite".to_owned()]);
 
     ctx.set_fonts(fonts);
 }
 
-/// Moldura estilo gabinete de guerra para painéis e janelas
+/// Retorna a família de fontes para títulos/botões: Oswald se disponível no contexto, senão Proportional.
+pub fn familia_oswald(ctx: &egui::Context) -> FontFamily {
+    let oswald = FontFamily::Name("Oswald".into());
+    let disponivel = ctx.fonts(|f| f.definitions().families.contains_key(&oswald));
+    if disponivel {
+        oswald
+    } else {
+        FontFamily::Proportional
+    }
+}
+
+/// Moldura estilo gabinete de guerra para painéis e janelas (papel creme com borda vermelha)
 pub fn moldura_painel() -> egui::Frame {
     egui::Frame {
-        inner_margin: Margin::same(12),
-        fill: superficies::BG_BASE,
-        stroke: Stroke::new(1.0, superficies::BORDER_MEDIUM),
+        inner_margin: Margin::same(14),
+        fill: menu::PAPEL,
+        stroke: Stroke::new(2.0, menu::VERMELHO),
+        corner_radius: CornerRadius::ZERO,
+        shadow: egui::Shadow {
+            offset: [4, 6],
+            blur: 14,
+            spread: 0,
+            color: Color32::from_black_alpha(85),
+        },
+        ..Default::default()
+    }
+}
+
+/// Moldura padrão para janelas no estilo do menu: papel envelhecido, borda vermelha 2px e cantos secos.
+pub fn moldura_janela_papel() -> egui::Frame {
+    moldura_painel()
+}
+
+/// Moldura estilo cartão de dossiê / setor secundário
+pub fn moldura_cartao() -> egui::Frame {
+    egui::Frame {
+        inner_margin: Margin::same(10),
+        fill: menu::PAPEL_CARD,
+        stroke: Stroke::new(1.0, menu::PAPEL_BORDA),
         corner_radius: CornerRadius::ZERO,
         ..Default::default()
     }
 }
 
-/// Moldura estilo cartão de ministério / setor
-pub fn moldura_cartao() -> egui::Frame {
-    egui::Frame {
-        inner_margin: Margin::same(8),
-        fill: superficies::BG_SURFACE,
-        stroke: Stroke::new(1.0, superficies::BORDER_SUBTLE),
-        corner_radius: CornerRadius::same(1),
-        ..Default::default()
-    }
+/// Moldura estilo cartão em papel
+pub fn moldura_cartao_papel() -> egui::Frame {
+    moldura_cartao()
 }
 
 /// Moldura estilo documento em papel de gabinete envelhecido
 pub fn moldura_papel_dossie() -> egui::Frame {
     egui::Frame {
         inner_margin: Margin::same(14),
-        fill: dossie_papel::PAPEL_BASE,
-        stroke: Stroke::new(1.5, dossie_papel::PAPEL_BORDA),
+        fill: menu::PAPEL,
+        stroke: Stroke::new(1.5, menu::VERMELHO),
         corner_radius: CornerRadius::ZERO,
         ..Default::default()
     }
+}
+
+/// Desenha a borda interna e os cantos decorativos estilo dossiê 1945 sobre o retângulo fornecido.
+pub fn desenhar_moldura_dupla_com_cantos(painter: &egui::Painter, rect: egui::Rect) {
+    let vermelha = menu::VERMELHO;
+    // Borda interna recuada 3.5 px da borda da janela
+    let interna = rect.shrink(3.5);
+    painter.rect_stroke(interna, 0.0, Stroke::new(1.0, vermelha), egui::StrokeKind::Inside);
+
+    // Cantos decorativos (linhas reforçadas em L nos 4 vértices)
+    let tam = 9.0;
+    let s = Stroke::new(2.0, vermelha);
+
+    // Superior Esquerdo
+    let tl = interna.left_top();
+    painter.line_segment([tl, tl + egui::vec2(tam, 0.0)], s);
+    painter.line_segment([tl, tl + egui::vec2(0.0, tam)], s);
+
+    // Superior Direito
+    let tr = interna.right_top();
+    painter.line_segment([tr, tr - egui::vec2(tam, 0.0)], s);
+    painter.line_segment([tr, tr + egui::vec2(0.0, tam)], s);
+
+    // Inferior Esquerdo
+    let bl = interna.left_bottom();
+    painter.line_segment([bl, bl + egui::vec2(tam, 0.0)], s);
+    painter.line_segment([bl, bl - egui::vec2(0.0, tam)], s);
+
+    // Inferior Direito
+    let br = interna.right_bottom();
+    painter.line_segment([br, br - egui::vec2(tam, 0.0)], s);
+    painter.line_segment([br, br - egui::vec2(0.0, tam)], s);
+}
+
+/// Decora a janela atual com borda dupla vermelha e cantos de cartaz.
+pub fn decorar_janela(ui: &egui::Ui) {
+    desenhar_moldura_dupla_com_cantos(ui.painter(), ui.max_rect());
+}
+
+/// Cria uma janela egui pré-configurada no estilo visual do menu.
+pub fn janela_estilo_menu<'a>(titulo: impl Into<egui::WidgetText>) -> egui::Window<'a> {
+    egui::Window::new(titulo)
+        .frame(moldura_janela_papel())
+        .collapsible(false)
+}
+
+/// Desenha linha divisória decorativa dupla (vermelha) no estilo do cartaz da Guerra Fria.
+pub fn linha_decorativa(ui: &mut egui::Ui) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 6.0), egui::Sense::hover());
+    let p = ui.painter();
+    let y1 = rect.top() + 1.0;
+    let y2 = rect.top() + 4.0;
+    let cor = menu::VERMELHO;
+    p.line_segment([egui::pos2(rect.left(), y1), egui::pos2(rect.right(), y1)], Stroke::new(1.5, cor));
+    p.line_segment([egui::pos2(rect.left(), y2), egui::pos2(rect.right(), y2)], Stroke::new(0.8, cor));
+    ui.add_space(4.0);
+}
+
+/// Cabeçalho estilizado para painéis: título com fonte Oswald em CAIXA ALTA e linha decorativa dupla vermelha.
+pub fn cabecalho_painel(ui: &mut egui::Ui, titulo: &str) {
+    let fam = familia_oswald(ui.ctx());
+    ui.vertical(|ui| {
+        ui.label(
+            egui::RichText::new(titulo.to_uppercase())
+                .family(fam)
+                .size(22.0)
+                .strong()
+                .color(menu::TINTA),
+        );
+        linha_decorativa(ui);
+    });
+}
+
+/// Botão no estilo do menu: fundo vermelho com texto creme na fonte Oswald.
+pub fn botao_estilo_menu(ui: &mut egui::Ui, texto: &str) -> egui::Response {
+    let fam = familia_oswald(ui.ctx());
+    ui.add(
+        egui::Button::new(
+            egui::RichText::new(texto)
+                .family(fam)
+                .size(16.0)
+                .color(menu::PAPEL),
+        )
+        .fill(menu::VERMELHO)
+        .stroke(Stroke::new(1.0, menu::TINTA))
+        .min_size(Vec2::new(80.0, 30.0)),
+    )
+}
+
+/// Botão secundário no estilo do menu: cartão creme com borda vermelha e texto escuro.
+pub fn botao_estilo_secundario(ui: &mut egui::Ui, texto: &str) -> egui::Response {
+    ui.add(
+        egui::Button::new(
+            egui::RichText::new(texto)
+                .size(15.0)
+                .color(menu::TINTA),
+        )
+        .fill(menu::PAPEL_CARD)
+        .stroke(Stroke::new(1.0, menu::VERMELHO))
+        .min_size(Vec2::new(70.0, 28.0)),
+    )
+}
+
+/// Aba estilo dossiê: botão selecionável com realce vermelho quando ativo.
+pub fn aba_estilo_menu(ui: &mut egui::Ui, ativa: bool, texto: &str) -> bool {
+    let fam = familia_oswald(ui.ctx());
+    let (fill, text_color, stroke) = if ativa {
+        (
+            menu::VERMELHO,
+            menu::PAPEL,
+            Stroke::new(1.5, menu::TINTA),
+        )
+    } else {
+        (
+            menu::PAPEL_CARD,
+            menu::TINTA,
+            Stroke::new(1.0, menu::PAPEL_BORDA),
+        )
+    };
+    ui.add(
+        egui::Button::new(
+            egui::RichText::new(texto)
+                .family(fam)
+                .size(15.0)
+                .color(text_color),
+        )
+        .fill(fill)
+        .stroke(stroke)
+        .min_size(Vec2::new(90.0, 28.0)),
+    )
+    .clicked()
+}
+
+/// Pinta o fundo de uma linha de tabela de forma suave e alternada (odd/even).
+pub fn tabela_linha_alt(painter: &egui::Painter, indice: usize, rect: egui::Rect) {
+    if indice % 2 == 1 {
+        painter.rect_filled(rect, 0.0, menu::PAPEL_ALT);
+    }
+}
+
+/// Garante que o Ui use as cores escuras sobre papel mesmo em áreas isoladas.
+pub fn estilo_papel_ui(ui: &mut egui::Ui) {
+    let v = ui.visuals_mut();
+    v.override_text_color = Some(menu::TINTA);
+    v.selection.bg_fill = menu::VERMELHO;
+    v.slider_trailing_fill = true;
 }
