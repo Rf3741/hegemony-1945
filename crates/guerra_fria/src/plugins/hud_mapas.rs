@@ -310,9 +310,9 @@ pub fn calcular_alertas(i: &InsumosAlertas) -> Vec<Alerta> {
 
 fn cor_gravidade(g: u8) -> egui::Color32 {
     match g {
-        2 => egui::Color32::from_rgb(220, 80, 70),
-        1 => egui::Color32::from_rgb(230, 190, 70),
-        _ => egui::Color32::from_rgb(170, 190, 210),
+        2 => ui_refinada::menu::PERIGO,
+        1 => ui_refinada::menu::AVISO,
+        _ => ui_refinada::menu::INFO,
     }
 }
 
@@ -355,44 +355,46 @@ pub fn barra_extra(
     }
     let alertas = calcular_alertas(&alertas_in);
     let _ = (&jogador, &relogio);
-    egui::Panel::top("barra_modulos").show(&mut raiz, |ui| {
-        ui.horizontal_wrapped(|ui| {
-            if let Some(d) = diplo.as_mut() {
-                let r = ui.selectable_label(d.aberto, "Diplomacia (4)");
-                super::tutorial_guiado::marcar(&r, "btn_diplo");
-                if r.clicked() {
-                    d.aberto = !d.aberto;
-                }
-            }
-            if let Some(t) = tec.as_mut() {
-                let r = ui.selectable_label(t.aberto, "Tecnologia (5)");
-                super::tutorial_guiado::marcar(&r, "btn_tec");
-                if r.clicked() {
-                    t.aberto = !t.aberto;
-                }
-            }
-            if let Some(g) = guerra.as_mut()
-                && ui.selectable_label(g.aberto, "Guerra (6)").clicked()
-            {
-                g.aberto = !g.aberto;
-            }
-            ui.separator();
-            ui.label("Mapa:");
-            for m in ModoTematico::TODOS {
-                if ui.selectable_label(*modo == m, m.nome()).clicked() {
-                    *modo = m;
-                }
-            }
-        });
-        if !alertas.is_empty() {
+    egui::Panel::top("barra_modulos")
+        .frame(egui::Frame::NONE.fill(ui_refinada::menu::PAPEL).stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO)).inner_margin(4.0))
+        .show(&mut raiz, |ui| {
             ui.horizontal_wrapped(|ui| {
-                for a in &alertas {
-                    ui.label(egui::RichText::new(format!("{} {}", a.icone, a.texto)).color(cor_gravidade(a.gravidade)).strong());
-                    ui.add_space(8.0);
+                if let Some(d) = diplo.as_mut() {
+                    let r = ui.selectable_label(d.aberto, "Diplomacia (4)");
+                    super::tutorial_guiado::marcar(&r, "btn_diplo");
+                    if r.clicked() {
+                        d.aberto = !d.aberto;
+                    }
+                }
+                if let Some(t) = tec.as_mut() {
+                    let r = ui.selectable_label(t.aberto, "Tecnologia (5)");
+                    super::tutorial_guiado::marcar(&r, "btn_tec");
+                    if r.clicked() {
+                        t.aberto = !t.aberto;
+                    }
+                }
+                if let Some(g) = guerra.as_mut()
+                    && ui.selectable_label(g.aberto, "Guerra (6)").clicked()
+                {
+                    g.aberto = !g.aberto;
+                }
+                ui.separator();
+                ui.label(egui::RichText::new("Mapa:").strong().color(ui_refinada::menu::TINTA));
+                for m in ModoTematico::TODOS {
+                    if ui.selectable_label(*modo == m, m.nome()).clicked() {
+                        *modo = m;
+                    }
                 }
             });
-        }
-    });
+            if !alertas.is_empty() {
+                ui.horizontal_wrapped(|ui| {
+                    for a in &alertas {
+                        ui.label(egui::RichText::new(format!("{} {}", a.icone, a.texto)).color(cor_gravidade(a.gravidade)).strong());
+                        ui.add_space(8.0);
+                    }
+                });
+            }
+        });
     Ok(())
 }
 
@@ -400,7 +402,11 @@ pub fn barra_extra(
 fn seletor_canto(mut contextos: EguiContexts, mut modo: ResMut<ModoTematico>) -> Result {
     let ctx = contextos.ctx_mut()?;
     egui::Area::new("seletor_modo_mapa".into()).anchor(egui::Align2::RIGHT_BOTTOM, [-10.0, -10.0]).show(ctx, |ui| {
-        let quadro = egui::Frame::popup(ui.style()).show(ui, |ui| {
+        let quadro = egui::Frame::popup(ui.style())
+            .fill(ui_refinada::menu::PAPEL)
+            .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
+            .inner_margin(6.0)
+            .show(ui, |ui| {
             ui.horizontal(|ui| {
                 if ui.small_button("<").on_hover_text("Modo anterior (Shift+M)").clicked() {
                     *modo = modo.vizinho(true);
@@ -427,7 +433,11 @@ fn legenda(mut contextos: EguiContexts, modo: Res<ModoTematico>, escala: Res<Esc
     }
     let ctx = contextos.ctx_mut()?;
     egui::Area::new("legenda_mapa".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(ctx, |ui| {
-        egui::Frame::popup(ui.style()).show(ui, |ui| {
+        egui::Frame::popup(ui.style())
+            .fill(ui_refinada::menu::PAPEL)
+            .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
+            .inner_margin(8.0)
+            .show(ui, |ui| {
             ui.strong(format!("Mapa: {}", modo.nome()));
             let amostra = |ui: &mut egui::Ui, c: [u8; 4], txt: &str| {
                 ui.horizontal(|ui| {

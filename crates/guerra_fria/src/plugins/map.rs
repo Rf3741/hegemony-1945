@@ -886,8 +886,12 @@ fn legenda_zonas_ocupacao(
     }
     let ctx = contextos.ctx_mut()?;
     egui::Area::new("legenda_zonas".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -88.0]).show(ctx, |ui| {
-        egui::Frame::popup(ui.style()).show(ui, |ui| {
-            ui.label(egui::RichText::new("Zona de ocupação (hachura) — H fixa").strong());
+        egui::Frame::popup(ui.style())
+            .fill(ui_refinada::menu::PAPEL)
+            .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
+            .inner_margin(8.0)
+            .show(ui, |ui| {
+            ui.label(egui::RichText::new("Zona de ocupação (hachura) — H fixa").color(ui_refinada::menu::TINTA).strong());
             for tag in ocupantes {
                 if let Some(p) = mundo.paises.get(tag) {
                     ui.horizontal(|ui| {
