@@ -872,4 +872,22 @@ mod testes {
     fn tutorial_tem_de_3_a_5_passos() {
         assert!((3..=5).contains(&PASSOS_TUTORIAL.len()));
     }
+
+    /// Diagnóstico (temporário): lucro previsto do mesmo prédio em várias províncias dos EUA.
+    #[test]
+    #[ignore]
+    fn diag_lucro_por_provincia() {
+        let app = app_headless();
+        let v = &app.world().resource::<EconomiaSim>().vista;
+        println!("DIAG pais={} provincias na vista: {} estados: {}", v.pais_id, v.provincias.len(), v.estados.len());
+        let provs: Vec<&Provincia> = v.provincias.iter().step_by((v.provincias.len() / 10).max(1)).take(10).collect();
+        for tipo in ["fabrica_moveis", "siderurgica", "mina_carvao", "fazenda_trigo"] {
+            let linha: Vec<String> = provs.iter().map(|pr| {
+                opcoes_para_provincia(v, pr).iter().find(|o| o.tipo_id.contains(tipo.split('_').next().unwrap()) ).map_or("-".into(), |o| format!("{:.1}", o.lucro_dia))
+            }).collect();
+            println!("DIAG {tipo}: {}", linha.join(" | "));
+        }
+        for pr in &provs { println!("DIAG prov {} estado={}", pr.nome, pr.estado_id); }
+    }
+
 }
