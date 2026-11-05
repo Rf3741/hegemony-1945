@@ -1637,7 +1637,7 @@
         titulo: "A Criação do Pacto de Varsóvia em Resposta ao Rearmamento Alemão",
         descricao: "Nove dias após a entrada da República Federal da Alemanha na OTAN, a União Soviética e sete Estados satélites da Europa Oriental (Polônia, Tchecoslováquia, Alemanha Oriental, Hungria, Romênia, Bulgária e Albânia) assinam em Varsóvia o Tratado de Amizade, Cooperação e Assistência Mútua. O marechal Ivan Konev assume o comando unificado da aliança, legitimando a presença militar soviética permanente em todo o Leste Europeu.",
         data_gatilho: DataGatilho(ano: 1955, mes: 5, dia: 14),
-        paises_alvo: ["SOV", "POL", "CZE", "GDR", "HUN", "ROM", "BUL", "ALB"],
+        paises_alvo: ["SOV", "POL", "CZE", "GDR", "HUN", "ROU", "BUL", "ALB"],
         condicoes: [
             "ano >= 1955",
             "pos_evento:soberania_rfa_entrada_otan_1955",
@@ -4766,10 +4766,10 @@
         titulo: "O Golpe dos Coronéis em Atenas e a Ditadura Militar Grega",
         descricao: "A poucas semanas de eleições parlamentares que apontavam a vitória certa da União do Centro de George Papandreou e da esquerda moderada, uma conspiração de oficiais de extrema-direita liderada pelo coronel Stylianos Pattakos e Georgios Papadopoulos deflagra um golpe militar incruento em Atenas. Utilizando o plano de emergência Prometheus da OTAN para simular ameaça de invasão comunista, a junta militar suspende a Constituição, prende 10 mil cidadãos e instaura uma ditadura de tortura e terror.",
         data_gatilho: DataGatilho(ano: 1967, mes: 4, dia: 21),
-        paises_alvo: ["GRE", "USA"],
+        paises_alvo: ["GRC", "USA"],
         condicoes: [
             "ano >= 1967",
-            "soberano:GRE",
+            "soberano:GRC",
         ],
         opcoes: [
             OpcaoEvento(

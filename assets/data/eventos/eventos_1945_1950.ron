@@ -413,7 +413,7 @@
         titulo: "A Eclosão da Guerra Civil Grega: Monarquistas vs. Comunistas",
         descricao: "Após o ataque a Litohoro em março de 1946, o Exército Democrático da Grécia (DSE), braço armado do Partido Comunista Grego (KKE), inicia uma insurgência guerrilheira em larga escala a partir das montanhas do norte, com apoio logístico e santuário na Iugoslávia de Tito e na Albânia.",
         data_gatilho: DataGatilho(ano: 1946, mes: 10, dia: 28),
-        paises_alvo: ["GRE", "GBR", "USA", "YUG"],
+        paises_alvo: ["GRC", "GBR", "USA", "YUG"],
         condicoes: [],
         opcoes: [
             OpcaoEvento(
@@ -483,7 +483,7 @@
         titulo: "Proclamação da Doutrina Truman: A Política de Contenção",
         descricao: "Em discurso solene perante sessão conjunta do Congresso dos EUA, o presidente Harry S. Truman declara que a política americana deve ser 'apoiar os povos livres que estão resistindo a tentativas de subjugação por minorias armadas ou por pressões externas', solicitando US$ 400 milhões em ajuda militar e econômica para a Grécia e a Turquia.",
         data_gatilho: DataGatilho(ano: 1947, mes: 3, dia: 12),
-        paises_alvo: ["USA", "GRE", "TUR", "SOV"],
+        paises_alvo: ["USA", "GRC", "TUR", "SOV"],
         condicoes: [],
         opcoes: [
             OpcaoEvento(

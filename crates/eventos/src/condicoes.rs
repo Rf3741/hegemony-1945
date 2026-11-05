@@ -25,6 +25,8 @@ pub enum Condicao {
     NaoTemFlag(String),
     RelacaoMin(String, f32),
     RelacaoMax(String, f32),
+    /// Bloco geopolítico do país afetado (`alinhamento:bloco_ocidental`).
+    Alinhamento(String),
     /// Variável numérica comparada a um valor (`tensao_guerra_fria >= 40`).
     Compara(String, Op, f32),
     /// Sem dado no cliente para avaliar: assume verdadeira e avisa no log.
@@ -43,6 +45,7 @@ impl Condicao {
                 "tem_lei" => Condicao::TemLei(v.to_string()),
                 "nao_tem_lei" | "sem_lei" => Condicao::NaoTemLei(v.to_string()),
                 "tem_flag" | "flag" => Condicao::TemFlag(v.to_string()),
+                "alinhamento" => Condicao::Alinhamento(v.to_ascii_lowercase()),
                 "nao_tem_flag" | "sem_flag" => Condicao::NaoTemFlag(v.to_string()),
                 "legitimidade_max" | "legitimidade_maxima" => {
                     v.parse::<f32>().map(Condicao::LegitimidadeMax).unwrap_or_else(|_| Condicao::Desconhecida(s.to_string()))

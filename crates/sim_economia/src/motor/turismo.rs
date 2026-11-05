@@ -114,7 +114,10 @@ impl MundoEconomico {
         self.turismo.ultimo_calculo = Some(self.dias_decorridos);
     }
 
-    /// Aplica o turismo do dia: exportação de serviços no PIB e imposto no tesouro. Recalcula mensalmente.
+    /// Aplica o turismo do dia: exportação de serviços no PIB e imposto na conta de receitas.
+    /// Recalcula mensalmente. O imposto NÃO credita o tesouro aqui: quem consolida receita no
+    /// tesouro é o fechamento fiscal (`receita_total` já inclui `receita_turismo`); creditar nas
+    /// duas contas dobrava a arrecadação do turismo todos os dias.
     pub(super) fn aplicar_turismo_diario(&mut self) {
         let precisa = match self.turismo.ultimo_calculo {
             None => true,
@@ -125,12 +128,9 @@ impl MundoEconomico {
         }
         for i in 0..self.paises.len() {
             let gasto = self.turismo.receita_receptiva[i];
-            let imposto = gasto * IMPOSTO_TURISMO;
             let p = &mut self.paises[i];
             p.pib_diario += gasto;
-            p.orcamento.receita_turismo = imposto;
-            p.orcamento.tesouro += imposto;
-            p.orcamento.saldo_diario += imposto;
+            p.orcamento.receita_turismo = gasto * IMPOSTO_TURISMO;
         }
     }
 }

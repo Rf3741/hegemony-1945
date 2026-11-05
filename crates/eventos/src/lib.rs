@@ -369,6 +369,10 @@ impl EstadoEventos {
             Condicao::NaoTemFlag(f) => !self.tem_flag(alvo, f),
             Condicao::RelacaoMin(tag, min_val) => self.obter_relacao(alvo, tag) >= *min_val,
             Condicao::RelacaoMax(tag, max_val) => self.obter_relacao(alvo, tag) <= *max_val,
+            Condicao::Alinhamento(bloco) => mundo
+                .paises
+                .get(alvo)
+                .is_some_and(|p| chave_alinhamento(p.alinhamento_inicial) == *bloco),
             Condicao::Compara(nome, op, n) => match variavel(mundo, self, alvo, nome) {
                 Some(v) => match op {
                     Op::Ge => v >= *n,
@@ -393,10 +397,26 @@ impl EstadoEventos {
 }
 
 /// Dias de tolerância depois da data do gatilho para as condições ainda poderem ser atendidas.
-const JANELA_DIAS: i64 = 0;
+/// Com tolerância zero, um evento cujas condições não batessem exatamente no dia ficava perdido
+/// para sempre (a história do cenário não se repete).
+const JANELA_DIAS: i64 = 15;
 
+/// Dia absoluto do calendário gregoriano (contagem de dias civis, com anos bissextos reais).
+/// A aproximação anterior de "mês de 30 dias" fazia dois dias reais terem o mesmo número
+/// (dia 31 e dia 1 do mês seguinte) e dois números nunca aparecerem (29 e 30 de fevereiro),
+/// adiantando ou tornando inatingível o disparo de eventos datados.
 fn dias(d: (i32, u8, u8)) -> i64 {
-    d.0 as i64 * 365 + (d.1 as i64 - 1) * 30 + d.2 as i64
+    let mut ano = i64::from(d.0);
+    let (mes, dia) = (i64::from(d.1), i64::from(d.2));
+    if mes <= 2 {
+        ano -= 1;
+    }
+    let era = if ano >= 0 { ano } else { ano - 399 }.div_euclid(400);
+    let yoe = ano - era * 400;
+    let m = if mes > 2 { mes - 3 } else { mes + 9 };
+    let doy = (153 * m + 2) / 5 + dia - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe - 719468
 }
 
 fn rolar(id: &str, d: (i32, u8, u8)) -> f32 {
@@ -405,6 +425,16 @@ fn rolar(id: &str, d: (i32, u8, u8)) -> f32 {
         h = (h ^ b as u64).wrapping_mul(1099511628211);
     }
     (h >> 40) as f32 / (1u64 << 24) as f32
+}
+
+/// Chave usada nas condições `alinhamento:<chave>` do catálogo de eventos.
+fn chave_alinhamento(alinhamento: simulacao::AlinhamentoGeopolitico) -> &'static str {
+    match alinhamento {
+        simulacao::AlinhamentoGeopolitico::BlocoOcidental => "bloco_ocidental",
+        simulacao::AlinhamentoGeopolitico::BlocoSovietico => "bloco_sovietico",
+        simulacao::AlinhamentoGeopolitico::NaoAlinhado => "nao_alinhado",
+        simulacao::AlinhamentoGeopolitico::OcupacaoAliada => "ocupacao_aliada",
+    }
 }
 
 fn variavel(mundo: &MundoJogo, est: &EstadoEventos, pais: &str, nome: &str) -> Option<f32> {
