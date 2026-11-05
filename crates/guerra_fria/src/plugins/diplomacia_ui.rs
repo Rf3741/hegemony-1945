@@ -13,6 +13,15 @@ use simulacao::mapa::AlinhamentoGeopolitico;
 #[derive(Resource)]
 pub struct DiploSim(pub Diplomacia);
 
+#[derive(Clone, Debug)]
+pub struct ItemDiploCache {
+    pub tag: String,
+    pub nome: String,
+    pub relacao: f32,
+    pub esfera: Esfera,
+    pub tag_legado: String,
+}
+
 #[derive(Resource, Default)]
 pub struct PainelDiplomacia {
     pub aberto: bool,
@@ -25,6 +34,9 @@ pub struct PainelDiplomacia {
     /// Pede repintura do mapa.
     pub repintar: bool,
     pub dias_desde_pintura: u32,
+    pub cache_lista: Vec<ItemDiploCache>,
+    pub cache_busca: String,
+    pub versao_diplo: u64,
 }
 
 pub struct DiplomaciaUiPlugin;
@@ -213,30 +225,55 @@ fn tela_diplomacia(
                 ui.label("Buscar:");
                 ui.text_edit_singleline(&mut painel.busca);
             });
-            egui::ScrollArea::vertical().id_salt("diplo_lista").max_height(480.0).show(&mut cols[0], |ui| {
+            // Cache da lista de países: só recalcula se a busca ou os dados diplomáticos mudarem
+            if painel.cache_busca != painel.busca || painel.cache_lista.is_empty() || d.is_changed() {
+                painel.cache_busca = painel.busca.clone();
                 let busca = painel.busca.to_lowercase();
-                let tags: Vec<String> = d.0.paises.iter().map(|p| p.tag.clone()).collect();
-                for t in tags {
-                    if t == eu || (!busca.is_empty() && !nome(&t).to_lowercase().contains(&busca) && !t.to_lowercase().contains(&busca)) {
+                let mut nova_lista = Vec::new();
+                for p in &d.0.paises {
+                    let t = &p.tag;
+                    if *t == eu {
                         continue;
                     }
-                    let r = d.0.relacao(&eu, &t);
-                    let e = d.0.esfera(&t);
+                    let n = nome(t);
+                    if !busca.is_empty() && !n.to_lowercase().contains(&busca) && !t.to_lowercase().contains(&busca) {
+                        continue;
+                    }
+                    let r = d.0.relacao(&eu, t);
+                    let e = d.0.esfera(t);
+                    nova_lista.push(ItemDiploCache {
+                        tag: t.clone(),
+                        nome: n,
+                        relacao: r,
+                        esfera: e,
+                        tag_legado: tag_diplo_para_legado(t),
+                    });
+                }
+                painel.cache_lista = nova_lista;
+            }
+            let total_linhas = painel.cache_lista.len();
+            let mut novo_alvo = None;
+            egui::ScrollArea::vertical().id_salt("diplo_lista").max_height(480.0).show_rows(&mut cols[0], 22.0, total_linhas, |ui, row_range| {
+                for idx in row_range {
+                    let item = &painel.cache_lista[idx];
                     ui.horizontal(|ui| {
-                        if !super::bandeiras_ui::bandeira_ui(ui, &tag_diplo_para_legado(&t), 14.0) {
-                            ui.colored_label(cor_egui(e), "■");
+                        if !super::bandeiras_ui::bandeira_ui(ui, &item.tag_legado, 14.0) {
+                            ui.colored_label(cor_egui(item.esfera), "■");
                         }
-                        let sel = painel.alvo == t;
-                        if ui.selectable_label(sel, format!("{} ({t})", nome(&t))).clicked() {
-                            painel.alvo = t.clone();
+                        let sel = painel.alvo == item.tag;
+                        if ui.selectable_label(sel, format!("{} ({})", item.nome, item.tag)).clicked() {
+                            novo_alvo = Some(item.tag.clone());
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let c = if r >= 21.0 { ui_refinada::menu::SUCESSO } else if r <= -21.0 { ui_refinada::menu::PERIGO } else { ui_refinada::menu::TINTA_SUAVE };
-                            ui.colored_label(c, format!("{r:+.0}"));
+                            let c = if item.relacao >= 21.0 { ui_refinada::menu::SUCESSO } else if item.relacao <= -21.0 { ui_refinada::menu::PERIGO } else { ui_refinada::menu::TINTA_SUAVE };
+                            ui.colored_label(c, format!("{:+0.0}", item.relacao));
                         });
                     });
                 }
             });
+            if let Some(alvo) = novo_alvo {
+                painel.alvo = alvo;
+            }
             // ---- Coluna direita: detalhes e ações ----
             let ui = &mut cols[1];
             if painel.alvo.is_empty() {

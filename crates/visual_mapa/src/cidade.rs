@@ -332,10 +332,14 @@ pub fn atualizar_sprites_cidade_sistema(
 pub fn animar_predios_cidade_sistema(
     time: Res<Time>,
     eras: Res<GerenciadorEras>,
+    lod: Option<Res<crate::lod::EstadoLod>>,
     mut materiais: ResMut<Assets<ColorMaterial>>,
     cidades: Query<&CidadeVisual>,
     mut predios: Query<(&ChildOf, &mut PredioCidade, &mut Transform, &MeshMaterial2d<ColorMaterial>)>,
 ) {
+    if lod.as_ref().is_some_and(|l| l.nivel_atual != crate::lod::NivelLod::Local) {
+        return;
+    }
     let dt = time.delta_secs();
     let altura_era = eras.multiplicador_altura();
     let mut cor_aplicada = false;
@@ -361,7 +365,10 @@ pub fn animar_predios_cidade_sistema(
             1.0
         };
         let e = p.escala_animada * pop;
-        tr.scale = Vec3::new(p.tamanho.x * e, p.tamanho.y * e * altura_era, 1.0);
+        let novo_s = Vec3::new(p.tamanho.x * e, p.tamanho.y * e * altura_era, 1.0);
+        if (tr.scale.x - novo_s.x).abs() > 1e-4 {
+            tr.scale = novo_s;
+        }
     }
 }
 

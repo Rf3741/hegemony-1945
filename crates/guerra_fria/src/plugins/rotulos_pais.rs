@@ -229,10 +229,8 @@ fn invalidar_rotulos(
     rotulos: Query<Entity, With<RotuloPais>>,
     mut dias: MessageReader<super::time::EventoTickDiario>,
 ) {
-    // Fronteiras só mudam na virada do dia: ordenar e fazer hash de todas as províncias a cada
-    // quadro custava ~2,5 ms por quadro. Fora do dia novo, só conta o debounce pendente.
     let dia_novo = dias.read().count() > 0;
-    if !dia_novo && estado.assinatura != 0 {
+    if (!dia_novo || !mundo.is_changed()) && estado.assinatura != 0 {
         if estado.pendente > 0.0 {
             estado.pendente -= tempo.delta_secs();
             if estado.pendente <= 0.0 {
@@ -244,14 +242,18 @@ fn invalidar_rotulos(
         }
         return;
     }
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    let mut donos: Vec<_> = mundo.0.dono_por_provincia.iter().collect();
-    donos.sort_by_key(|(id, _)| **id);
-    donos.hash(&mut h);
-    let mut controladores: Vec<_> = mundo.0.controlador_por_provincia.iter().collect();
-    controladores.sort_by_key(|(id, _)| **id);
-    controladores.hash(&mut h);
-    let assinatura = h.finish();
+    // Hash comutativo XOR O(N) sem alocar nem ordenar 5.000 províncias
+    let mut assinatura = 0u64;
+    for (&id, tag) in &mundo.0.dono_por_provincia {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (id, tag.as_str()).hash(&mut h);
+        assinatura ^= h.finish();
+    }
+    for (&id, tag) in &mundo.0.controlador_por_provincia {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (id, tag.as_str(), 1u8).hash(&mut h);
+        assinatura ^= h.finish();
+    }
     if estado.assinatura == 0 {
         estado.assinatura = assinatura;
         return;

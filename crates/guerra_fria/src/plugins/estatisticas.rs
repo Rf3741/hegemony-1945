@@ -263,6 +263,18 @@ pub struct RecursoLedger {
     pub cat_ordem: Categoria,
     pub cat_desc: bool,
     pub linhas_cat: Vec<LinhaCategoria>,
+    pub top_economicas: Vec<EntradaRankingPotencia>,
+    pub top_militares: Vec<EntradaRankingPotencia>,
+    pub top_influencia: Vec<EntradaRankingPotencia>,
+    pub tabela_cache: Vec<EntradaRankingPotencia>,
+    pub tabela_cache_busca: String,
+    pub tabela_cache_bloco: Option<String>,
+    pub tabela_cache_col: ColunaLedger,
+    pub tabela_cache_desc: bool,
+    pub tabela_cache_versao: usize,
+    pub lista_grafico_cache: Vec<(usize, String, String, String)>,
+    pub lista_grafico_busca: String,
+    pub lista_grafico_versao: usize,
 }
 
 impl Default for RecursoLedger {
@@ -286,6 +298,18 @@ impl Default for RecursoLedger {
             cat_ordem: Categoria::Pib,
             cat_desc: true,
             linhas_cat: Vec::new(),
+            top_economicas: Vec::new(),
+            top_militares: Vec::new(),
+            top_influencia: Vec::new(),
+            tabela_cache: Vec::new(),
+            tabela_cache_busca: String::new(),
+            tabela_cache_bloco: None,
+            tabela_cache_col: ColunaLedger::PontuacaoTotal,
+            tabela_cache_desc: true,
+            tabela_cache_versao: 0,
+            lista_grafico_cache: Vec::new(),
+            lista_grafico_busca: String::new(),
+            lista_grafico_versao: 0,
         }
     }
 }
@@ -478,6 +502,11 @@ fn atualizar_rankings_sistema(
     if eco.vista.ranking.is_empty() {
         return;
     }
+    let eco_mudou = eco.is_changed();
+    let diplo_mudou = diplo.as_ref().is_some_and(|d| d.is_changed());
+    if !eco_mudou && !diplo_mudou && !ledger.rankings_cache.is_empty() {
+        return;
+    }
 
     // Calcula os maiores valores para normalização relativa
     let mut max_pib = 1.0_f64;
@@ -609,7 +638,23 @@ fn atualizar_rankings_sistema(
         };
     }
 
+    let mut eco_top = entradas.clone();
+    eco_top.sort_by(|a, b| b.pib_anual.total_cmp(&a.pib_anual));
+    eco_top.truncate(10);
+    ledger.top_economicas = eco_top;
+
+    let mut mil_top = entradas.clone();
+    mil_top.sort_by(|a, b| b.pontuacao_mil.total_cmp(&a.pontuacao_mil));
+    mil_top.truncate(10);
+    ledger.top_militares = mil_top;
+
+    let mut inf_top = entradas.clone();
+    inf_top.sort_by(|a, b| b.pontuacao_inf.total_cmp(&a.pontuacao_inf));
+    inf_top.truncate(10);
+    ledger.top_influencia = inf_top;
+
     ledger.rankings_cache = entradas;
+    ledger.tabela_cache.clear();
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -753,23 +798,38 @@ fn desenhar_aba_graficos(
             ui.add_space(4.0);
             let termo = ledger.filtro_busca.trim().to_lowercase();
 
+            // Cache dos países para o gráfico
+            if ledger.lista_grafico_cache.is_empty()
+                || ledger.lista_grafico_busca != termo
+                || ledger.lista_grafico_versao != ledger.historico_paises.len()
+            {
+                ledger.lista_grafico_busca = termo.clone();
+                ledger.lista_grafico_versao = ledger.historico_paises.len();
+                let mut paises_lista: Vec<_> = ledger.historico_paises.values().collect();
+                paises_lista.sort_by(|a, b| a.nome.cmp(&b.nome));
+                let mut filtrada = Vec::new();
+                for (idx, p) in paises_lista.iter().enumerate() {
+                    if !termo.is_empty()
+                        && !p.nome.to_lowercase().contains(&termo)
+                        && !p.tag.to_lowercase().contains(&termo)
+                    {
+                        continue;
+                    }
+                    filtrada.push((idx, p.id.clone(), p.nome.clone(), p.tag.clone()));
+                }
+                ledger.lista_grafico_cache = filtrada;
+            }
+
+            let total_itens = ledger.lista_grafico_cache.len();
+            let mut alternar_selecao = None;
             egui::ScrollArea::vertical()
                 .id_salt("scroll_paises_grafico")
                 .max_height(480.0)
-                .show(ui, |ui| {
-                    let mut paises_lista: Vec<_> = ledger.historico_paises.values().collect();
-                    paises_lista.sort_by(|a, b| a.nome.cmp(&b.nome));
-
-                    for (idx, p) in paises_lista.iter().enumerate() {
-                        if !termo.is_empty()
-                            && !p.nome.to_lowercase().contains(&termo)
-                            && !p.tag.to_lowercase().contains(&termo)
-                        {
-                            continue;
-                        }
-
-                        let marcado = ledger.paises_selecionados.contains(&p.id);
-                        let eh_jogador = p.id == id_jogador;
+                .show_rows(ui, 22.0, total_itens, |ui, row_range| {
+                    for i in row_range {
+                        let (idx, ref pid, ref pnome, ref ptag) = ledger.lista_grafico_cache[i];
+                        let marcado = ledger.paises_selecionados.contains(pid);
+                        let eh_jogador = pid == id_jogador;
                         let cor_item = cor_para_indice(idx);
 
                         ui.horizontal(|ui| {
@@ -778,21 +838,25 @@ fn desenhar_aba_graficos(
 
                             let mut checked = marcado;
                             let rotulo = if eh_jogador {
-                                format!("{} (Você)", p.nome)
+                                format!("{pnome} (Você)")
                             } else {
-                                format!("{} ({})", p.nome, p.tag)
+                                format!("{pnome} ({ptag})")
                             };
 
                             if ui.checkbox(&mut checked, rotulo).changed() {
-                                if checked {
-                                    ledger.paises_selecionados.insert(p.id.clone());
-                                } else {
-                                    ledger.paises_selecionados.remove(&p.id);
-                                }
+                                alternar_selecao = Some((pid.clone(), checked));
                             }
                         });
                     }
                 });
+
+            if let Some((pid, checked)) = alternar_selecao {
+                if checked {
+                    ledger.paises_selecionados.insert(pid);
+                } else {
+                    ledger.paises_selecionados.remove(&pid);
+                }
+            }
         });
 
         // Coluna 2: Gráfico Histórico Interativo com egui_plot
@@ -957,9 +1021,7 @@ fn desenhar_aba_potencias(
                 // Coluna 1: Maiores Potências Econômicas
                 cols[0].group(|ui| {
                     ui.strong("📈 Potência Econômica (PIB)");
-                    let mut lista = ledger.rankings_cache.clone();
-                    lista.sort_by(|a, b| b.pib_anual.total_cmp(&a.pib_anual));
-                    for (i, p) in lista.iter().take(10).enumerate() {
+                    for (i, p) in ledger.top_economicas.iter().take(10).enumerate() {
                         let eh_jog = p.id == id_jogador;
                         let txt = format!("{}. {} — {}", i + 1, p.nome, fmt_din(p.pib_anual));
                         if eh_jog {
@@ -973,9 +1035,7 @@ fn desenhar_aba_potencias(
                 // Coluna 2: Maiores Potências Militares
                 cols[1].group(|ui| {
                     ui.strong("⚔️ Potência Militar (Força Armada)");
-                    let mut lista = ledger.rankings_cache.clone();
-                    lista.sort_by(|a, b| b.pontuacao_mil.total_cmp(&a.pontuacao_mil));
-                    for (i, p) in lista.iter().take(10).enumerate() {
+                    for (i, p) in ledger.top_militares.iter().take(10).enumerate() {
                         let eh_jog = p.id == id_jogador;
                         let txt = format!("{}. {} — {:.0} pts", i + 1, p.nome, p.pontuacao_mil);
                         if eh_jog {
@@ -989,9 +1049,7 @@ fn desenhar_aba_potencias(
                 // Coluna 3: Maior Influência & Geopolítica
                 cols[2].group(|ui| {
                     ui.strong("🌐 Projeção de Influência");
-                    let mut lista = ledger.rankings_cache.clone();
-                    lista.sort_by(|a, b| b.pontuacao_inf.total_cmp(&a.pontuacao_inf));
-                    for (i, p) in lista.iter().take(10).enumerate() {
+                    for (i, p) in ledger.top_influencia.iter().take(10).enumerate() {
                         let eh_jog = p.id == id_jogador;
                         let txt = format!("{}. {} — {:.0} pts ({})", i + 1, p.nome, p.pontuacao_inf, p.esfera);
                         if eh_jog {
@@ -1036,39 +1094,53 @@ fn desenhar_aba_tabela(
 
     ui.add_space(4.0);
 
-    let mut lista = ledger.rankings_cache.clone();
+    let precisa_recalcular = ledger.tabela_cache.is_empty()
+        || ledger.tabela_cache_busca != ledger.filtro_busca
+        || ledger.tabela_cache_bloco != ledger.filtro_bloco
+        || ledger.tabela_cache_col != ledger.coluna_ordenacao
+        || ledger.tabela_cache_desc != ledger.ordenacao_decrescente;
 
-    // Filtra busca e bloco
-    let termo = ledger.filtro_busca.trim().to_lowercase();
-    if !termo.is_empty() {
-        lista.retain(|p| p.nome.to_lowercase().contains(&termo) || p.tag.to_lowercase().contains(&termo));
+    if precisa_recalcular {
+        let mut lista = ledger.rankings_cache.clone();
+
+        // Filtra busca e bloco
+        let termo = ledger.filtro_busca.trim().to_lowercase();
+        if !termo.is_empty() {
+            lista.retain(|p| p.nome.to_lowercase().contains(&termo) || p.tag.to_lowercase().contains(&termo));
+        }
+        if let Some(b) = &ledger.filtro_bloco {
+            lista.retain(|p| p.esfera == b.as_str());
+        }
+
+        // Ordenação
+        let col = ledger.coluna_ordenacao;
+        let desc = ledger.ordenacao_decrescente;
+
+        lista.sort_by(|a, b| {
+            let cmp = match col {
+                ColunaLedger::RankGeral => a.rank_geral.cmp(&b.rank_geral),
+                ColunaLedger::Nome => a.nome.cmp(&b.nome),
+                ColunaLedger::PontuacaoTotal => a.pontuacao_total.total_cmp(&b.pontuacao_total),
+                ColunaLedger::PontuacaoEco => a.pontuacao_eco.total_cmp(&b.pontuacao_eco),
+                ColunaLedger::Pib => a.pib_anual.total_cmp(&b.pib_anual),
+                ColunaLedger::PontuacaoMil => a.pontuacao_mil.total_cmp(&b.pontuacao_mil),
+                ColunaLedger::ForcaMil => a.forca_militar.total_cmp(&b.forca_militar),
+                ColunaLedger::PontuacaoInf => a.pontuacao_inf.total_cmp(&b.pontuacao_inf),
+                ColunaLedger::Populacao => a.populacao.total_cmp(&b.populacao),
+                ColunaLedger::PadraoVida => a.padrao_vida.total_cmp(&b.padrao_vida),
+                ColunaLedger::Desemprego => a.desemprego.total_cmp(&b.desemprego),
+                ColunaLedger::Tesouro => a.tesouro.total_cmp(&b.tesouro),
+                ColunaLedger::Divida => a.divida.total_cmp(&b.divida),
+            };
+            if desc { cmp.reverse() } else { cmp }
+        });
+
+        ledger.tabela_cache_busca = ledger.filtro_busca.clone();
+        ledger.tabela_cache_bloco = ledger.filtro_bloco.clone();
+        ledger.tabela_cache_col = ledger.coluna_ordenacao;
+        ledger.tabela_cache_desc = ledger.ordenacao_decrescente;
+        ledger.tabela_cache = lista;
     }
-    if let Some(b) = &ledger.filtro_bloco {
-        lista.retain(|p| p.esfera == b.as_str());
-    }
-
-    // Ordenação
-    let col = ledger.coluna_ordenacao;
-    let desc = ledger.ordenacao_decrescente;
-
-    lista.sort_by(|a, b| {
-        let cmp = match col {
-            ColunaLedger::RankGeral => a.rank_geral.cmp(&b.rank_geral),
-            ColunaLedger::Nome => a.nome.cmp(&b.nome),
-            ColunaLedger::PontuacaoTotal => a.pontuacao_total.total_cmp(&b.pontuacao_total),
-            ColunaLedger::PontuacaoEco => a.pontuacao_eco.total_cmp(&b.pontuacao_eco),
-            ColunaLedger::Pib => a.pib_anual.total_cmp(&b.pib_anual),
-            ColunaLedger::PontuacaoMil => a.pontuacao_mil.total_cmp(&b.pontuacao_mil),
-            ColunaLedger::ForcaMil => a.forca_militar.total_cmp(&b.forca_militar),
-            ColunaLedger::PontuacaoInf => a.pontuacao_inf.total_cmp(&b.pontuacao_inf),
-            ColunaLedger::Populacao => a.populacao.total_cmp(&b.populacao),
-            ColunaLedger::PadraoVida => a.padrao_vida.total_cmp(&b.padrao_vida),
-            ColunaLedger::Desemprego => a.desemprego.total_cmp(&b.desemprego),
-            ColunaLedger::Tesouro => a.tesouro.total_cmp(&b.tesouro),
-            ColunaLedger::Divida => a.divida.total_cmp(&b.divida),
-        };
-        if desc { cmp.reverse() } else { cmp }
-    });
 
     let col_ord = ledger.coluna_ordenacao;
     let desc_ord = ledger.ordenacao_decrescente;
@@ -1083,84 +1155,82 @@ fn desenhar_aba_tabela(
         }
     };
 
+    // Cabeçalho fixo da tabela
+    ui.horizontal(|ui| {
+        if ui.add_sized([50.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::RankGeral, "Rank"))).clicked() {
+            nova_col_ord = Some(ColunaLedger::RankGeral);
+        }
+        if ui.add_sized([180.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::Nome, "País"))).clicked() {
+            nova_col_ord = Some(ColunaLedger::Nome);
+        }
+        ui.add_sized([110.0, 20.0], egui::Label::new(egui::RichText::new("Grau").strong()));
+        if ui.add_sized([60.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::PontuacaoTotal, "Pontos"))).clicked() {
+            nova_col_ord = Some(ColunaLedger::PontuacaoTotal);
+        }
+        if ui.add_sized([80.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::Pib, "PIB Anual"))).clicked() {
+            nova_col_ord = Some(ColunaLedger::Pib);
+        }
+        if ui.add_sized([60.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::PontuacaoMil, "Militar"))).clicked() {
+            nova_col_ord = Some(ColunaLedger::PontuacaoMil);
+        }
+        if ui.add_sized([70.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::PontuacaoInf, "Influência"))).clicked() {
+            nova_col_ord = Some(ColunaLedger::PontuacaoInf);
+        }
+        if ui.add_sized([80.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::Populacao, "População"))).clicked() {
+            nova_col_ord = Some(ColunaLedger::Populacao);
+        }
+        if ui.add_sized([50.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::PadraoVida, "SoL"))).clicked() {
+            nova_col_ord = Some(ColunaLedger::PadraoVida);
+        }
+        if ui.add_sized([60.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::Desemprego, "Desemp."))).clicked() {
+            nova_col_ord = Some(ColunaLedger::Desemprego);
+        }
+        if ui.add_sized([80.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::Tesouro, "Tesouro"))).clicked() {
+            nova_col_ord = Some(ColunaLedger::Tesouro);
+        }
+        if ui.add_sized([80.0, 20.0], egui::Button::new(rotulo_cabecalho(ColunaLedger::Divida, "Dívida"))).clicked() {
+            nova_col_ord = Some(ColunaLedger::Divida);
+        }
+        ui.add_sized([120.0, 20.0], egui::Label::new(egui::RichText::new("Esfera").strong()));
+    });
+    ui.separator();
+
+    let total_linhas = ledger.tabela_cache.len();
     egui::ScrollArea::vertical()
         .id_salt("scroll_tabela_ledger")
         .max_height(580.0)
-        .show(ui, |ui| {
-            egui::Grid::new("grid_ledger_paises")
-                .striped(true)
-                .min_col_width(70.0)
-                .spacing([12.0, 6.0])
-                .show(ui, |ui| {
-                    // Cabeçalho da tabela
-                    if ui.button(rotulo_cabecalho(ColunaLedger::RankGeral, "Rank")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::RankGeral);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Nome, "País")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Nome);
-                    }
-                    ui.strong("Grau");
-                    if ui.button(rotulo_cabecalho(ColunaLedger::PontuacaoTotal, "Pontos")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::PontuacaoTotal);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Pib, "PIB Anual")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Pib);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::PontuacaoMil, "Militar")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::PontuacaoMil);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::PontuacaoInf, "Influência")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::PontuacaoInf);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Populacao, "População")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Populacao);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::PadraoVida, "SoL")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::PadraoVida);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Desemprego, "Desemp.")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Desemprego);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Tesouro, "Tesouro")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Tesouro);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Divida, "Dívida")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Divida);
-                    }
-                    ui.strong("Esfera");
-                    ui.end_row();
+        .show_rows(ui, 22.0, total_linhas, |ui, row_range| {
+            for idx in row_range {
+                let p = &ledger.tabela_cache[idx];
+                let eh_jogador = p.id == id_jogador;
+                let cor_destaque = if eh_jogador { ui_refinada::menu::VERMELHO } else { ui_refinada::menu::TINTA };
 
-                    // Linhas dos países
-                    for p in &lista {
-                        let eh_jogador = p.id == id_jogador;
-                        let cor_destaque = if eh_jogador { ui_refinada::menu::VERMELHO } else { ui_refinada::menu::TINTA };
+                ui.horizontal(|ui| {
+                    ui.add_sized([50.0, 20.0], egui::Label::new(egui::RichText::new(format!("#{}", p.rank_geral)).color(cor_destaque)));
 
-                        ui.colored_label(cor_destaque, format!("#{}", p.rank_geral));
+                    let (r, _) = ui.allocate_exact_size(egui::vec2(14.0, 10.0), egui::Sense::hover());
+                    ui.painter().rect_filled(r, 1.5, p.cor);
 
-                        ui.horizontal(|ui| {
-                            let (r, _) = ui.allocate_exact_size(egui::vec2(14.0, 10.0), egui::Sense::hover());
-                            ui.painter().rect_filled(r, 1.5, p.cor);
-                            if eh_jogador {
-                                ui.colored_label(cor_destaque, egui::RichText::new(format!("{} ({}) ★", p.nome, p.tag)).strong());
-                            } else {
-                                ui.colored_label(cor_destaque, format!("{} ({})", p.nome, p.tag));
-                            }
-                        });
+                    let nome_txt = if eh_jogador {
+                        egui::RichText::new(format!("{} ({}) ★", p.nome, p.tag)).color(cor_destaque).strong()
+                    } else {
+                        egui::RichText::new(format!("{} ({})", p.nome, p.tag)).color(cor_destaque)
+                    };
+                    ui.add_sized([162.0, 20.0], egui::Label::new(nome_txt).truncate());
 
-                        ui.colored_label(p.grau.badge_cor(), format!("{} {}", p.grau.icone(), p.grau.rotulo()));
-                        ui.colored_label(egui::Color32::from_rgb(250, 220, 90), format!("{:.0}", p.pontuacao_total));
-                        ui.label(fmt_din(p.pib_anual));
-                        ui.label(format!("{:.0}", p.pontuacao_mil));
-                        ui.label(format!("{:.0}", p.pontuacao_inf));
-                        ui.label(fmt_pop(p.populacao as u64));
-                        ui.label(format!("{:.1}", p.padrao_vida));
-                        ui.label(format!("{:.1}%", p.desemprego * 100.0));
-                        ui.label(fmt_din(p.tesouro));
-                        ui.label(fmt_din(p.divida));
-                        ui.label(p.esfera);
-                        ui.end_row();
-                    }
+                    ui.add_sized([110.0, 20.0], egui::Label::new(egui::RichText::new(format!("{} {}", p.grau.icone(), p.grau.rotulo())).color(p.grau.badge_cor())));
+                    ui.add_sized([60.0, 20.0], egui::Label::new(egui::RichText::new(format!("{:.0}", p.pontuacao_total)).color(egui::Color32::from_rgb(250, 220, 90))));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_din(p.pib_anual)));
+                    ui.add_sized([60.0, 20.0], egui::Label::new(format!("{:.0}", p.pontuacao_mil)));
+                    ui.add_sized([70.0, 20.0], egui::Label::new(format!("{:.0}", p.pontuacao_inf)));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_pop(p.populacao as u64)));
+                    ui.add_sized([50.0, 20.0], egui::Label::new(format!("{:.1}", p.padrao_vida)));
+                    ui.add_sized([60.0, 20.0], egui::Label::new(format!("{:.1}%", p.desemprego * 100.0)));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_din(p.tesouro)));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_din(p.divida)));
+                    ui.add_sized([120.0, 20.0], egui::Label::new(p.esfera));
                 });
+            }
         });
 
     if let Some(nova_col) = nova_col_ord {
@@ -1170,6 +1240,7 @@ fn desenhar_aba_tabela(
             ledger.coluna_ordenacao = nova_col;
             ledger.ordenacao_decrescente = true;
         }
+        ledger.tabela_cache.clear();
     }
 }
 

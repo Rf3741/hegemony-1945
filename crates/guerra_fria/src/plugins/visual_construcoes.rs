@@ -186,13 +186,6 @@ pub fn atualizar_predios_de_mundo(
     coords: &HashMap<String, (f32, f32)>,
     entrada: &mut EntradaEconomiaVisual,
 ) {
-    let mut mapa_existentes: HashMap<String, usize> = entrada
-        .predios
-        .iter()
-        .enumerate()
-        .map(|(idx, p)| (p.id.clone(), idx))
-        .collect();
-
     let tags: HashMap<&str, String> = mundo
         .paises()
         .iter()
@@ -202,6 +195,54 @@ pub fn atualizar_predios_de_mundo(
                 p.tag.clone().unwrap_or_else(|| p.id.to_uppercase()),
             )
         })
+        .collect();
+
+    if entrada.predios.is_empty() {
+        let total: usize = mundo.provincias().iter().map(|p| p.predios.len()).sum();
+        entrada.predios.reserve(total);
+        for prov in mundo.provincias() {
+            let pais_tag = tags
+                .get(prov.pais_id.as_str())
+                .cloned()
+                .unwrap_or_else(|| prov.pais_id.to_uppercase());
+            let bloco = Some(BlocoVisual::de_pais(&pais_tag));
+            let pos = prov
+                .codigo_externo
+                .as_deref()
+                .and_then(|adm1| coords.get(adm1).copied())
+                .or_else(|| coords.get(&prov.id).copied());
+
+            for (p_idx, predio) in prov.predios.iter().enumerate() {
+                let p_id = format!("{}_{}_{}", prov.id, predio.tipo_predio_id, p_idx);
+                let ocupacao = predio.taxa_ocupacao() as f32;
+                let insumos = predio.fator_insumos() as f32;
+                let producao = (ocupacao * insumos).clamp(0.0, 1.0);
+                let producao = if producao > 0.0 { producao } else { 1.0 };
+
+                entrada.predios.push(PredioEconomiaEntrada {
+                    id: p_id,
+                    tipo: predio.tipo_predio_id.clone(),
+                    estado_id: prov.estado_id.clone(),
+                    provincia_id: Some(prov.id.clone()),
+                    pais_tag: pais_tag.clone(),
+                    nivel: predio.nivel,
+                    metodos_ativos: predio.metodos_ativos.clone(),
+                    producao,
+                    posicao: pos,
+                    bloco,
+                    era: Some(0),
+                    ativa: true,
+                });
+            }
+        }
+        return;
+    }
+
+    let mapa_existentes: HashMap<String, usize> = entrada
+        .predios
+        .iter()
+        .enumerate()
+        .map(|(idx, p)| (p.id.clone(), idx))
         .collect();
 
     for prov in mundo.provincias() {
@@ -243,7 +284,6 @@ pub fn atualizar_predios_de_mundo(
                     era: Some(0),
                     ativa: true,
                 };
-                mapa_existentes.insert(p_id, entrada.predios.len());
                 entrada.predios.push(novo);
             }
         }

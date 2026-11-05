@@ -21,6 +21,13 @@ const GRANDES_POTENCIAS: [&str; 4] = ["USA", "SOV", "GBR", "FRA"];
 const BLOCO_SOVIETICO: [&str; 10] = ["SOV", "POL", "ROM", "BUL", "HUN", "CZE", "ALB", "MON", "CCP", "YUG"];
 const INTERVALO_ENTRADAS: u64 = 30;
 
+#[derive(Clone, Default)]
+pub struct LayoutRamoCache {
+    pub pres: Vec<Vec<usize>>,
+    pub anos: Vec<i32>,
+    pub lay: Vec<(usize, usize)>,
+}
+
 #[derive(Resource)]
 pub struct TecnologiaSim {
     pub mundo: MundoTec,
@@ -39,6 +46,7 @@ pub struct TecnologiaSim {
     zoom: f32,
     /// Avisos de pesquisas concluídas do jogador, para o HUD/tela.
     pub concluidas_jogador: Vec<String>,
+    pub cache_layout: BTreeMap<Ramo, LayoutRamoCache>,
 }
 
 impl TecnologiaSim {
@@ -54,6 +62,18 @@ impl TecnologiaSim {
     pub fn carregar(raiz: &std::path::Path) -> Result<Self, String> {
         let cat = CatalogoTec::carregar(&raiz.join("assets/data/tecnologia")).map_err(|e| e.to_string())?;
         let blocos = blocos_para(&cat);
+
+        let mut cache_layout = BTreeMap::new();
+        for &ramo in &Ramo::TODOS {
+            let techs: Vec<&Tecnologia> = cat.techs.iter().filter(|x| x.ramo == ramo).collect();
+            let idx: BTreeMap<&str, usize> = techs.iter().enumerate().map(|(i, x)| (x.id.as_str(), i)).collect();
+            let pres: Vec<Vec<usize>> = techs.iter().map(|x| x.pre_requisitos.iter().filter_map(|p| idx.get(p.as_str()).copied()).collect()).collect();
+            let eras: Vec<u32> = techs.iter().map(|x| x.era_visual).collect();
+            let anos: Vec<i32> = techs.iter().map(|x| x.ano_historico).collect();
+            let lay = layout_arvore(&eras, &anos, &pres);
+            cache_layout.insert(ramo, LayoutRamoCache { pres, anos, lay });
+        }
+
         let mundo = MundoTec::novo(Arc::new(cat), blocos);
         Ok(Self {
             mundo,
@@ -70,6 +90,7 @@ impl TecnologiaSim {
             pan: egui::vec2(16.0, 16.0),
             zoom: 1.0,
             concluidas_jogador: Vec::new(),
+            cache_layout,
         })
     }
 
@@ -345,7 +366,9 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
             });
             ui.separator();
 
-            arvore(ui, m, &tag, ramo_atual, est, ano, &entrada, &mut pan_zoom, &mut acoes);
+            if let Some(cache) = t.cache_layout.get(&ramo_atual) {
+                arvore(ui, m, &tag, ramo_atual, est, ano, &entrada, &mut pan_zoom, &mut acoes, cache);
+            }
         });
     }
     let tec = &mut *t;
@@ -454,13 +477,22 @@ fn cor_estado(conhecida: bool, ativa: bool, disp: bool) -> egui::Color32 {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn arvore(ui: &mut egui::Ui, m: &MundoTec, tag: &str, ramo: Ramo, est: &sim_tecnologia::EstadoPais, ano: i32, entrada: &EntradaPais, pan_zoom: &mut (egui::Vec2, f32), acoes: &mut Vec<Acao>) {
+fn arvore(
+    ui: &mut egui::Ui,
+    m: &MundoTec,
+    tag: &str,
+    ramo: Ramo,
+    est: &sim_tecnologia::EstadoPais,
+    ano: i32,
+    entrada: &EntradaPais,
+    pan_zoom: &mut (egui::Vec2, f32),
+    acoes: &mut Vec<Acao>,
+    cache: &LayoutRamoCache,
+) {
     let techs: Vec<&Tecnologia> = m.catalogo.techs.iter().filter(|x| x.ramo == ramo).collect();
-    let idx: BTreeMap<&str, usize> = techs.iter().enumerate().map(|(i, x)| (x.id.as_str(), i)).collect();
-    let pres: Vec<Vec<usize>> = techs.iter().map(|x| x.pre_requisitos.iter().filter_map(|p| idx.get(p.as_str()).copied()).collect()).collect();
-    let eras: Vec<u32> = techs.iter().map(|x| x.era_visual).collect();
-    let anos: Vec<i32> = techs.iter().map(|x| x.ano_historico).collect();
-    let lay = layout_arvore(&eras, &anos, &pres);
+    let pres = &cache.pres;
+    let anos = &cache.anos;
+    let lay = &cache.lay;
 
     let tam = egui::vec2(ui.available_width(), ui.available_height().max(420.0));
     let (resp, painter) = ui.allocate_painter(tam, egui::Sense::click_and_drag());

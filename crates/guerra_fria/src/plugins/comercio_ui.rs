@@ -230,48 +230,52 @@ fn render_rotas_ativas(
 
     ui.label(format!("Total de rotas ativas: {}", v.rotas_comerciais.len()));
 
-    egui::ScrollArea::vertical().show(ui, |ui| {
-        egui::Grid::new("tabela_rotas_comerciais")
-            .striped(true)
-            .min_col_width(70.0)
-            .spacing([12.0, 6.0])
-            .show(ui, |ui| {
-                ui.strong("Tipo");
-                ui.strong("Bem");
-                ui.strong("Parceiro");
-                ui.strong("Volume");
-                ui.strong("Preço Origem");
-                ui.strong("Preço Destino");
-                ui.strong("Margem Unit.");
-                ui.strong("Lucro Diário");
-                ui.strong("Tarifas");
-                ui.strong("Ações");
-                ui.end_row();
+    ui.horizontal(|ui| {
+        ui.add_sized([85.0, 20.0], egui::Label::new(egui::RichText::new("Tipo").strong()));
+        ui.add_sized([130.0, 20.0], egui::Label::new(egui::RichText::new("Bem").strong()));
+        ui.add_sized([130.0, 20.0], egui::Label::new(egui::RichText::new("Parceiro").strong()));
+        ui.add_sized([85.0, 20.0], egui::Label::new(egui::RichText::new("Volume").strong()));
+        ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new("Preço Origem").strong()));
+        ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new("Preço Destino").strong()));
+        ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new("Margem Unit.").strong()));
+        ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new("Lucro Diário").strong()));
+        ui.add_sized([110.0, 20.0], egui::Label::new(egui::RichText::new("Tarifas").strong()));
+        ui.add_sized([140.0, 20.0], egui::Label::new(egui::RichText::new("Ações").strong()));
+    });
+    ui.separator();
 
-                for rota in &v.rotas_comerciais {
-                    let tipo_rotulo = if rota.eh_exportacao { "Exportação" } else { "Importação" };
-                    let tipo_cor = if rota.eh_exportacao {
-                        ui_refinada::menu::SUCESSO
-                    } else {
-                        ui_refinada::menu::AVISO
-                    };
-                    ui.colored_label(tipo_cor, tipo_rotulo);
+    let total = v.rotas_comerciais.len();
+    egui::ScrollArea::vertical()
+        .id_salt("scroll_rotas_comerciais")
+        .max_height(480.0)
+        .show_rows(ui, 24.0, total, |ui, row_range| {
+            for idx in row_range {
+                let rota = &v.rotas_comerciais[idx];
+                let tipo_rotulo = if rota.eh_exportacao { "Exportação" } else { "Importação" };
+                let tipo_cor = if rota.eh_exportacao {
+                    ui_refinada::menu::SUCESSO
+                } else {
+                    ui_refinada::menu::AVISO
+                };
 
-                    ui.horizontal(|ui| {
-                        icones.mostrar(ui, &rota.bem_id, 20.0);
+                ui.horizontal(|ui| {
+                    ui.add_sized([85.0, 20.0], egui::Label::new(egui::RichText::new(tipo_rotulo).color(tipo_cor)));
+
+                    ui.allocate_ui_with_layout(egui::vec2(130.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        icones.mostrar(ui, &rota.bem_id, 18.0);
                         ui.label(&rota.bem_nome);
                     });
 
-                    ui.horizontal(|ui| {
+                    ui.allocate_ui_with_layout(egui::vec2(130.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         ui.label(&rota.parceiro_pais_nome);
                         if rota.tem_acordo {
                             ui.colored_label(ui_refinada::menu::INFO, "(Acordo)");
                         }
                     });
 
-                    ui.label(format!("{:.1} / {:.0}", rota.volume_atual, rota.volume_maximo));
-                    ui.label(fmt_din(rota.preco_origem));
-                    ui.label(fmt_din(rota.preco_destino));
+                    ui.add_sized([85.0, 20.0], egui::Label::new(format!("{:.1} / {:.0}", rota.volume_atual, rota.volume_maximo)));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_din(rota.preco_origem)));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_din(rota.preco_destino)));
 
                     let margem = rota.preco_destino / (1.0 + rota.tarifa_destino)
                         - (rota.preco_origem * (1.0 + rota.tarifa_origem));
@@ -280,18 +284,18 @@ fn render_rotas_ativas(
                     } else {
                         ui_refinada::menu::PERIGO
                     };
-                    ui.colored_label(cor_margem, fmt_din(margem));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new(fmt_din(margem)).color(cor_margem)));
 
                     let cor_lucro = if rota.lucro_ultimo_tick >= 0.0 {
                         ui_refinada::menu::SUCESSO
                     } else {
                         ui_refinada::menu::PERIGO
                     };
-                    ui.colored_label(cor_lucro, fmt_din(rota.lucro_ultimo_tick));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new(fmt_din(rota.lucro_ultimo_tick)).color(cor_lucro)));
 
-                    ui.label(format!("Exp {:.0}% / Imp {:.0}%", rota.tarifa_origem * 100.0, rota.tarifa_destino * 100.0));
+                    ui.add_sized([110.0, 20.0], egui::Label::new(format!("Exp {:.0}% / Imp {:.0}%", rota.tarifa_origem * 100.0, rota.tarifa_destino * 100.0)));
 
-                    ui.horizontal(|ui| {
+                    ui.allocate_ui_with_layout(egui::vec2(140.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         let btn_auto = if rota.automatica { "Auto" } else { "Fixo" };
                         if ui.button(btn_auto).on_hover_text("Alternar entre ajuste automático de volume e volume manual fixo").clicked() {
                             comandos.push(Comando::AlternarRotaAuto(rota.id.clone()));
@@ -312,11 +316,9 @@ fn render_rotas_ativas(
                             comandos.push(Comando::RemoverRota(rota.id.clone()));
                         }
                     });
-
-                    ui.end_row();
-                }
-            });
-    });
+                });
+            }
+        });
 }
 
 fn render_nova_rota(
@@ -503,31 +505,36 @@ fn render_tarifas_e_abertura(
     ui.strong("Tarifas Seletivas por Bem:");
     ui.label("Você pode proteger setores estratégicos da indústria nacional ou isentar insumos críticos.");
 
-    egui::ScrollArea::vertical().max_height(280.0).show(ui, |ui| {
-        egui::Grid::new("grid_tarifas_bens")
-            .striped(true)
-            .min_col_width(80.0)
-            .spacing([12.0, 4.0])
-            .show(ui, |ui| {
-                ui.strong("Bem");
-                ui.strong("Tarifa Importação");
-                ui.strong("Tarifa Exportação");
-                ui.strong("Políticas Rápidas");
-                ui.end_row();
+    let bens_comerc: Vec<&_> = v.bens.iter().filter(|b| b.comercializavel).collect();
+    let total_bens = bens_comerc.len();
 
-                for bem in v.bens.iter().filter(|b| b.comercializavel) {
-                    let imp_efetiva = pais.politica_fiscal.tarifa_importacao_bem(&bem.id);
-                    let exp_efetiva = pais.politica_fiscal.tarifa_exportacao_bem(&bem.id);
+    ui.horizontal(|ui| {
+        ui.add_sized([160.0, 20.0], egui::Label::new(egui::RichText::new("Bem").strong()));
+        ui.add_sized([120.0, 20.0], egui::Label::new(egui::RichText::new("Tarifa Importação").strong()));
+        ui.add_sized([120.0, 20.0], egui::Label::new(egui::RichText::new("Tarifa Exportação").strong()));
+        ui.add_sized([320.0, 20.0], egui::Label::new(egui::RichText::new("Políticas Rápidas").strong()));
+    });
+    ui.separator();
 
-                    ui.horizontal(|ui| {
+    egui::ScrollArea::vertical()
+        .id_salt("scroll_tarifas_bens")
+        .max_height(280.0)
+        .show_rows(ui, 24.0, total_bens, |ui, row_range| {
+            for idx in row_range {
+                let bem = bens_comerc[idx];
+                let imp_efetiva = pais.politica_fiscal.tarifa_importacao_bem(&bem.id);
+                let exp_efetiva = pais.politica_fiscal.tarifa_exportacao_bem(&bem.id);
+
+                ui.horizontal(|ui| {
+                    ui.allocate_ui_with_layout(egui::vec2(160.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         icones.mostrar(ui, &bem.id, 18.0);
                         ui.label(&bem.nome);
                     });
 
-                    ui.label(format!("{:.1}%", imp_efetiva * 100.0));
-                    ui.label(format!("{:.1}%", exp_efetiva * 100.0));
+                    ui.add_sized([120.0, 20.0], egui::Label::new(format!("{:.1}%", imp_efetiva * 100.0)));
+                    ui.add_sized([120.0, 20.0], egui::Label::new(format!("{:.1}%", exp_efetiva * 100.0)));
 
-                    ui.horizontal(|ui| {
+                    ui.allocate_ui_with_layout(egui::vec2(320.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         if ui.small_button("Isento (0%)").on_hover_text("Incentivar importação e suprimento").clicked() {
                             comandos.push(Comando::DefinirTarifaBem { bem_id: bem.id.clone(), tarifa_imp: 0.0, tarifa_exp: 0.0 });
                         }
@@ -541,11 +548,9 @@ fn render_tarifas_e_abertura(
                             comandos.push(Comando::DefinirTarifaBem { bem_id: bem.id.clone(), tarifa_imp: 0.60, tarifa_exp: 0.0 });
                         }
                     });
-
-                    ui.end_row();
-                }
-            });
-    });
+                });
+            }
+        });
 }
 
 fn render_acordos_e_blocos(
