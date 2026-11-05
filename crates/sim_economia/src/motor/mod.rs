@@ -2,6 +2,7 @@
 //! e auditoria de invariantes numéricas.
 
 pub mod cadeia;
+pub mod ciclos_demanda;
 pub mod consumo;
 pub mod demografia;
 pub mod distribuicao;
@@ -103,6 +104,8 @@ pub struct MundoEconomico {
     buffers: BuffersTick,
     /// Turismo e hotelaria (demanda internacional, atratividade, risco).
     pub(crate) turismo: turismo::EstadoTurismo,
+    /// Ciclos históricos de demanda, tecnologia e choques de recursos.
+    pub(crate) ciclos_demanda: ciclos_demanda::EstadoCiclosDemanda,
 }
 
 impl MundoEconomico {
@@ -183,6 +186,7 @@ impl MundoEconomico {
         self.turismo.receita_receptiva.resize(n_paises, 0.0);
         self.turismo.gasto_emissivo.resize(n_paises, 0.0);
         self.turismo.fator_seguranca.resize(n_paises, 1.0);
+        self.ciclos_demanda.redimensionar_mercados(n_bens, n_mercados);
         self.buffers.proxima_oferta.resize(n_mercados * n_bens, 0.0);
         self.buffers.proxima_demanda.resize(n_mercados * n_bens, 0.0);
         self.buffers.importacoes_liquidas.resize(n_mercados * n_bens, 0.0);
@@ -706,8 +710,19 @@ impl MundoEconomico {
             }
         }
 
+        let mut ciclos_demanda = ciclos_demanda::EstadoCiclosDemanda::default();
+        ciclos_demanda.inicializar_do_cenario(&catalogo, num_mercados, &cenario.provincias);
+        ciclos_demanda.recalcular_fatores_diarios(
+            &catalogo,
+            &cenario.paises,
+            num_mercados,
+            cenario.data_inicial,
+            0,
+        );
+
         Ok(Self {
             turismo: Default::default(),
+            ciclos_demanda,
             data_atual: cenario.data_inicial,
             dias_decorridos: 0,
             config: cenario.config,
@@ -743,6 +758,13 @@ impl MundoEconomico {
     /// Executa 1 tick diário completo do motor econômico, avançando o calendário em 1 dia.
     pub fn executar_tick_diario(&mut self) -> RelatorioTick {
         self.buffers.importacoes_liquidas.fill(0.0);
+        self.ciclos_demanda.recalcular_fatores_diarios(
+            &self.catalogo,
+            &self.paises,
+            self.mercados.len(),
+            self.data_atual,
+            self.dias_decorridos,
+        );
 
         // (1) Produção dos prédios e subsistência
         producao::executar_producao_diaria(
@@ -759,6 +781,11 @@ impl MundoEconomico {
             &mut self.buffers.infra_gerada_estado,
             &mut self.buffers.infra_usada_estado,
             &mut self.buffers.pop_incorporada_pais,
+        );
+        self.ciclos_demanda.aplicar_demanda_industrial_era(
+            &self.catalogo,
+            self.mercados.len(),
+            &mut self.buffers.proxima_demanda,
         );
 
         // (3) Salários, lucros, caixas e dividendos
@@ -795,12 +822,18 @@ impl MundoEconomico {
             &self.buffers.pop_ari_pais,
             &mut self.buffers.cestas_pais,
             &mut self.buffers.demanda_necessidade_pais,
+            &self.ciclos_demanda.fator_peso_pop_bem,
             &mut self.buffers.scratch_tipo_a,
             &mut self.buffers.scratch_tipo_b,
             &mut self.buffers.proxima_demanda,
         );
 
         // (2) Comércio exterior entre mercados e fechamento de preços por oferta e demanda
+        self.ciclos_demanda.aplicar_procura_estrategica_e_choques(
+            &self.catalogo,
+            self.mercados.len(),
+            &mut self.buffers.proxima_demanda,
+        );
         mercado::processar_rotas_comerciais(
             &self.catalogo,
             &self.mercados,
@@ -820,6 +853,8 @@ impl MundoEconomico {
                 &self.mercados,
                 &mut self.paises,
                 &abertura,
+                &self.ciclos_demanda.fator_absorcao_excedente_bem,
+                &self.ciclos_demanda.fator_oferta_importacao_bem,
                 &mut self.buffers.proxima_oferta,
                 &mut self.buffers.proxima_demanda,
                 &mut self.buffers.importacoes_liquidas,
@@ -904,6 +939,11 @@ impl MundoEconomico {
         self.aplicar_turismo_diario();
         self.atualizar_produtividade();
         self.data_atual.avancar_dia();
+        self.ciclos_demanda.avancar_dia_choques(
+            &self.catalogo,
+            self.data_atual,
+            self.dias_decorridos,
+        );
 
         let pib_mundial_diario = self.paises.iter().map(|p| p.pib_diario).sum();
         let populacao_mundial = self.provincias.iter().map(|p| p.populacao_total()).sum();
@@ -965,6 +1005,13 @@ impl MundoEconomico {
         use std::time::Instant;
         let mut t = TemposFasesTick::default();
         self.buffers.importacoes_liquidas.fill(0.0);
+        self.ciclos_demanda.recalcular_fatores_diarios(
+            &self.catalogo,
+            &self.paises,
+            self.mercados.len(),
+            self.data_atual,
+            self.dias_decorridos,
+        );
 
         let i0 = Instant::now();
         producao::executar_producao_diaria(
@@ -981,6 +1028,11 @@ impl MundoEconomico {
             &mut self.buffers.infra_gerada_estado,
             &mut self.buffers.infra_usada_estado,
             &mut self.buffers.pop_incorporada_pais,
+        );
+        self.ciclos_demanda.aplicar_demanda_industrial_era(
+            &self.catalogo,
+            self.mercados.len(),
+            &mut self.buffers.proxima_demanda,
         );
         t.producao_ms = i0.elapsed().as_secs_f64() * 1_000.0;
 
@@ -1018,6 +1070,7 @@ impl MundoEconomico {
             &self.buffers.pop_ari_pais,
             &mut self.buffers.cestas_pais,
             &mut self.buffers.demanda_necessidade_pais,
+            &self.ciclos_demanda.fator_peso_pop_bem,
             &mut self.buffers.scratch_tipo_a,
             &mut self.buffers.scratch_tipo_b,
             &mut self.buffers.proxima_demanda,
@@ -1025,6 +1078,11 @@ impl MundoEconomico {
         t.consumo_ms = i2.elapsed().as_secs_f64() * 1_000.0;
 
         let i3 = Instant::now();
+        self.ciclos_demanda.aplicar_procura_estrategica_e_choques(
+            &self.catalogo,
+            self.mercados.len(),
+            &mut self.buffers.proxima_demanda,
+        );
         mercado::processar_rotas_comerciais(
             &self.catalogo,
             &self.mercados,
@@ -1044,6 +1102,8 @@ impl MundoEconomico {
                 &self.mercados,
                 &mut self.paises,
                 &abertura,
+                &self.ciclos_demanda.fator_absorcao_excedente_bem,
+                &self.ciclos_demanda.fator_oferta_importacao_bem,
                 &mut self.buffers.proxima_oferta,
                 &mut self.buffers.proxima_demanda,
                 &mut self.buffers.importacoes_liquidas,
@@ -1132,6 +1192,11 @@ impl MundoEconomico {
         self.aplicar_turismo_diario();
         self.atualizar_produtividade();
         self.data_atual.avancar_dia();
+        self.ciclos_demanda.avancar_dia_choques(
+            &self.catalogo,
+            self.data_atual,
+            self.dias_decorridos,
+        );
 
         let pib_mundial_diario = self.paises.iter().map(|p| p.pib_diario).sum();
         let populacao_mundial = self.provincias.iter().map(|p| p.populacao_total()).sum();
@@ -2287,9 +2352,88 @@ pub struct EstadoEconomiaSalvo {
     pub provincias: Vec<Provincia>,
     pub rotas_comerciais: Vec<RotaComercial>,
     pub blocos_comerciais: Vec<BlocoComercial>,
+    #[serde(default)]
+    pub ciclos_demanda: ciclos_demanda::EstadoCiclosDemanda,
 }
 
 impl MundoEconomico {
+    /// Define a semente determinística da partida para variação dos ciclos históricos de demanda.
+    pub fn definir_semente_ciclos(&mut self, semente: u64) {
+        self.ciclos_demanda.semente_partida = semente;
+        self.ciclos_demanda.recalcular_fatores_diarios(
+            &self.catalogo,
+            &self.paises,
+            self.mercados.len(),
+            self.data_atual,
+            self.dias_decorridos,
+        );
+    }
+
+    /// Retorna a semente atual dos ciclos históricos de demanda.
+    pub fn semente_ciclos(&self) -> u64 {
+        self.ciclos_demanda.semente_partida
+    }
+
+    /// Ativa ou desativa os gatilhos autônomos de eventos históricos de oferta/demanda.
+    pub fn definir_gatilhos_historicos_autonomos(&mut self, ativo: bool) {
+        self.ciclos_demanda.usar_gatilhos_historicos_autonomos = ativo;
+    }
+
+    /// Registra a conclusão de uma tecnologia por um país, atualizando os gatilhos de demanda.
+    pub fn registrar_tecnologia_pesquisada(&mut self, pais_id: &str, tecnologia_id: &str) -> bool {
+        let novo = self.ciclos_demanda.registrar_tecnologia(pais_id, tecnologia_id);
+        if novo {
+            self.ciclos_demanda.recalcular_fatores_diarios(
+                &self.catalogo,
+                &self.paises,
+                self.mercados.len(),
+                self.data_atual,
+                self.dias_decorridos,
+            );
+        }
+        novo
+    }
+
+    /// Dispara os choques econômicos associados a um evento histórico (deduplicado por partida).
+    pub fn registrar_evento_historico(&mut self, evento_id: &str) -> bool {
+        let ok = self.ciclos_demanda.disparar_evento(
+            &self.catalogo,
+            evento_id,
+            self.dias_decorridos,
+        );
+        if ok {
+            self.ciclos_demanda.recalcular_fatores_diarios(
+                &self.catalogo,
+                &self.paises,
+                self.mercados.len(),
+                self.data_atual,
+                self.dias_decorridos,
+            );
+        }
+        ok
+    }
+
+    /// Consulta o fator de demanda industrial/era corrente de um bem (`1.0` se sem curva ou base).
+    pub fn fator_demanda_historica_bem(&self, bem_id: &str) -> f64 {
+        self.catalogo
+            .indice_bem(bem_id)
+            .and_then(|g| self.ciclos_demanda.fator_demanda_bem.get(g).copied())
+            .unwrap_or(1.0)
+    }
+
+    /// Consulta o fator corrente de procura estratégica mundial de um bem (`0.0` se não estratégico).
+    pub fn fator_procura_estrategica_bem(&self, bem_id: &str) -> f64 {
+        self.catalogo
+            .indice_bem(bem_id)
+            .and_then(|g| self.ciclos_demanda.fator_procura_estrategica_bem.get(g).copied())
+            .unwrap_or(0.0)
+    }
+
+    /// Lista os choques históricos de oferta/demanda atualmente ativos.
+    pub fn choques_demanda_ativos(&self) -> &[ciclos_demanda::ChoqueEventoAtivo] {
+        &self.ciclos_demanda.choques_ativos
+    }
+
     /// Captura o estado dinâmico (sem o catálogo).
     pub fn salvar_estado(&mut self) -> EstadoEconomiaSalvo {
         let c = self.exportar_cenario();
@@ -2303,6 +2447,7 @@ impl MundoEconomico {
             provincias: c.provincias,
             rotas_comerciais: c.rotas_comerciais,
             blocos_comerciais: c.blocos_comerciais,
+            ciclos_demanda: self.ciclos_demanda.clone(),
         }
     }
 
@@ -2348,6 +2493,7 @@ impl MundoEconomico {
             blocos_comerciais: e.blocos_comerciais,
         })?;
         m.dias_decorridos = e.dias_decorridos;
+        m.ciclos_demanda = e.ciclos_demanda;
 
         // Restaurar países: `novo` modifica campos serializados (ex.: pontos_construcao_base *= 2, orçamento).
         for (pais, salvo) in m.paises.iter_mut().zip(paises_salvos) {
@@ -2434,6 +2580,14 @@ impl MundoEconomico {
                 estado.infraestrutura_urbanizacao = urbanizacao_infra;
             }
         }
+        m.ciclos_demanda.inicializar_do_cenario(&m.catalogo, m.mercados.len(), &m.provincias);
+        m.ciclos_demanda.recalcular_fatores_diarios(
+            &m.catalogo,
+            &m.paises,
+            m.mercados.len(),
+            m.data_atual,
+            m.dias_decorridos,
+        );
         Ok(m)
     }
 }

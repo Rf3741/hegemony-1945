@@ -43,6 +43,10 @@ pub use motor::consumo::calcular_fatias_substituicao;
 pub use motor::demografia::taxa_crescimento_anual_pop;
 pub use motor::mercado::{atualizar_precos_mercado_isolado, calcular_preco_alvo};
 pub use motor::producao::atualizar_infraestrutura_estados;
+pub use motor::ciclos_demanda::{
+    ChoqueEventoAtivo, ChoqueEventoDemanda, CurvaDemandaBem, EstadoCiclosDemanda,
+    GatilhoTecnologiaDemanda, PontoEraDemanda, TabelaCiclosDemanda,
+};
 pub use motor::global::{ConfigMercadoGlobal, MercadoGlobal};
 pub mod estimativa;
 pub use estimativa::{calcular_com_perfil, precos_por_indice, PerfilPredio, calcular_lucratividade_esperada, ContextoLucratividade, EstimativaLucratividade};

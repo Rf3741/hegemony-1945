@@ -193,7 +193,7 @@
         custo_pontos_construcao: 240.0,
         usa_terra_aravel: false,
         recurso_natural_requerido: Some("uranio"),
-        financiado_pelo_governo: true,
+        financiado_pelo_governo: false,
         metodos_permitidos: ["extracao_pechblenda_manual", "lavra_uranio_lixiviacao_quimica", "propriedade_privada", "propriedade_aristocratica", "propriedade_estatal", "propriedade_cooperativa"],
         metodos_padrao: ["extracao_pechblenda_manual", "propriedade_estatal"],
     ),

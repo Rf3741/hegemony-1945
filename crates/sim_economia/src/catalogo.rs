@@ -2,6 +2,7 @@
 //! `Bem`, `TipoPop`, `LeiEconomica`, `MetodoProducao` e `TipoPredio`.
 
 use crate::erro::{ErroEconomia, ResultadoEconomia, validar_id_snake_case};
+use crate::motor::ciclos_demanda::TabelaCiclosDemanda;
 use crate::tipos::{
     CategoriaBem, CategoriaNecessidade, CategoriaPredio, Estrato, GrupoLeiEconomica,
     NUM_NECESSIDADES, RegimePropriedade, SlotMetodo,
@@ -208,6 +209,8 @@ pub struct CatalogoEconomia {
     pub leis: Vec<LeiEconomica>,
     pub metodos_producao: Vec<MetodoProducao>,
     pub tipos_predio: Vec<TipoPredio>,
+    #[serde(default)]
+    pub ciclos_demanda: TabelaCiclosDemanda,
 
     #[serde(skip)]
     pub(crate) indice_bens: BTreeMap<String, usize>,
@@ -266,6 +269,12 @@ impl CatalogoEconomia {
         let metodos_producao: Vec<MetodoProducao> =
             ler_arquivo_ron(&dir.join("metodos_producao.ron"))?;
         let tipos_predio: Vec<TipoPredio> = ler_arquivo_ron(&dir.join("tipos_predio.ron"))?;
+        let caminho_ciclos = dir.join("ciclos_demanda.ron");
+        let ciclos_demanda: TabelaCiclosDemanda = if caminho_ciclos.exists() {
+            ler_arquivo_ron(&caminho_ciclos)?
+        } else {
+            TabelaCiclosDemanda::default()
+        };
 
         let mut catalogo = Self {
             bens,
@@ -273,6 +282,7 @@ impl CatalogoEconomia {
             leis,
             metodos_producao,
             tipos_predio,
+            ciclos_demanda,
             ..Default::default()
         };
         catalogo.validar_e_indexar()?;
@@ -568,6 +578,9 @@ impl CatalogoEconomia {
                 folha_base_padrao: folha_base,
             });
         }
+
+        // 6. Ciclos históricos de demanda (opcional em catálogos sintéticos de teste)
+        self.ciclos_demanda.validar_e_indexar(&self.indice_bens)?;
 
         Ok(())
     }
