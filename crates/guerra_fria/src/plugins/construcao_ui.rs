@@ -129,10 +129,14 @@ fn contexto_lucratividade(v: &VistaEconomia, prov: &Provincia, tipo_idx: usize, 
     let salario_base = prov.predios.iter().map(|p| p.salario_base).sum::<f64>() / prov.predios.len().max(1) as f64;
     let niveis = est.niveis_do_tipo(tipo_idx) as f64;
     let (potencial_livre, potencial_total) = if t.usa_terra_aravel {
-        (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+        if !est.cultura_permitida(&t.id) {
+            (Some(0.0), Some(0.0))
+        } else {
+            (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+        }
     } else if let Some(rec) = &t.recurso_natural_requerido {
         let total = est.limite_recurso(rec) as f64;
-        (Some(total - niveis), Some(total))
+        (Some((total - niveis).max(0.0)), Some(total))
     } else {
         (None, None)
     };
@@ -149,6 +153,7 @@ fn contexto_lucratividade(v: &VistaEconomia, prov: &Provincia, tipo_idx: usize, 
         potencial_total,
         niveis_iguais: niveis,
         bonus_cadeia: est.bonus_cadeia(tipo_idx),
+        urbanizacao: est.urbanizacao,
     }
 }
 
@@ -198,9 +203,9 @@ fn detalhe_lucro(v: &VistaEconomia, prov: &Provincia, t: &TipoPredio, l: Estimat
         _ => "-".to_string(),
     };
     format!(
-        "Recurso local: {recurso}\nCadeia local: +{:.0}% ({cadeia})\nOutros fatores: salário x{:.2}; mão de obra x{:.2}; infra x{:.2}; acesso x{:.2}; concorrência x{:.2}",
+        "Recurso local: {recurso}\nCadeia local: +{:.0}% ({cadeia})\nOutros fatores: salário x{:.2}; mão de obra x{:.2}; infra x{:.2}; acesso x{:.2}; concorrência x{:.2}; mercado local x{:.2}",
         (l.fator_cadeia_local - 1.0).max(0.0) * 100.0,
-        l.fator_salario, l.fator_mao_de_obra, l.fator_infraestrutura, l.fator_acesso, l.fator_concorrencia
+        l.fator_salario, l.fator_mao_de_obra, l.fator_infraestrutura, l.fator_acesso, l.fator_concorrencia, l.fator_mercado_local
     )
 }
 
@@ -222,9 +227,9 @@ pub fn potencial_livre(v: &VistaEconomia, est: &Estado, t: &TipoPredio) -> Optio
 fn texto_potencial(v: &VistaEconomia, est: &Estado, t: &TipoPredio) -> String {
     match potencial_livre(v, est, t) {
         None => "Sem recurso regional (só precisa de espaço urbano)".into(),
-        Some(0) if t.usa_terra_aravel && !est.cultura_permitida(&t.id) => "Cultura não permitida neste estado".into(),
-        Some(0) if t.usa_terra_aravel => "Sem terra arável livre".into(),
-        Some(0) => format!("Sem jazida livre de {}", t.recurso_natural_requerido.as_deref().unwrap_or("recurso").replace('_', " ")),
+        Some(0) if t.usa_terra_aravel && !est.cultura_permitida(&t.id) => "Clima/solo desfavorável (rendimento reduzido)".into(),
+        Some(0) if t.usa_terra_aravel => "Sem terra arável livre (rendimento reduzido)".into(),
+        Some(0) => format!("Sem jazida de {} (rendimento reduzido)", t.recurso_natural_requerido.as_deref().unwrap_or("recurso").replace('_', " ")),
         Some(n) => {
             let q = est.fator_qualidade_predio(t);
             let b = if q > 1.0 { format!(", qualidade +{:.0}%", (q - 1.0) * 100.0) } else { String::new() };
@@ -255,7 +260,13 @@ pub fn opcoes_para_provincia(v: &VistaEconomia, prov: &Provincia) -> Vec<OpcaoCo
             let (potencial, motivo) = match est {
                 Some(e) => {
                     let p = texto_potencial(v, e, t);
-                    let m = if let Some(tec) = bloqueio_tec { format!("Requer tecnologia: {tec}") } else if comporta { String::new() } else { p.clone() };
+                    let m = if let Some(tec) = bloqueio_tec {
+                        format!("Requer tecnologia: {tec}")
+                    } else if !comporta {
+                        "Porto requer província costeira".into()
+                    } else {
+                        String::new()
+                    };
                     (p, m)
                 }
                 None => ("-".into(), String::new()),
@@ -266,7 +277,7 @@ pub fn opcoes_para_provincia(v: &VistaEconomia, prov: &Provincia) -> Vec<OpcaoCo
                 nome: t.nome.clone(),
                 categoria: t.categoria,
                 comporta,
-                motivo: if comporta || !motivo.is_empty() { motivo } else { "Capacidade esgotada".into() },
+                motivo,
                 pontos: t.custo_pontos_construcao,
                 dias: t.custo_pontos_construcao / pontos_dia,
                 custo_bens: mat.total_reais,
@@ -327,7 +338,7 @@ pub fn ranking_estados(v: &VistaEconomia, tipo_idx: usize) -> Vec<LinhaEstado> {
             let alvo = melhor.as_ref().map(|(_, p, _)| p.id.clone());
             let luc = melhor.map_or_else(EstimativaLucratividade::default, |(_, _, l)| l);
             let lucro = if t.financiado_pelo_governo { -(luc.custo_insumos + luc.custo_folha) } else { luc.lucro_liquido };
-            let pot = livre.map_or(1.0, |n| (1.0 + n as f64).ln());
+            let pot = livre.map_or(1.0, |n| if n > 0 { 1.0 + (n as f64).ln_1p() } else { 0.25 });
             let folga = (1.0 - e.penalidade_infraestrutura).clamp(0.05, 1.0);
             let vantagem = if alvo.is_some() { luc.fator_recurso * folga * pot * if lucro > 0.0 { 1.0 + lucro.max(0.0).ln_1p() } else { 0.5 } } else { 0.0 };
             LinhaEstado {
@@ -395,7 +406,7 @@ pub fn cores_por_adm1(v: &VistaEconomia, modo: ModoMapa, tipo_idx: usize) -> Has
 
 pub const PASSOS_TUTORIAL: [(&str, &str); 5] = [
     ("1/5  Como construir", "Aperte B (ou o botão \"Construir\" no topo) para abrir a tela de construção. Clique numa província do seu país e use a seção \"Construir aqui\" do painel da direita: escolha o prédio e aperte \"Construir\"."),
-    ("2/5  Recursos regionais", "Cada estado tem recursos próprios: terra arável, culturas permitidas e jazidas. Café só onde há cultura de café; ferro e carvão só onde há jazida. A lista só mostra o que cabe na província."),
+    ("2/5  Recursos regionais", "Qualquer prédio pode ser erguido em qualquer província, mas os recursos locais definem o rendimento: terras férteis e jazidas ricas rendem muito mais, enquanto regiões sem recursos rendem pouco e podem dar prejuízo."),
     ("3/5  Custo e lucro", "Cada obra gasta bens (aço, madeira, ferramentas...) e pontos de construção. O lucro esperado por dia ajuda a escolher. Prédios do governo dão serviço, não lucro."),
     ("4/5  Infraestrutura", "Prédios usam infraestrutura do estado (ferrovias, portos, urbanização). Passando da capacidade, a produção cai. Veja o modo de mapa \"Infraestrutura\" na tela de construção."),
     ("5/5  Setor privado e fila", "Capitalistas também investem sozinhos, conforme a lei econômica, usando o fundo privado. A fila de obras (na tela B) mostra o progresso de cada obra, estatal ou privada."),
@@ -943,21 +954,100 @@ mod testes {
         assert!((3..=5).contains(&PASSOS_TUTORIAL.len()));
     }
 
-    /// Diagnóstico (temporário): lucro previsto do mesmo prédio em várias províncias dos EUA.
+    /// Diagnóstico e validação regional: lucro previsto do mesmo prédio em várias províncias dos EUA.
     #[test]
-    #[ignore]
     fn diag_lucro_por_provincia() {
         let app = app_headless();
         let v = &app.world().resource::<EconomiaSim>().vista;
         println!("DIAG pais={} provincias na vista: {} estados: {}", v.pais_id, v.provincias.len(), v.estados.len());
         let provs: Vec<&Provincia> = v.provincias.iter().step_by((v.provincias.len() / 10).max(1)).take(10).collect();
+
+        let buscar_tipo = |opcoes: &[OpcaoConstrucao], tipo: &str| -> Option<f64> {
+            match tipo {
+                "fazenda_trigo" => opcoes.iter().find(|o| o.tipo_id == "fazenda_graos").map(|o| o.lucro_dia),
+                "fabrica_moveis" => opcoes.iter().find(|o| o.tipo_id == "fabrica_moveis").map(|o| o.lucro_dia),
+                "siderurgica" => opcoes.iter().find(|o| o.tipo_id == "siderurgica").map(|o| o.lucro_dia),
+                "mina_carvao" => {
+                    opcoes
+                        .iter()
+                        .find(|o| o.tipo_id == "mina_carvao")
+                        .or_else(|| opcoes.iter().find(|o| o.tipo_id.starts_with("mina_")))
+                        .map(|o| o.lucro_dia)
+                }
+                outro => opcoes.iter().find(|o| o.tipo_id.contains(outro.split('_').next().unwrap())).map(|o| o.lucro_dia),
+            }
+        };
+
         for tipo in ["fabrica_moveis", "siderurgica", "mina_carvao", "fazenda_trigo"] {
             let linha: Vec<String> = provs.iter().map(|pr| {
-                opcoes_para_provincia(v, pr).iter().find(|o| o.tipo_id.contains(tipo.split('_').next().unwrap()) ).map_or("-".into(), |o| format!("{:.1}", o.lucro_dia))
+                let ops = opcoes_para_provincia(v, pr);
+                buscar_tipo(&ops, tipo).map_or("-".into(), |val| format!("{:.1}", val))
             }).collect();
             println!("DIAG {tipo}: {}", linha.join(" | "));
         }
-        for pr in &provs { println!("DIAG prov {} estado={}", pr.nome, pr.estado_id); }
+
+        let prov_samoa = provs.iter().find(|p| p.estado_id == "usa_american_samoa").copied().expect("samoa");
+        let prov_ohio = provs.iter().find(|p| p.estado_id == "usa_ohio").copied().expect("ohio");
+        let prov_iowa = provs.iter().find(|p| p.estado_id == "usa_iowa").copied().expect("iowa");
+
+        let ops_samoa = opcoes_para_provincia(v, prov_samoa);
+        let ops_ohio = opcoes_para_provincia(v, prov_ohio);
+        let ops_iowa = opcoes_para_provincia(v, prov_iowa);
+
+        let lucro_moveis_samoa = buscar_tipo(&ops_samoa, "fabrica_moveis").expect("lucro moveis samoa");
+        let lucro_moveis_ohio = buscar_tipo(&ops_ohio, "fabrica_moveis").expect("lucro moveis ohio");
+        let lucro_siderurgica_ohio = buscar_tipo(&ops_ohio, "siderurgica").expect("lucro siderurgica ohio");
+        let lucro_trigo_iowa = buscar_tipo(&ops_iowa, "fazenda_trigo").expect("lucro trigo iowa");
+
+        // 1. Fazenda de trigo em Iowa > 0
+        assert!(lucro_trigo_iowa > 0.0, "fazenda de trigo em Iowa deve ser > 0, deu {lucro_trigo_iowa:.1}");
+
+        // 2. Siderúrgica em Ohio > 0
+        assert!(lucro_siderurgica_ohio > 0.0, "siderurgica em Ohio deve ser > 0, deu {lucro_siderurgica_ohio:.1}");
+
+        // 3. Lucro previsto da mesma fábrica deve diferir pelo menos 20% entre Samoa Americana e Ohio
+        let dif_rel = (lucro_moveis_ohio - lucro_moveis_samoa).abs() / lucro_moveis_ohio.abs().max(lucro_moveis_samoa.abs()).max(1.0);
+        assert!(
+            dif_rel >= 0.20,
+            "lucro previsto de fábrica deve diferir pelo menos 20% entre Samoa ({lucro_moveis_samoa:.1}) e Ohio ({lucro_moveis_ohio:.1}), dif={:.1}%",
+            dif_rel * 100.0
+        );
+
+        for pr in &provs {
+            let est = estado_de(v, pr);
+            let desemp: f64 = pr.pops.iter().map(|p| p.desempregados()).sum();
+            println!(
+                "DIAG prov {} estado={} pop={:.0} desemp={:.0} urb={:?} infra={:?}/{:?} pen_infra={:?} acesso={:?} terra={:?}/{:?}",
+                pr.nome,
+                pr.estado_id,
+                pr.populacao_total(),
+                desemp,
+                est.map(|e| e.urbanizacao),
+                est.map(|e| e.infraestrutura_uso),
+                est.map(|e| e.infraestrutura_capacidade),
+                est.map(|e| e.penalidade_infraestrutura),
+                est.map(|e| e.acesso_mercado),
+                est.map(|e| e.terra_aravel_livre()),
+                est.map(|e| e.terra_aravel),
+            );
+        }
     }
 
+    /// Validação da regra do usuário: em Cuba o jogador tem dezenas de opções construíveis.
+    #[test]
+    fn cuba_tem_dezenas_de_opcoes_construiveis() {
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let nucleo = crate::plugins::economia_sim::Nucleo::carregar(&raiz.join("assets/data/economia"), 0).expect("nucleo");
+        let v = nucleo.vista("cub");
+        assert!(!v.provincias.is_empty(), "Cuba deve ter províncias");
+        for prov in &v.provincias {
+            let opcoes = opcoes_para_provincia(&v, prov);
+            let construiveis = opcoes.iter().filter(|o| o.comporta).count();
+            println!("Cuba prov {}: {} construíveis de {} opções totais", prov.nome, construiveis, opcoes.len());
+            assert!(
+                construiveis >= 20,
+                "em Cuba o jogador deve ter dezenas de opções construíveis (deu {construiveis})"
+            );
+        }
+    }
 }
