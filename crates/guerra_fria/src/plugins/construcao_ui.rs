@@ -129,10 +129,14 @@ fn contexto_lucratividade(v: &VistaEconomia, prov: &Provincia, tipo_idx: usize, 
     let salario_base = prov.predios.iter().map(|p| p.salario_base).sum::<f64>() / prov.predios.len().max(1) as f64;
     let niveis = est.niveis_do_tipo(tipo_idx) as f64;
     let (potencial_livre, potencial_total) = if t.usa_terra_aravel {
-        (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+        if !est.cultura_permitida(&t.id) {
+            (Some(0.0), Some(0.0))
+        } else {
+            (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+        }
     } else if let Some(rec) = &t.recurso_natural_requerido {
         let total = est.limite_recurso(rec) as f64;
-        (Some(total - niveis), Some(total))
+        (Some((total - niveis).max(0.0)), Some(total))
     } else {
         (None, None)
     };
@@ -149,6 +153,7 @@ fn contexto_lucratividade(v: &VistaEconomia, prov: &Provincia, tipo_idx: usize, 
         potencial_total,
         niveis_iguais: niveis,
         bonus_cadeia: est.bonus_cadeia(tipo_idx),
+        urbanizacao: est.urbanizacao,
     }
 }
 
@@ -198,9 +203,9 @@ fn detalhe_lucro(v: &VistaEconomia, prov: &Provincia, t: &TipoPredio, l: Estimat
         _ => "-".to_string(),
     };
     format!(
-        "Recurso local: {recurso}\nCadeia local: +{:.0}% ({cadeia})\nOutros fatores: salário x{:.2}; mão de obra x{:.2}; infra x{:.2}; acesso x{:.2}; concorrência x{:.2}",
+        "Recurso local: {recurso}\nCadeia local: +{:.0}% ({cadeia})\nOutros fatores: salário x{:.2}; mão de obra x{:.2}; infra x{:.2}; acesso x{:.2}; concorrência x{:.2}; mercado local x{:.2}",
         (l.fator_cadeia_local - 1.0).max(0.0) * 100.0,
-        l.fator_salario, l.fator_mao_de_obra, l.fator_infraestrutura, l.fator_acesso, l.fator_concorrencia
+        l.fator_salario, l.fator_mao_de_obra, l.fator_infraestrutura, l.fator_acesso, l.fator_concorrencia, l.fator_mercado_local
     )
 }
 
@@ -873,21 +878,83 @@ mod testes {
         assert!((3..=5).contains(&PASSOS_TUTORIAL.len()));
     }
 
-    /// Diagnóstico (temporário): lucro previsto do mesmo prédio em várias províncias dos EUA.
+    /// Diagnóstico e validação regional: lucro previsto do mesmo prédio em várias províncias dos EUA.
     #[test]
-    #[ignore]
     fn diag_lucro_por_provincia() {
         let app = app_headless();
         let v = &app.world().resource::<EconomiaSim>().vista;
         println!("DIAG pais={} provincias na vista: {} estados: {}", v.pais_id, v.provincias.len(), v.estados.len());
         let provs: Vec<&Provincia> = v.provincias.iter().step_by((v.provincias.len() / 10).max(1)).take(10).collect();
+
+        let buscar_tipo = |opcoes: &[OpcaoConstrucao], tipo: &str| -> Option<f64> {
+            match tipo {
+                "fazenda_trigo" => opcoes.iter().find(|o| o.tipo_id == "fazenda_graos").map(|o| o.lucro_dia),
+                "fabrica_moveis" => opcoes.iter().find(|o| o.tipo_id == "fabrica_moveis").map(|o| o.lucro_dia),
+                "siderurgica" => opcoes.iter().find(|o| o.tipo_id == "siderurgica").map(|o| o.lucro_dia),
+                "mina_carvao" => {
+                    opcoes
+                        .iter()
+                        .find(|o| o.tipo_id == "mina_carvao")
+                        .or_else(|| opcoes.iter().find(|o| o.tipo_id.starts_with("mina_")))
+                        .map(|o| o.lucro_dia)
+                }
+                outro => opcoes.iter().find(|o| o.tipo_id.contains(outro.split('_').next().unwrap())).map(|o| o.lucro_dia),
+            }
+        };
+
         for tipo in ["fabrica_moveis", "siderurgica", "mina_carvao", "fazenda_trigo"] {
             let linha: Vec<String> = provs.iter().map(|pr| {
-                opcoes_para_provincia(v, pr).iter().find(|o| o.tipo_id.contains(tipo.split('_').next().unwrap()) ).map_or("-".into(), |o| format!("{:.1}", o.lucro_dia))
+                let ops = opcoes_para_provincia(v, pr);
+                buscar_tipo(&ops, tipo).map_or("-".into(), |val| format!("{:.1}", val))
             }).collect();
             println!("DIAG {tipo}: {}", linha.join(" | "));
         }
-        for pr in &provs { println!("DIAG prov {} estado={}", pr.nome, pr.estado_id); }
+
+        let prov_samoa = provs.iter().find(|p| p.estado_id == "usa_american_samoa").copied().expect("samoa");
+        let prov_ohio = provs.iter().find(|p| p.estado_id == "usa_ohio").copied().expect("ohio");
+        let prov_iowa = provs.iter().find(|p| p.estado_id == "usa_iowa").copied().expect("iowa");
+
+        let ops_samoa = opcoes_para_provincia(v, prov_samoa);
+        let ops_ohio = opcoes_para_provincia(v, prov_ohio);
+        let ops_iowa = opcoes_para_provincia(v, prov_iowa);
+
+        let lucro_moveis_samoa = buscar_tipo(&ops_samoa, "fabrica_moveis").expect("lucro moveis samoa");
+        let lucro_moveis_ohio = buscar_tipo(&ops_ohio, "fabrica_moveis").expect("lucro moveis ohio");
+        let lucro_siderurgica_ohio = buscar_tipo(&ops_ohio, "siderurgica").expect("lucro siderurgica ohio");
+        let lucro_trigo_iowa = buscar_tipo(&ops_iowa, "fazenda_trigo").expect("lucro trigo iowa");
+
+        // 1. Fazenda de trigo em Iowa > 0
+        assert!(lucro_trigo_iowa > 0.0, "fazenda de trigo em Iowa deve ser > 0, deu {lucro_trigo_iowa:.1}");
+
+        // 2. Siderúrgica em Ohio > 0
+        assert!(lucro_siderurgica_ohio > 0.0, "siderurgica em Ohio deve ser > 0, deu {lucro_siderurgica_ohio:.1}");
+
+        // 3. Lucro previsto da mesma fábrica deve diferir pelo menos 20% entre Samoa Americana e Ohio
+        let dif_rel = (lucro_moveis_ohio - lucro_moveis_samoa).abs() / lucro_moveis_ohio.abs().max(lucro_moveis_samoa.abs()).max(1.0);
+        assert!(
+            dif_rel >= 0.20,
+            "lucro previsto de fábrica deve diferir pelo menos 20% entre Samoa ({lucro_moveis_samoa:.1}) e Ohio ({lucro_moveis_ohio:.1}), dif={:.1}%",
+            dif_rel * 100.0
+        );
+
+        for pr in &provs {
+            let est = estado_de(v, pr);
+            let desemp: f64 = pr.pops.iter().map(|p| p.desempregados()).sum();
+            println!(
+                "DIAG prov {} estado={} pop={:.0} desemp={:.0} urb={:?} infra={:?}/{:?} pen_infra={:?} acesso={:?} terra={:?}/{:?}",
+                pr.nome,
+                pr.estado_id,
+                pr.populacao_total(),
+                desemp,
+                est.map(|e| e.urbanizacao),
+                est.map(|e| e.infraestrutura_uso),
+                est.map(|e| e.infraestrutura_capacidade),
+                est.map(|e| e.penalidade_infraestrutura),
+                est.map(|e| e.acesso_mercado),
+                est.map(|e| e.terra_aravel_livre()),
+                est.map(|e| e.terra_aravel),
+            );
+        }
     }
 
 }

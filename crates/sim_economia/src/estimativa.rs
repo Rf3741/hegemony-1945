@@ -18,6 +18,8 @@ pub struct ContextoLucratividade {
     pub niveis_iguais: f64,
     /// Bônus de cadeia local (0.0 = nenhum; 0.2 = +20%), vindo de `Estado::bonus_cadeia`.
     pub bonus_cadeia: f64,
+    /// Grau de urbanização do estado (população urbana e polos cívicos/industriais).
+    pub urbanizacao: f64,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -37,6 +39,8 @@ pub struct EstimativaLucratividade {
     pub fator_concorrencia: f64,
     /// 1.0 + bônus de cadeia local.
     pub fator_cadeia_local: f64,
+    /// Fator de mercado consumidor local baseado na urbanização do estado.
+    pub fator_mercado_local: f64,
 }
 
 /// Insumos, produtos e vagas de um tipo de prédio com seus métodos, pré-agregados uma única vez
@@ -112,13 +116,17 @@ pub fn calcular_com_perfil(
     let preco_de = |i: usize| precos.get(i).copied().unwrap_or(20.0);
 
     let acesso = contexto.acesso_mercado.clamp(0.0, 1.0);
-    let fator_acesso = (0.65 + 0.35 * acesso).clamp(0.35, 1.0);
-    // Recurso local domina a extração: sem depósito (ou sem espaço livre) o rendimento é zero.
+    let fator_acesso = (0.70 + 0.30 * acesso).clamp(0.35, 1.0);
+    // Recurso local domina a extração: sem jazida ou se a cultura não for permitida, o rendimento é zero.
     let fator_recurso = match (contexto.potencial_livre, contexto.potencial_total) {
-        (Some(livre), Some(total)) if total > 0.0 && livre > 0.0 => {
-            (0.35 + 0.65 * (livre / total).clamp(0.0, 1.0)) * contexto.qualidade_recurso.max(0.0)
+        (_, Some(total)) if total <= 0.0 => 0.0,
+        (Some(livre), Some(total)) if total > 0.0 && tipo.recurso_natural_requerido.is_some() => {
+            if livre > 0.0 {
+                (0.85 + 0.15 * (livre / total).clamp(0.0, 1.0)) * contexto.qualidade_recurso.max(0.0)
+            } else {
+                0.50 * contexto.qualidade_recurso.max(0.0)
+            }
         }
-        (Some(_), Some(_)) => 0.0,
         _ => contexto.qualidade_recurso.max(0.0),
     };
     let peso_infra = match tipo.categoria {
@@ -128,13 +136,23 @@ pub fn calcular_com_perfil(
     };
     let uso_projetado = contexto.infraestrutura_uso + peso_infra;
     let fator_infra = if contexto.infraestrutura_capacidade > 1e-6 {
-        (1.0 - ((uso_projetado / contexto.infraestrutura_capacidade) - 1.0).max(0.0) * 0.65).clamp(0.25, 1.0)
+        let razao = uso_projetado / contexto.infraestrutura_capacidade;
+        if razao <= 0.80 {
+            1.05
+        } else if razao <= 1.0 {
+            1.0
+        } else {
+            (1.0 - (razao - 1.0) * 0.65).clamp(0.25, 1.0)
+        }
     } else if peso_infra > 0.0 {
         0.35
     } else {
         1.0
     };
-    let fator_concorrencia = 1.0 / (1.0 + contexto.niveis_iguais.max(0.0) * 0.12);
+    // Economia de escala e cluster industrial existente (reflete o motor: econ_escala até +25%)
+    let econ_escala = 1.0 + 0.008 * (contexto.niveis_iguais.min(25.0));
+    // Concorrência local moderada (saturação de margem)
+    let fator_concorrencia = (1.0 / (1.0 + contexto.niveis_iguais.max(0.0) * 0.0001)).clamp(0.95, 1.0);
     let salario_referencia = (4.0 * (contexto.padrao_vida / 10.0).clamp(0.55, 2.5)).max(0.5);
     let salario = contexto.salario_base.max(salario_referencia * 0.75);
     let fator_salario = salario / 4.0;
@@ -147,16 +165,35 @@ pub fn calcular_com_perfil(
         vagas_totais += vagas;
         custo_folha += vagas * salario * mult;
     }
+    // Mão de obra disponível: penaliza fortemente quando as vagas superam a mão de obra livre
     let fator_mao_de_obra = if vagas_totais > 0.0 {
-        (contexto.desempregados.max(0.0) / vagas_totais.max(1.0)).clamp(0.35, 1.0)
+        let disponivel = contexto.desempregados.max(0.0);
+        if disponivel < vagas_totais {
+            let razao = (disponivel / vagas_totais).clamp(0.05, 1.0);
+            razao.powf(1.1) * 0.80
+        } else {
+            1.0
+        }
     } else {
         1.0
     };
+    // Mercado consumidor local por tamanho/urbanização do estado
+    let fator_mercado_local = match tipo.categoria {
+        CategoriaPredio::Industrial => {
+            if contexto.urbanizacao < 10.0 {
+                (0.60 + 0.35 * (contexto.urbanizacao.max(0.0) / 10.0)).clamp(0.60, 0.95)
+            } else if contexto.urbanizacao < 50.0 {
+                0.95 + 0.05 * ((contexto.urbanizacao - 10.0) / 40.0)
+            } else {
+                1.0 + 0.05 * ((contexto.urbanizacao - 50.0) / 100.0).clamp(0.0, 1.0)
+            }
+        }
+        _ => 1.0,
+    };
     let fator_cadeia_local = 1.0 + contexto.bonus_cadeia.max(0.0);
-    let fator_producao = fator_acesso * fator_recurso * fator_infra * fator_concorrencia * fator_mao_de_obra * fator_cadeia_local;
+    let fator_producao = fator_acesso * fator_recurso * fator_infra * fator_concorrencia * fator_mao_de_obra * fator_cadeia_local * fator_mercado_local * econ_escala;
     receita *= fator_producao;
     custo_insumos *= fator_producao;
-    custo_folha *= fator_salario;
     let lucro_liquido = if tipo.financiado_pelo_governo {
         -(custo_insumos + custo_folha)
     } else {
@@ -179,6 +216,7 @@ pub fn calcular_com_perfil(
         fator_acesso,
         fator_concorrencia,
         fator_cadeia_local,
+        fator_mercado_local,
     }
 }
 
@@ -226,7 +264,7 @@ mod tests {
             salario_base: 4.0, padrao_vida: 10.0, desempregados: 100.0, mao_de_obra_total: 100.0,
             infraestrutura_uso: 5.0, infraestrutura_capacidade: 20.0, acesso_mercado: 1.0,
             qualidade_recurso: 1.0, potencial_livre: Some(10.0), potencial_total: Some(10.0),
-            niveis_iguais: 0.0, bonus_cadeia: 0.0,
+            niveis_iguais: 0.0, bonus_cadeia: 0.0, urbanizacao: 10.0,
         };
         let rica = calcular_lucratividade_esperada(&cat, tipo, &tipo.metodos_padrao, &[("ferro".into(), 10.0)], base);
         let pobre = calcular_lucratividade_esperada(&cat, tipo, &tipo.metodos_padrao, &[("ferro".into(), 10.0)], ContextoLucratividade {
@@ -248,7 +286,7 @@ mod tests {
             salario_base: 4.0, padrao_vida: 10.0, desempregados: 100.0, mao_de_obra_total: 100.0,
             infraestrutura_uso: 5.0, infraestrutura_capacidade: 20.0, acesso_mercado: 1.0,
             qualidade_recurso: 1.0, potencial_livre: Some(10.0), potencial_total: Some(10.0),
-            niveis_iguais: 0.0, bonus_cadeia: 0.0,
+            niveis_iguais: 0.0, bonus_cadeia: 0.0, urbanizacao: 10.0,
         };
         let precos = [("ferro".to_string(), 10.0)];
         let com = calcular_lucratividade_esperada(&cat, tipo, &tipo.metodos_padrao, &precos, base);

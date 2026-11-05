@@ -187,10 +187,14 @@ impl IaEconomia {
         let salario = prov.predios.iter().map(|p| p.salario_base).sum::<f64>() / prov.predios.len().max(1) as f64;
         let niveis = est.niveis_do_tipo(tipo_idx) as f64;
         let (livre, total) = if tipo.usa_terra_aravel {
-            (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+            if !est.cultura_permitida(&tipo.id) {
+                (Some(0.0), Some(0.0))
+            } else {
+                (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+            }
         } else if let Some(rec) = &tipo.recurso_natural_requerido {
             let total = est.limite_recurso(rec) as f64;
-            (Some(total - niveis), Some(total))
+            (Some((total - niveis).max(0.0)), Some(total))
         } else {
             (None, None)
         };
@@ -207,6 +211,7 @@ impl IaEconomia {
             potencial_total: total,
             niveis_iguais: niveis,
             bonus_cadeia: est.bonus_cadeia(tipo_idx),
+            urbanizacao: est.urbanizacao,
         }
     }
 
