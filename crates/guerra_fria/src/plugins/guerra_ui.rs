@@ -47,15 +47,17 @@ fn tela_guerra(
 
     let mut aberto = true;
 
-    egui::Window::new("Ministério da Guerra e Forças Armadas (6)")
+    ui_refinada::janela_estilo_menu("MINISTÉRIO DA GUERRA E FORÇAS ARMADAS (6)")
         .open(&mut aberto)
         .default_size([940.0, 620.0])
         .show(ctx, |ui| {
+            ui_refinada::decorar_janela(ui);
+            ui_refinada::cabecalho_painel(ui, "MINISTÉRIO DA GUERRA (6)");
             ui.horizontal(|ui| {
-                ui.selectable_value(&mut painel.aba, 0, "Guerras Ativas");
-                ui.selectable_value(&mut painel.aba, 1, "Frentes Operacionais");
-                ui.selectable_value(&mut painel.aba, 2, "Exércitos e Divisões");
-                ui.selectable_value(&mut painel.aba, 3, "Histórico de Paz");
+                if ui_refinada::aba_estilo_menu(ui, painel.aba == 0, "Guerras Ativas") { painel.aba = 0; }
+                if ui_refinada::aba_estilo_menu(ui, painel.aba == 1, "Frentes") { painel.aba = 1; }
+                if ui_refinada::aba_estilo_menu(ui, painel.aba == 2, "Exércitos") { painel.aba = 2; }
+                if ui_refinada::aba_estilo_menu(ui, painel.aba == 3, "Histórico") { painel.aba = 3; }
             });
             ui.separator();
 
@@ -81,17 +83,17 @@ fn tela_guerra(
                                     ui.horizontal(|ui| {
                                         ui.strong("Atacantes:");
                                         for a in &g.atacantes {
-                                            ui.colored_label(egui::Color32::from_rgb(220, 80, 80), format!("{} ({a})", nome(a)));
+                                            ui.colored_label(ui_refinada::menu::PERIGO, format!("{} ({a})", nome(a)));
                                         }
                                         ui.strong(" vs Defensores:");
                                         for d in &g.defensores {
-                                            ui.colored_label(egui::Color32::from_rgb(80, 140, 240), format!("{} ({d})", nome(d)));
+                                            ui.colored_label(ui_refinada::menu::AZUL_MARINHO, format!("{} ({d})", nome(d)));
                                         }
                                     });
 
                                     // Barra e valor da pontuação de guerra
                                     let score = g.pontuacao_guerra;
-                                    let cor_score = if score > 0.0 { egui::Color32::LIGHT_GREEN } else if score < 0.0 { egui::Color32::LIGHT_RED } else { egui::Color32::GRAY };
+                                    let cor_score = if score > 0.0 { ui_refinada::menu::SUCESSO } else if score < 0.0 { ui_refinada::menu::PERIGO } else { ui_refinada::menu::TINTA_SUAVE };
                                     ui.horizontal(|ui| {
                                         ui.label("Pontuação de Guerra:");
                                         ui.colored_label(cor_score, format!("{score:+.1}%"));
@@ -106,9 +108,9 @@ fn tela_guerra(
                                     });
 
                                     if g.capitulou_defensores {
-                                        ui.colored_label(egui::Color32::YELLOW, "⚠ Os defensores capitularam incondicionalmente!");
+                                        ui.colored_label(ui_refinada::menu::AVISO, "⚠ Os defensores capitularam incondicionalmente!");
                                     } else if g.capitulou_atacantes {
-                                        ui.colored_label(egui::Color32::YELLOW, "⚠ Os atacantes capitularam incondicionalmente!");
+                                        ui.colored_label(ui_refinada::menu::AVISO, "⚠ Os atacantes capitularam incondicionalmente!");
                                     }
 
                                     // Ações de paz para o jogador beligerante
@@ -191,7 +193,7 @@ fn tela_guerra(
                                 ui.group(|ui| {
                                     ui.horizontal(|ui| {
                                         ui.heading(&f.nome_pt);
-                                        let cor_status = if f.ativa { egui::Color32::LIGHT_GREEN } else { egui::Color32::GRAY };
+                                        let cor_status = if f.ativa { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::TINTA_SUAVE };
                                         ui.colored_label(cor_status, if f.ativa { "● Ativa" } else { "○ Inativa" });
                                     });
                                     ui.horizontal(|ui| {
@@ -305,7 +307,7 @@ fn tela_guerra(
 
             if !painel.mensagem.is_empty() {
                 ui.separator();
-                ui.colored_label(egui::Color32::LIGHT_GREEN, &painel.mensagem);
+                ui.colored_label(ui_refinada::menu::SUCESSO, &painel.mensagem);
             }
         });
 

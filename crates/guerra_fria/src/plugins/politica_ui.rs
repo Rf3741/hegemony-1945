@@ -5,11 +5,11 @@ use sim_politica::{FaseLegislativa, HumorGrupoInteresse, PapelGrupoInteresse, Pa
 
 fn cor_aprovacao(a: f64) -> egui::Color32 {
     if a >= 5.0 {
-        egui::Color32::LIGHT_GREEN
+        ui_refinada::menu::SUCESSO
     } else if a <= -5.0 {
-        egui::Color32::LIGHT_RED
+        ui_refinada::menu::PERIGO
     } else {
-        egui::Color32::LIGHT_YELLOW
+        ui_refinada::menu::AVISO
     }
 }
 
@@ -52,9 +52,9 @@ pub fn aba_politica(ui: &mut egui::Ui, pol: &mut PoliticaSim) {
 }
 
 fn cabecalho(ui: &mut egui::Ui, p: &PaisPolitica, data: &str) {
-    ui.heading(format!("Política de {} ({data})", p.nome));
+    ui_refinada::cabecalho_painel(ui, &format!("POLÍTICA DE {} ({data})", p.nome));
     let l = p.legitimidade;
-    let cor = if l >= 60.0 { egui::Color32::LIGHT_GREEN } else if l >= 35.0 { egui::Color32::YELLOW } else { egui::Color32::LIGHT_RED };
+    let cor = if l >= 60.0 { ui_refinada::menu::SUCESSO } else if l >= 35.0 { ui_refinada::menu::AVISO } else { ui_refinada::menu::PERIGO };
     ui.horizontal(|ui| {
         ui.label("Legitimidade:");
         ui.add(egui::ProgressBar::new((l / 100.0) as f32).desired_width(160.0).text(format!("{l:.0}% ({:?})", p.faixa_legitimidade)).fill(cor));
@@ -71,7 +71,7 @@ fn cabecalho(ui: &mut egui::Ui, p: &PaisPolitica, data: &str) {
     ));
     if !p.crises_ativas.is_empty() {
         for c in p.crises_ativas.iter().filter(|c| !c.resolvida) {
-            ui.colored_label(egui::Color32::LIGHT_RED, format!("Crise: {:?} (intensidade {:.0}%, {} dias)", c.tipo_crise, c.intensidade * 100.0, c.dias_ativa));
+            ui.colored_label(ui_refinada::menu::PERIGO, format!("Crise: {:?} (intensidade {:.0}%, {} dias)", c.tipo_crise, c.intensidade * 100.0, c.dias_ativa));
         }
     }
 }
@@ -92,7 +92,7 @@ fn grupos(ui: &mut egui::Ui, p: &PaisPolitica) {
             ui.colored_label(cor_aprovacao(g.aprovacao), format!("{:+.1}", g.aprovacao));
             ui.label(humor_pt(g.humor));
             match g.papel {
-                PapelGrupoInteresse::NoGoverno => ui.colored_label(egui::Color32::LIGHT_GREEN, "no governo"),
+                PapelGrupoInteresse::NoGoverno => ui.colored_label(ui_refinada::menu::SUCESSO, "no governo"),
                 PapelGrupoInteresse::NaOposicao => ui.label("oposição"),
                 PapelGrupoInteresse::Marginalizado => ui.weak("marginalizado"),
             };
@@ -136,16 +136,16 @@ fn leis(ui: &mut egui::Ui, pol: &PoliticaSim, p: &PaisPolitica, cmds: &mut Vec<C
     let nome_lei = |id: &str| cat.leis.get(id).map_or(id.to_string(), |l| l.nome.clone());
     if let Some(t) = &p.lei_em_tramitacao {
         ui.group(|ui| {
-            ui.colored_label(egui::Color32::YELLOW, format!("Em tramitação: {} -> {}", nome_lei(&t.lei_anterior_id), nome_lei(&t.lei_alvo_id)));
+            ui.colored_label(ui_refinada::menu::AVISO, format!("Em tramitação: {} -> {}", nome_lei(&t.lei_anterior_id), nome_lei(&t.lei_alvo_id)));
             ui.horizontal(|ui| {
                 ui.label(format!("{} ({} dias na fase, entraves {}/3)", fase_pt(t.fase), t.dias_na_fase, t.contagem_entraves));
                 ui.add(egui::ProgressBar::new((t.progresso_fase / 100.0) as f32).desired_width(140.0));
             });
             ui.label(format!("Chance de avançar {:.0}% | debate {:.0}% | travar {:.0}%", t.chance_avanco * 100.0, t.chance_debate * 100.0, t.chance_travar * 100.0));
             if !p.faixa_legitimidade.permite_tramitacao_leis() {
-                ui.colored_label(egui::Color32::LIGHT_RED, "Governo ilegítimo: paralisia legislativa.");
+                ui.colored_label(ui_refinada::menu::PERIGO, "Governo ilegítimo: paralisia legislativa.");
             }
-            if ui.button("Retirar proposta").clicked() {
+            if ui_refinada::botao_estilo_secundario(ui, "Retirar proposta").clicked() {
                 cmds.push(ComandoPol::CancelarLei);
             }
         });
@@ -201,7 +201,7 @@ fn movimentos(ui: &mut egui::Ui, p: &PaisPolitica) {
             ui.label(format!("{:.0}%", m.apoio * 100.0));
             ui.label(format!("{:.0}%", m.radicalismo * 100.0));
             if m.em_revolucao {
-                ui.colored_label(egui::Color32::LIGHT_RED, "EM REVOLUÇÃO");
+                ui.colored_label(ui_refinada::menu::PERIGO, "EM REVOLUÇÃO");
             } else {
                 ui.label(format!("{:.0}%", m.termometro_revolucao));
             }

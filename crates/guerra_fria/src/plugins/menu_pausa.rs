@@ -9,12 +9,7 @@ use super::menu_ui::TelaMenu;
 use crate::estado::AppState;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
-
-const PAPEL: egui::Color32 = egui::Color32::from_rgb(0xE8, 0xDE, 0xC8);
-const VERMELHO: egui::Color32 = egui::Color32::from_rgb(0x8C, 0x25, 0x1E);
-const TINTA: egui::Color32 = egui::Color32::from_rgb(0x17, 0x16, 0x14);
-const TINTA_SUAVE: egui::Color32 = egui::Color32::from_rgb(0x5C, 0x58, 0x50);
-const CINZA: egui::Color32 = egui::Color32::from_rgb(0x3A, 0x37, 0x32);
+use ui_refinada::menu::{CINZA, PAPEL, TINTA, TINTA_SUAVE, VERMELHO};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AbaConfig {
@@ -153,6 +148,7 @@ fn card(ctx: &egui::Context, id: &str, largura: f32, conteudo: impl FnOnce(&mut 
         )
         .show(ctx, |ui| {
             ui.set_width(largura);
+            ui_refinada::decorar_janela(ui);
             estilo_papel(ui);
             conteudo(ui);
         });
@@ -260,14 +256,31 @@ fn botao_rankings(
 ) -> Result {
     egui::Area::new(egui::Id::new("botao_rankings")).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(contextos.ctx_mut()?, |ui| {
         ui.horizontal(|ui| {
-            let b = egui::Button::new(egui::RichText::new("Rankings (7)").strong().size(16.0).color(PAPEL)).fill(VERMELHO).stroke(egui::Stroke::new(1.5, PAPEL));
+            let fam = ui_refinada::familia_oswald(ui.ctx());
+            let b = egui::Button::new(
+                egui::RichText::new("Rankings (7)")
+                    .family(fam.clone())
+                    .strong()
+                    .size(16.0)
+                    .color(PAPEL),
+            )
+            .fill(VERMELHO)
+            .stroke(egui::Stroke::new(1.5, TINTA));
             if ui.add(b).on_hover_text("Estatísticas e rankings globais: comércio, PIB, população, força militar...").clicked() {
                 ledger.aberto = !ledger.aberto;
                 if ledger.aberto {
                     ledger.aba_ativa = AbaLedger::RankingsCategoria;
                 }
             }
-            if ui.button("Configurações").clicked() {
+            let b_cfg = egui::Button::new(
+                egui::RichText::new("Configurações")
+                    .family(fam)
+                    .size(15.0)
+                    .color(TINTA),
+            )
+            .fill(PAPEL)
+            .stroke(egui::Stroke::new(1.0, VERMELHO));
+            if ui.add(b_cfg).clicked() {
                 config.abrir();
             }
         });
@@ -296,6 +309,7 @@ fn janela_config(
     card(&ctx, "janela_config", 700.0, |ui| {
         ui.label(
             egui::RichText::new("CONFIGURAÇÕES")
+                .family(ui_refinada::familia_oswald(ui.ctx()))
                 .size(28.0)
                 .strong()
                 .color(VERMELHO),

@@ -70,11 +70,10 @@ fn atalho_jornal(teclas: Res<ButtonInput<KeyCode>>, mut ev: ResMut<EstadoEv>) {
     }
 }
 
-const PAPEL: egui::Color32 = egui::Color32::from_rgb(0xd9, 0xcf, 0xb8);
-const TINTA: egui::Color32 = egui::Color32::from_rgb(0x23, 0x20, 0x1b);
-const TINTA_SUAVE: egui::Color32 = egui::Color32::from_rgb(0x59, 0x53, 0x47);
-const CARIMBO: egui::Color32 = egui::Color32::from_rgb(0xa3, 0x27, 0x22);
-const BORDA: egui::Color32 = egui::Color32::from_rgb(0x9e, 0x91, 0x76);
+const PAPEL: egui::Color32 = ui_refinada::menu::PAPEL;
+const TINTA: egui::Color32 = ui_refinada::menu::TINTA;
+const TINTA_SUAVE: egui::Color32 = ui_refinada::menu::TINTA_SUAVE;
+const CARIMBO: egui::Color32 = ui_refinada::menu::VERMELHO;
 
 fn popup_evento(
     mut contextos: EguiContexts,
@@ -119,8 +118,9 @@ fn popup_evento(
         .order(egui::Order::Foreground)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .fixed_size([620.0, 0.0])
-        .frame(egui::Frame::new().fill(PAPEL).stroke(egui::Stroke::new(2.0, BORDA)).inner_margin(0.0))
+        .frame(ui_refinada::moldura_janela_papel())
         .show(contextos.ctx_mut()?, |ui| {
+            ui_refinada::decorar_janela(ui);
             // Cabeçalho (faixa com a cor do país e carimbo).
             egui::Frame::new().fill(cor_pais.gamma_multiply(0.55)).inner_margin(egui::Margin::symmetric(14, 10)).show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -138,7 +138,13 @@ fn popup_evento(
                     super::personagens_ui::retrato_chefe(ui, el, r, &super::politica_sim::tag_politica(&pend.pais), 64.0);
                     ui.add_space(4.0);
                 }
-                ui.label(egui::RichText::new(&evento.titulo).color(TINTA).size(20.0).strong());
+                ui.label(
+                    egui::RichText::new(evento.titulo.to_uppercase())
+                        .family(ui_refinada::familia_oswald(ui.ctx()))
+                        .color(TINTA)
+                        .size(22.0)
+                        .strong(),
+                );
                 ui.add_space(6.0);
                 egui::ScrollArea::vertical().max_height(180.0).show(ui, |ui| {
                     ui.label(egui::RichText::new(&evento.descricao).color(TINTA));
@@ -147,7 +153,13 @@ fn popup_evento(
                 ui.separator();
                 for (i, op) in evento.opcoes.iter().enumerate() {
                     let letra = (b'A' + (i as u8 % 26)) as char;
-                    let r = ui.add_sized([ui.available_width(), 34.0], egui::Button::new(egui::RichText::new(format!("{letra}. {}", op.texto)).color(TINTA)).fill(egui::Color32::from_rgb(0xcb, 0xbf, 0xa3)).wrap());
+                    let r = ui.add_sized(
+                        [ui.available_width(), 34.0],
+                        egui::Button::new(egui::RichText::new(format!("{letra}. {}", op.texto)).color(TINTA))
+                            .fill(ui_refinada::menu::PAPEL_CARD)
+                            .stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO))
+                            .wrap(),
+                    );
                     let r = r.on_hover_ui(|ui| {
                         ui.set_max_width(380.0);
                         if !op.descricao_resultado.is_empty() {
@@ -156,7 +168,7 @@ fn popup_evento(
                         }
                         for m in &op.efeitos {
                             let bom = m.valor >= 0.0;
-                            ui.colored_label(if bom { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED }, descrever_efeito(m));
+                            ui.colored_label(if bom { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::PERIGO }, descrever_efeito(m));
                         }
                     });
                     if r.clicked() {
@@ -186,14 +198,16 @@ fn jornal(mut contextos: EguiContexts, ev: Res<EstadoEv>) -> Result {
     if !ev.jornal_aberto || ev.estado.jornal.is_empty() {
         return Ok(());
     }
-    egui::Window::new("Jornal (J)")
+    ui_refinada::janela_estilo_menu("Jornal (J)")
         .anchor(egui::Align2::RIGHT_BOTTOM, [-10.0, -10.0])
         .default_width(340.0)
         .resizable(false)
         .show(contextos.ctx_mut()?, |ui| {
+            ui_refinada::decorar_janela(ui);
+            ui_refinada::cabecalho_painel(ui, "JORNAL E TELEGRAMAS (J)");
             for n in ev.estado.jornal.iter().rev().take(6) {
-                ui.label(egui::RichText::new(format!("{:02}/{:02}/{}", n.data.2, n.data.1, n.data.0)).small().weak());
-                ui.label(&n.texto);
+                ui.label(egui::RichText::new(format!("{:02}/{:02}/{}", n.data.2, n.data.1, n.data.0)).small().color(TINTA_SUAVE));
+                ui.label(egui::RichText::new(&n.texto).color(TINTA));
                 ui.separator();
             }
         });

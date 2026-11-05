@@ -286,6 +286,8 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
         let m = &t.mundo;
         let est = m.paises.get(&tag);
         egui::Window::new("Tecnologia (5)").open(&mut aberto).default_size([1180.0, 700.0]).show(ctx, |ui| {
+            ui_refinada::decorar_janela(ui);
+            ui_refinada::cabecalho_painel(ui, "ÁRVORE TECNOLÓGICA (5)");
             let Some(est) = est else {
                 ui.label("Este país não tem dados de tecnologia.");
                 return;
@@ -301,7 +303,7 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
                 ui.label(format!("Era visual: {}", m.era_visual(&tag)));
                 if !t.mensagem.is_empty() {
                     ui.separator();
-                    ui.colored_label(egui::Color32::LIGHT_GREEN, &t.mensagem);
+                    ui.colored_label(ui_refinada::menu::SUCESSO, &t.mensagem);
                 }
             });
             ui.group(|ui| {
@@ -318,7 +320,7 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
                         ui.add(egui::ProgressBar::new(prog.clamp(0.0, 1.0) as f32).text(format!("{:.0}% de {:.0} pts", prog * 100.0, custo)).desired_width(ui.available_width()));
                     }
                     None => {
-                        ui.colored_label(egui::Color32::YELLOW, "Nenhuma pesquisa ativa: escolha uma tecnologia (os pontos ficam acumulados na reserva).");
+                        ui.colored_label(ui_refinada::menu::AVISO, "Nenhuma pesquisa ativa: escolha uma tecnologia (os pontos ficam acumulados na reserva).");
                     }
                 }
                 if !est.fila.is_empty() {
@@ -335,7 +337,7 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
             let ramo_atual = t.ramo.unwrap_or(Ramo::Producao);
             ui.horizontal(|ui| {
                 for r in Ramo::TODOS {
-                    if ui.selectable_label(ramo_atual == r, egui::RichText::new(r.nome()).color(cor_ramo(r))).clicked() {
+                    if ui_refinada::aba_estilo_menu(ui, ramo_atual == r, r.nome()) {
                         acoes.push(Acao::Ramo(Some(r)));
                     }
                 }
@@ -441,13 +443,13 @@ pub fn layout_arvore(eras: &[u32], anos: &[i32], pres: &[Vec<usize>]) -> Vec<(us
 
 fn cor_estado(conhecida: bool, ativa: bool, disp: bool) -> egui::Color32 {
     if conhecida {
-        egui::Color32::from_rgb(24, 66, 36)
+        egui::Color32::from_rgb(215, 235, 215)
     } else if ativa {
-        egui::Color32::from_rgb(28, 46, 84)
+        egui::Color32::from_rgb(220, 230, 248)
     } else if disp {
-        egui::Color32::from_gray(52)
+        ui_refinada::menu::PAPEL_CLARO
     } else {
-        egui::Color32::from_gray(30)
+        ui_refinada::menu::PAPEL_ALT
     }
 }
 
@@ -464,7 +466,7 @@ fn arvore(ui: &mut egui::Ui, m: &MundoTec, tag: &str, ramo: Ramo, est: &sim_tecn
     let (resp, painter) = ui.allocate_painter(tam, egui::Sense::click_and_drag());
     let rect = resp.rect;
     let painter = painter.with_clip_rect(rect);
-    painter.rect_filled(rect, 4.0, egui::Color32::from_gray(16));
+    painter.rect_filled(rect, 4.0, ui_refinada::menu::PAPEL_CARD);
     if resp.dragged() {
         pan_zoom.0 += resp.drag_delta();
     }
@@ -498,7 +500,7 @@ fn arvore(ui: &mut egui::Ui, m: &MundoTec, tag: &str, ramo: Ramo, est: &sim_tecn
         let (mn, mx) = (ys.iter().min().copied().unwrap_or(0), ys.iter().max().copied().unwrap_or(0));
         let x = origem.x + c as f32 * (NO_L + GAP_X) * z;
         let txt = if mn == mx { format!("{mn}") } else { format!("{mn}–{mx}") };
-        painter.text(egui::pos2(x, rect.min.y + 2.0), egui::Align2::LEFT_TOP, txt, egui::FontId::proportional(12.0), egui::Color32::from_gray(140));
+        painter.text(egui::pos2(x, rect.min.y + 2.0), egui::Align2::LEFT_TOP, txt, egui::FontId::proportional(12.0), ui_refinada::menu::TINTA_SUAVE);
     }
     // linhas
     let cr = cor_ramo(ramo);
@@ -511,7 +513,7 @@ fn arvore(ui: &mut egui::Ui, m: &MundoTec, tag: &str, ramo: Ramo, est: &sim_tecn
             let (ini, fim) = (a.right_center(), b.left_center());
             let dx = ((fim.x - ini.x) * 0.5).max(10.0 * z);
             let ok = est.conhecidas.contains(&techs[p].id);
-            let cor = if ok { cr.gamma_multiply(0.9) } else { egui::Color32::from_gray(90) };
+            let cor = if ok { cr } else { ui_refinada::menu::PAPEL_BORDA };
             let st = egui::Stroke::new((1.6 * z).max(1.0), cor);
             painter.add(egui::epaint::CubicBezierShape::from_points_stroke([ini, ini + egui::vec2(dx, 0.0), fim - egui::vec2(dx, 0.0), fim], false, egui::Color32::TRANSPARENT, st));
             let s = 5.0 * z.max(0.6);
@@ -535,20 +537,20 @@ fn arvore(ui: &mut egui::Ui, m: &MundoTec, tag: &str, ramo: Ramo, est: &sim_tecn
         if r_int.hovered() {
             fundo = fundo.gamma_multiply(1.35);
         }
-        let borda = if ativa { egui::Color32::from_rgb(120, 160, 255) } else if na_fila { egui::Color32::YELLOW } else if conhecida { egui::Color32::from_rgb(60, 130, 80) } else { cr.gamma_multiply(if disp { 0.9 } else { 0.35 }) };
+        let borda = if ativa { ui_refinada::menu::AZUL_MARINHO } else if na_fila { ui_refinada::menu::AVISO } else if conhecida { ui_refinada::menu::SUCESSO } else { cr.gamma_multiply(if disp { 1.0 } else { 0.4 }) };
         painter.rect(r, 5.0 * z, fundo, egui::Stroke::new(1.5, borda), egui::StrokeKind::Inside);
-        let txt_cor = if conhecida || disp || ativa { egui::Color32::from_gray(235) } else { egui::Color32::from_gray(130) };
+        let txt_cor = if conhecida || disp || ativa { ui_refinada::menu::TINTA } else { ui_refinada::menu::TINTA_SUAVE };
         let fs = (13.0 * z).max(7.0);
         if z >= 0.45 {
             painter.text(r.min + egui::vec2(8.0, 6.0) * z, egui::Align2::LEFT_TOP, &tec.nome, egui::FontId::proportional(fs), txt_cor);
             let sub = if conhecida { "✓ pesquisada".to_string() } else { format!("{:.0} pts · ~{:.0} d · {}", custo, custo / pts, tec.ano_historico) };
-            painter.text(r.min + egui::vec2(8.0, 28.0) * z, egui::Align2::LEFT_TOP, sub, egui::FontId::proportional((11.0 * z).max(7.0)), if conhecida { egui::Color32::LIGHT_GREEN } else { egui::Color32::from_gray(160) });
+            painter.text(r.min + egui::vec2(8.0, 28.0) * z, egui::Align2::LEFT_TOP, sub, egui::FontId::proportional((11.0 * z).max(7.0)), if conhecida { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::TINTA_SUAVE });
         }
         if ativa {
             let prog = est.progresso.get(&tec.id).copied().unwrap_or(0.0).clamp(0.0, 1.0) as f32;
             let barra = egui::Rect::from_min_max(egui::pos2(r.min.x + 6.0 * z, r.max.y - 12.0 * z), egui::pos2(r.max.x - 6.0 * z, r.max.y - 6.0 * z));
-            painter.rect_filled(barra, 2.0, egui::Color32::from_gray(20));
-            painter.rect_filled(egui::Rect::from_min_size(barra.min, egui::vec2(barra.width() * prog, barra.height())), 2.0, egui::Color32::from_rgb(90, 140, 240));
+            painter.rect_filled(barra, 2.0, ui_refinada::menu::PAPEL_BORDA);
+            painter.rect_filled(egui::Rect::from_min_size(barra.min, egui::vec2(barra.width() * prog, barra.height())), 2.0, ui_refinada::menu::AZUL_MARINHO);
         } else if !conhecida {
             if let Some(&p) = est.progresso.get(&tec.id) {
                 let barra = egui::Rect::from_min_max(egui::pos2(r.min.x + 6.0 * z, r.max.y - 9.0 * z), egui::pos2(r.max.x - 6.0 * z, r.max.y - 6.0 * z));
@@ -574,16 +576,16 @@ fn tooltip(ui: &mut egui::Ui, m: &MundoTec, tec: &Tecnologia, est: &sim_tecnolog
         ui.label(&tec.descricao);
     }
     if est.conhecidas.contains(&tec.id) {
-        ui.colored_label(egui::Color32::LIGHT_GREEN, "Já pesquisada");
+        ui.colored_label(ui_refinada::menu::SUCESSO, "Já pesquisada");
     } else {
         let base = tec.custo * (1.0 + sim_tecnologia::penalidade_antecedencia(ano, tec.ano_historico));
         let desc = (1.0 - custo / base) * 100.0;
         ui.small(format!("Custo {:.0} pts | histórica {}", custo, tec.ano_historico));
         if desc > 0.5 {
-            ui.small(egui::RichText::new(format!("Desconto de difusão: -{:.0}%", desc)).color(egui::Color32::LIGHT_BLUE));
+            ui.small(egui::RichText::new(format!("Desconto de difusão: -{:.0}%", desc)).color(ui_refinada::menu::INFO));
         }
         if disp && ano < tec.ano_historico - 10 {
-            ui.small(egui::RichText::new("Adiantada demais (mais de 10 anos)").color(egui::Color32::LIGHT_RED));
+            ui.small(egui::RichText::new("Adiantada demais (mais de 10 anos)").color(ui_refinada::menu::PERIGO));
         }
         ui.small(if est.ativa.is_none() { "Clique: pesquisar" } else { "Clique: pôr na fila" });
     }
@@ -591,7 +593,7 @@ fn tooltip(ui: &mut egui::Ui, m: &MundoTec, tec: &Tecnologia, est: &sim_tecnolog
         ui.horizontal_wrapped(|ui| {
             ui.small("Requer:");
             for p in &tec.pre_requisitos {
-                let c = if est.conhecidas.contains(p) { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED };
+                let c = if est.conhecidas.contains(p) { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::PERIGO };
                 ui.small(egui::RichText::new(nome_tec(m, p)).color(c));
             }
         });
@@ -603,7 +605,7 @@ fn tooltip(ui: &mut egui::Ui, m: &MundoTec, tec: &Tecnologia, est: &sim_tecnolog
     u.extend(d.leis.iter().map(|x| format!("lei {}", bonito(x))));
     u.extend(d.unidades_militares.iter().map(|x| format!("unidade {}", bonito(x))));
     if !u.is_empty() {
-        ui.small(egui::RichText::new(format!("Libera: {}", u.join(", "))).color(egui::Color32::from_rgb(220, 200, 120)));
+        ui.small(egui::RichText::new(format!("Libera: {}", u.join(", "))).color(ui_refinada::menu::OURO));
     }
 }
 

@@ -180,27 +180,32 @@ fn tela_diplomacia(
     let nomes: std::collections::HashMap<String, String> = mundo.0.paises.values().map(|p| (normalizar(&p.tag), p.nome.clone())).collect();
     let nome = |t: &str| nomes.get(t).cloned().unwrap_or_else(|| t.to_string());
 
-    egui::Window::new("Diplomacia (4)").open(&mut aberto).default_size([900.0, 600.0]).show(ctx, |ui| {
-        ui.horizontal_wrapped(|ui| {
-            ui.group(|ui| {
-                ui.label("Tensão mundial:");
-                let t = d.0.tensao;
-                let cor = if t > 60.0 { egui::Color32::LIGHT_RED } else if t > 30.0 { egui::Color32::YELLOW } else { egui::Color32::LIGHT_GREEN };
-                ui.colored_label(cor, format!("{t:.0}/100"));
+    ui_refinada::janela_estilo_menu("DIPLOMACIA E RELAÇÕES EXTERIORES (4)")
+        .open(&mut aberto)
+        .default_size([900.0, 600.0])
+        .show(ctx, |ui| {
+            ui_refinada::decorar_janela(ui);
+            ui_refinada::cabecalho_painel(ui, "DIPLOMACIA E RELAÇÕES EXTERIORES (4)");
+            ui.horizontal_wrapped(|ui| {
+                ui.group(|ui| {
+                    ui.label("Tensão mundial:");
+                    let t = d.0.tensao;
+                    let cor = if t > 60.0 { ui_refinada::menu::PERIGO } else if t > 30.0 { ui_refinada::menu::AVISO } else { ui_refinada::menu::SUCESSO };
+                    ui.colored_label(cor, format!("{t:.0}/100"));
+                });
+                ui.group(|ui| {
+                    ui.label("Pontos de influência:");
+                    ui.strong(format!("{:.0}", d.0.pontos.get(&eu).copied().unwrap_or(0.0)));
+                });
+                ui.group(|ui| {
+                    ui.label("Sua esfera:");
+                    let e = d.0.esfera(&eu);
+                    ui.colored_label(cor_egui(e), nome_esfera(e));
+                });
+                if ui.checkbox(&mut painel.mapa_esferas, "Mapa: Esferas").changed() {
+                    mudou_mapa = true;
+                }
             });
-            ui.group(|ui| {
-                ui.label("Pontos de influência:");
-                ui.strong(format!("{:.0}", d.0.pontos.get(&eu).copied().unwrap_or(0.0)));
-            });
-            ui.group(|ui| {
-                ui.label("Sua esfera:");
-                let e = d.0.esfera(&eu);
-                ui.colored_label(cor_egui(e), nome_esfera(e));
-            });
-            if ui.checkbox(&mut painel.mapa_esferas, "Mapa: Esferas").changed() {
-                mudou_mapa = true;
-            }
-        });
         ui.separator();
         ui.columns(2, |cols| {
             // ---- Coluna esquerda: lista de países ----
@@ -226,7 +231,7 @@ fn tela_diplomacia(
                             painel.alvo = t.clone();
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let c = if r >= 21.0 { egui::Color32::LIGHT_GREEN } else if r <= -21.0 { egui::Color32::LIGHT_RED } else { egui::Color32::GRAY };
+                            let c = if r >= 21.0 { ui_refinada::menu::SUCESSO } else if r <= -21.0 { ui_refinada::menu::PERIGO } else { ui_refinada::menu::TINTA_SUAVE };
                             ui.colored_label(c, format!("{r:+.0}"));
                         });
                     });
@@ -292,14 +297,14 @@ fn tela_diplomacia(
                 if let Some(ref mut g_sim) = guerra_sim {
                     let guerra_ativa = g_sim.0.guerras().iter().find(|gw| gw.ativa && gw.sao_inimigos(&eu, &alvo)).cloned();
                     if let Some(gw) = guerra_ativa {
-                        ui.colored_label(egui::Color32::from_rgb(240, 80, 80), "⚔ VOCÊ ESTÁ EM GUERRA COM ESTE PAÍS");
+                        ui.colored_label(ui_refinada::menu::PERIGO, "⚔ VOCÊ ESTÁ EM GUERRA COM ESTE PAÍS");
                         let score = if gw.eh_atacante(&eu) { gw.pontuacao_guerra } else { -gw.pontuacao_guerra };
-                        let cor_s = if score > 0.0 { egui::Color32::LIGHT_GREEN } else if score < 0.0 { egui::Color32::LIGHT_RED } else { egui::Color32::GRAY };
+                        let cor_s = if score > 0.0 { ui_refinada::menu::SUCESSO } else if score < 0.0 { ui_refinada::menu::PERIGO } else { ui_refinada::menu::TINTA_SUAVE };
                         ui.horizontal(|ui| {
                             ui.label("Pontuação de Guerra:");
                             ui.colored_label(cor_s, format!("{score:+.1}%"));
                         });
-                        if ui.button("Abrir Painel de Guerra e Paz (6)").clicked() {
+                        if ui_refinada::botao_estilo_menu(ui, "Abrir Painel de Guerra e Paz (6)").clicked() {
                             if let Some(ref mut pg) = painel_guerra {
                                 pg.aberto = true;
                                 pg.aba = 0;
