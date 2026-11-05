@@ -21,9 +21,8 @@ use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use std::collections::HashMap;
 
-const PAPEL: egui::Color32 = egui::Color32::from_rgb(0xE8, 0xDE, 0xC8);
-const VERMELHO: egui::Color32 = egui::Color32::from_rgb(0x8C, 0x25, 0x1E);
-const TINTA: egui::Color32 = egui::Color32::from_rgb(0x23, 0x20, 0x1B);
+const VERMELHO: egui::Color32 = ui_refinada::menu::VERMELHO;
+const TINTA: egui::Color32 = ui_refinada::menu::TINTA;
 
 // ---------------------------------------------------------------------------------------------
 // Registro de alvos (retângulos dos widgets), guardado na memória do egui
@@ -657,7 +656,7 @@ fn desenhar(
     let livre = |pos: &egui::Pos2| buraco_efetivo.is_none_or(|b| !b.expand(30.0).intersects(egui::Rect::from_min_size(*pos, egui::vec2(larg, alt))));
     let pos_caixa = if confirmando { egui::pos2(tela.center().x - larg / 2.0, tela.center().y - 80.0) } else { cands.iter().copied().find(livre).unwrap_or(cands[0]) };
 
-    let moldura = egui::Frame::NONE.fill(PAPEL).stroke(egui::Stroke::new(2.5, VERMELHO)).inner_margin(14.0);
+    let moldura = ui_refinada::moldura_janela_papel();
     let mut acao_proximo = false;
     let mut acao_pular = false;
     let mut acao_sair = false;
@@ -668,23 +667,36 @@ fn desenhar(
     egui::Area::new(egui::Id::new("tut_caixa")).order(egui::Order::Tooltip).fixed_pos(pos_caixa).interactable(true).show(&ctx, |ui| {
         moldura.show(ui, |ui| {
             ui.set_width(larg);
+            ui_refinada::decorar_janela(ui);
             ui.style_mut().visuals.override_text_color = Some(TINTA);
             if confirmando {
-                ui.label(egui::RichText::new("Sair do tutorial?").size(20.0).strong());
+                ui.label(
+                    egui::RichText::new("SAIR DO TUTORIAL?")
+                        .family(ui_refinada::familia_oswald(ui.ctx()))
+                        .size(22.0)
+                        .strong()
+                        .color(VERMELHO),
+                );
                 ui.label("Você volta ao menu principal e perde o progresso desta partida de treino.");
                 ui.horizontal(|ui| {
-                    if ui.button("Sim, sair").clicked() {
+                    if ui_refinada::botao_estilo_menu(ui, "Sim, sair").clicked() {
                         acao_confirmar = true;
                     }
-                    if ui.button("Continuar tutorial").clicked() {
+                    if ui_refinada::botao_estilo_secundario(ui, "Continuar tutorial").clicked() {
                         acao_cancelar = true;
                     }
                 });
                 return;
             }
             let passo = m.passo_atual();
-            ui.label(egui::RichText::new(format!("Tutorial {}/{}", m.passo + 1, PASSOS.len())).small().color(VERMELHO));
-            ui.label(egui::RichText::new(passo.titulo).size(20.0).strong());
+            ui.label(egui::RichText::new(format!("TUTORIAL {}/{}", m.passo + 1, PASSOS.len())).small().color(VERMELHO));
+            ui.label(
+                egui::RichText::new(passo.titulo.to_uppercase())
+                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                    .size(20.0)
+                    .strong()
+                    .color(TINTA),
+            );
             ui.add_space(4.0);
             ui.label(egui::RichText::new(passo.texto).size(15.0));
             ui.add_space(6.0);
@@ -692,15 +704,15 @@ fn desenhar(
             ui.add_space(6.0);
             ui.horizontal(|ui| {
                 if m.estado == EstadoTut::Concluido || (m.ultimo() && matches!(passo.cond, Cond::Manual)) {
-                    if ui.button("Continuar jogando com os EUA").clicked() {
+                    if ui_refinada::botao_estilo_menu(ui, "Continuar com os EUA").clicked() {
                         acao_livre = true;
                     }
-                    if ui.button("Voltar ao menu").clicked() {
+                    if ui_refinada::botao_estilo_secundario(ui, "Voltar ao menu").clicked() {
                         acao_menu = true;
                     }
                     return;
                 }
-                if matches!(passo.cond, Cond::Manual) && ui.button("Próximo").clicked() {
+                if matches!(passo.cond, Cond::Manual) && ui_refinada::botao_estilo_menu(ui, "Próximo").clicked() {
                     acao_proximo = true;
                 }
                 if ui.add(egui::Button::new(egui::RichText::new("Pular passo").small()).frame(false)).clicked() {

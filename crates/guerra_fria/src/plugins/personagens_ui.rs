@@ -58,13 +58,18 @@ pub fn cartao_lider(ui: &mut egui::Ui, r: &mut Retratos, e: &Elenco, p: &Persona
             ui.label(format!("{} anos | {}", p.idade(hoje), p.ideologia.replace('_', " ")));
             ui.horizontal_wrapped(|ui| {
                 for t in &p.tracos {
-                    let resp = ui.label(egui::RichText::new(nome_traco(e, t)).small().background_color(egui::Color32::from_rgb(0x2a, 0x33, 0x44)));
+                    let resp = ui.label(
+                        egui::RichText::new(nome_traco(e, t))
+                            .small()
+                            .color(ui_refinada::menu::TINTA)
+                            .background_color(ui_refinada::menu::PAPEL_CARD),
+                    );
                     if let Some(tr) = e.traco(t) {
                         resp.on_hover_ui(|ui| {
                             ui.set_max_width(320.0);
                             ui.label(&tr.descricao);
                             for (k, v) in &tr.efeitos {
-                                let cor = if *v >= 0.0 { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED };
+                                let cor = if *v >= 0.0 { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::PERIGO };
                                 ui.colored_label(cor, format!("{k}: {v:+.2}"));
                             }
                         });

@@ -632,7 +632,7 @@ fn desenhar_tela_ledger(
 
     let mut aberto = ledger.aberto;
 
-    egui::Window::new("📊 Estatísticas & Ledger Geral (7)")
+    ui_refinada::janela_estilo_menu("ESTATÍSTICAS & LEDGER GERAL (7)")
         .open(&mut aberto)
         .default_width(1200.0)
         .default_height(720.0)
@@ -640,20 +640,20 @@ fn desenhar_tela_ledger(
         .min_height(550.0)
         .resizable(true)
         .show(ctx, |ui| {
+            ui_refinada::decorar_janela(ui);
+            ui_refinada::cabecalho_painel(ui, "ESTATÍSTICAS & LEDGER MUNDIAL (7)");
             ui.horizontal(|ui| {
-                ui.heading("ESTATÍSTICAS & LEDGER MUNDIAL");
-                ui.separator();
                 let rotulo_aba1 = format!("📈 Gráficos Históricos ({})", ledger.metrica_grafico.titulo());
-                if ui.selectable_label(ledger.aba_ativa == AbaLedger::GraficosHistoricos, rotulo_aba1).clicked() {
+                if ui_refinada::aba_estilo_menu(ui, ledger.aba_ativa == AbaLedger::GraficosHistoricos, &rotulo_aba1) {
                     ledger.aba_ativa = AbaLedger::GraficosHistoricos;
                 }
-                if ui.selectable_label(ledger.aba_ativa == AbaLedger::RankingsPotencias, "👑 Grandes Potências (Top 8)").clicked() {
+                if ui_refinada::aba_estilo_menu(ui, ledger.aba_ativa == AbaLedger::RankingsPotencias, "👑 Grandes Potências (Top 8)") {
                     ledger.aba_ativa = AbaLedger::RankingsPotencias;
                 }
-                if ui.selectable_label(ledger.aba_ativa == AbaLedger::TabelaPaises, "📋 Ledger de Países (Tabela)").clicked() {
+                if ui_refinada::aba_estilo_menu(ui, ledger.aba_ativa == AbaLedger::TabelaPaises, "📋 Ledger de Países (Tabela)") {
                     ledger.aba_ativa = AbaLedger::TabelaPaises;
                 }
-                if ui.selectable_label(ledger.aba_ativa == AbaLedger::RankingsCategoria, "🏆 Rankings Globais").clicked() {
+                if ui_refinada::aba_estilo_menu(ui, ledger.aba_ativa == AbaLedger::RankingsCategoria, "🏆 Rankings Globais") {
                     ledger.aba_ativa = AbaLedger::RankingsCategoria;
                 }
             });
@@ -929,13 +929,13 @@ fn desenhar_aba_potencias(
                         });
 
                         if eh_jogador {
-                            ui.colored_label(egui::Color32::LIGHT_GREEN, "★ SEU PAÍS ★");
+                            ui.colored_label(ui_refinada::menu::SUCESSO, "★ SEU PAÍS ★");
                         }
 
                         ui.separator();
                         ui.horizontal(|ui| {
                             ui.label("Pontuação Total:");
-                            ui.colored_label(egui::Color32::from_rgb(255, 230, 100), egui::RichText::new(format!("{:.0} pts", p.pontuacao_total)).strong());
+                            ui.colored_label(ui_refinada::menu::OURO, egui::RichText::new(format!("{:.0} pts", p.pontuacao_total)).strong());
                         });
 
                         ui.add_space(4.0);
@@ -963,7 +963,7 @@ fn desenhar_aba_potencias(
                         let eh_jog = p.id == id_jogador;
                         let txt = format!("{}. {} — {}", i + 1, p.nome, fmt_din(p.pib_anual));
                         if eh_jog {
-                            ui.colored_label(egui::Color32::LIGHT_GREEN, egui::RichText::new(txt).strong());
+                            ui.colored_label(ui_refinada::menu::SUCESSO, egui::RichText::new(txt).strong());
                         } else {
                             ui.label(txt);
                         }
@@ -979,7 +979,7 @@ fn desenhar_aba_potencias(
                         let eh_jog = p.id == id_jogador;
                         let txt = format!("{}. {} — {:.0} pts", i + 1, p.nome, p.pontuacao_mil);
                         if eh_jog {
-                            ui.colored_label(egui::Color32::LIGHT_GREEN, egui::RichText::new(txt).strong());
+                            ui.colored_label(ui_refinada::menu::SUCESSO, egui::RichText::new(txt).strong());
                         } else {
                             ui.label(txt);
                         }
@@ -995,7 +995,7 @@ fn desenhar_aba_potencias(
                         let eh_jog = p.id == id_jogador;
                         let txt = format!("{}. {} — {:.0} pts ({})", i + 1, p.nome, p.pontuacao_inf, p.esfera);
                         if eh_jog {
-                            ui.colored_label(egui::Color32::LIGHT_GREEN, egui::RichText::new(txt).strong());
+                            ui.colored_label(ui_refinada::menu::SUCESSO, egui::RichText::new(txt).strong());
                         } else {
                             ui.label(txt);
                         }
@@ -1133,7 +1133,7 @@ fn desenhar_aba_tabela(
                     // Linhas dos países
                     for p in &lista {
                         let eh_jogador = p.id == id_jogador;
-                        let cor_destaque = if eh_jogador { egui::Color32::LIGHT_GREEN } else { egui::Color32::WHITE };
+                        let cor_destaque = if eh_jogador { ui_refinada::menu::VERMELHO } else { ui_refinada::menu::TINTA };
 
                         ui.colored_label(cor_destaque, format!("#{}", p.rank_geral));
 

@@ -19,8 +19,12 @@ fn aplicar_tema(mut contextos: EguiContexts, estilo: Res<EstiloMapa>, mut aplica
     }
     let ctx = contextos.ctx_mut()?;
     ui_refinada::setup_cold_war_fonts(ctx);
-    ctx.set_style_of(egui::Theme::Dark, ui_refinada::cold_war_style());
-    ctx.set_theme(egui::ThemePreference::Dark);
+    let style = ui_refinada::cold_war_style();
+    ctx.set_style_of(egui::Theme::Light, style.clone());
+    ctx.set_style_of(egui::Theme::Dark, style.clone());
+    ctx.set_theme(egui::ThemePreference::Light);
+    ctx.set_visuals(ui_refinada::cold_war_visuals());
+    ctx.set_global_style(style);
     *aplicado = true;
     Ok(())
 }
@@ -38,7 +42,7 @@ fn moldura_vinheta(mut contextos: EguiContexts, estilo: Res<EstiloMapa>) -> Resu
         let escuro = egui::Color32::from_rgba_unmultiplied(8, 10, 12, a);
         let claro = egui::Color32::TRANSPARENT;
         let t = (r.width().min(r.height()) * 0.18).max(40.0);
-        let mut faixa = |rect: egui::Rect, c: [egui::Color32; 4]| {
+        let faixa = |rect: egui::Rect, c: [egui::Color32; 4]| {
             let mut m = egui::Mesh::default();
             m.colored_vertex(rect.left_top(), c[0]);
             m.colored_vertex(rect.right_top(), c[1]);
@@ -59,4 +63,40 @@ fn moldura_vinheta(mut contextos: EguiContexts, estilo: Res<EstiloMapa>) -> Resu
         p.rect_stroke(r.shrink(11.0), 0.0, egui::Stroke::new(1.0, ouro), egui::StrokeKind::Inside);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+    use ui_refinada::menu;
+    use ui_refinada::paleta::razao_contraste;
+
+    #[test]
+    fn tema_contraste_minimo_papel_e_tinta() {
+        let papel = menu::PAPEL;
+        let tinta = menu::TINTA;
+        let c = razao_contraste(tinta, papel);
+        assert!(c >= 7.0, "Tinta sobre papel deve ter contraste AAA >= 7.0 (deu {c:.2})");
+
+        let c_vermelho = razao_contraste(menu::VERMELHO, papel);
+        assert!(c_vermelho >= 4.5, "Vermelho de destaque deve ter contraste >= 4.5 (deu {c_vermelho:.2})");
+
+        let c_sucesso = razao_contraste(menu::SUCESSO, papel);
+        assert!(c_sucesso >= 4.0, "Sucesso sobre papel deve ter contraste >= 4.0 (deu {c_sucesso:.2})");
+
+        let c_perigo = razao_contraste(menu::PERIGO, papel);
+        assert!(c_perigo >= 4.5, "Perigo sobre papel deve ter contraste >= 4.5 (deu {c_perigo:.2})");
+    }
+
+    #[test]
+    fn estilo_visual_contem_fontes_e_molduras() {
+        let visuals = ui_refinada::cold_war_visuals();
+        assert_eq!(visuals.panel_fill, menu::PAPEL);
+        assert_eq!(visuals.window_fill, menu::PAPEL);
+        assert_eq!(visuals.override_text_color, Some(menu::TINTA));
+
+        let moldura = ui_refinada::moldura_janela_papel();
+        assert_eq!(moldura.fill, menu::PAPEL);
+        assert_eq!(moldura.stroke.color, menu::VERMELHO);
+    }
 }

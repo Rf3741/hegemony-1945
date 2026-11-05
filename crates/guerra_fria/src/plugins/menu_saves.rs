@@ -6,12 +6,7 @@ use super::map::RaizProjeto;
 use crate::estado::AppState;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
-
-const PAPEL: egui::Color32 = egui::Color32::from_rgb(0xE8, 0xDE, 0xC8);
-const VERMELHO: egui::Color32 = egui::Color32::from_rgb(0x8C, 0x25, 0x1E);
-const TINTA: egui::Color32 = egui::Color32::from_rgb(0x17, 0x16, 0x14);
-const TINTA_SUAVE: egui::Color32 = egui::Color32::from_rgb(0x5C, 0x58, 0x50);
-const CINZA: egui::Color32 = egui::Color32::from_rgb(0x3A, 0x37, 0x32);
+use ui_refinada::menu::{CINZA, PAPEL, TINTA, TINTA_SUAVE, VERMELHO};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Acao {
@@ -100,7 +95,15 @@ fn janela_saves(
         .frame(egui::Frame::NONE.fill(PAPEL).stroke(egui::Stroke::new(2.0, VERMELHO)).inner_margin(20.0))
         .show(&ctx, |ui| {
             ui.set_width(640.0);
-            ui.label(egui::RichText::new(if so_carregar { "CARREGAR JOGO" } else { "SALVAR / CARREGAR" }).size(28.0).strong().color(VERMELHO));
+            ui_refinada::decorar_janela(ui);
+            let titulo = if so_carregar { "CARREGAR JOGO" } else { "SALVAR / CARREGAR" };
+            ui.label(
+                egui::RichText::new(titulo)
+                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                    .size(28.0)
+                    .strong()
+                    .color(VERMELHO),
+            );
             ui.add_space(8.0);
             for slot in ordem {
                 let info: InfoSlot = slots.lista.iter().find(|(s, _)| *s == slot).map(|(_, i)| i.clone()).unwrap_or_default();
@@ -211,7 +214,7 @@ fn aviso(mut contextos: EguiContexts, slots: Res<Slots>, tempo: Res<Time>, mut v
     let a = |c: egui::Color32| c.gamma_multiply(alfa);
     egui::Area::new(egui::Id::new("aviso_saves")).order(egui::Order::Tooltip).anchor(egui::Align2::CENTER_TOP, [0.0, 70.0]).interactable(false).show(contextos.ctx_mut()?, |ui| {
         egui::Frame::NONE.fill(a(PAPEL)).stroke(egui::Stroke::new(2.0, a(VERMELHO))).inner_margin(egui::Margin::symmetric(24, 10)).show(ui, |ui| {
-            ui.label(egui::RichText::new(&slots.aviso).size(22.0).strong().color(a(VERMELHO)));
+            ui.label(egui::RichText::new(&slots.aviso).family(ui_refinada::familia_oswald(ui.ctx())).size(22.0).strong().color(a(VERMELHO)));
         });
     });
     Ok(())

@@ -198,26 +198,27 @@ fn aviso_formacao(
         relogio.pausado = true;
     }
     let mut ok = false;
-    egui::Window::new("novo_pais")
+    ui_refinada::janela_estilo_menu("novo_pais")
         .title_bar(false)
         .collapsible(false)
         .resizable(false)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .fixed_size([520.0, 0.0])
         .show(contextos.ctx_mut()?, |ui| {
-            ui.label(egui::RichText::new(format!("{:02}/{:02}/{}", e.data.dia, e.data.mes, e.data.ano)).weak());
-            ui.heading(texto_noticia(&e));
+            ui_refinada::decorar_janela(ui);
+            ui.label(egui::RichText::new(format!("{:02}/{:02}/{}", e.data.dia, e.data.mes, e.data.ano)).color(ui_refinada::menu::TINTA_SUAVE));
+            ui_refinada::cabecalho_painel(ui, &texto_noticia(&e));
             if !e.descricao.is_empty() {
-                ui.label(&e.descricao);
+                ui.label(egui::RichText::new(&e.descricao).color(ui_refinada::menu::TINTA));
             }
             if !e.independencia {
-                ui.label(format!("{} províncias, população {}.", e.provincias.len(), super::jogador::fmt_pop(e.populacao)));
+                ui.label(egui::RichText::new(format!("{} províncias, população {}.", e.provincias.len(), super::jogador::fmt_pop(e.populacao))).color(ui_refinada::menu::TINTA));
             }
             let faltam = form.avisos.len() - 1;
             if faltam > 0 {
-                ui.weak(format!("(+{faltam} na fila)"));
+                ui.label(egui::RichText::new(format!("(+{faltam} na fila)")).color(ui_refinada::menu::TINTA_SUAVE));
             }
-            if ui.button("Entendido").clicked() {
+            if ui_refinada::botao_estilo_menu(ui, "Entendido").clicked() {
                 ok = true;
             }
         });

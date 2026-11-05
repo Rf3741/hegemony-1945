@@ -502,9 +502,14 @@ fn tela_construcao(mut contextos: EguiContexts, mut c: ResMut<ConstrucaoUi>, eco
     let Some(eco) = eco else { return Ok(()) };
     let ctx = contextos.ctx_mut()?;
     let mut aberta = true;
-    egui::Window::new("Construção (B)").open(&mut aberta).default_size([860.0, 640.0]).show(ctx, |ui| {
-        corpo_tela_construcao(ui, &eco.vista, &mut c);
-    });
+    ui_refinada::janela_estilo_menu("CONSTRUÇÃO (B)")
+        .open(&mut aberta)
+        .default_size([860.0, 640.0])
+        .show(ctx, |ui| {
+            ui_refinada::decorar_janela(ui);
+            ui_refinada::cabecalho_painel(ui, "CONSTRUÇÃO E EDIFICAÇÃO (B)");
+            corpo_tela_construcao(ui, &eco.vista, &mut c);
+        });
     c.aberta = aberta;
     Ok(())
 }
@@ -522,11 +527,11 @@ pub fn corpo_tela_construcao(ui: &mut egui::Ui, v: &VistaEconomia, c: &mut Const
         ui.label(format!("Capacidade de construção: {:.0} pts/dia", v.pontos_construcao_dia));
         ui.separator();
         ui.label("Modo do mapa:");
-        ui.selectable_value(&mut c.modo_mapa, ModoMapa::Normal, "Normal");
-        ui.selectable_value(&mut c.modo_mapa, ModoMapa::Potencial, "Potencial");
-        ui.selectable_value(&mut c.modo_mapa, ModoMapa::Infraestrutura, "Infraestrutura");
+        if ui_refinada::aba_estilo_menu(ui, c.modo_mapa == ModoMapa::Normal, "Normal") { c.modo_mapa = ModoMapa::Normal; }
+        if ui_refinada::aba_estilo_menu(ui, c.modo_mapa == ModoMapa::Potencial, "Potencial") { c.modo_mapa = ModoMapa::Potencial; }
+        if ui_refinada::aba_estilo_menu(ui, c.modo_mapa == ModoMapa::Infraestrutura, "Infraestrutura") { c.modo_mapa = ModoMapa::Infraestrutura; }
         ui.separator();
-        if ui.button("Ver tutorial").clicked() {
+        if ui_refinada::botao_estilo_secundario(ui, "Ver tutorial").clicked() {
             c.tutorial = Some(0);
         }
     });
@@ -640,26 +645,31 @@ fn janela_tutorial(mut contextos: EguiContexts, mut c: ResMut<ConstrucaoUi>) -> 
     let ctx = contextos.ctx_mut()?;
     let (titulo, texto) = PASSOS_TUTORIAL[passo.min(PASSOS_TUTORIAL.len() - 1)];
     let mut novo = Some(passo);
-    egui::Window::new("Tutorial: construção").collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0]).default_width(440.0).show(ctx, |ui| {
-        ui.heading(titulo);
-        ui.label(texto);
-        ui.add_space(8.0);
-        ui.horizontal(|ui| {
-            if ui.add_enabled(passo > 0, egui::Button::new("Voltar")).clicked() {
-                novo = Some(passo - 1);
-            }
-            if passo + 1 < PASSOS_TUTORIAL.len() {
-                if ui.button("Próximo").clicked() {
-                    novo = Some(passo + 1);
+    ui_refinada::janela_estilo_menu("TUTORIAL: CONSTRUÇÃO")
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .default_width(440.0)
+        .show(ctx, |ui| {
+            ui_refinada::decorar_janela(ui);
+            ui_refinada::cabecalho_painel(ui, titulo);
+            ui.label(texto);
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui.add_enabled(passo > 0, egui::Button::new("Voltar")).clicked() {
+                    novo = Some(passo - 1);
                 }
-            } else if ui.button("Entendi").clicked() {
-                novo = None;
-            }
-            if ui.button("Pular").clicked() {
-                novo = None;
-            }
+                if passo + 1 < PASSOS_TUTORIAL.len() {
+                    if ui_refinada::botao_estilo_menu(ui, "Próximo").clicked() {
+                        novo = Some(passo + 1);
+                    }
+                } else if ui_refinada::botao_estilo_menu(ui, "Entendi").clicked() {
+                    novo = None;
+                }
+                if ui_refinada::botao_estilo_secundario(ui, "Pular").clicked() {
+                    novo = None;
+                }
+            });
         });
-    });
     c.tutorial = novo;
     Ok(())
 }

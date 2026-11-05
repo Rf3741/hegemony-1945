@@ -189,7 +189,7 @@ pub fn cor_pais(p: &EstadoPais) -> egui::Color32 {
 }
 
 fn cor_saldo(v: f64) -> egui::Color32 {
-    if v >= 0.0 { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED }
+    ui_refinada::cor_saldo(v)
 }
 
 /// Faixa do HUD com os indicadores do país do jogador (economia vinda do `sim_economia`).
@@ -217,7 +217,7 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
                 dica_conceito(ui.label(format!("Padrão de vida: {:.1}", eco.vista.padrao_vida)), "padrao_de_vida");
                 dica_conceito(ui.label(format!("Desemprego: {:.1}%", eco.vista.desemprego * 100.0)), "estrato_social");
                 if o.em_calote {
-                    ui.colored_label(egui::Color32::LIGHT_RED, "CALOTE");
+                    ui.colored_label(ui_refinada::menu::PERIGO, "CALOTE");
                 }
             }
             _ => {
@@ -230,10 +230,14 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
             ui.label(format!("Legitimidade atual: {:.1}%", p.politica.legitimidade));
         });
         if eco.atraso_dias() > 10 || eco.dias_perdidos > 0 {
-            ui.colored_label(egui::Color32::YELLOW, format!("Economia atrasada {} d", eco.atraso_dias()));
+            ui.colored_label(ui_refinada::menu::AVISO, format!("Economia atrasada {} d", eco.atraso_dias()));
         }
         ui.separator();
-        let b_constr = ui.add(egui::Button::new(egui::RichText::new("🏗 Construir (B)").strong().size(16.0)).fill(egui::Color32::from_rgb(40, 100, 60))).on_hover_text("Abre a tela de construção");
+        let b_constr = ui.add(
+            egui::Button::new(egui::RichText::new("🏗 Construir (B)").strong().size(16.0).color(ui_refinada::menu::PAPEL))
+                .fill(ui_refinada::menu::VERMELHO)
+                .stroke(egui::Stroke::new(1.0, ui_refinada::menu::TINTA)),
+        ).on_hover_text("Abre a tela de construção");
         super::tutorial_guiado::marcar(&b_constr, "btn_construir");
         if b_constr.clicked() {
             *construcao_aberta = !*construcao_aberta;
@@ -335,13 +339,24 @@ fn toasts(mut contextos: EguiContexts, tempo: Res<Time<Real>>, mut notas: ResMut
     // Acima dos botões fixos "Rankings (7)" e "Configurações" (canto inferior esquerdo).
     egui::Area::new("toasts".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -64.0]).show(contextos.ctx_mut()?, |ui| {
         for (txt, _, repeticoes) in notas.0.iter().rev().take(3) {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
-                ui.label(if *repeticoes > 1 {
-                    format!("{txt} ×{repeticoes}")
-                } else {
-                    txt.clone()
+            egui::Frame::NONE
+                .fill(ui_refinada::menu::PAPEL)
+                .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
+                .inner_margin(8.0)
+                .shadow(egui::Shadow {
+                    offset: [2, 3],
+                    blur: 6,
+                    spread: 0,
+                    color: egui::Color32::from_black_alpha(70),
+                })
+                .show(ui, |ui| {
+                    let msg = if *repeticoes > 1 {
+                        format!("{txt} ×{repeticoes}")
+                    } else {
+                        txt.clone()
+                    };
+                    ui.label(egui::RichText::new(msg).color(ui_refinada::menu::TINTA).strong());
                 });
-            });
         }
     });
     Ok(())
@@ -365,40 +380,46 @@ fn painel_pais(
     let mut aba = painel.aba;
     let ctx = contextos.ctx_mut()?;
     let (tag_p, nome_p) = pol.as_ref().and_then(|p| p.vista.pais.as_ref().map(|x| (x.tag.clone(), x.nome.clone()))).unwrap_or_default();
-    egui::Window::new("Painel do país (1)").open(&mut aberto).default_size([720.0, 600.0]).show(ctx, |ui| {
-        if !tag_p.is_empty() {
+    ui_refinada::janela_estilo_menu("Painel do país (1)")
+        .open(&mut aberto)
+        .default_size([720.0, 600.0])
+        .show(ctx, |ui| {
+            ui_refinada::decorar_janela(ui);
+            if !tag_p.is_empty() {
+                ui.horizontal(|ui| {
+                    let tl = super::politica_sim::tag_legado_pub(&tag_p);
+                    super::bandeiras_ui::bandeira_ui(ui, &tl, 40.0);
+                    let titulo_txt = format!("PAÍS (1) — {}", super::bandeiras_ui::nome_dinamico(ui, &tl).unwrap_or(nome_p.clone()));
+                    ui_refinada::cabecalho_painel(ui, &titulo_txt);
+                });
+            } else {
+                ui_refinada::cabecalho_painel(ui, "PAÍS (1)");
+            }
             ui.horizontal(|ui| {
-                let tl = super::politica_sim::tag_legado_pub(&tag_p);
-                super::bandeiras_ui::bandeira_ui(ui, &tl, 40.0);
-                ui.heading(super::bandeiras_ui::nome_dinamico(ui, &tl).unwrap_or(nome_p.clone()));
+                if ui_refinada::aba_estilo_menu(ui, aba == Aba::Economia, "Economia") { aba = Aba::Economia; }
+                if ui_refinada::aba_estilo_menu(ui, aba == Aba::Construcao, "Construção") { aba = Aba::Construcao; }
+                if ui_refinada::aba_estilo_menu(ui, aba == Aba::Politica, "Política") { aba = Aba::Politica; }
+                if ui_refinada::aba_estilo_menu(ui, aba == Aba::Ranking, "Ranking") { aba = Aba::Ranking; }
             });
             ui.separator();
-        }
-        ui.horizontal(|ui| {
-            ui.selectable_value(&mut aba, Aba::Economia, "Economia");
-            ui.selectable_value(&mut aba, Aba::Construcao, "Construção e Prédios");
-            ui.selectable_value(&mut aba, Aba::Politica, "Política");
-            ui.selectable_value(&mut aba, Aba::Ranking, "Ranking");
-        });
-        ui.separator();
-        egui::ScrollArea::vertical().show(ui, |ui| match aba {
-            Aba::Economia => aba_economia(ui, &mut eco, &mut painel, &mut icones),
-            Aba::Construcao => aba_construcao(ui, &mut eco, &mut painel, &mut icones),
-            Aba::Politica => match pol.as_mut() {
-                Some(p) => {
-                    if let (Some(el), Some(r), Some(tag)) = (elenco.as_deref(), retratos.as_deref_mut(), p.tag.clone()) {
-                        super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
-                        ui.separator();
+            egui::ScrollArea::vertical().show(ui, |ui| match aba {
+                Aba::Economia => aba_economia(ui, &mut eco, &mut painel, &mut icones),
+                Aba::Construcao => aba_construcao(ui, &mut eco, &mut painel, &mut icones),
+                Aba::Politica => match pol.as_mut() {
+                    Some(p) => {
+                        if let (Some(el), Some(r), Some(tag)) = (elenco.as_deref(), retratos.as_deref_mut(), p.tag.clone()) {
+                            super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
+                            ui.separator();
+                        }
+                        super::politica_ui::aba_politica(ui, p)
                     }
-                    super::politica_ui::aba_politica(ui, p)
-                }
-                None => {
-                    ui.label("Política ainda carregando...");
-                }
-            },
-            Aba::Ranking => aba_ranking(ui, &eco.vista),
+                    None => {
+                        ui.label("Política ainda carregando...");
+                    }
+                },
+                Aba::Ranking => aba_ranking(ui, &eco.vista),
+            });
         });
-    });
     painel.aba = aba;
     painel.aberto = aberto;
     Ok(())

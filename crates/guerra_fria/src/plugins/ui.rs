@@ -41,22 +41,24 @@ fn barra_superior(
     mut janela_saves: ResMut<super::menu_saves::JanelaSaves>,
 ) -> Result {
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
-    egui::Panel::top("barra_superior").show(&mut raiz, |ui| {
-        ui.horizontal(|ui| {
-            let b_salvar = ui.button("Salvar / Carregar").on_hover_text("Abre o menu de jogos salvos (Ctrl+S salva rápido, Ctrl+L carrega)");
-            super::tutorial_guiado::marcar(&b_salvar, "salvar");
-            if b_salvar.clicked() {
-                janela_saves.abrir(false);
-            }
-            ui.separator();
-            if let Some(c) = camada_visivel {
-                let texto = if c.0 { "🏛 Construções: [V] Ativas" } else { "🏛 Construções: [V] Ocultas" };
-                ui.label(texto);
+    egui::Panel::top("barra_superior")
+        .frame(egui::Frame::NONE.fill(ui_refinada::menu::PAPEL).stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO)).inner_margin(6.0))
+        .show(&mut raiz, |ui| {
+            ui.horizontal(|ui| {
+                let b_salvar = ui_refinada::botao_estilo_secundario(ui, "Salvar / Carregar").on_hover_text("Abre o menu de jogos salvos (Ctrl+S salva rápido, Ctrl+L carrega)");
+                super::tutorial_guiado::marcar(&b_salvar, "salvar");
+                if b_salvar.clicked() {
+                    janela_saves.abrir(false);
+                }
                 ui.separator();
-            }
-            ui.weak("?").on_hover_text("Espaço: pausa | +/−: velocidade | WASD: mover | scroll: zoom | V: construções | M: modos de mapa | 1-9: painéis | Ctrl+S/L: salvar/carregar");
+                if let Some(c) = camada_visivel {
+                    let texto = if c.0 { "🏛 Construções: [V] Ativas" } else { "🏛 Construções: [V] Ocultas" };
+                    ui.label(egui::RichText::new(texto).color(ui_refinada::menu::TINTA));
+                    ui.separator();
+                }
+                ui.label(egui::RichText::new("?").color(ui_refinada::menu::TINTA_SUAVE)).on_hover_text("Espaço: pausa | +/−: velocidade | WASD: mover | scroll: zoom | V: construções | M: modos de mapa | 1-9: painéis | Ctrl+S/L: salvar/carregar");
+            });
         });
-    });
     Ok(())
 }
 
@@ -72,11 +74,11 @@ fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) {
         let (r, resp) = ui.allocate_exact_size(egui::vec2(8.0, 18.0), egui::Sense::click());
         let acesa = !relogio.pausado && n <= relogio.velocidade.nivel();
         let cor = if acesa {
-            egui::Color32::from_rgb(230, 200, 90)
+            ui_refinada::menu::VERMELHO
         } else if resp.hovered() {
-            egui::Color32::from_gray(110)
+            ui_refinada::menu::TINTA_SUAVE
         } else {
-            egui::Color32::from_gray(65)
+            ui_refinada::menu::PAPEL_CARD
         };
         let alto = 6.0 + 3.0 * n as f32;
         let barra = egui::Rect::from_min_max(egui::pos2(r.left() + 1.0, r.bottom() - alto), egui::pos2(r.right() - 1.0, r.bottom()));
@@ -90,12 +92,21 @@ fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) {
         relogio.definir_velocidade(v);
     }
     let rotulo = if relogio.pausado { "Continuar" } else { "Pausar" };
-    let b_pausa = dica(ui.button(rotulo), "tooltip_topbar_botao_pausar");
+    let b_pausa = dica(ui_refinada::botao_estilo_menu(ui, rotulo), "tooltip_topbar_botao_pausar");
     super::tutorial_guiado::marcar(&b_pausa, "pausa");
     if b_pausa.clicked() {
         relogio.alternar_pausa();
     }
-    dica(ui.heading(relogio.data.formatar_pt_br()), "tooltip_topbar_data");
+    dica(
+        ui.label(
+            egui::RichText::new(relogio.data.formatar_pt_br())
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(20.0)
+                .strong()
+                .color(ui_refinada::menu::TINTA),
+        ),
+        "tooltip_topbar_data",
+    );
 }
 
 fn barra_hud(
@@ -112,14 +123,16 @@ fn barra_hud(
     let Some(eco) = eco else { return Ok(()) };
     let Some(p) = jogador.and_then(|j| mundo.paises.get(&j.0)) else { return Ok(()) };
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
-    egui::Panel::top("barra_hud").show(&mut raiz, |ui| {
-        hud_pais(ui, p, &eco, &mut painel.aberto, &mut mercado.aberto, &mut comercio.aberto, &mut constr.aberta);
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            widget_relogio(ui, &mut relogio);
-            super::tutorial_guiado::alvo(ui.ctx(), "relogio", ui.min_rect());
+    egui::Panel::top("barra_hud")
+        .frame(egui::Frame::NONE.fill(ui_refinada::menu::PAPEL).stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO)).inner_margin(6.0))
+        .show(&mut raiz, |ui| {
+            hud_pais(ui, p, &eco, &mut painel.aberto, &mut mercado.aberto, &mut comercio.aberto, &mut constr.aberta);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                widget_relogio(ui, &mut relogio);
+                super::tutorial_guiado::alvo(ui.ctx(), "relogio", ui.min_rect());
+            });
+            super::tutorial_guiado::alvo(ui.ctx(), "hud", ui.min_rect());
         });
-        super::tutorial_guiado::alvo(ui.ctx(), "hud", ui.min_rect());
-    });
     Ok(())
 }
 
@@ -136,32 +149,35 @@ fn painel_provincia(
     }
     let Some(prov) = catalogo.0.obter_por_id(selecionada.0) else { return Ok(()) };
     let mut raiz = ui_raiz(contextos.ctx_mut()?);
-    egui::Panel::right("painel_provincia").min_size(260.0).show(&mut raiz, |ui| {
-        super::tutorial_guiado::alvo(ui.ctx(), "painel_provincia", ui.max_rect());
-        ui.heading(&prov.nome);
-        let estado = if prov.estado.is_empty() { prov.adm1_code.as_str() } else { prov.estado.as_str() };
-        ui.label(format!("Estado: {estado}"));
-        ui.label(format!("ID da província: {} | Código do estado (ADM1): {}", prov.id, prov.adm1_code));
-        ui.label(format!("Área da província: {:.0} km²", prov.area));
-        ui.label(format!("País moderno: {}", prov.pais_moderno));
-        if let Some(tag) = mundo.dono_por_provincia.get(&prov.id) {
-            let nome = mundo.paises.get(tag).map(|p| p.nome.as_str()).unwrap_or("?");
-            ui.label(format!("Dono em 1945: {nome} ({tag})"));
-            if let Some(pais) = mundo.paises.get(tag) {
-                ui.separator();
-                resumo_pais(ui, pais);
-                ui.separator();
+    egui::Panel::right("painel_provincia")
+        .frame(ui_refinada::moldura_janela_papel())
+        .min_size(260.0)
+        .show(&mut raiz, |ui| {
+            super::tutorial_guiado::alvo(ui.ctx(), "painel_provincia", ui.max_rect());
+            ui_refinada::cabecalho_painel(ui, &prov.nome);
+            let estado = if prov.estado.is_empty() { prov.adm1_code.as_str() } else { prov.estado.as_str() };
+            ui.label(format!("Estado: {estado}"));
+            ui.label(format!("ID da província: {} | Código do estado (ADM1): {}", prov.id, prov.adm1_code));
+            ui.label(format!("Área da província: {:.0} km²", prov.area));
+            ui.label(format!("País moderno: {}", prov.pais_moderno));
+            if let Some(tag) = mundo.dono_por_provincia.get(&prov.id) {
+                let nome = mundo.paises.get(tag).map(|p| p.nome.as_str()).unwrap_or("?");
+                ui.label(format!("Dono em 1945: {nome} ({tag})"));
+                if let Some(pais) = mundo.paises.get(tag) {
+                    ui.separator();
+                    resumo_pais(ui, pais);
+                    ui.separator();
+                }
             }
-        }
-        if let Some(pop) = mundo.populacao_por_provincia.get(&prov.id) {
-            ui.label(format!("População da província: {pop}"));
-        }
-        let irmas = catalogo.0.provincias.iter().filter(|p| p.adm1_code == prov.adm1_code).count();
-        ui.label(format!("Vizinhas: {} | Províncias do estado: {irmas}", prov.vizinhos.len()));
-        ui.label("Construção, economia e política são por estado.");
-        if let Some(eco) = &eco {
-            egui::ScrollArea::vertical().id_salt("scroll_painel_prov").show(ui, |ui| secao_construir_aqui(ui, &eco.vista, &prov.adm1_code, &mut constr));
-        }
-    });
+            if let Some(pop) = mundo.populacao_por_provincia.get(&prov.id) {
+                ui.label(format!("População da província: {pop}"));
+            }
+            let irmas = catalogo.0.provincias.iter().filter(|p| p.adm1_code == prov.adm1_code).count();
+            ui.label(format!("Vizinhas: {} | Províncias do estado: {irmas}", prov.vizinhos.len()));
+            ui.label("Construção, economia e política são por estado.");
+            if let Some(eco) = &eco {
+                egui::ScrollArea::vertical().id_salt("scroll_painel_prov").show(ui, |ui| secao_construir_aqui(ui, &eco.vista, &prov.adm1_code, &mut constr));
+            }
+        });
     Ok(())
 }
