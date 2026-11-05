@@ -374,3 +374,184 @@ pub fn estilo_papel_ui(ui: &mut egui::Ui) {
     v.selection.bg_fill = menu::VERMELHO;
     v.slider_trailing_fill = true;
 }
+
+/// Ornamento ◆ (losango) desenhado pelo painter, usado nas faixas de título.
+fn losango(ui: &mut egui::Ui, cor: Color32) {
+    let (rect, _) = ui.allocate_exact_size(Vec2::splat(9.0), egui::Sense::hover());
+    let c = rect.center();
+    let d = rect.width() * 0.46;
+    ui.painter().add(egui::Shape::convex_polygon(
+        vec![
+            c + egui::vec2(0.0, -d),
+            c + egui::vec2(d, 0.0),
+            c + egui::vec2(0.0, d),
+            c + egui::vec2(-d, 0.0),
+        ],
+        cor,
+        Stroke::NONE,
+    ));
+}
+
+/// Faixa de título estilo cartaz: barra azul-marinho com rótulo Oswald creme,
+/// losangos vermelhos de ornamento, selo opcional de atalho e botão de fechar.
+/// `aberto: Some(&mut bool)` mostra o "X" que fecha o painel.
+pub fn faixa_titulo(ui: &mut egui::Ui, titulo: &str, atalho: Option<&str>, aberto: Option<&mut bool>) {
+    let fam = familia_oswald(ui.ctx());
+    egui::Frame::new()
+        .fill(menu::AZUL_MARINHO)
+        .inner_margin(Margin::symmetric(10, 5))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 7.0;
+                if let Some(t) = atalho {
+                    ui.label(
+                        egui::RichText::new(t)
+                            .family(fam.clone())
+                            .size(12.0)
+                            .color(menu::AZUL_MARINHO)
+                            .background_color(menu::PAPEL)
+                            .strong(),
+                    );
+                }
+                losango(ui, menu::VERMELHO_HOVER);
+                ui.label(
+                    egui::RichText::new(titulo.to_uppercase())
+                        .family(fam)
+                        .size(17.0)
+                        .strong()
+                        .color(menu::PAPEL_CLARO),
+                );
+                losango(ui, menu::VERMELHO_HOVER);
+                if let Some(flag) = aberto {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    egui::RichText::new("X")
+                                        .family(FontFamily::Name("Oswald".into()))
+                                        .size(13.0)
+                                        .color(menu::PAPEL),
+                                )
+                                .fill(menu::VERMELHO)
+                                .stroke(Stroke::new(1.0, menu::PAPEL))
+                                .min_size(Vec2::new(22.0, 20.0)),
+                            )
+                            .clicked()
+                        {
+                            *flag = false;
+                        }
+                    });
+                }
+            });
+        });
+}
+
+/// Título de seção dentro de um painel: Oswald azul-marinho sobre filete de cartaz.
+pub fn titulo_secao(ui: &mut egui::Ui, texto: &str) {
+    ui.label(
+        egui::RichText::new(texto.to_uppercase())
+            .family(familia_oswald(ui.ctx()))
+            .size(17.0)
+            .strong()
+            .color(menu::AZUL_MARINHO),
+    );
+    linha_decorativa(ui);
+}
+
+/// Janela de dossiê: moldura de papel, sem barra de título do egui (use [`faixa_titulo`] dentro dela).
+/// Posicionada abaixo da barra superior para não cobrir recursos/data.
+pub fn janela_dossie<'a>(titulo_interno: &'static str, aberto: Option<&'a mut bool>) -> egui::Window<'a> {
+    let mut win = egui::Window::new(titulo_interno)
+        .title_bar(false)
+        .frame(moldura_janela_papel())
+        .collapsible(false)
+        .resizable(true)
+        .default_pos([24.0, 104.0]);
+    if let Some(f) = aberto {
+        win = win.open(f);
+    }
+    win
+}
+
+/// Aba com glifo vetorial desenhado pelo painter no lugar de emoji.
+/// `chave_glifo = None` renderiza apenas o texto.
+pub fn aba_glifo(ui: &mut egui::Ui, ativa: bool, chave_glifo: Option<&str>, texto: &str) -> bool {
+    let fam = familia_oswald(ui.ctx());
+    let (fill, text_color, stroke) = if ativa {
+        (menu::VERMELHO, menu::PAPEL, Stroke::new(1.5, menu::TINTA))
+    } else {
+        (menu::PAPEL_CARD, menu::TINTA, Stroke::new(1.0, menu::PAPEL_BORDA))
+    };
+    let (g, s) = (menu::TINTA, menu::VERMELHO);
+    let (pa, pac) = (menu::PAPEL, menu::PAPEL_CLARO);
+    let resp = egui::Frame::new()
+        .fill(fill)
+        .stroke(stroke)
+        .inner_margin(Margin::symmetric(7, 3))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                let (rect, _) = ui.allocate_at_least(Vec2::splat(15.0), egui::Sense::hover());
+                if let Some(k) = chave_glifo {
+                    let cores = if ativa { (pa, pac) } else { (g, s) };
+                    super::icone::desenhar(ui.painter(), rect, k, cores.0, cores.1);
+                }
+                if !texto.is_empty() {
+                    ui.label(
+                        egui::RichText::new(texto.to_uppercase())
+                            .family(fam.clone())
+                            .size(13.0)
+                            .color(text_color),
+                    );
+                }
+            });
+            ui.min_rect()
+        })
+        .response
+        .on_hover_cursor(egui::CursorIcon::PointingHand);
+    let clicado = resp.clicked();
+    if ativa {
+        ui.painter().line_segment(
+            [resp.rect.left_bottom(), resp.rect.right_bottom()],
+            Stroke::new(2.0, menu::OURO),
+        );
+    }
+    clicado
+}
+
+/// Chapa de recurso: cartão de papel com glifo, rótulo e valor alinhados.
+pub fn chapa(ui: &mut egui::Ui, chave_glifo: &str, rotulo: &str, valor: &str, cor_valor: Option<Color32>) {
+    let fam = familia_oswald(ui.ctx());
+    egui::Frame::new()
+        .fill(menu::PAPEL_CARD)
+        .stroke(Stroke::new(1.0, menu::PAPEL_BORDA))
+        .inner_margin(Margin::symmetric(7, 2))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 5.0;
+                let (rect, _) = ui.allocate_exact_size(Vec2::splat(15.0), egui::Sense::hover());
+                super::icone::desenhar(ui.painter(), rect, chave_glifo, menu::TINTA, menu::VERMELHO);
+                ui.label(egui::RichText::new(rotulo).small().color(menu::TINTA_SUAVE));
+                ui.label(egui::RichText::new(valor).family(fam).size(15.0).strong().color(cor_valor.unwrap_or(menu::TINTA)));
+            });
+        });
+}
+
+/// Placa da data: bloco azul-marinho com a data em Oswald creme, destaque da barra superior.
+pub fn placa_data(ui: &mut egui::Ui, data: &str) {
+    let fam = familia_oswald(ui.ctx());
+    egui::Frame::new()
+        .fill(menu::AZUL_MARINHO)
+        .stroke(Stroke::new(1.0, menu::TINTA))
+        .inner_margin(Margin::symmetric(10, 2))
+        .show(ui, |ui| {
+            ui.label(
+                egui::RichText::new(data.to_uppercase())
+                    .family(fam)
+                    .size(17.0)
+                    .strong()
+                    .color(menu::PAPEL_CLARO),
+            );
+        });
+}

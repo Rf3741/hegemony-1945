@@ -187,10 +187,14 @@ impl IaEconomia {
         let salario = prov.predios.iter().map(|p| p.salario_base).sum::<f64>() / prov.predios.len().max(1) as f64;
         let niveis = est.niveis_do_tipo(tipo_idx) as f64;
         let (livre, total) = if tipo.usa_terra_aravel {
-            (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+            if !est.cultura_permitida(&tipo.id) {
+                (Some(0.0), Some(0.0))
+            } else {
+                (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+            }
         } else if let Some(rec) = &tipo.recurso_natural_requerido {
             let total = est.limite_recurso(rec) as f64;
-            (Some(total - niveis), Some(total))
+            (Some((total - niveis).max(0.0)), Some(total))
         } else {
             (None, None)
         };
@@ -207,6 +211,7 @@ impl IaEconomia {
             potencial_total: total,
             niveis_iguais: niveis,
             bonus_cadeia: est.bonus_cadeia(tipo_idx),
+            urbanizacao: est.urbanizacao,
         }
     }
 
@@ -363,7 +368,15 @@ impl IaEconomia {
                     180.0 * (1.0 - acesso)
                 } else {
                     let regional = Self::pontuacao_regional(mundo, pr, ti, t, &perfil, &precos);
-                    regional.max(base * 0.25) - pr.predios.len() as f64 * 0.5
+                    // A IA não deve lotar províncias ruins só porque pode: se der prejuízo regional, ignora.
+                    if regional <= 0.0 {
+                        continue;
+                    }
+                    let score_base = match t.categoria {
+                        CategoriaPredio::Extrativo | CategoriaPredio::RuralAgricola => regional,
+                        _ => regional.max(base * 0.25),
+                    };
+                    score_base - pr.predios.len() as f64 * 0.5
                 };
                 if melhor.is_none_or(|(s, _)| score > s) {
                     melhor = Some((score, pi));

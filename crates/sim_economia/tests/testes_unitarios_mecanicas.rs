@@ -593,12 +593,9 @@ fn teste_fila_construcao_conclusao_e_limites_recursos() {
             .any(|b| b.tipo_predio_id == "fabrica_texteis_consumo" && b.nivel >= 1)
     );
 
-    // Bruxelas não possui jazida de carvão em `limites_recursos`, logo mina_carvao deve falhar com CapacidadeExcedida
+    // Bruxelas não possui jazida de carvão em `limites_recursos`, mas construções são liberadas (com rendimento reduzido)
     let erro_mina = mundo.enfileirar_construcao("belgica", "bruxelas", "mina_carvao", false);
-    assert!(matches!(
-        erro_mina,
-        Err(ErroEconomia::CapacidadeExcedida { .. })
-    ));
+    assert!(erro_mina.is_ok(), "construções liberadas mesmo sem jazida mineral");
 }
 
 #[test]
@@ -659,15 +656,13 @@ fn teste_potencial_regional_culturas_e_limites_estado() {
     // Grãos são permitidos
     assert!(mundo.pode_construir(prov_sp, "fazenda_graos"), "grãos devem ser permitidos em SP");
 
-    // Gado (pecuaria_pesca) NÃO é permitido em São Paulo nesta configuração
-    assert!(!mundo.pode_construir(prov_sp, "pecuaria_pesca"), "pecuária não deve ser permitida onde cultura não consta");
-    let err_gado = mundo.enfileirar_construcao("brasil", prov_sp, "pecuaria_pesca", false);
-    assert!(matches!(err_gado, Err(ErroEconomia::CapacidadeExcedida { .. })));
+    // Gado (pecuaria_pesca) é permitido construir mesmo sem aptidão climática (rendimento reduzido)
+    assert!(mundo.pode_construir(prov_sp, "pecuaria_pesca"), "pecuária permitida mesmo onde cultura não consta");
+    assert!(mundo.enfileirar_construcao("brasil", prov_sp, "pecuaria_pesca", false).is_ok());
 
-    // Mina de carvão: não há jazida (limite 0)
-    assert!(!mundo.pode_construir(prov_sp, "mina_carvao"), "carvão com limite 0 não pode ser construído");
-    let err_carvao = mundo.enfileirar_construcao("brasil", prov_sp, "mina_carvao", false);
-    assert!(matches!(err_carvao, Err(ErroEconomia::CapacidadeExcedida { .. })));
+    // Mina de carvão: liberada para construir mesmo sem jazida (rendimento reduzido)
+    assert!(mundo.pode_construir(prov_sp, "mina_carvao"), "carvão liberado para construir mesmo com limite 0");
+    assert!(mundo.enfileirar_construcao("brasil", prov_sp, "mina_carvao", false).is_ok());
 
     // Mina de ferro: limite de 1 nível
     assert!(mundo.pode_construir(prov_sp, "mina_ferro"), "ferro com limite 1 pode ser construído");

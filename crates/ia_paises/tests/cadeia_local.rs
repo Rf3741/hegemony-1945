@@ -58,14 +58,17 @@ fn cadeia_local_e_recurso_dominam_a_estimativa() {
         .fold(0.0, f64::max);
     assert!(com > sem, "bônus com petróleo local ({com}) deve superar o sem ({sem})");
 
-    // Mina só rende onde há depósito.
+    // Mina pode ser construída mesmo sem depósito, mas com rendimento muito inferior.
     let mina = &cat.tipos_predio[tipo("mina_ferro")];
     let sem_dep = eco.estados().iter().find(|e| e.limite_recurso("ferro") == 0).unwrap();
     let idx_mina = tipo("mina_ferro");
     let prov_sem = eco.provincias().iter().find(|p| p.estado_id == sem_dep.id).unwrap();
-    assert!(!sim_economia::estado_comporta_novo_nivel(cat, sem_dep, prov_sem, idx_mina), "sem ferro não se constrói mina");
+    assert!(sim_economia::estado_comporta_novo_nivel(cat, sem_dep, prov_sem, idx_mina), "construções liberadas mesmo sem jazida");
     let com_dep = eco.estados().iter().find(|e| e.limite_recurso("ferro") > 0).unwrap();
-    assert!(com_dep.rendimento_recurso(mina) > 0.0);
+    let rend_com = com_dep.rendimento_recurso(mina);
+    let rend_sem = sem_dep.rendimento_recurso(mina);
+    assert!(rend_com >= rend_sem * 2.0, "região com jazida deve render muito mais ({rend_com}) que sem ({rend_sem})");
+    assert!(rend_sem > 0.0, "sem jazida rende pouco, mas não zero ({rend_sem})");
 }
 
 /// Nos dados de 1945 o petróleo está espalhado por todos os estados dos países produtores, então a

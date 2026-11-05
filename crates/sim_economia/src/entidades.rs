@@ -476,15 +476,25 @@ impl Estado {
     }
 
     /// Rendimento do recurso local para um prédio extrativo: qualidade do depósito x riqueza
-    /// (quantidade do depósito, 0.8..1.2). Sem depósito, 0. Demais prédios: só a qualidade.
+    /// (quantidade do depósito, 0.8..1.2). Sem depósito, rendimento baixo (0.20).
+    /// Demais prédios: qualidade do recurso (cultura não permitida rende 0.25).
     pub fn rendimento_recurso(&self, def: &TipoPredio) -> f64 {
         let q = self.fator_qualidade_predio(def).max(0.0);
         match &def.recurso_natural_requerido {
             Some(rec) if !self.limites_recursos.is_empty() => {
                 let lim = self.limite_recurso(rec);
-                // Prédios já existentes sem depósito registrado (dados de 1945) mantêm o piso 0.8;
-                // construir novos exige depósito (`estado_comporta_novo_nivel`) e a estimativa zera o lucro.
-                q * (0.8 + 0.4 * (lim as f64 / 120.0).clamp(0.0, 1.0))
+                if lim == 0 {
+                    0.40 * q
+                } else {
+                    q * (0.8 + 0.4 * (lim as f64 / 120.0).clamp(0.0, 1.0))
+                }
+            }
+            _ if def.usa_terra_aravel && !self.culturas_permitidas.is_empty() => {
+                if !self.cultura_permitida(&def.id) {
+                    0.25 * q
+                } else {
+                    q
+                }
             }
             _ => q,
         }

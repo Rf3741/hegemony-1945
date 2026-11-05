@@ -13,12 +13,12 @@ As medições foram executadas no ambiente oficial utilizando o comando padroniz
 
 ### Tabela de Comparação (Antes vs. Depois)
 
-| Cenário de Teste | FPS Médio (Antes) | FPS Médio (Depois) | Ganho (%) | Meta (>100 FPS) | Status |
+| Cenário de Teste | FPS Médio (Antes) | FPS Médio (Depois do Merge) | Ganho (%) | Meta (>100 FPS) | Status |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Pausado (Velocidade 0)** | 103,0 | **129,6** | **+25,8%** | Sim (>100) | Atingido com folga |
-| **Velocidade 2** | 95,0 | **112,3** | **+18,2%** | Sim (>100) | Atingido com folga |
-| **Velocidade 5** | 93,0 | **97,4** | **+4,7%** | Próximo | Simulação pesada (327 dias/25s) |
-| **Painel 4 (Diplomacia / Lista)** | Lento / com stutter | **70,9** (358 dias/25s) | Expressivo | N/A | Fluido com virtualização |
+| **Pausado (Velocidade 0)** | 103,0 | **144,0** | **+39,8%** | Sim (>100) | Atingido com folga |
+| **Velocidade 2** | 95,0 | **129,1** | **+35,9%** | Sim (>100) | Atingido com folga |
+| **Velocidade 5** | 93,0 | **120,5** | **+29,6%** | Sim (>100) | Atingido com folga (287 dias/25s) |
+| **Painel 4 (Diplomacia / Lista)** | Lento / com stutter | **107,6** (281 dias/25s) | Expressivo | Sim (>100) | Fluido com virtualização e novo design |
 
 ---
 
@@ -61,5 +61,5 @@ Antes da otimização, o trace com `--features perfil` acusava:
 
 ## 4. Validação Visual e de Integridade
 
-- **Captura de Tela:** Inspecionada a captura em [`docs/img/smoke_depois.png`](file:///home/rafael/claude/hege-wt/a-lod/docs/img/smoke_depois.png). O visual de perto, as cores do mapa, as fronteiras provinciais, os rótulos de países e cidades e as janelas modais egui mantiveram 100% de integridade e fidelidade.
+- **Captura de Tela:** Inspecionada a captura movida para [`.ops/smoke/smoke_depois.png`](file:///home/rafael/claude/guerra-fria-staging/.ops/smoke/smoke_depois.png). O visual de perto, as cores do mapa, as fronteiras provinciais, os rótulos de países e cidades e as janelas modais egui mantiveram 100% de integridade e fidelidade com o design refinado do branch `jogavel`.
 - **Simulação Headless:** Todos os 101 testes unitários e de integração de `guerra_fria` e os 69 testes de `visual_mapa` passaram com sucesso (incluindo o teste de 5 anos de simulação headless `cinco_anos_headless_sem_nan_e_precos_na_faixa`), comprovando que a simulação e o modelo numérico permanecem idênticos.

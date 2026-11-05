@@ -71,6 +71,7 @@ fn atalho_jornal(teclas: Res<ButtonInput<KeyCode>>, mut ev: ResMut<EstadoEv>) {
 }
 
 const PAPEL: egui::Color32 = ui_refinada::menu::PAPEL;
+const PAPEL_CLARO: egui::Color32 = ui_refinada::menu::PAPEL_CLARO;
 const TINTA: egui::Color32 = ui_refinada::menu::TINTA;
 const TINTA_SUAVE: egui::Color32 = ui_refinada::menu::TINTA_SUAVE;
 const CARIMBO: egui::Color32 = ui_refinada::menu::VERMELHO;
@@ -121,17 +122,29 @@ fn popup_evento(
         .frame(ui_refinada::moldura_janela_papel())
         .show(contextos.ctx_mut()?, |ui| {
             ui_refinada::decorar_janela(ui);
-            // Cabeçalho (faixa com a cor do país e carimbo).
-            egui::Frame::new().fill(cor_pais.gamma_multiply(0.55)).inner_margin(egui::Margin::symmetric(14, 10)).show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(nome_pais.to_uppercase()).color(egui::Color32::WHITE).strong());
-                    ui.label(egui::RichText::new(format!("• {data}")).color(egui::Color32::WHITE));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(egui::RichText::new("URGENTE • JOGO PAUSADO").color(CARIMBO).background_color(PAPEL).strong());
+            // Cabeçalho: faixa azul-marinho com a cor do país, data e carimbo de urgência.
+            egui::Frame::new()
+                .fill(ui_refinada::menu::AZUL_MARINHO)
+                .inner_margin(egui::Margin::symmetric(14, 8))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        let (rect, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
+                        ui.painter().rect_filled(rect, 1.0, cor_pais);
+                        ui.painter().rect_stroke(rect, 1.0, egui::Stroke::new(1.0, PAPEL), egui::StrokeKind::Inside);
+                        ui.label(
+                            egui::RichText::new(nome_pais.to_uppercase())
+                                .family(ui_refinada::familia_oswald(ui.ctx()))
+                                .size(16.0)
+                                .strong()
+                                .color(PAPEL),
+                        );
+                        ui.label(egui::RichText::new(data).color(PAPEL_CLARO));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(egui::RichText::new("URGENTE • JOGO PAUSADO").color(CARIMBO).background_color(PAPEL).strong());
+                        });
                     });
                 });
-            });
             egui::Frame::new().inner_margin(egui::Margin::symmetric(18, 12)).show(ui, |ui| {
                 if let (Some(el), Some(r)) = (elenco.as_deref(), retratos.as_deref_mut()) {
                     // Retrato do chefe de Estado do país afetado (tag do legado -> política).
@@ -150,15 +163,19 @@ fn popup_evento(
                     ui.label(egui::RichText::new(&evento.descricao).color(TINTA));
                 });
                 ui.add_space(10.0);
-                ui.separator();
+                ui_refinada::linha_decorativa(ui);
                 for (i, op) in evento.opcoes.iter().enumerate() {
                     let letra = (b'A' + (i as u8 % 26)) as char;
                     let r = ui.add_sized(
                         [ui.available_width(), 34.0],
-                        egui::Button::new(egui::RichText::new(format!("{letra}. {}", op.texto)).color(TINTA))
-                            .fill(ui_refinada::menu::PAPEL_CARD)
-                            .stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO))
-                            .wrap(),
+                        egui::Button::new(
+                            egui::RichText::new(format!("{letra}.  {}", op.texto))
+                                .color(TINTA)
+                                .size(14.0),
+                        )
+                        .fill(ui_refinada::menu::PAPEL_CARD)
+                        .stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO))
+                        .wrap(),
                     );
                     let r = r.on_hover_ui(|ui| {
                         ui.set_max_width(380.0);
@@ -198,18 +215,28 @@ fn jornal(mut contextos: EguiContexts, ev: Res<EstadoEv>) -> Result {
     if !ev.jornal_aberto || ev.estado.jornal.is_empty() {
         return Ok(());
     }
-    ui_refinada::janela_estilo_menu("Jornal (J)")
+    ui_refinada::janela_dossie("Jornal (J)", None)
         .anchor(egui::Align2::RIGHT_BOTTOM, [-10.0, -10.0])
-        .default_width(340.0)
+        .default_width(360.0)
         .resizable(false)
         .show(contextos.ctx_mut()?, |ui| {
-            ui_refinada::decorar_janela(ui);
-            ui_refinada::cabecalho_painel(ui, "JORNAL E TELEGRAMAS (J)");
-            for n in ev.estado.jornal.iter().rev().take(6) {
-                ui.label(egui::RichText::new(format!("{:02}/{:02}/{}", n.data.2, n.data.1, n.data.0)).small().color(TINTA_SUAVE));
-                ui.label(egui::RichText::new(&n.texto).color(TINTA));
-                ui.separator();
-            }
+            ui_refinada::faixa_titulo(ui, "Jornal e Telegramas", Some("J"), None);
+            egui::ScrollArea::vertical().id_salt("scroll_jornal").max_height(320.0).show(ui, |ui| {
+                for n in ev.estado.jornal.iter().rev().take(12) {
+                    ui.horizontal(|ui| {
+                        ui_refinada::glifo_ui(ui, "jornal", 13.0, Some(CARIMBO));
+                        ui.label(
+                            egui::RichText::new(format!("{:02}/{:02}/{}", n.data.2, n.data.1, n.data.0))
+                                .family(ui_refinada::familia_oswald(ui.ctx()))
+                                .size(13.0)
+                                .strong()
+                                .color(ui_refinada::menu::AZUL_MARINHO),
+                        );
+                    });
+                    ui.label(egui::RichText::new(&n.texto).color(TINTA));
+                    ui_refinada::linha_decorativa(ui);
+                }
+            });
         });
     Ok(())
 }

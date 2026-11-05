@@ -135,10 +135,23 @@ pub fn nome_categoria(cat: &str) -> &str {
     }
 }
 
+/// Chave de glifo vetorial (painter) para cada categoria da enciclopédia.
+pub fn chave_categoria(cat: &str) -> &'static str {
+    match cat {
+        "demografia_e_sociedade" => "pessoa",
+        "economia_e_mercado" => "moeda",
+        "producao_e_infraestrutura" => "fabrica",
+        "financas_publicas" => "caixa",
+        "politica_e_governo" => "urna",
+        "geopolitica_e_diplomacia" => "balanca",
+        "contexto_historico_1945" => "livro",
+        _ => "lupa",
+    }
+}
+
 // ==============================================================================
 // MENSAGENS (modelos com {placeholders})
 // ==============================================================================
-
 /// Substitui `{chave}` pelos valores dados; chaves sem valor ficam como estão.
 pub fn interpolar(modelo: &str, valores: &[(&str, String)]) -> String {
     let mut s = modelo.to_string();
@@ -365,25 +378,24 @@ fn janela_enciclopedia(mut contextos: EguiContexts, mut enc: ResMut<Enciclopedia
     let mut ir: Option<String> = None;
     let mut voltar = false;
     let e = &mut *enc;
-    ui_refinada::janela_estilo_menu("ENCICLOPÉDIA HISTÓRICA & MECÂNICAS (8)")
-        .open(&mut aberta)
-        .default_size([920.0, 600.0])
+    ui_refinada::janela_dossie("ENCICLOPÉDIA HISTÓRICA & MECÂNICAS (8)", None)
+        .default_pos([20.0, 96.0])
+        .default_size([980.0, 660.0])
         .show(contextos.ctx_mut()?, |ui| {
-            ui_refinada::decorar_janela(ui);
-            ui_refinada::cabecalho_painel(ui, "ENCICLOPÉDIA DE GABINETE (8)");
-            ui.horizontal(|ui| {
-                ui.label("Buscar:");
-                ui.text_edit_singleline(&mut e.busca);
+            ui_refinada::faixa_titulo(ui, "Enciclopédia de Gabinete", Some("8"), Some(&mut aberta));
+            ui.horizontal_wrapped(|ui| {
+                ui_refinada::glifo_ui(ui, "lupa", 15.0, Some(ui_refinada::menu::VERMELHO));
+                ui.add(egui::TextEdit::singleline(&mut e.busca).hint_text("Buscar verbete...").desired_width(210.0));
                 if ui_refinada::botao_estilo_secundario(ui, "Limpar").clicked() {
                     e.busca.clear();
                 }
                 ui.separator();
-                if ui.add_enabled(!e.historico.is_empty(), egui::Button::new("< Voltar")).clicked() {
+                if ui.add_enabled(!e.historico.is_empty(), egui::Button::new("Voltar")).clicked() {
                     voltar = true;
                 }
             });
             ui.horizontal_wrapped(|ui| {
-                if ui_refinada::aba_estilo_menu(ui, e.categoria.is_none(), "Todas") {
+                if ui_refinada::aba_glifo(ui, e.categoria.is_none(), Some("lupa"), "Todas") {
                     e.categoria = None;
                 }
                 let mut cats: Vec<&str> = Vec::new();
@@ -393,21 +405,26 @@ fn janela_enciclopedia(mut contextos: EguiContexts, mut enc: ResMut<Enciclopedia
                     }
                 }
                 for c in cats {
-                    if ui_refinada::aba_estilo_menu(ui, e.categoria.as_deref() == Some(c), nome_categoria(c)) {
+                    if ui_refinada::aba_glifo(ui, e.categoria.as_deref() == Some(c), Some(chave_categoria(c)), nome_categoria(c)) {
                         e.categoria = Some(c.to_string());
                     }
                 }
             });
-        ui.separator();
+        ui.add_space(4.0);
         let lista = filtrar_conceitos(d, &e.busca, e.categoria.as_deref());
         ui.columns(2, |cols| {
-            cols[0].label(format!("{} verbete(s)", lista.len()));
+            cols[0].label(egui::RichText::new(format!("{} verbete(s)", lista.len())).small().color(ui_refinada::menu::TINTA_SUAVE));
             egui::ScrollArea::vertical().id_salt("enc_lista").show(&mut cols[0], |ui| {
                 let mut cat_ant = "";
                 for c in &lista {
                     if c.categoria != cat_ant {
-                        ui.add_space(4.0);
-                        ui.label(egui::RichText::new(nome_categoria(&c.categoria)).strong().weak());
+                        ui.add_space(6.0);
+                        ui.label(egui::RichText::new(nome_categoria(&c.categoria).to_uppercase())
+                            .family(ui_refinada::familia_oswald(ui.ctx()))
+                            .size(13.0)
+                            .strong()
+                            .color(ui_refinada::menu::AZUL_MARINHO));
+                        ui_refinada::linha_decorativa(ui);
                         cat_ant = &c.categoria;
                     }
                     if ui.selectable_label(e.atual.as_deref() == Some(c.id.as_str()), &c.nome).clicked() {
@@ -417,35 +434,55 @@ fn janela_enciclopedia(mut contextos: EguiContexts, mut enc: ResMut<Enciclopedia
             });
             egui::ScrollArea::vertical().id_salt("enc_detalhe").show(&mut cols[1], |ui| {
                 let Some(c) = e.atual.as_deref().and_then(|id| d.conceito(id)) else {
-                    ui.label("Escolha um verbete à esquerda. Passe o mouse sobre os números do jogo para ver explicações; clique do meio num número abre o verbete aqui.");
+                    ui.weak("Escolha um verbete à esquerda. Passe o mouse sobre os números do jogo para ver explicações; clique do meio num número abre o verbete aqui.");
                     return;
                 };
-                ui.heading(&c.nome);
-                ui.label(egui::RichText::new(nome_categoria(&c.categoria)).small().weak());
-                ui.add_space(4.0);
-                ui.strong("Mecânica");
-                ui.label(&c.definicao_mecanica);
-                ui.add_space(4.0);
-                ui.strong("Contexto histórico");
-                ui.label(&c.contexto_historico);
-                ui.add_space(4.0);
-                ui.strong("Dica estratégica");
-                ui.label(&c.dica_estrategica);
-                if !c.conceitos_relacionados.is_empty() {
-                    ui.add_space(6.0);
-                    ui.strong("Veja também");
-                    ui.horizontal_wrapped(|ui| {
-                        for rel in &c.conceitos_relacionados {
-                            if let Some(x) = d.conceito(rel) {
-                                let r = ui.link(&x.nome);
-                                let r = r.on_hover_text(primeira_frase(&x.definicao_mecanica));
-                                if r.clicked() {
-                                    ir = Some(x.id.clone());
+                ui_refinada::moldura_cartao().show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new(&c.nome)
+                            .family(ui_refinada::familia_oswald(ui.ctx()))
+                            .size(21.0)
+                            .strong()
+                            .color(ui_refinada::menu::AZUL_MARINHO),
+                    );
+                    ui.horizontal(|ui| {
+                        ui_refinada::glifo_ui(ui, chave_categoria(&c.categoria), 13.0, Some(ui_refinada::menu::VERMELHO));
+                        ui.label(egui::RichText::new(nome_categoria(&c.categoria)).small().weak());
+                    });
+                    let rotulo = |ui: &mut egui::Ui, glifo: &str, texto: &str| {
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            ui_refinada::glifo_ui(ui, glifo, 13.0, Some(ui_refinada::menu::VERMELHO));
+                            ui.label(
+                                egui::RichText::new(texto.to_uppercase())
+                                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                                    .size(14.0)
+                                    .strong()
+                                    .color(ui_refinada::menu::TINTA),
+                            );
+                        });
+                    };
+                    rotulo(ui, "engrenagem", "Mecânica");
+                    ui.label(&c.definicao_mecanica);
+                    rotulo(ui, "livro", "Contexto histórico");
+                    ui.label(&c.contexto_historico);
+                    rotulo(ui, "estrela", "Dica estratégica");
+                    ui.label(&c.dica_estrategica);
+                    if !c.conceitos_relacionados.is_empty() {
+                        rotulo(ui, "balanca", "Veja também");
+                        ui.horizontal_wrapped(|ui| {
+                            for rel in &c.conceitos_relacionados {
+                                if let Some(x) = d.conceito(rel) {
+                                    let r = ui.link(&x.nome);
+                                    let r = r.on_hover_text(primeira_frase(&x.definicao_mecanica));
+                                    if r.clicked() {
+                                        ir = Some(x.id.clone());
+                                    }
                                 }
                             }
-                        }
-                    });
-                }
+                        });
+                    }
+                });
             });
         });
     });
@@ -485,23 +522,33 @@ fn janela_tutorial(
         .default_width(460.0)
         .show(ctx, |ui| {
             ui_refinada::decorar_janela(ui);
-        ui.heading(&p.titulo);
+        let oswald = ui_refinada::familia_oswald(ui.ctx());
+        ui.label(egui::RichText::new(&p.titulo).family(oswald.clone()).size(19.0).strong().color(ui_refinada::menu::AZUL_MARINHO));
+        ui_refinada::barra_trilho(ui, (i as f32 + 1.0) / passos.len() as f32, ui_refinada::menu::VERMELHO, ui.available_width(), 8.0);
+        ui.label(egui::RichText::new(format!("Passo {} de {}", i + 1, passos.len())).small().color(ui_refinada::menu::TINTA_SUAVE));
+        ui.add_space(4.0);
         egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
             ui.label(&p.texto);
         });
         ui.add_space(4.0);
-        ui.label(egui::RichText::new(format!("Objetivo: {}", p.objetivo)).strong());
-        ui.label(egui::RichText::new(format!("Dica: {}", p.dica)).italics().weak());
-        ui.separator();
         ui.horizontal(|ui| {
-            if ui.add_enabled(i > 0, egui::Button::new("< Anterior")).clicked() {
+            ui_refinada::glifo_ui(ui, "estrela", 13.0, Some(ui_refinada::menu::VERMELHO));
+            ui.label(egui::RichText::new(format!("Objetivo: {}", p.objetivo)).strong());
+        });
+        ui.horizontal(|ui| {
+            ui_refinada::glifo_ui(ui, "livro", 13.0, None);
+            ui.label(egui::RichText::new(format!("Dica: {}", p.dica)).italics().weak());
+        });
+        ui_refinada::linha_decorativa(ui);
+        ui.horizontal(|ui| {
+            if ui.add_enabled(i > 0, egui::Button::new(egui::RichText::new("Anterior").family(oswald.clone()).size(14.0))).clicked() {
                 novo = Some(i - 1);
             }
             if i + 1 < passos.len() {
-                if ui.button("Próximo >").clicked() {
+                if ui_refinada::botao_estilo_secundario(ui, "Próximo").clicked() {
                     novo = Some(i + 1);
                 }
-            } else if ui.button("Concluir").clicked() {
+            } else if ui_refinada::botao_estilo_menu(ui, "Concluir").clicked() {
                 novo = None;
             }
             if ui.button("Sair do tutorial").clicked() {

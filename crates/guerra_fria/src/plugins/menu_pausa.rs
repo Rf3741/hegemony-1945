@@ -31,6 +31,18 @@ impl AbaConfig {
         (Self::Interface, "Interface"),
         (Self::Controles, "Controles"),
     ];
+
+    /// Chave de glifo vetorial (painter) da aba.
+    const fn glifo(aba: Self) -> &'static str {
+        match aba {
+            Self::Video => "monitor",
+            Self::Audio => "falante",
+            Self::Graficos => "diamante",
+            Self::Jogo => "canhao",
+            Self::Interface => "caixa",
+            Self::Controles => "engrenagem",
+        }
+    }
 }
 
 #[derive(Resource, Default)]
@@ -187,10 +199,12 @@ fn tela_pausa(
         ui.vertical_centered(|ui| {
             ui.label(
                 egui::RichText::new("PAUSADO")
+                    .family(ui_refinada::familia_oswald(ui.ctx()))
                     .size(34.0)
                     .strong()
                     .color(VERMELHO),
             );
+            ui_refinada::linha_decorativa(ui);
             ui.label(
                 egui::RichText::new("Hegemony: 1945")
                     .size(15.0)
@@ -289,7 +303,17 @@ fn botao_rankings(
 }
 
 fn linha(ui: &mut egui::Ui, rotulo: &str, conteudo: impl FnOnce(&mut egui::Ui)) {
-    ui.label(egui::RichText::new(rotulo).color(TINTA_SUAVE));
+    ui.add_sized(
+        [170.0, 16.0],
+        egui::Label::new(
+            egui::RichText::new(rotulo)
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(12.0)
+                .strong()
+                .color(TINTA),
+        )
+        .selectable(false),
+    );
     ui.horizontal(|ui| conteudo(ui));
     ui.end_row();
 }
@@ -315,15 +339,15 @@ fn janela_config(
                 .color(VERMELHO),
         );
         ui.add_space(6.0);
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             for (a, nome) in AbaConfig::TODAS {
-                if botao_menor(ui, nome, aba == a) {
+                if ui_refinada::aba_glifo(ui, aba == a, Some(AbaConfig::glifo(a)), nome) {
                     aba = a;
                 }
             }
         });
         ui.separator();
-        ui.set_min_height(330.0);
+        ui.set_min_height(240.0);
         egui::Grid::new("grade_config").num_columns(2).spacing([24.0, 12.0]).show(ui, |ui| match aba {
             AbaConfig::Video => {
                 linha(ui, "Tela", |ui| {
@@ -362,7 +386,11 @@ fn janela_config(
             AbaConfig::Audio => {
                 for (i, (_, nome)) in CANAIS.iter().enumerate() {
                     linha(ui, nome, |ui| {
-                        ui.add(egui::Slider::new(&mut c.audio.volumes[i], 0.0..=1.0).custom_formatter(|v, _| format!("{:.0}%", v * 100.0)));
+                        ui.add_sized(
+                            [140.0, 21.0],
+                            egui::Slider::new(&mut c.audio.volumes[i], 0.0..=1.0)
+                                .custom_formatter(|v, _| format!("{:.0}%", v * 100.0)),
+                        );
                         ui.checkbox(&mut c.audio.mudos[i], "mudo");
                     });
                 }

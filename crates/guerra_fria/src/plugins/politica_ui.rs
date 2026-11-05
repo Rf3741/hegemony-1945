@@ -13,6 +13,11 @@ fn cor_aprovacao(a: f64) -> egui::Color32 {
     }
 }
 
+/// Cabeçalho de coluna em caixa alta, na tinta suave do cartaz.
+fn cab(ui: &mut egui::Ui, h: &str) {
+    ui.label(egui::RichText::new(h.to_uppercase()).size(12.0).strong().color(ui_refinada::menu::TINTA_SUAVE));
+}
+
 fn humor_pt(h: HumorGrupoInteresse) -> &'static str {
     match h {
         HumorGrupoInteresse::Radical => "radical",
@@ -38,13 +43,13 @@ pub fn aba_politica(ui: &mut egui::Ui, pol: &mut PoliticaSim) {
     };
     let mut cmds: Vec<ComandoPol> = Vec::new();
     cabecalho(ui, &p, &pol.vista.data.map(|d| d.to_string()).unwrap_or_default());
-    ui.separator();
+    ui.add_space(8.0);
     grupos(ui, &p);
-    ui.separator();
+    ui.add_space(8.0);
     partidos(ui, &p);
-    ui.separator();
+    ui.add_space(8.0);
     leis(ui, pol, &p, &mut cmds);
-    ui.separator();
+    ui.add_space(8.0);
     movimentos(ui, &p);
     for c in cmds {
         pol.enviar(c);
@@ -52,15 +57,27 @@ pub fn aba_politica(ui: &mut egui::Ui, pol: &mut PoliticaSim) {
 }
 
 fn cabecalho(ui: &mut egui::Ui, p: &PaisPolitica, data: &str) {
-    ui_refinada::cabecalho_painel(ui, &format!("POLÍTICA DE {} ({data})", p.nome));
+    ui_refinada::faixa_titulo(ui, &format!("Política de {}", p.nome), None, None);
+    ui.label(egui::RichText::new(data).small().color(ui_refinada::menu::TINTA_SUAVE));
     let l = p.legitimidade;
     let cor = if l >= 60.0 { ui_refinada::menu::SUCESSO } else if l >= 35.0 { ui_refinada::menu::AVISO } else { ui_refinada::menu::PERIGO };
-    ui.horizontal(|ui| {
-        ui.label("Legitimidade:");
-        ui.add(egui::ProgressBar::new((l / 100.0) as f32).desired_width(160.0).text(format!("{l:.0}% ({:?})", p.faixa_legitimidade)).fill(cor));
-    });
+    ui_refinada::barra_status(
+        ui,
+        Some("Legitimidade"),
+        l as f32,
+        100.0,
+        cor,
+        160.0,
+        Some(&format!("{l:.0}% · {:?}", p.faixa_legitimidade)),
+    );
     if let Some(c) = &p.chefe_de_estado {
-        ui.label(format!("Chefe de Estado: {} (popularidade {:.0}%)", c.nome, c.popularidade * 100.0));
+        ui_refinada::chapa(
+            ui,
+            "coroa",
+            "Chefe de Estado",
+            &format!("{} · popularidade {:.0}%", c.nome, c.popularidade * 100.0),
+            None,
+        );
     }
     let pop = p.populacao_total().max(1.0);
     ui.label(format!(
@@ -77,17 +94,18 @@ fn cabecalho(ui: &mut egui::Ui, p: &PaisPolitica, data: &str) {
 }
 
 fn grupos(ui: &mut egui::Ui, p: &PaisPolitica) {
-    ui.strong("Grupos de interesse");
+    ui_refinada::titulo_secao(ui, "Grupos de interesse");
     let mut gis: Vec<_> = p.grupos_interesse.values().collect();
     gis.sort_by(|a, b| b.clout.total_cmp(&a.clout));
-    egui::Grid::new("pol_gis").striped(true).show(ui, |ui| {
-        for h in ["Grupo", "Líder", "Influência", "Aprovação", "Humor", "Papel"] {
-            ui.strong(h);
+    egui::Grid::new("pol_gis").striped(true).spacing([12.0, 3.0]).show(ui, |ui| {
+        for h in ["Grupo", "Líder", "Influência", "", "Aprovação", "Humor", "Papel"] {
+            cab(ui, h);
         }
         ui.end_row();
         for g in gis {
             ui.label(&g.nome);
             ui.label(g.lider.as_ref().map_or("-".to_string(), |l| l.nome.clone()));
+            ui_refinada::barra_trilho(ui, (g.clout * 4.0) as f32, ui_refinada::menu::OURO, 46.0, 9.0);
             ui.label(format!("{:.1}%", g.clout * 100.0));
             ui.colored_label(cor_aprovacao(g.aprovacao), format!("{:+.1}", g.aprovacao));
             ui.label(humor_pt(g.humor));
@@ -102,7 +120,7 @@ fn grupos(ui: &mut egui::Ui, p: &PaisPolitica) {
 }
 
 fn partidos(ui: &mut egui::Ui, p: &PaisPolitica) {
-    ui.strong("Partidos e eleições");
+    ui_refinada::titulo_secao(ui, "Partidos e eleições");
     match p.dias_para_proxima_eleicao {
         0 => ui.label("Eleição iminente."),
         d => ui.label(format!("Próxima eleição em {d} dias (~{:.1} anos){}", d as f32 / 365.0, if p.campanha_eleitoral.as_ref().is_some_and(|c| c.em_andamento) { " - CAMPANHA EM ANDAMENTO" } else { "" })),
@@ -115,16 +133,18 @@ fn partidos(ui: &mut egui::Ui, p: &PaisPolitica) {
     } else {
         ui.label("Nenhuma eleição realizada ainda no jogo.");
     }
-    egui::Grid::new("pol_partidos").striped(true).show(ui, |ui| {
-        for h in ["Partido", "Votos", "Cadeiras", "Momento"] {
-            ui.strong(h);
+    let max_votos = ps.iter().map(|x| x.percentual_votos_ultima_eleicao).fold(0.0_f64, f64::max).max(0.01);
+    egui::Grid::new("pol_partidos").striped(true).spacing([12.0, 3.0]).show(ui, |ui| {
+        for h in ["Partido", "Votos", "", "Cadeiras", "Momento"] {
+            cab(ui, h);
         }
         ui.end_row();
         for pt in ps {
             ui.label(&pt.nome);
             ui.label(format!("{:.1}%", pt.percentual_votos_ultima_eleicao * 100.0));
+            ui_refinada::barra_trilho(ui, (pt.percentual_votos_ultima_eleicao / max_votos) as f32, ui_refinada::menu::AZUL_MARINHO, 60.0, 9.0);
             ui.label(pt.cadeiras_parlamento.to_string());
-            ui.label(format!("{:+.2}", pt.momento_campanha));
+            ui.colored_label(ui_refinada::cor_variacao(pt.momento_campanha), format!("{:+.2}", pt.momento_campanha));
             ui.end_row();
         }
     });
@@ -132,14 +152,17 @@ fn partidos(ui: &mut egui::Ui, p: &PaisPolitica) {
 
 fn leis(ui: &mut egui::Ui, pol: &PoliticaSim, p: &PaisPolitica, cmds: &mut Vec<ComandoPol>) {
     let cat = &pol.catalogo;
-    ui.strong("Leis");
+    ui_refinada::titulo_secao(ui, "Leis e tramitação legislativa");
     let nome_lei = |id: &str| cat.leis.get(id).map_or(id.to_string(), |l| l.nome.clone());
     if let Some(t) = &p.lei_em_tramitacao {
-        ui.group(|ui| {
-            ui.colored_label(ui_refinada::menu::AVISO, format!("Em tramitação: {} -> {}", nome_lei(&t.lei_anterior_id), nome_lei(&t.lei_alvo_id)));
+        ui_refinada::moldura_cartao().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(format!("{} ({} dias na fase, entraves {}/3)", fase_pt(t.fase), t.dias_na_fase, t.contagem_entraves));
-                ui.add(egui::ProgressBar::new((t.progresso_fase / 100.0) as f32).desired_width(140.0));
+                ui_refinada::glifo_ui(ui, "balanca", 15.0, Some(ui_refinada::menu::AVISO));
+                ui.colored_label(ui_refinada::menu::AVISO, format!("Em tramitação: {} -> {}", nome_lei(&t.lei_anterior_id), nome_lei(&t.lei_alvo_id)));
+            });
+            ui.horizontal(|ui| {
+                ui.label(format!("{} · {} dias na fase · entraves {}/3", fase_pt(t.fase), t.dias_na_fase, t.contagem_entraves));
+                ui_refinada::barra_trilho(ui, (t.progresso_fase / 100.0) as f32, ui_refinada::menu::AZUL_MARINHO, 140.0, 11.0);
             });
             ui.label(format!("Chance de avançar {:.0}% | debate {:.0}% | travar {:.0}%", t.chance_avanco * 100.0, t.chance_debate * 100.0, t.chance_travar * 100.0));
             if !p.faixa_legitimidade.permite_tramitacao_leis() {
@@ -150,12 +173,19 @@ fn leis(ui: &mut egui::Ui, pol: &PoliticaSim, p: &PaisPolitica, cmds: &mut Vec<C
             }
         });
     } else {
-        ui.label("Nenhuma lei em tramitação (só uma por vez).");
+        ui.weak("Nenhuma lei em tramitação (só uma por vez).");
     }
     let livre = p.lei_em_tramitacao.is_none();
     for (cid, c) in &cat.categorias_leis {
         let atual = p.leis_ativas.get(cid).cloned().unwrap_or_default();
-        egui::CollapsingHeader::new(format!("{}: {}", c.nome, nome_lei(&atual))).id_salt(("pol_cat", cid)).show(ui, |ui| {
+        egui::CollapsingHeader::new(
+            egui::RichText::new(format!("{} · {}", c.nome.to_uppercase(), nome_lei(&atual)))
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(15.0)
+                .color(ui_refinada::menu::AZUL_MARINHO),
+        )
+        .id_salt(("pol_cat", cid))
+        .show(ui, |ui| {
             for l in &c.leis {
                 if l.id == atual {
                     continue;
@@ -173,7 +203,10 @@ fn leis(ui: &mut egui::Ui, pol: &PoliticaSim, p: &PaisPolitica, cmds: &mut Vec<C
                     if !ok {
                         b.on_disabled_hover_text("Pré-requisitos não atendidos");
                     }
+                    ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&l.id), 14.0, None);
                     ui.strong(&l.nome);
+                    ui_refinada::barra_trilho(ui, (apoio * 3.0) as f32, ui_refinada::menu::SUCESSO, 44.0, 8.0);
+                    ui_refinada::barra_trilho(ui, (oposicao * 3.0) as f32, ui_refinada::menu::PERIGO, 44.0, 8.0);
                     ui.label(format!("apoio {:.0}% / oposição {:.0}%", apoio * 100.0, oposicao * 100.0));
                     let chance = (apoio * 0.65 - oposicao * 0.5 + 0.35).clamp(0.05, 0.95);
                     ui.weak(format!("chance estimada {:.0}%", chance * 100.0));
@@ -186,24 +219,25 @@ fn leis(ui: &mut egui::Ui, pol: &PoliticaSim, p: &PaisPolitica, cmds: &mut Vec<C
 }
 
 fn movimentos(ui: &mut egui::Ui, p: &PaisPolitica) {
-    ui.strong("Movimentos políticos");
+    ui_refinada::titulo_secao(ui, "Movimentos políticos");
     if p.movimentos.is_empty() {
-        ui.label("Nenhum movimento ativo.");
+        ui.weak("Nenhum movimento ativo.");
         return;
     }
-    egui::Grid::new("pol_mov").striped(true).show(ui, |ui| {
-        for h in ["Movimento", "Apoio", "Radicalismo", "Revolução"] {
-            ui.strong(h);
+    egui::Grid::new("pol_mov").striped(true).spacing([12.0, 3.0]).show(ui, |ui| {
+        for h in ["Movimento", "Apoio", "Radicalismo", "Termômetro", "Revolução"] {
+            cab(ui, h);
         }
         ui.end_row();
         for m in &p.movimentos {
             ui.label(&m.nome);
             ui.label(format!("{:.0}%", m.apoio * 100.0));
             ui.label(format!("{:.0}%", m.radicalismo * 100.0));
+            ui_refinada::barra_trilho(ui, (m.termometro_revolucao / 100.0) as f32, ui_refinada::menu::VERMELHO, 70.0, 9.0);
             if m.em_revolucao {
                 ui.colored_label(ui_refinada::menu::PERIGO, "EM REVOLUÇÃO");
             } else {
-                ui.label(format!("{:.0}%", m.termometro_revolucao));
+                ui.label(format!("{:.0}", m.termometro_revolucao));
             }
             ui.end_row();
         }

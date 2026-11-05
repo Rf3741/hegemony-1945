@@ -64,6 +64,15 @@ impl Plugin for ComercioUiPlugin {
     }
 }
 
+/// Nome de célula de tabela: corta em `n` caracteres e sinaliza o corte com reticências ASCII.
+fn encurtar(texto: &str, n: usize) -> String {
+    if texto.chars().count() > n {
+        format!("{}...", texto.chars().take(n).collect::<String>())
+    } else {
+        texto.to_string()
+    }
+}
+
 fn alternar_comercio(teclas: Res<ButtonInput<KeyCode>>, mut p: ResMut<PainelComercio>) {
     if teclas.just_pressed(KeyCode::Digit3) || teclas.just_pressed(KeyCode::Numpad3) {
         p.aberto = !p.aberto;
@@ -86,41 +95,25 @@ fn tela_comercio(
     let r = &v.resumo_comercio;
     let mut comandos = Vec::new();
 
-    ui_refinada::janela_estilo_menu("COMÉRCIO INTERNACIONAL (3)")
-        .open(&mut aberto)
-        .default_size([960.0, 640.0])
+    ui_refinada::janela_dossie("COMÉRCIO INTERNACIONAL (3)", None)
+        .default_pos([20.0, 96.0])
+        .default_size([980.0, 660.0])
         .show(ctx, |ui| {
-            ui_refinada::decorar_janela(ui);
-            ui_refinada::cabecalho_painel(ui, "COMÉRCIO INTERNACIONAL (3)");
+            ui_refinada::faixa_titulo(ui, "Comércio Internacional", Some("3"), Some(&mut aberto));
             // =========================================================================
             // PAINEL SUPERIOR: INDICADORES MACROECONÔMICOS DE COMÉRCIO
             // =========================================================================
             ui.horizontal_wrapped(|ui| {
-                ui.group(|ui| {
-                    ui.label("Exportações:");
-                    ui.colored_label(ui_refinada::menu::SUCESSO, fmt_din(r.total_exportacoes_valor));
-                });
-                ui.group(|ui| {
-                    ui.label("Importações:");
-                    ui.colored_label(ui_refinada::menu::AVISO, fmt_din(r.total_importacoes_valor));
-                });
-                ui.group(|ui| {
-                    ui.label("Saldo Comercial:");
-                    let cor_saldo = if r.saldo_comercial >= 0.0 {
-                        ui_refinada::menu::SUCESSO
-                    } else {
-                        ui_refinada::menu::PERIGO
-                    };
-                    ui.colored_label(cor_saldo, fmt_din(r.saldo_comercial));
-                });
-                ui.group(|ui| {
-                    ui.label("Receita de Tarifas:");
-                    ui.colored_label(ui_refinada::menu::INFO, fmt_din(r.receita_tarifas_total));
-                });
-                ui.group(|ui| {
-                    ui.label("Abertura Comercial:");
-                    ui.strong(format!("{:.0}%", r.nivel_abertura * 100.0));
-                });
+                ui_refinada::chapa(ui, "navio", "Exportações", &fmt_din(r.total_exportacoes_valor), Some(ui_refinada::menu::SUCESSO));
+                ui_refinada::chapa(ui, "trem", "Importações", &fmt_din(r.total_importacoes_valor), Some(ui_refinada::menu::AVISO));
+                let cor_saldo = if r.saldo_comercial >= 0.0 {
+                    ui_refinada::menu::SUCESSO
+                } else {
+                    ui_refinada::menu::PERIGO
+                };
+                ui_refinada::chapa(ui, "balanca", "Saldo comercial", &fmt_din(r.saldo_comercial), Some(cor_saldo));
+                ui_refinada::chapa(ui, "moeda", "Receita de tarifas", &fmt_din(r.receita_tarifas_total), Some(ui_refinada::menu::INFO));
+                ui_refinada::chapa(ui, "engrenagem", "Abertura", &format!("{:.0}%", r.nivel_abertura * 100.0), None);
             });
 
             ui.add_space(4.0);
@@ -128,29 +121,30 @@ fn tela_comercio(
             // =========================================================================
             // LINHA DE STATUS DO BLOCO COMERCIAL E COMECON
             // =========================================================================
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if let Some(bloco_nome) = &r.bloco_nome {
-                    let (status_txt, cor_bloco) = if r.bloco_id.as_deref() == Some("bloco_sovietico") {
+                    let (glifo, status_txt, cor_bloco) = if r.bloco_id.as_deref() == Some("bloco_sovietico") {
                         if r.comecon_ativo {
-                            ("★ COMECON Ativo (Mercado Integrado Socialista)", ui_refinada::menu::SUCESSO)
+                            ("estrela", "COMECON ATIVO · MERCADO INTEGRADO SOCIALISTA", ui_refinada::menu::SUCESSO)
                         } else {
-                            ("🔒 Mercados Fechados até o COMECON", ui_refinada::menu::PERIGO)
+                            ("caixa", "MERCADOS FECHADOS ATÉ O COMECON", ui_refinada::menu::PERIGO)
                         }
                     } else if r.bloco_fechado {
-                        ("🔒 Mercado Fechado", ui_refinada::menu::PERIGO)
+                        ("caixa", "MERCADO FECHADO", ui_refinada::menu::PERIGO)
                     } else {
-                        ("🌐 Mercado Aberto / GATT", ui_refinada::menu::INFO)
+                        ("navio", "MERCADO ABERTO · GATT", ui_refinada::menu::INFO)
                     };
 
                     ui.label(format!("Bloco Econômico: {bloco_nome}"));
-                    ui.colored_label(cor_bloco, format!("[{status_txt}]"));
+                    ui_refinada::glifo_ui(ui, glifo, 14.0, Some(cor_bloco));
+                    ui.colored_label(cor_bloco, egui::RichText::new(status_txt).small().strong());
 
                     // Se for a URSS ou satélite do bloco soviético, permite alternar/ativar o COMECON
                     if r.bloco_id.as_deref() == Some("bloco_sovietico") {
                         let btn_txt = if r.comecon_ativo {
                             "Desativar COMECON"
                         } else {
-                            "★ Ativar Integração COMECON (1949)"
+                            "Ativar Integração COMECON (1949)"
                         };
                         if ui_refinada::botao_estilo_secundario(ui, btn_txt).clicked() {
                             comandos.push(Comando::AlternarComecon);
@@ -167,16 +161,16 @@ fn tela_comercio(
             // ABAS DE NAVEGAÇÃO
             // =========================================================================
             ui.horizontal(|ui| {
-                if ui_refinada::aba_estilo_menu(ui, painel.aba == AbaComercio::RotasAtivas, "🛳 Rotas Ativas") {
+                if ui_refinada::aba_glifo(ui, painel.aba == AbaComercio::RotasAtivas, Some("navio"), "Rotas Ativas") {
                     painel.aba = AbaComercio::RotasAtivas;
                 }
-                if ui_refinada::aba_estilo_menu(ui, painel.aba == AbaComercio::NovaRota, "➕ Nova Rota") {
+                if ui_refinada::aba_glifo(ui, painel.aba == AbaComercio::NovaRota, Some("mais"), "Nova Rota") {
                     painel.aba = AbaComercio::NovaRota;
                 }
-                if ui_refinada::aba_estilo_menu(ui, painel.aba == AbaComercio::TarifasEAbertura, "⚖ Tarifas") {
+                if ui_refinada::aba_glifo(ui, painel.aba == AbaComercio::TarifasEAbertura, Some("balanca"), "Tarifas") {
                     painel.aba = AbaComercio::TarifasEAbertura;
                 }
-                if ui_refinada::aba_estilo_menu(ui, painel.aba == AbaComercio::AcordosEBlocos, "🤝 Acordos e Blocos") {
+                if ui_refinada::aba_glifo(ui, painel.aba == AbaComercio::AcordosEBlocos, Some("coroa"), "Acordos e Blocos") {
                     painel.aba = AbaComercio::AcordosEBlocos;
                 }
             });
@@ -221,8 +215,14 @@ fn render_rotas_ativas(
     if v.rotas_comerciais.is_empty() {
         ui.vertical_centered(|ui| {
             ui.add_space(40.0);
-            ui.heading("Nenhuma rota comercial direta ativa.");
-            ui.label("Use a aba '➕ Estabelecer Nova Rota' para abrir linhas de importação ou exportação com outros países.");
+            ui.label(
+                egui::RichText::new("NENHUMA ROTA COMERCIAL DIRETA ATIVA")
+                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                    .size(18.0)
+                    .strong()
+                    .color(ui_refinada::menu::AZUL_MARINHO),
+            );
+            ui.label("Use a aba Nova Rota para abrir linhas de importação ou exportação com outros países.");
             ui.add_space(20.0);
         });
         return;
@@ -231,24 +231,35 @@ fn render_rotas_ativas(
     ui.label(format!("Total de rotas ativas: {}", v.rotas_comerciais.len()));
 
     ui.horizontal(|ui| {
-        ui.add_sized([85.0, 20.0], egui::Label::new(egui::RichText::new("Tipo").strong()));
-        ui.add_sized([130.0, 20.0], egui::Label::new(egui::RichText::new("Bem").strong()));
-        ui.add_sized([130.0, 20.0], egui::Label::new(egui::RichText::new("Parceiro").strong()));
-        ui.add_sized([85.0, 20.0], egui::Label::new(egui::RichText::new("Volume").strong()));
-        ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new("Preço Origem").strong()));
-        ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new("Preço Destino").strong()));
-        ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new("Margem Unit.").strong()));
-        ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new("Lucro Diário").strong()));
-        ui.add_sized([110.0, 20.0], egui::Label::new(egui::RichText::new("Tarifas").strong()));
-        ui.add_sized([140.0, 20.0], egui::Label::new(egui::RichText::new("Ações").strong()));
+        let cab = |ui: &mut egui::Ui, t: &str, w: f32| {
+            ui.add_sized(
+                [w, 20.0],
+                egui::Label::new(
+                    egui::RichText::new(t.to_uppercase())
+                        .family(ui_refinada::familia_oswald(ui.ctx()))
+                        .size(11.0)
+                        .strong()
+                        .color(ui_refinada::menu::TINTA_SUAVE),
+                ),
+            );
+        };
+        cab(ui, "Tipo", 66.0);
+        cab(ui, "Bem", 118.0);
+        cab(ui, "Parceiro", 130.0);
+        cab(ui, "Volume", 88.0);
+        cab(ui, "Preços", 84.0);
+        cab(ui, "Margem", 56.0);
+        cab(ui, "Lucro/dia", 60.0);
+        cab(ui, "Tarifas", 70.0);
+        cab(ui, "Ações", 140.0);
     });
     ui.separator();
 
     let total = v.rotas_comerciais.len();
     egui::ScrollArea::vertical()
-        .id_salt("scroll_rotas_comerciais")
+        .id_salt("scroll_rotas_ativas")
         .max_height(480.0)
-        .show_rows(ui, 24.0, total, |ui, row_range| {
+        .show_rows(ui, 22.0, total, |ui, row_range| {
             for idx in row_range {
                 let rota = &v.rotas_comerciais[idx];
                 let tipo_rotulo = if rota.eh_exportacao { "Exportação" } else { "Importação" };
@@ -259,23 +270,46 @@ fn render_rotas_ativas(
                 };
 
                 ui.horizontal(|ui| {
-                    ui.add_sized([85.0, 20.0], egui::Label::new(egui::RichText::new(tipo_rotulo).color(tipo_cor)));
+                    ui.add_sized(
+                        [66.0, 18.0],
+                        egui::Label::new(egui::RichText::new(tipo_rotulo).size(12.0).color(tipo_cor)).selectable(false),
+                    );
 
-                    ui.allocate_ui_with_layout(egui::vec2(130.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        icones.mostrar(ui, &rota.bem_id, 18.0);
-                        ui.label(&rota.bem_nome);
-                    });
+                    ui.allocate_ui_with_layout(
+                        egui::Vec2::new(118.0, 18.0),
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            icones.mostrar(ui, &rota.bem_id, 18.0);
+                            let nome: String = encurtar(&rota.bem_nome, 12);
+                            ui.label(egui::RichText::new(nome).size(12.0).color(ui_refinada::menu::TINTA)).on_hover_text(&rota.bem_nome);
+                        },
+                    );
 
-                    ui.allocate_ui_with_layout(egui::vec2(130.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        ui.label(&rota.parceiro_pais_nome);
-                        if rota.tem_acordo {
-                            ui.colored_label(ui_refinada::menu::INFO, "(Acordo)");
-                        }
-                    });
+                    ui.allocate_ui_with_layout(
+                        egui::Vec2::new(130.0, 18.0),
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            let nome: String = encurtar(&rota.parceiro_pais_nome, 18);
+                            ui.label(egui::RichText::new(nome).size(12.0).color(ui_refinada::menu::TINTA)).on_hover_text(&rota.parceiro_pais_nome);
+                            if rota.tem_acordo {
+                                ui.colored_label(ui_refinada::menu::INFO, egui::RichText::new("acordo").size(10.0).color(ui_refinada::menu::INFO));
+                            }
+                        },
+                    );
 
-                    ui.add_sized([85.0, 20.0], egui::Label::new(format!("{:.1} / {:.0}", rota.volume_atual, rota.volume_maximo)));
-                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_din(rota.preco_origem)));
-                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_din(rota.preco_destino)));
+                    ui.allocate_ui_with_layout(
+                        egui::Vec2::new(88.0, 18.0),
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            let ocup = if rota.volume_maximo > 0.0 { (rota.volume_atual / rota.volume_maximo) as f32 } else { 0.0 };
+                            ui_refinada::barra_trilho(ui, ocup, ui_refinada::menu::AZUL_MARINHO, 34.0, 10.0);
+                            ui.label(egui::RichText::new(format!("{:.0}/{:.0}", rota.volume_atual, rota.volume_maximo)).size(11.0));
+                        },
+                    );
+                    ui.add_sized(
+                        [84.0, 18.0],
+                        egui::Label::new(egui::RichText::new(format!("{} / {}", fmt_din(rota.preco_origem), fmt_din(rota.preco_destino))).size(12.0)).selectable(false),
+                    );
 
                     let margem = rota.preco_destino / (1.0 + rota.tarifa_destino)
                         - (rota.preco_origem * (1.0 + rota.tarifa_origem));
@@ -284,38 +318,57 @@ fn render_rotas_ativas(
                     } else {
                         ui_refinada::menu::PERIGO
                     };
-                    ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new(fmt_din(margem)).color(cor_margem)));
+                    ui.add_sized(
+                        [56.0, 18.0],
+                        egui::Label::new(egui::RichText::new(fmt_din(margem)).size(12.0).color(cor_margem)).selectable(false),
+                    );
 
                     let cor_lucro = if rota.lucro_ultimo_tick >= 0.0 {
                         ui_refinada::menu::SUCESSO
                     } else {
                         ui_refinada::menu::PERIGO
                     };
-                    ui.add_sized([80.0, 20.0], egui::Label::new(egui::RichText::new(fmt_din(rota.lucro_ultimo_tick)).color(cor_lucro)));
+                    ui.add_sized(
+                        [60.0, 18.0],
+                        egui::Label::new(egui::RichText::new(fmt_din(rota.lucro_ultimo_tick)).size(12.0).color(cor_lucro)).selectable(false),
+                    );
 
-                    ui.add_sized([110.0, 20.0], egui::Label::new(format!("Exp {:.0}% / Imp {:.0}%", rota.tarifa_origem * 100.0, rota.tarifa_destino * 100.0)));
+                    ui.add_sized(
+                        [70.0, 18.0],
+                        egui::Label::new(
+                            egui::RichText::new(format!("{:.0}% / {:.0}%", rota.tarifa_origem * 100.0, rota.tarifa_destino * 100.0))
+                                .size(12.0)
+                                .color(ui_refinada::menu::TINTA),
+                        )
+                        .selectable(false),
+                    );
 
-                    ui.allocate_ui_with_layout(egui::vec2(140.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        let btn_auto = if rota.automatica { "Auto" } else { "Fixo" };
-                        if ui.button(btn_auto).on_hover_text("Alternar entre ajuste automático de volume e volume manual fixo").clicked() {
-                            comandos.push(Comando::AlternarRotaAuto(rota.id.clone()));
-                        }
-                        if ui.small_button("+10").clicked() {
-                            comandos.push(Comando::AjustarVolumeRota {
-                                rota_id: rota.id.clone(),
-                                volume: rota.volume_maximo + 10.0,
-                            });
-                        }
-                        if ui.small_button("-10").clicked() && rota.volume_maximo > 10.0 {
-                            comandos.push(Comando::AjustarVolumeRota {
-                                rota_id: rota.id.clone(),
-                                volume: (rota.volume_maximo - 10.0).max(5.0),
-                            });
-                        }
-                        if ui.button("❌").on_hover_text("Cancelar e encerrar rota comercial").clicked() {
-                            comandos.push(Comando::RemoverRota(rota.id.clone()));
-                        }
-                    });
+                    ui.allocate_ui_with_layout(
+                        egui::Vec2::new(140.0, 18.0),
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            ui.spacing_mut().item_spacing.x = 4.0;
+                            let btn_auto = if rota.automatica { "Auto" } else { "Fixo" };
+                            if ui.small_button(btn_auto).on_hover_text("Alternar entre ajuste automático de volume e volume manual fixo").clicked() {
+                                comandos.push(Comando::AlternarRotaAuto(rota.id.clone()));
+                            }
+                            if ui.small_button("+10").clicked() {
+                                comandos.push(Comando::AjustarVolumeRota {
+                                    rota_id: rota.id.clone(),
+                                    volume: rota.volume_maximo + 10.0,
+                                });
+                            }
+                            if ui.small_button("-10").clicked() && rota.volume_maximo > 10.0 {
+                                comandos.push(Comando::AjustarVolumeRota {
+                                    rota_id: rota.id.clone(),
+                                    volume: (rota.volume_maximo - 10.0).max(5.0),
+                                });
+                            }
+                            if ui.small_button("Encerrar").clicked() {
+                                comandos.push(Comando::RemoverRota(rota.id.clone()));
+                            }
+                        },
+                    );
                 });
             }
         });
@@ -381,7 +434,7 @@ fn render_nova_rota(
                         extra.push_str(" [Acordo Bilateral]");
                     }
                     if !p.permitido_comercio {
-                        extra.push_str(" [🔒 Bloqueado por Bloco]");
+                        extra.push_str(" [Bloqueado por Bloco]");
                     }
                     let rotulo = format!("{}{extra}", p.nome);
                     if ui.selectable_value(&mut painel.nova_rota_parceiro, p.pais_id.clone(), rotulo).clicked() {}
@@ -402,24 +455,33 @@ fn render_nova_rota(
     let bem_opt = v.bens.iter().find(|b| b.id == painel.nova_rota_bem);
 
     if let (Some(parc), Some(bem)) = (parceiro_opt, bem_opt) {
-        ui.group(|ui| {
+        ui_refinada::moldura_cartao().show(ui, |ui| {
             ui.horizontal(|ui| {
                 icones.mostrar(ui, &bem.id, 24.0);
                 ui.heading(format!("Análise da Rota: {} com {}", bem.nome, parc.nome));
             });
+            ui_refinada::linha_decorativa(ui);
 
-            ui.label(format!("• Preço Base Internacional: {}", fmt_din(bem.preco_base)));
-            ui.label(format!("• Preço no Seu Mercado: {}", fmt_din(bem.preco_nacional)));
-            ui.label(format!("• Preço Médio Mundial: {}", fmt_din(bem.preco_mundial)));
+            egui::Grid::new("gradeAnaliseRota").striped(true).spacing([10.0, 3.0]).show(ui, |ui| {
+                ui.weak("Preço base internacional:");
+                ui.label(fmt_din(bem.preco_base));
+                ui.end_row();
+                ui.weak("Preço no seu mercado:");
+                ui.label(fmt_din(bem.preco_nacional));
+                ui.end_row();
+                ui.weak("Preço médio mundial:");
+                ui.label(fmt_din(bem.preco_mundial));
+                ui.end_row();
+            });
 
             if !parc.permitido_comercio {
                 if let Some(razao) = &parc.razao_bloqueio {
-                    ui.colored_label(ui_refinada::menu::PERIGO, format!("⚠ Comércio Bloqueado: {razao}"));
-                    ui.label("Assine um acordo comercial prévio na aba '🤝 Acordos Bilaterais' para liberar o comércio com este país.");
+                    ui.colored_label(ui_refinada::menu::PERIGO, egui::RichText::new(format!("COMÉRCIO BLOQUEADO · {razao}")).strong());
+                    ui.label("Assine um acordo comercial prévio na aba Acordos e Blocos para liberar o comércio com este país.");
                 }
             } else {
                 if parc.tem_acordo {
-                    ui.colored_label(ui_refinada::menu::INFO, "✓ Acordo Comercial Ativo: 85% de desconto nas tarifas alfandegárias.");
+                    ui.colored_label(ui_refinada::menu::INFO, "ACORDO COMERCIAL ATIVO · 85% de desconto nas tarifas alfandegárias.");
                 }
                 if ui_refinada::botao_estilo_menu(ui, "Confirmar e Abrir Rota Comercial").clicked() {
                     comandos.push(Comando::CriarRota {
@@ -450,30 +512,32 @@ fn render_tarifas_e_abertura(
     let mut tarifa_exp = pais.politica_fiscal.tarifa_exportacao;
     let abertura = pais.politica_fiscal.nivel_abertura();
 
-    ui.group(|ui| {
-        ui.strong("Presets de Política Comercial (Victoria 3):");
+    ui_refinada::moldura_cartao().show(ui, |ui| {
+        ui.strong("Presets de Política Comercial:");
         ui.horizontal_wrapped(|ui| {
-            if ui.button("🌐 Livre-Câmbio (GATT) [Tarifas Mínimas]").clicked() {
+            if ui_refinada::botao_estilo_secundario(ui, "Livre-Câmbio (GATT) · tarifas mínimas").clicked() {
                 comandos.push(Comando::DefinirAbertura(1.0));
             }
-            if ui.button("🛡 Protecionismo Moderado [Subs. Importações]").clicked() {
+            if ui_refinada::botao_estilo_secundario(ui, "Protecionismo Moderado · subs. importações").clicked() {
                 comandos.push(Comando::DefinirAbertura(0.60));
             }
-            if ui.button("🧱 Protecionismo Severo [Altas Tarifas]").clicked() {
+            if ui_refinada::botao_estilo_secundario(ui, "Protecionismo Severo · altas tarifas").clicked() {
                 comandos.push(Comando::DefinirAbertura(0.30));
             }
-            if ui.button("🔒 Autarquia Fechada [Isolacionismo]").clicked() {
+            if ui_refinada::botao_estilo_secundario(ui, "Autarquia Fechada · isolacionismo").clicked() {
                 comandos.push(Comando::DefinirAbertura(0.0));
             }
         });
 
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            ui.label(format!("Nível Geral de Abertura: {:.0}%", abertura * 100.0));
-            if ui.button("➕ Mais Aberto (+5%)").clicked() {
+            ui.label("Nível Geral de Abertura:");
+            ui_refinada::barra_trilho(ui, abertura as f32, ui_refinada::menu::AZUL_MARINHO, 120.0, 12.0);
+            ui.strong(format!("{:.0}%", abertura * 100.0));
+            if ui.button("Mais Aberto (+5%)").clicked() {
                 comandos.push(Comando::DefinirAbertura((abertura + 0.05).min(1.0)));
             }
-            if ui.button("➖ Mais Fechado (-5%)").clicked() {
+            if ui.button("Mais Fechado (-5%)").clicked() {
                 comandos.push(Comando::DefinirAbertura((abertura - 0.05).max(0.0)));
             }
         });
@@ -481,7 +545,7 @@ fn render_tarifas_e_abertura(
 
     ui.add_space(8.0);
 
-    ui.group(|ui| {
+    ui_refinada::moldura_cartao().show(ui, |ui| {
         ui.strong("Tarifas Gerais Aduaneiras:");
         let mut alterou_geral = false;
         ui.horizontal(|ui| {
@@ -566,22 +630,24 @@ fn render_acordos_e_blocos(
     // =========================================================================
     // SEÇÃO 1: ACORDOS VIGENTES
     // =========================================================================
-    ui.group(|ui| {
-        ui.strong("Acordos Comerciais Bilaterais Ativos:");
+    ui_refinada::moldura_cartao().show(ui, |ui| {
+        ui_refinada::titulo_secao(ui, "Acordos Bilaterais Vigentes");
         let acordos = &v.resumo_comercio.acordos_comerciais;
         if acordos.is_empty() {
-            ui.label("(Nenhum acordo comercial bilateral firmado no momento)");
+            ui.weak("(Nenhum acordo comercial bilateral firmado no momento)");
         } else {
             let mut cancelar = None;
-            for pid in acordos {
-                let nome_parceiro = v.ranking.iter().find(|p| &p.id == pid).map(|p| p.nome.as_str()).unwrap_or(pid);
-                ui.horizontal(|ui| {
-                    ui.label(format!("🤝 Acordo de Livre Comércio com {nome_parceiro} ({pid})"));
+            egui::Grid::new("grade_acordos").striped(true).spacing([10.0, 3.0]).show(ui, |ui| {
+                for pid in acordos {
+                    let nome_parceiro = v.ranking.iter().find(|p| &p.id == pid).map(|p| p.nome.as_str()).unwrap_or(pid);
+                    ui_refinada::glifo_ui(ui, "balanca", 14.0, Some(ui_refinada::menu::AZUL_MARINHO));
+                    ui.label(format!("Acordo de Livre Comércio com {nome_parceiro} ({pid})"));
                     if ui.button("Revogar Acordo").clicked() {
                         cancelar = Some(pid.clone());
                     }
-                });
-            }
+                    ui.end_row();
+                }
+            });
             if let Some(pid) = cancelar {
                 comandos.push(Comando::CancelarAcordo(pid));
             }
@@ -593,8 +659,8 @@ fn render_acordos_e_blocos(
     // =========================================================================
     // SEÇÃO 2: PROPOR NOVO ACORDO
     // =========================================================================
-    ui.group(|ui| {
-        ui.strong("Firmar Novo Acordo Comercial Bilateral:");
+    ui_refinada::moldura_cartao().show(ui, |ui| {
+        ui_refinada::titulo_secao(ui, "Firmar Novo Acordo Comercial Bilateral");
         let parceiros_sem_acordo: Vec<&super::economia_sim::ResumoPaisEco> = v
             .ranking
             .iter()
@@ -602,7 +668,7 @@ fn render_acordos_e_blocos(
             .collect();
 
         if parceiros_sem_acordo.is_empty() {
-            ui.label("Todos os países conhecidos já possuem acordos comerciais com a sua nação.");
+            ui.weak("Todos os países conhecidos já possuem acordos comerciais com a sua nação.");
         } else {
             if painel.novo_acordo_parceiro.is_empty() || !parceiros_sem_acordo.iter().any(|p| p.id == painel.novo_acordo_parceiro) {
                 painel.novo_acordo_parceiro = parceiros_sem_acordo[0].id.clone();
@@ -618,7 +684,7 @@ fn render_acordos_e_blocos(
                         }
                     });
 
-                if ui.button("Firmar Acordo Comercial").clicked() {
+                if ui_refinada::botao_estilo_menu(ui, "Firmar Acordo Comercial").clicked() {
                     comandos.push(Comando::AssinarAcordo(painel.novo_acordo_parceiro.clone()));
                 }
             });
@@ -630,41 +696,54 @@ fn render_acordos_e_blocos(
     // =========================================================================
     // SEÇÃO 3: BLOCOS ECONÔMICOS DA GUERRA FRIA
     // =========================================================================
-    ui.group(|ui| {
-        ui.strong("Blocos Econômicos da Guerra Fria:");
+    ui_refinada::moldura_cartao().show(ui, |ui| {
+        ui_refinada::titulo_secao(ui, "Blocos Econômicos da Guerra Fria");
         ui.label("Na ordem econômica pós-1945, o mundo se divide entre a integração multilateral aberta (Bretton Woods / GATT) e a economia planificada socialista.");
         ui.add_space(4.0);
 
-        ui.label(format!("• Seu Bloco Atual: {}", v.resumo_comercio.bloco_nome.as_deref().unwrap_or("Não Alinhado")));
-        if v.resumo_comercio.bloco_fechado {
-            ui.colored_label(ui_refinada::menu::PERIGO, "• Status do Bloco: FECHADO para o comércio exterior capitalista sem acordo bilateral.");
+        ui_refinada::chapa(
+            ui,
+            "caixa",
+            "Seu bloco atual",
+            v.resumo_comercio.bloco_nome.as_deref().unwrap_or("Não Alinhado"),
+            Some(ui_refinada::menu::AZUL_MARINHO),
+        );
+        let glifo_status = if v.resumo_comercio.bloco_fechado { "canhao" } else { "navio" };
+        let (texto_status, cor_status) = if v.resumo_comercio.bloco_fechado {
+            ("Fechado para o comércio exterior capitalista sem acordo bilateral.", ui_refinada::menu::PERIGO)
         } else {
-            ui.colored_label(ui_refinada::menu::SUCESSO, "• Status do Bloco: ABERTO ao comércio internacional.");
-        }
+            ("Aberto ao comércio internacional.", ui_refinada::menu::SUCESSO)
+        };
+        ui.horizontal(|ui| {
+            ui_refinada::glifo_ui(ui, glifo_status, 15.0, Some(cor_status));
+            ui.colored_label(cor_status, texto_status);
+        });
 
         if v.resumo_comercio.bloco_id.as_deref() == Some("bloco_sovietico") {
-            ui.separator();
-            ui.strong("Conselho para Assistência Econômica Mútua (COMECON):");
+            ui.add_space(6.0);
+            ui_refinada::linha_decorativa(ui);
+            ui.strong("Conselho para Assistência Econômica Mútua (COMECON)");
             ui.label("Em 1945, os mercados da URSS e seus satélites no Leste Europeu operavam fechados sob controle central e acordos bilaterais rígidos.");
             ui.label("Com a ativação do COMECON (historicamente em janeiro de 1949), todos os membros do bloco socialista desfrutam de livre cooperação econômica e comércio mútuo com tarifas zeradas.");
             ui.add_space(4.0);
 
-            let status_comecon = if v.resumo_comercio.comecon_ativo {
-                "Ativo: Livre Comércio Socialista Unificado (0% Tarifas entre Membros)"
+            let (status_comecon, cor_comecon) = if v.resumo_comercio.comecon_ativo {
+                ("Ativo: livre comércio socialista unificado (0% de tarifas entre membros)", ui_refinada::menu::SUCESSO)
             } else {
-                "Inativo (Mercados da URSS e Satélites Fechados até 1949)"
+                ("Inativo: mercados da URSS e satélites fechados até 1949", ui_refinada::menu::AVISO)
             };
             ui.horizontal(|ui| {
+                ui_refinada::glifo_ui(ui, "balanca", 15.0, Some(cor_comecon));
                 ui.strong("Situação:");
-                ui.colored_label(if v.resumo_comercio.comecon_ativo { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::AVISO }, status_comecon);
+                ui.colored_label(cor_comecon, status_comecon);
             });
 
             let btn_txt = if v.resumo_comercio.comecon_ativo {
                 "Desativar Integração COMECON"
             } else {
-                "★ Fundar / Ativar COMECON (Mercado Socialista Integrado)"
+                "Fundar COMECON: Mercado Socialista Integrado"
             };
-            if ui.button(btn_txt).clicked() {
+            if ui_refinada::botao_estilo_menu(ui, btn_txt).clicked() {
                 comandos.push(Comando::AlternarComecon);
             }
         }
