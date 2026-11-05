@@ -8022,7 +8022,7 @@
     ),
     (
         estado_id: "usa_iowa",
-        terra_aravel: 170,
+        terra_aravel: 600,
         culturas_permitidas: ["acucar", "frutas", "gado", "graos", "tabaco"],
         recursos: {
             "madeira": 30,

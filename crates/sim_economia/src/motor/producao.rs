@@ -100,7 +100,6 @@ pub(crate) fn executar_producao_diaria(
     // das províncias é a global, então toda soma de ponto flutuante é idêntica à versão sequencial
     // (resultado determinístico, independente do número de threads).
     let num_alimentos = bens_alimento_basico.len();
-    let estados_ro: &[Estado] = &*estados;
     let mut tarefas: Vec<TarefaMercadoProducao> = proxima_oferta
         .chunks_mut(num_bens)
         .zip(proxima_demanda.chunks_mut(num_bens))

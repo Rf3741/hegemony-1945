@@ -117,15 +117,26 @@ pub fn calcular_com_perfil(
 
     let acesso = contexto.acesso_mercado.clamp(0.0, 1.0);
     let fator_acesso = (0.70 + 0.30 * acesso).clamp(0.35, 1.0);
-    // Recurso local domina a extração: sem jazida ou se a cultura não for permitida, o rendimento é zero.
+    // Recurso local: jazida/aptidão ampla rende no potencial pleno;
+    // sem jazida ou além da capacidade, rende pouco (fator baixo, não zero), podendo dar prejuízo.
     let fator_recurso = match (contexto.potencial_livre, contexto.potencial_total) {
-        (_, Some(total)) if total <= 0.0 => 0.0,
         (Some(livre), Some(total)) if total > 0.0 && tipo.recurso_natural_requerido.is_some() => {
             if livre > 0.0 {
                 (0.85 + 0.15 * (livre / total).clamp(0.0, 1.0)) * contexto.qualidade_recurso.max(0.0)
             } else {
-                0.50 * contexto.qualidade_recurso.max(0.0)
+                0.35 * contexto.qualidade_recurso.max(0.0)
             }
+        }
+        (Some(livre), Some(total)) if total > 0.0 && tipo.usa_terra_aravel => {
+            if livre > 0.0 {
+                contexto.qualidade_recurso.max(0.0)
+            } else {
+                0.40 * contexto.qualidade_recurso.max(0.0)
+            }
+        }
+        (_, Some(total)) if total <= 0.0 => {
+            // Sem jazida ou cultura não permitida: fator baixo, não zero!
+            (contexto.qualidade_recurso * 0.25).max(0.15)
         }
         _ => contexto.qualidade_recurso.max(0.0),
     };
@@ -294,7 +305,8 @@ mod tests {
         let sem = calcular_lucratividade_esperada(&cat, tipo, &tipo.metodos_padrao, &precos, ContextoLucratividade {
             potencial_livre: Some(0.0), potencial_total: Some(0.0), qualidade_recurso: 0.0, ..base
         });
-        assert!(sem.lucro_liquido < 0.0 && sem.fator_recurso == 0.0, "sem depósito não há receita");
+        assert!(sem.lucro_liquido < 0.0 && sem.fator_recurso > 0.0 && sem.fator_recurso <= 0.30, "sem depósito rende pouco e dá prejuízo");
+        assert!(com.fator_recurso >= sem.fator_recurso * 3.0, "região com jazida rende muito mais que sem");
         let cadeia = calcular_lucratividade_esperada(&cat, tipo, &tipo.metodos_padrao, &precos, ContextoLucratividade {
             bonus_cadeia: 0.2, ..base
         });

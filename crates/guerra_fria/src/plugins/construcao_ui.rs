@@ -227,9 +227,9 @@ pub fn potencial_livre(v: &VistaEconomia, est: &Estado, t: &TipoPredio) -> Optio
 fn texto_potencial(v: &VistaEconomia, est: &Estado, t: &TipoPredio) -> String {
     match potencial_livre(v, est, t) {
         None => "Sem recurso regional (só precisa de espaço urbano)".into(),
-        Some(0) if t.usa_terra_aravel && !est.cultura_permitida(&t.id) => "Cultura não permitida neste estado".into(),
-        Some(0) if t.usa_terra_aravel => "Sem terra arável livre".into(),
-        Some(0) => format!("Sem jazida livre de {}", t.recurso_natural_requerido.as_deref().unwrap_or("recurso").replace('_', " ")),
+        Some(0) if t.usa_terra_aravel && !est.cultura_permitida(&t.id) => "Clima/solo desfavorável (rendimento reduzido)".into(),
+        Some(0) if t.usa_terra_aravel => "Sem terra arável livre (rendimento reduzido)".into(),
+        Some(0) => format!("Sem jazida de {} (rendimento reduzido)", t.recurso_natural_requerido.as_deref().unwrap_or("recurso").replace('_', " ")),
         Some(n) => {
             let q = est.fator_qualidade_predio(t);
             let b = if q > 1.0 { format!(", qualidade +{:.0}%", (q - 1.0) * 100.0) } else { String::new() };
@@ -260,7 +260,13 @@ pub fn opcoes_para_provincia(v: &VistaEconomia, prov: &Provincia) -> Vec<OpcaoCo
             let (potencial, motivo) = match est {
                 Some(e) => {
                     let p = texto_potencial(v, e, t);
-                    let m = if let Some(tec) = bloqueio_tec { format!("Requer tecnologia: {tec}") } else if comporta { String::new() } else { p.clone() };
+                    let m = if let Some(tec) = bloqueio_tec {
+                        format!("Requer tecnologia: {tec}")
+                    } else if !comporta {
+                        "Porto requer província costeira".into()
+                    } else {
+                        String::new()
+                    };
                     (p, m)
                 }
                 None => ("-".into(), String::new()),
@@ -271,7 +277,7 @@ pub fn opcoes_para_provincia(v: &VistaEconomia, prov: &Provincia) -> Vec<OpcaoCo
                 nome: t.nome.clone(),
                 categoria: t.categoria,
                 comporta,
-                motivo: if comporta || !motivo.is_empty() { motivo } else { "Capacidade esgotada".into() },
+                motivo,
                 pontos: t.custo_pontos_construcao,
                 dias: t.custo_pontos_construcao / pontos_dia,
                 custo_bens: mat.total_reais,
@@ -332,7 +338,7 @@ pub fn ranking_estados(v: &VistaEconomia, tipo_idx: usize) -> Vec<LinhaEstado> {
             let alvo = melhor.as_ref().map(|(_, p, _)| p.id.clone());
             let luc = melhor.map_or_else(EstimativaLucratividade::default, |(_, _, l)| l);
             let lucro = if t.financiado_pelo_governo { -(luc.custo_insumos + luc.custo_folha) } else { luc.lucro_liquido };
-            let pot = livre.map_or(1.0, |n| (1.0 + n as f64).ln());
+            let pot = livre.map_or(1.0, |n| if n > 0 { 1.0 + (n as f64).ln_1p() } else { 0.25 });
             let folga = (1.0 - e.penalidade_infraestrutura).clamp(0.05, 1.0);
             let vantagem = if alvo.is_some() { luc.fator_recurso * folga * pot * if lucro > 0.0 { 1.0 + lucro.max(0.0).ln_1p() } else { 0.5 } } else { 0.0 };
             LinhaEstado {
@@ -400,7 +406,7 @@ pub fn cores_por_adm1(v: &VistaEconomia, modo: ModoMapa, tipo_idx: usize) -> Has
 
 pub const PASSOS_TUTORIAL: [(&str, &str); 5] = [
     ("1/5  Como construir", "Aperte B (ou o botão \"Construir\" no topo) para abrir a tela de construção. Clique numa província do seu país e use a seção \"Construir aqui\" do painel da direita: escolha o prédio e aperte \"Construir\"."),
-    ("2/5  Recursos regionais", "Cada estado tem recursos próprios: terra arável, culturas permitidas e jazidas. Café só onde há cultura de café; ferro e carvão só onde há jazida. A lista só mostra o que cabe na província."),
+    ("2/5  Recursos regionais", "Qualquer prédio pode ser erguido em qualquer província, mas os recursos locais definem o rendimento: terras férteis e jazidas ricas rendem muito mais, enquanto regiões sem recursos rendem pouco e podem dar prejuízo."),
     ("3/5  Custo e lucro", "Cada obra gasta bens (aço, madeira, ferramentas...) e pontos de construção. O lucro esperado por dia ajuda a escolher. Prédios do governo dão serviço, não lucro."),
     ("4/5  Infraestrutura", "Prédios usam infraestrutura do estado (ferrovias, portos, urbanização). Passando da capacidade, a produção cai. Veja o modo de mapa \"Infraestrutura\" na tela de construção."),
     ("5/5  Setor privado e fila", "Capitalistas também investem sozinhos, conforme a lei econômica, usando o fundo privado. A fila de obras (na tela B) mostra o progresso de cada obra, estatal ou privada."),
@@ -967,4 +973,21 @@ mod testes {
         }
     }
 
+    /// Validação da regra do usuário: em Cuba o jogador tem dezenas de opções construíveis.
+    #[test]
+    fn cuba_tem_dezenas_de_opcoes_construiveis() {
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let nucleo = crate::plugins::economia_sim::Nucleo::carregar(&raiz.join("assets/data/economia"), 0).expect("nucleo");
+        let v = nucleo.vista("cub");
+        assert!(!v.provincias.is_empty(), "Cuba deve ter províncias");
+        for prov in &v.provincias {
+            let opcoes = opcoes_para_provincia(&v, prov);
+            let construiveis = opcoes.iter().filter(|o| o.comporta).count();
+            println!("Cuba prov {}: {} construíveis de {} opções totais", prov.nome, construiveis, opcoes.len());
+            assert!(
+                construiveis >= 20,
+                "em Cuba o jogador deve ter dezenas de opções construíveis (deu {construiveis})"
+            );
+        }
+    }
 }

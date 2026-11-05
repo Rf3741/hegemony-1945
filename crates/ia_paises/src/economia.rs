@@ -368,7 +368,15 @@ impl IaEconomia {
                     180.0 * (1.0 - acesso)
                 } else {
                     let regional = Self::pontuacao_regional(mundo, pr, ti, t, &perfil, &precos);
-                    regional.max(base * 0.25) - pr.predios.len() as f64 * 0.5
+                    // A IA não deve lotar províncias ruins só porque pode: se der prejuízo regional, ignora.
+                    if regional <= 0.0 {
+                        continue;
+                    }
+                    let score_base = match t.categoria {
+                        CategoriaPredio::Extrativo | CategoriaPredio::RuralAgricola => regional,
+                        _ => regional.max(base * 0.25),
+                    };
+                    score_base - pr.predios.len() as f64 * 0.5
                 };
                 if melhor.is_none_or(|(s, _)| score > s) {
                     melhor = Some((score, pi));
