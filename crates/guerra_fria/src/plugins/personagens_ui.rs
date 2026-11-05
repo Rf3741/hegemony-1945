@@ -53,9 +53,9 @@ pub fn cartao_lider(ui: &mut egui::Ui, r: &mut Retratos, e: &Elenco, p: &Persona
     ui.horizontal(|ui| {
         r.mostrar(ui, &p.id, altura);
         ui.vertical(|ui| {
-            ui.small(cargo);
-            ui.strong(&p.nome);
-            ui.label(format!("{} anos | {}", p.idade(hoje), p.ideologia.replace('_', " ")));
+            ui.label(egui::RichText::new(cargo.to_uppercase()).size(10.0).strong().color(ui_refinada::menu::TINTA_SUAVE));
+            ui.label(egui::RichText::new(&p.nome).family(ui_refinada::familia_oswald(ui.ctx())).size(15.0).strong().color(ui_refinada::menu::TINTA));
+            ui.label(egui::RichText::new(format!("{} anos | {}", p.idade(hoje), p.ideologia.replace('_', " "))).size(12.0).color(ui_refinada::menu::TINTA));
             ui.horizontal_wrapped(|ui| {
                 for t in &p.tracos {
                     let resp = ui.label(
@@ -88,7 +88,7 @@ pub fn painel_lideres(ui: &mut egui::Ui, el: &ElencoRes, r: &mut Retratos, tag: 
     if estado.is_none() && governo.is_none() {
         return;
     }
-    ui.strong("Liderança");
+    ui_refinada::titulo_secao(ui, "Liderança");
     if let Some(p) = estado {
         cartao_lider(ui, r, e, p, Papel::Estado.nome(), hoje, 84.0);
     }
@@ -120,8 +120,19 @@ pub fn retrato_chefe(ui: &mut egui::Ui, el: &ElencoRes, r: &mut Retratos, tag: &
         ui.horizontal(|ui| {
             r.mostrar(ui, &p.id, altura);
             ui.vertical(|ui| {
-                ui.small(Papel::Estado.nome());
-                ui.strong(&p.nome);
+                ui.label(
+                    egui::RichText::new(Papel::Estado.nome().to_uppercase())
+                        .size(10.0)
+                        .strong()
+                        .color(ui_refinada::menu::TINTA_SUAVE),
+                );
+                ui.label(
+                    egui::RichText::new(&p.nome)
+                        .family(ui_refinada::familia_oswald(ui.ctx()))
+                        .size(14.0)
+                        .strong()
+                        .color(ui_refinada::menu::TINTA),
+                );
             });
         });
     }

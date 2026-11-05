@@ -19,7 +19,12 @@ fn aplicar_tema(mut contextos: EguiContexts, estilo: Res<EstiloMapa>, mut aplica
     }
     let ctx = contextos.ctx_mut()?;
     ui_refinada::setup_cold_war_fonts(ctx);
-    let style = ui_refinada::cold_war_style();
+    let mut style = ui_refinada::cold_war_style();
+    // Títulos de seção em Oswald (uma vez, junto com o tema).
+    style.text_styles.insert(
+        egui::TextStyle::Heading,
+        egui::FontId::new(19.0, ui_refinada::familia_oswald(ctx)),
+    );
     ctx.set_style_of(egui::Theme::Light, style.clone());
     ctx.set_style_of(egui::Theme::Dark, style.clone());
     ctx.set_theme(egui::ThemePreference::Light);

@@ -72,7 +72,17 @@ impl Icones {
         });
         match tex {
             Some(t) => ui.add(egui::Image::new(egui::load::SizedTexture::new(t.id(), egui::vec2(tam, tam)))),
-            None => ui.allocate_response(egui::vec2(tam, tam), egui::Sense::hover()),
+            None => {
+                let resp = ui.allocate_response(egui::vec2(tam, tam), egui::Sense::hover());
+                ui_refinada::theme::icone::desenhar(
+                    ui.painter(),
+                    resp.rect,
+                    ui_refinada::chave_para(id),
+                    ui_refinada::menu::TINTA,
+                    ui_refinada::menu::VERMELHO,
+                );
+                resp
+            }
         }
     }
 }
@@ -124,15 +134,15 @@ impl Filtro {
 
     pub fn icone(self) -> &'static str {
         match self {
-            Self::Todos => "📦",
-            Self::Alimentos => "🌾",
-            Self::Materias => "⛏",
-            Self::Energia => "⚡",
-            Self::Industrial => "🏭",
-            Self::Consumo => "🛒",
-            Self::Luxo => "💎",
-            Self::Militar => "🎖",
-            Self::Servicos => "🛠",
+            Self::Todos => "caixa",
+            Self::Alimentos => "trigo",
+            Self::Materias => "picareta",
+            Self::Energia => "raio",
+            Self::Industrial => "fabrica",
+            Self::Consumo => "caixa",
+            Self::Luxo => "diamante",
+            Self::Militar => "canhao",
+            Self::Servicos => "engrenagem",
         }
     }
 
@@ -288,8 +298,7 @@ pub fn cor_preco_relativo(preco: f64, preco_base: f64) -> egui::Color32 {
 }
 
 pub fn fmt_var(v: f64) -> String {
-    let seta = if v > 0.005 { "▲" } else if v < -0.005 { "▼" } else { "―" };
-    format!("{seta} {:+.1}%", v * 100.0)
+    if v.abs() < 0.0005 { "plano".to_string() } else { format!("{:+.1}%", v * 100.0) }
 }
 
 pub fn fmt_qtd(v: f64) -> String {
@@ -413,6 +422,17 @@ impl EstadoMercado {
             Self::ExcessoSevero => ui_refinada::menu::AZUL_MARINHO,
         }
     }
+
+    /// Rotulo curto do estado, para selos e abas.
+    pub fn rotulo(self) -> &'static str {
+        match self {
+            Self::EscassezCritica => "Escassez crítica",
+            Self::EscassezModerada => "Escassez moderada",
+            Self::Equilibrado => "Equilibrado",
+            Self::ExcessoModerado => "Excesso moderado",
+            Self::ExcessoSevero => "Excesso severo",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -439,7 +459,7 @@ pub fn gerar_diagnostico(b: &VistaBem) -> DiagnosticoPreco {
     let (estado, titulo, motivo, recomendacao) = if o <= 1e-6 && d > 1e-6 {
         (
             EstadoMercado::EscassezCritica,
-            "🔴 ESCASSEZ CRÍTICA (Sem Produção Local)".to_string(),
+            "ESCASSEZ CRÍTICA (Sem Produção Local)".to_string(),
             format!(
                 "Demanda nacional de {} un., sem nenhuma oferta interna disponível. O preço opera no teto ({:+.1}% vs base).",
                 fmt_qtd(d),
@@ -451,7 +471,7 @@ pub fn gerar_diagnostico(b: &VistaBem) -> DiagnosticoPreco {
         let def_pct = (d / o.max(1.0) - 1.0) * 100.0;
         (
             EstadoMercado::EscassezCritica,
-            "🔴 ESCASSEZ SEVERA NO MERCADO LOCAL".to_string(),
+            "ESCASEZ SEVERA NO MERCADO LOCAL".to_string(),
             format!(
                 "Demanda nacional ({}) supera a produção interna ({}) em {:.0}%. Preço inflacionado ({:+.1}% vs base).",
                 fmt_qtd(d),
@@ -465,7 +485,7 @@ pub fn gerar_diagnostico(b: &VistaBem) -> DiagnosticoPreco {
         let def_pct = (d / o.max(1.0) - 1.0) * 100.0;
         (
             EstadoMercado::EscassezModerada,
-            "🟠 ESCASSEZ MODERADA NO MERCADO LOCAL".to_string(),
+            "ESCASEZ MODERADA NO MERCADO LOCAL".to_string(),
             format!(
                 "Demanda nacional ({}) é {:.0}% maior que a oferta interna ({}). Preço pressionado para cima ({:+.1}% vs base).",
                 fmt_qtd(d),
@@ -479,7 +499,7 @@ pub fn gerar_diagnostico(b: &VistaBem) -> DiagnosticoPreco {
         let exc_pct = (o / d.max(1.0) - 1.0) * 100.0;
         (
             EstadoMercado::ExcessoSevero,
-            "🔵 EXCESSO SEVERO DE OFERTA".to_string(),
+            "EXCESSO SEVERO DE OFERTA".to_string(),
             format!(
                 "Produção nacional ({}) supera o consumo interno ({}) em {:.0}%. Estoques elevados derrubaram o preço ({:+.1}% vs base).",
                 fmt_qtd(o),
@@ -493,7 +513,7 @@ pub fn gerar_diagnostico(b: &VistaBem) -> DiagnosticoPreco {
         let exc_pct = (o / d.max(1.0) - 1.0) * 100.0;
         (
             EstadoMercado::ExcessoModerado,
-            "🔵 EXCESSO MODERADO DE PRODUÇÃO".to_string(),
+            "EXCESSO MODERADO DE PRODUÇÃO".to_string(),
             format!(
                 "Oferta nacional ({}) excede o consumo local ({}) em {:.0}%. Preço ligeiramente deprimido ({:+.1}% vs base).",
                 fmt_qtd(o),
@@ -506,7 +526,7 @@ pub fn gerar_diagnostico(b: &VistaBem) -> DiagnosticoPreco {
     } else {
         (
             EstadoMercado::Equilibrado,
-            "🟢 MERCADO EM EQUILÍBRIO".to_string(),
+            "MERCADO EM EQUILÍBRIO".to_string(),
             format!(
                 "Oferta ({}) e demanda ({}) estão alinhadas. O preço (${:.1}) opera próximo à cotação base (${:.1}).",
                 fmt_qtd(o),
@@ -521,51 +541,51 @@ pub fn gerar_diagnostico(b: &VistaBem) -> DiagnosticoPreco {
     let impacto_comercio = if saldo > 1.0 {
         let pct_coberta = if d > 0.0 { (saldo / d) * 100.0 } else { 0.0 };
         format!(
-            "📦 Importação Líquida: O país importa +{} un. ({:.1}% da demanda local), mitigando a pressão inflacionária.",
+            "Importação Líquida: O país importa +{} un. ({:.1}% da demanda local), mitigando a pressão inflacionária.",
             fmt_qtd(saldo),
             pct_coberta
         )
     } else if saldo < -1.0 {
         format!(
-            "🚢 Exportação Líquida: Produtores escoam {} un. ao exterior, drenando excedentes e garantindo receitas.",
+            "Exportação Líquida: Produtores escoam {} un. ao exterior, drenando excedentes e garantindo receitas.",
             fmt_qtd(-saldo)
         )
     } else if !b.comercializavel {
-        "🔒 Bem Local: Intransferível entre mercados (serviço ou infraestrutura puramente doméstica).".to_string()
+        "Bem Local: Intransferível entre mercados (serviço ou infraestrutura puramente doméstica).".to_string()
     } else {
-        "⚖️ Sem Fluxo Comercial Significativo: Atendido predominantemente pela produção interna.".to_string()
+        "Sem Fluxo Comercial Significativo: Atendido predominantemente pela produção interna.".to_string()
     };
 
     let diff_mun_pct = if p_mun > 0.0 { (p_nac - p_mun) / p_mun * 100.0 } else { 0.0 };
     let comparacao_mundial = if diff_mun_pct > 8.0 {
         format!(
-            "🌐 Mercado Mundial: Preço local (${:.1}) está {:.1}% mais CARO que o mundial (${:.1}). Importar é economicamente vantajoso.",
+            "Mercado Mundial: Preço local (${:.1}) está {:.1}% mais CARO que o mundial (${:.1}). Importar é economicamente vantajoso.",
             p_nac, diff_mun_pct, p_mun
         )
     } else if diff_mun_pct < -8.0 {
         format!(
-            "🌐 Mercado Mundial: Preço local (${:.1}) está {:.1}% mais BARATO que o mundial (${:.1}). Forte competitividade para exportar.",
+            "Mercado Mundial: Preço local (${:.1}) está {:.1}% mais BARATO que o mundial (${:.1}). Forte competitividade para exportar.",
             p_nac, -diff_mun_pct, p_mun
         )
     } else {
         format!(
-            "🌐 Mercado Mundial: Cotação local (${:.1}) converge com o valor de equilíbrio mundial (${:.1}).",
+            "Mercado Mundial: Cotação local (${:.1}) converge com o valor de equilíbrio mundial (${:.1}).",
             p_nac, p_mun
         )
     };
 
     let tendencia_recente = if var30 > 0.02 {
         format!(
-            "📈 Tendência (30d): Alta de {:+.1}% nos últimos 30 dias por elevação no consumo ou aperto na cadeia de insumos.",
+            "Tendência (30d): Alta de {:+.1}% nos últimos 30 dias por elevação no consumo ou aperto na cadeia de insumos.",
             var30 * 100.0
         )
     } else if var30 < -0.02 {
         format!(
-            "📉 Tendência (30d): Queda de {:+.1}% nos últimos 30 dias por expansão da oferta ou desaquecimento na demanda.",
+            "Tendência (30d): Queda de {:+.1}% nos últimos 30 dias por expansão da oferta ou desaquecimento na demanda.",
             var30 * 100.0
         )
     } else {
-        format!("➡️ Tendência (30d): Cotação estável nos últimos 30 dias ({:+.1}%).", var30 * 100.0)
+        format!("Tendência (30d): Cotação estável nos últimos 30 dias ({:+.1}%).", var30 * 100.0)
     };
 
     DiagnosticoPreco {
@@ -581,35 +601,56 @@ pub fn gerar_diagnostico(b: &VistaBem) -> DiagnosticoPreco {
 
 pub fn render_tooltip_diagnostico(ui: &mut egui::Ui, b: &VistaBem) {
     let diag = gerar_diagnostico(b);
-    ui.set_max_width(380.0);
+    ui.set_max_width(330.0);
     ui.horizontal(|ui| {
-        ui.heading(&b.nome);
-        ui.colored_label(diag.estado.cor(), &diag.titulo);
+        ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&b.id), 15.0, None);
+        ui.label(
+            egui::RichText::new(&b.nome)
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(17.0)
+                .strong()
+                .color(ui_refinada::menu::AZUL_MARINHO),
+        );
+        ui.colored_label(diag.estado.cor(), diag.estado.rotulo());
     });
-    ui.separator();
-    ui.label(format!(
-        "• Preço Nacional: ${:.1} | Base: ${:.1} | Mundial: ${:.1}",
-        b.preco_nacional, b.preco_base, b.preco_mundial
-    ));
-    ui.label(format!(
-        "• Oferta Nacional: {} | Demanda Nacional: {}",
-        fmt_qtd(b.oferta_nacional),
-        fmt_qtd(b.demanda_nacional)
-    ));
-    ui.separator();
-    ui.strong("Diagnóstico da Formação de Preço:");
-    ui.label(&diag.motivo);
-    ui.add_space(2.0);
-    ui.strong("Comércio Internacional:");
-    ui.label(&diag.impacto_comercio);
-    ui.add_space(2.0);
-    ui.strong("Cotação Mundial:");
-    ui.label(&diag.comparacao_mundial);
-    ui.add_space(2.0);
-    ui.strong("Variação dos Últimos 30 Dias:");
-    ui.label(&diag.tendencia_recente);
-    ui.add_space(3.0);
-    ui.colored_label(egui::Color32::from_rgb(230, 210, 140), format!("💡 Recomendação: {}", diag.recomendacao));
+    ui_refinada::linha_decorativa(ui);
+    egui::Grid::new("grade_tooltip_preco").striped(true).spacing([12.0, 2.0]).show(ui, |ui| {
+        ui.weak("Preço nacional");
+        ui.label(format!("${:.1}", b.preco_nacional));
+        ui.end_row();
+        ui.weak("Preço-base");
+        ui.label(format!("${:.1}", b.preco_base));
+        ui.end_row();
+        ui.weak("Cotação mundial");
+        ui.label(format!("${:.1}", b.preco_mundial));
+        ui.end_row();
+        ui.weak("Oferta / demanda");
+        ui.label(format!("{} / {}", fmt_qtd(b.oferta_nacional), fmt_qtd(b.demanda_nacional)));
+        ui.end_row();
+    });
+    let rotulo = |ui: &mut egui::Ui, t: &str| {
+        ui.add_space(4.0);
+        ui.label(
+            egui::RichText::new(t.to_uppercase())
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(13.0)
+                .strong()
+                .color(ui_refinada::menu::TINTA_SUAVE),
+        );
+    };
+    rotulo(ui, "Diagnóstico da formação de preço");
+    let corpo = |ui: &mut egui::Ui, t: &str| {
+        ui.add(egui::Label::new(egui::RichText::new(t).size(11.5).color(ui_refinada::menu::TINTA)).selectable(false));
+    };
+    corpo(ui, &diag.motivo);
+    rotulo(ui, "Comércio internacional");
+    corpo(ui, &diag.impacto_comercio);
+    rotulo(ui, "Cotação mundial");
+    corpo(ui, &diag.comparacao_mundial);
+    rotulo(ui, "Variação dos últimos 30 dias");
+    corpo(ui, &diag.tendencia_recente);
+    ui.add_space(4.0);
+    ui.colored_label(ui_refinada::menu::AVISO, format!("Recomendação: {}", diag.recomendacao));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -626,54 +667,51 @@ fn tela_mercado(
         return Ok(());
     }
     let ctx = contextos.ctx_mut()?;
-    let mut aberto = true;
     let v = &eco.vista;
 
-    ui_refinada::janela_estilo_menu("MERCADO GLOBAL & NACIONAL (2)")
-        .open(&mut aberto)
-        .default_size([1240.0, 700.0])
-        .resizable(true)
+    ui_refinada::janela_dossie("MERCADO GLOBAL & NACIONAL (2)", None)
+        .default_pos([20.0, 92.0])
+        .default_size([1240.0, 620.0])
+        .resizable(false)
         .show(ctx, |ui| {
             ui_refinada::decorar_janela(ui);
-            ui_refinada::cabecalho_painel(ui, "MERCADO GLOBAL & NACIONAL (2)");
+            ui_refinada::faixa_titulo(ui, "Mercado Global & Nacional", Some("2"), None);
             if v.bens.is_empty() {
                 ui.label("Aguardando os primeiros dados do motor econômico...");
                 return;
             }
 
             // Barra superior: Busca, estatísticas e resumo
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("🔍 Buscar:").strong());
+            ui.horizontal_wrapped(|ui| {
+                ui_refinada::glifo_ui(ui, "lupa", 15.0, Some(ui_refinada::menu::VERMELHO));
                 let resp_busca = ui.add(
                     egui::TextEdit::singleline(&mut painel.busca)
-                        .hint_text("Filtrar por nome ou ID...")
-                        .desired_width(180.0),
+                        .hint_text("Buscar bem por nome ou ID...")
+                        .desired_width(200.0),
                 );
-                if !painel.busca.is_empty() && ui.button("✖").on_hover_text("Limpar busca").clicked() {
+                if !painel.busca.is_empty() && ui.button("Limpar").on_hover_text("Limpar busca").clicked() {
                     painel.busca.clear();
                 }
                 ui.separator();
-                let total_bens = v.bens.len();
-                ui.label(format!("Bens catalogados: {total_bens}"));
+                ui.label(format!("Bens catalogados: {}", v.bens.len()));
                 ui.separator();
                 ui.label(format!(
-                    "Turismo (serviços): recebe {} /dia, viajantes gastam {} /dia no exterior, segurança {:.0}%",
+                    "Turismo: receita {}/dia, gasto no exterior {}/dia, segurança {:.0}%",
                     crate::plugins::jogador::fmt_din(v.turismo_receita_dia),
                     crate::plugins::jogador::fmt_din(v.turismo_gasto_exterior_dia),
                     v.turismo_seguranca * 100.0
                 ));
-                ui.separator();
-                ui.label(
-                    egui::RichText::new("💡 Dica: Clique nas colunas para ordenar (▲/▼). Clique num bem para inspecionar.")
-                        .italics()
-                        .color(ui_refinada::menu::TINTA_SUAVE),
-                );
                 if resp_busca.changed() && painel.selecionado.is_some() {
                     // Mantém seleção se ainda estiver visível
                 }
             });
+            ui.label(
+                egui::RichText::new("Dica: clique no cabeçalho de uma coluna para ordenar; clique num bem para inspecionar.")
+                    .size(11.0)
+                    .color(ui_refinada::menu::TINTA_SUAVE),
+            );
 
-            // Linha de filtros por categoria (com contagens)
+            // Linha de filtros por categoria (glifos vetoriais + contagem)
             ui.horizontal_wrapped(|ui| {
                 for f in Filtro::TODOS {
                     let contagem = if f == Filtro::Todos {
@@ -681,14 +719,16 @@ fn tela_mercado(
                     } else {
                         v.bens.iter().filter(|b| f.aceita(b.categoria)).count()
                     };
-                    let rotulo = format!("{} {} ({contagem})", f.icone(), f.nome());
-                    if ui_refinada::aba_estilo_menu(ui, painel.filtro == f, &rotulo) {
+                    if ui_refinada::aba_glifo(ui, painel.filtro == f, Some(f.icone()), f.nome()) {
                         painel.filtro = f;
                     }
+                    ui.label(egui::RichText::new(format!("{contagem}")).small().color(ui_refinada::menu::TINTA_SUAVE));
+                    ui.add_space(3.0);
                 }
             });
 
-            ui.separator();
+            ui.add_space(4.0);
+            ui_refinada::linha_decorativa(ui);
 
             // Filtragem e ordenação da lista
             let busca_norm = painel.busca.trim().to_lowercase();
@@ -757,22 +797,41 @@ fn tela_mercado(
                 // =====================================================================
                 // Coluna Esquerda: Tabela de Bens Victoria 3
                 // =====================================================================
-                egui::ScrollArea::vertical().id_salt("tab_bens_scroll").show(&mut cols[0], |ui| {
+                egui::ScrollArea::vertical().id_salt("tab_bens_scroll").max_height(430.0).show(&mut cols[0], |ui| {
                     egui::Grid::new("grade_bens_f2")
                         .striped(true)
                         .num_columns(8)
-                        .spacing([8.0, 4.0])
+                        .spacing([6.0, 4.0])
                         .show(ui, |ui| {
-                            // Cabeçalhos clicáveis com setas ordenadoras
-                            let mut cabecalho_btn = |ui: &mut egui::Ui, col: ColunaOrdenacao, tit: &str| {
+                            // Cabeçalhos clicáveis: triângulo desenhado pelo painter quando a coluna ordena.
+                            let mut cabecalho_btn = |ui: &mut egui::Ui, col: ColunaOrdenacao, tit: &str, largura: f32| {
                                 let ativo = painel.coluna_ordem == col;
-                                let seta = if ativo {
-                                    if painel.sentido_ordem == SentidoOrdenacao::Ascendente { " ▲" } else { " ▼" }
-                                } else {
-                                    ""
-                                };
-                                let texto = format!("{tit}{seta}");
-                                if ui.selectable_label(ativo, egui::RichText::new(texto).strong()).clicked() {
+                                let asc = painel.sentido_ordem == SentidoOrdenacao::Ascendente;
+                                let resp = ui.add_sized(
+                                    [largura, 18.0],
+                                    egui::Label::new(
+                                        egui::RichText::new(tit.to_uppercase())
+                                            .family(ui_refinada::familia_oswald(ui.ctx()))
+                                            .size(11.0)
+                                            .strong()
+                                            .color(if ativo { ui_refinada::menu::VERMELHO } else { ui_refinada::menu::TINTA_SUAVE })
+                                            .background_color(if ativo { ui_refinada::menu::PAPEL_ALT } else { egui::Color32::TRANSPARENT }),
+                                    )
+                                    .selectable(false)
+                                    .sense(egui::Sense::click()),
+                                );
+                                if ativo {
+                                    let r = resp.rect;
+                                    let x = r.max.x - 4.0;
+                                    let y = r.center().y;
+                                    let tri: Vec<egui::Pos2> = if asc {
+                                        vec![egui::pos2(x, y - 3.5), egui::pos2(x + 4.0, y + 2.5), egui::pos2(x - 4.0, y + 2.5)]
+                                    } else {
+                                        vec![egui::pos2(x - 4.0, y - 2.5), egui::pos2(x + 4.0, y - 2.5), egui::pos2(x, y + 3.5)]
+                                    };
+                                    ui.painter().add(egui::Shape::convex_polygon(tri, ui_refinada::menu::VERMELHO, egui::Stroke::NONE));
+                                }
+                                if resp.clicked() {
                                     if painel.coluna_ordem == col {
                                         painel.sentido_ordem = match painel.sentido_ordem {
                                             SentidoOrdenacao::Ascendente => SentidoOrdenacao::Descendente,
@@ -788,14 +847,14 @@ fn tela_mercado(
                                 }
                             };
 
-                            cabecalho_btn(ui, ColunaOrdenacao::Nome, "Bem");
-                            cabecalho_btn(ui, ColunaOrdenacao::PrecoNacional, "Nacional");
-                            cabecalho_btn(ui, ColunaOrdenacao::PrecoMundial, "Mundial");
-                            cabecalho_btn(ui, ColunaOrdenacao::Variacao, "Var. 30d");
-                            ui.strong("Tendência (30d)");
-                            cabecalho_btn(ui, ColunaOrdenacao::Oferta, "Oferta");
-                            cabecalho_btn(ui, ColunaOrdenacao::Demanda, "Demanda");
-                            cabecalho_btn(ui, ColunaOrdenacao::Saldo, "Saldo");
+                            cabecalho_btn(ui, ColunaOrdenacao::Nome, "Bem", 132.0);
+                            cabecalho_btn(ui, ColunaOrdenacao::PrecoNacional, "Nacional", 62.0);
+                            cabecalho_btn(ui, ColunaOrdenacao::PrecoMundial, "Mundial", 50.0);
+                            cabecalho_btn(ui, ColunaOrdenacao::Variacao, "Var 30d", 60.0);
+                            ui.add_sized([44.0, 18.0], egui::Label::new(egui::RichText::new("TEND.").family(ui_refinada::familia_oswald(ui.ctx())).size(11.0).strong().color(ui_refinada::menu::TINTA_SUAVE)).selectable(false));
+                            cabecalho_btn(ui, ColunaOrdenacao::Oferta, "Oferta", 46.0);
+                            cabecalho_btn(ui, ColunaOrdenacao::Demanda, "Dem.", 44.0);
+                            cabecalho_btn(ui, ColunaOrdenacao::Saldo, "Saldo", 76.0);
                             ui.end_row();
 
                             if lista.is_empty() {
@@ -810,15 +869,27 @@ fn tela_mercado(
                             for b in &lista {
                                 let selecionado = painel.selecionado.as_deref() == Some(&b.id);
 
-                                // Coluna 1: Ícone + Nome do Bem
-                                ui.horizontal(|ui| {
-                                    icones.mostrar(ui, &b.id, 20.0);
-                                    let btn = ui.selectable_label(selecionado, &b.nome);
-                                    if btn.clicked() {
-                                        painel.selecionado = Some(b.id.clone());
-                                    }
-                                    btn.on_hover_ui(|ui| render_tooltip_diagnostico(ui, b));
-                                });
+                                // Coluna 1: Ícone + Nome do Bem (largura fixa, sem quebrar a grade)
+                                ui.allocate_ui_with_layout(
+                                    egui::Vec2::new(132.0, 20.0),
+                                    egui::Layout::left_to_right(egui::Align::Center),
+                                    |ui| {
+                                        icones.mostrar(ui, &b.id, 18.0);
+                                        let nome_corto: String = if b.nome.chars().count() > 16 {
+                                            format!("{}...", b.nome.chars().take(16).collect::<String>())
+                                        } else {
+                                            b.nome.clone()
+                                        };
+                                        let btn = ui.selectable_label(
+                                            selecionado,
+                                            egui::RichText::new(nome_corto).size(12.0).color(ui_refinada::menu::TINTA),
+                                        );
+                                        if btn.clicked() {
+                                            painel.selecionado = Some(b.id.clone());
+                                        }
+                                        btn.on_hover_ui(|ui| render_tooltip_diagnostico(ui, b));
+                                    },
+                                );
 
                                 // Coluna 2: Preço Nacional + desvio vs preço base
                                 let diff_base_pct = if b.preco_base > 0.0 {
@@ -827,21 +898,24 @@ fn tela_mercado(
                                     0.0
                                 };
                                 let cor_p_nac = cor_preco_relativo(b.preco_nacional, b.preco_base);
-                                let lbl_p_nac = ui.colored_label(
-                                    cor_p_nac,
-                                    format!("{:.1} ({:+.0}%)", b.preco_nacional, diff_base_pct),
+                                let lbl_p_nac = ui.add_sized(
+                                    [62.0, 18.0],
+                                    egui::Label::new(egui::RichText::new(format!("{:.1} {:+.0}%", b.preco_nacional, diff_base_pct)).size(12.0).color(cor_p_nac)).selectable(false),
                                 );
                                 lbl_p_nac.on_hover_ui(|ui| render_tooltip_diagnostico(ui, b));
 
                                 // Coluna 3: Preço Mundial
-                                ui.label(format!("{:.1}", b.preco_mundial));
+                                ui.add_sized([50.0, 18.0], egui::Label::new(egui::RichText::new(format!("{:.1}", b.preco_mundial)).size(12.0)).selectable(false));
 
                                 // Coluna 4: Variação 30d (Nacional)
-                                let lbl_var = ui.colored_label(cor_variacao(b.var30_nacional), fmt_var(b.var30_nacional));
+                                let lbl_var = ui.add_sized(
+                                    [60.0, 18.0],
+                                    egui::Label::new(egui::RichText::new(fmt_var(b.var30_nacional)).size(12.0).color(cor_variacao(b.var30_nacional))).selectable(false),
+                                );
                                 lbl_var.on_hover_ui(|ui| render_tooltip_diagnostico(ui, b));
 
                                 // Coluna 5: Sparkline de 30 dias
-                                let resp_spark = desenhar_sparkline(ui, &b.hist_nacional, 30, 68.0, 18.0);
+                                let resp_spark = desenhar_sparkline(ui, &b.hist_nacional, 30, 44.0, 16.0);
                                 resp_spark.on_hover_ui(|ui| {
                                     let n = b.hist_nacional.len();
                                     let slice = &b.hist_nacional[n.saturating_sub(30)..];
@@ -855,21 +929,24 @@ fn tela_mercado(
                                 });
 
                                 // Coluna 6: Oferta Nacional
-                                ui.label(fmt_qtd(b.oferta_nacional));
+                                ui.add_sized([46.0, 18.0], egui::Label::new(egui::RichText::new(fmt_qtd(b.oferta_nacional)).size(12.0)).selectable(false));
 
                                 // Coluna 7: Demanda Nacional
-                                ui.label(fmt_qtd(b.demanda_nacional));
+                                ui.add_sized([44.0, 18.0], egui::Label::new(egui::RichText::new(fmt_qtd(b.demanda_nacional)).size(12.0)).selectable(false));
 
                                 // Coluna 8: Saldo Comercial (Líquido)
                                 let s = b.saldo_comercial;
                                 let (txt, cor_saldo) = if s > 1.0 {
-                                    (format!("+{} (Imp)", fmt_qtd(s)), ui_refinada::menu::INFO)
+                                    (format!("{} imp", fmt_qtd(s)), ui_refinada::menu::INFO)
                                 } else if s < -1.0 {
-                                    (format!("{} (Exp)", fmt_qtd(s)), ui_refinada::menu::AVISO)
+                                    (format!("{} exp", fmt_qtd(s)), ui_refinada::menu::AVISO)
                                 } else {
-                                    ("Equilibrado".to_string(), ui_refinada::menu::TINTA_SUAVE)
+                                    ("equilibrado".to_string(), ui_refinada::menu::TINTA_SUAVE)
                                 };
-                                let lbl_saldo = ui.colored_label(cor_saldo, txt);
+                                let lbl_saldo = ui.add_sized(
+                                    [76.0, 18.0],
+                                    egui::Label::new(egui::RichText::new(txt).size(12.0).color(cor_saldo)).selectable(false),
+                                );
                                 lbl_saldo.on_hover_ui(|ui| render_tooltip_diagnostico(ui, b));
 
                                 ui.end_row();
@@ -886,9 +963,11 @@ fn tela_mercado(
                 match escolhido {
                     None => {
                         ui_dir.vertical_centered(|ui| {
-                            ui.add_space(80.0);
-                            ui.heading("📊 Inspeção Detalhada de Mercado");
-                            ui.add_space(10.0);
+                            ui.add_space(60.0);
+                            ui_refinada::glifo_ui(ui, "lupa", 34.0, Some(ui_refinada::menu::VERMELHO));
+                            ui.add_space(6.0);
+                            ui_refinada::titulo_secao(ui, "Inspeção Detalhada de Mercado");
+                            ui.add_space(6.0);
                             ui.label("Selecione um bem na tabela ao lado para visualizar:");
                             ui.label("• Gráfico histórico de preços (1, 3 e 5 anos)");
                             ui.label("• Diagnóstico detalhado de escassez, excesso e importações");
@@ -903,7 +982,6 @@ fn tela_mercado(
             });
         });
 
-    painel.aberto = aberto;
     Ok(())
 }
 
@@ -940,9 +1018,9 @@ fn detalhe_bem(
                     ui.colored_label(ui_refinada::menu::TINTA_SUAVE, nome_categoria(b.categoria));
                     ui.separator();
                     if b.comercializavel {
-                        ui.colored_label(ui_refinada::menu::SUCESSO, "🌐 Comercializável Globalmente");
+                        ui.colored_label(ui_refinada::menu::SUCESSO, "Comercializável Globalmente");
                     } else {
-                        ui.colored_label(ui_refinada::menu::AVISO, "🔒 Bem Local (Intransferível)");
+                        ui.colored_label(ui_refinada::menu::AVISO, "Bem Local (Intransferível)");
                     }
                 });
             });
@@ -993,23 +1071,21 @@ fn detalhe_bem(
 
         // Caixa de Diagnóstico Econômico (Causas de Preço, Escassez, Excesso, Importação)
         let diag = gerar_diagnostico(b);
-        egui::Frame::new()
-            .fill(egui::Color32::from_black_alpha(50))
-            .stroke(egui::Stroke::new(1.0, diag.estado.cor().gamma_multiply(0.6)))
-            .corner_radius(4)
-            .inner_margin(8)
+        ui_refinada::moldura_cartao()
+            .stroke(egui::Stroke::new(1.0, diag.estado.cor()))
             .show(ui, |ui| {
+                ui_refinada::titulo_secao(ui, "Diagnóstico de Mercado");
                 ui.horizontal(|ui| {
-                    ui.strong("Diagnóstico de Mercado:");
+                    ui_refinada::glifo_ui(ui, "grafico", 14.0, Some(diag.estado.cor()));
                     ui.colored_label(diag.estado.cor(), &diag.titulo);
                 });
                 ui.add_space(2.0);
-                ui.label(format!("• {}", diag.motivo));
-                ui.label(format!("• {}", diag.impacto_comercio));
-                ui.label(format!("• {}", diag.comparacao_mundial));
-                ui.label(format!("• {}", diag.tendencia_recente));
-                ui.add_space(2.0);
-                ui.colored_label(egui::Color32::from_rgb(230, 210, 140), format!("💡 {}", diag.recomendacao));
+                ui.label(&diag.motivo);
+                ui.label(&diag.impacto_comercio);
+                ui.label(&diag.comparacao_mundial);
+                ui.label(&diag.tendencia_recente);
+                ui_refinada::linha_decorativa(ui);
+                ui.colored_label(ui_refinada::menu::AVISO, format!("Recomendação: {}", diag.recomendacao));
             });
 
         ui.add_space(8.0);
@@ -1079,30 +1155,32 @@ fn detalhe_bem(
 
         // Maiores Produtores e Consumidores (Mercados Globais)
         ui.columns(2, |cols| {
-            cols[0].strong("Maiores Produtores Mundiais");
+            ui_refinada::titulo_secao(&mut cols[0], "Maiores produtores mundiais");
             if b.produtores.is_empty() {
                 cols[0].label("Nenhum dado de produção disponível.");
             } else {
                 for (n, q) in &b.produtores {
                     let pct = if b.oferta_mundial > 0.0 { (q / b.oferta_mundial) * 100.0 } else { 0.0 };
                     cols[0].horizontal(|ui| {
-                        ui.label(format!("{n}:"));
+                        ui.add_sized([130.0, 16.0], egui::Label::new(format!("{n}")));
                         ui.strong(fmt_qtd(*q));
-                        ui.colored_label(egui::Color32::from_rgb(160, 180, 200), format!("({pct:.1}%)"));
+                        ui_refinada::barra_trilho(ui, (pct / 100.0) as f32, ui_refinada::menu::SUCESSO, 54.0, 9.0);
+                        ui.colored_label(ui_refinada::menu::TINTA_SUAVE, format!("({pct:.1}%)"));
                     });
                 }
             }
 
-            cols[1].strong("Maiores Consumidores Mundiais");
+            ui_refinada::titulo_secao(&mut cols[1], "Maiores consumidores mundiais");
             if b.consumidores.is_empty() {
                 cols[1].label("Nenhum dado de consumo disponível.");
             } else {
                 for (n, q) in &b.consumidores {
                     let pct = if b.demanda_mundial > 0.0 { (q / b.demanda_mundial) * 100.0 } else { 0.0 };
                     cols[1].horizontal(|ui| {
-                        ui.label(format!("{n}:"));
+                        ui.add_sized([130.0, 16.0], egui::Label::new(format!("{n}")));
                         ui.strong(fmt_qtd(*q));
-                        ui.colored_label(egui::Color32::from_rgb(160, 180, 200), format!("({pct:.1}%)"));
+                        ui_refinada::barra_trilho(ui, (pct / 100.0) as f32, ui_refinada::menu::AVISO, 54.0, 9.0);
+                        ui.colored_label(ui_refinada::menu::TINTA_SUAVE, format!("({pct:.1}%)"));
                     });
                 }
             }
@@ -1113,7 +1191,7 @@ fn detalhe_bem(
             ui.separator();
             ui.columns(2, |cols| {
                 // Prédios que produzem
-                cols[0].strong("🏭 Prédios que Produzem:");
+                ui_refinada::titulo_secao(&mut cols[0], "Prédios que produzem");
                 let mut produzem = Vec::new();
                 for t in &cat.tipos_predio {
                     let mut metodos = Vec::new();
@@ -1139,19 +1217,23 @@ fn detalhe_bem(
                             icones.mostrar(ui, &t.id, 18.0);
                             ui.strong(&t.nome);
                             if niv > 0 {
-                                ui.colored_label(ui_refinada::menu::SUCESSO, format!("[🏛 Nível {niv}]"));
+                                ui.colored_label(ui_refinada::menu::SUCESSO, format!("[Nível {niv}]"));
                             } else {
-                                ui.colored_label(ui_refinada::menu::TINTA_SUAVE, "[⚪ 0 no país]");
+                                ui.colored_label(ui_refinada::menu::TINTA_SUAVE, "[0 no país]");
                             }
                         });
                         for (mnome, qtd) in mets {
-                            cols[0].label(format!("  • {mnome}: +{qtd:.1}/nível"));
+                            cols[0].horizontal(|ui| {
+                                ui.add_space(24.0);
+                                ui.small(&mnome);
+                                ui.colored_label(ui_refinada::menu::SUCESSO, format!("+{qtd:.1}/nível"));
+                            });
                         }
                     }
                 }
 
                 // Prédios que consomem
-                cols[1].strong("⚙️ Prédios que Consomem:");
+                ui_refinada::titulo_secao(&mut cols[1], "Prédios que consomem");
                 let mut consomem = Vec::new();
                 for t in &cat.tipos_predio {
                     let mut metodos = Vec::new();
@@ -1177,13 +1259,17 @@ fn detalhe_bem(
                             icones.mostrar(ui, &t.id, 18.0);
                             ui.strong(&t.nome);
                             if niv > 0 {
-                                ui.colored_label(ui_refinada::menu::SUCESSO, format!("[🏛 Nível {niv}]"));
+                                ui.colored_label(ui_refinada::menu::SUCESSO, format!("[Nível {niv}]"));
                             } else {
-                                ui.colored_label(ui_refinada::menu::TINTA_SUAVE, "[⚪ 0 no país]");
+                                ui.colored_label(ui_refinada::menu::TINTA_SUAVE, "[0 no país]");
                             }
                         });
                         for (mnome, qtd) in mets {
-                            cols[1].label(format!("  • {mnome}: -{qtd:.1}/nível"));
+                            cols[1].horizontal(|ui| {
+                                ui.add_space(24.0);
+                                ui.small(&mnome);
+                                ui.colored_label(ui_refinada::menu::PERIGO, format!("-{qtd:.1}/nível"));
+                            });
                         }
                     }
                 }
@@ -1274,9 +1360,10 @@ mod testes {
 
     #[test]
     fn formatacoes_valores_e_variacao() {
-        assert_eq!(fmt_var(0.125), "▲ +12.5%");
-        assert_eq!(fmt_var(-0.063), "▼ -6.3%");
-        assert_eq!(fmt_var(0.001), "― +0.1%");
+        assert_eq!(fmt_var(0.125), "+12.5%");
+        assert_eq!(fmt_var(-0.063), "-6.3%");
+        assert_eq!(fmt_var(0.001), "+0.1%");
+        assert_eq!(fmt_var(0.0), "plano");
 
         assert_eq!(fmt_qtd(500.0), "500");
         assert_eq!(fmt_qtd(1500.0), "1.5 mil");

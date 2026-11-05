@@ -259,6 +259,7 @@ fn urbana_por_provincia(raiz: Option<&std::path::Path>, dados: &DadosMapa) -> st
 /// Um alerta da barra (estilo Victoria 3).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Alerta {
+    /// Chave de glifo vetorial (painter), não emoji.
     pub icone: &'static str,
     pub texto: String,
     pub gravidade: u8, // 0 = info, 1 = aviso, 2 = crítico
@@ -280,30 +281,30 @@ pub struct InsumosAlertas {
 pub fn calcular_alertas(i: &InsumosAlertas) -> Vec<Alerta> {
     let mut v = Vec::new();
     if i.em_calote {
-        v.push(Alerta { icone: "💥", texto: "Calote: o governo não paga suas dívidas".into(), gravidade: 2 });
+        v.push(Alerta { icone: "raio", texto: "Calote: o governo não paga suas dívidas".into(), gravidade: 2 });
     } else if let Some(t) = i.tesouro
         && i.saldo_diario < 0.0
     {
         let dias = t / -i.saldo_diario;
         if dias < 90.0 {
-            v.push(Alerta { icone: "💸", texto: format!("Falência próxima: tesouro acaba em {:.0} dias", dias.max(0.0)), gravidade: if dias < 30.0 { 2 } else { 1 } });
+            v.push(Alerta { icone: "moeda", texto: format!("Falência próxima: tesouro acaba em {:.0} dias", dias.max(0.0)), gravidade: if dias < 30.0 { 2 } else { 1 } });
         }
     }
     if i.desemprego > 0.12 {
-        v.push(Alerta { icone: "👷", texto: format!("Desemprego alto: {:.1}%", i.desemprego * 100.0), gravidade: if i.desemprego > 0.2 { 2 } else { 1 } });
+        v.push(Alerta { icone: "camisa", texto: format!("Desemprego alto: {:.1}%", i.desemprego * 100.0), gravidade: if i.desemprego > 0.2 { 2 } else { 1 } });
     }
     if let Some(l) = &i.lei_pronta {
-        v.push(Alerta { icone: "📜", texto: format!("Lei pronta para votação final: {l}"), gravidade: 0 });
+        v.push(Alerta { icone: "balanca", texto: format!("Lei pronta para votação final: {l}"), gravidade: 0 });
     }
     if i.em_campanha {
-        v.push(Alerta { icone: "🗳", texto: "Campanha eleitoral em andamento".into(), gravidade: 0 });
+        v.push(Alerta { icone: "urna", texto: "Campanha eleitoral em andamento".into(), gravidade: 0 });
     } else if let Some(d) = i.dias_eleicao
         && d <= 60
     {
-        v.push(Alerta { icone: "🗳", texto: format!("Eleição em {d} dias"), gravidade: 0 });
+        v.push(Alerta { icone: "urna", texto: format!("Eleição em {d} dias"), gravidade: 0 });
     }
     if let Some(t) = &i.pesquisa_concluida {
-        v.push(Alerta { icone: "🔬", texto: format!("Pesquisa concluída: {t}"), gravidade: 0 });
+        v.push(Alerta { icone: "estrela", texto: format!("Pesquisa concluída: {t}"), gravidade: 0 });
     }
     v
 }
@@ -389,8 +390,18 @@ pub fn barra_extra(
             if !alertas.is_empty() {
                 ui.horizontal_wrapped(|ui| {
                     for a in &alertas {
-                        ui.label(egui::RichText::new(format!("{} {}", a.icone, a.texto)).color(cor_gravidade(a.gravidade)).strong());
-                        ui.add_space(8.0);
+                        let cor = cor_gravidade(a.gravidade);
+                        egui::Frame::new()
+                            .fill(ui_refinada::menu::PAPEL_CARD)
+                            .stroke(egui::Stroke::new(1.0, cor))
+                            .inner_margin(egui::Margin::symmetric(6, 2))
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.spacing_mut().item_spacing.x = 5.0;
+                                    ui_refinada::glifo_ui(ui, a.icone, 14.0, Some(cor));
+                                    ui.label(egui::RichText::new(&a.texto).size(12.0).strong().color(cor));
+                                });
+                            });
                     }
                 });
             }

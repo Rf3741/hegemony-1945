@@ -52,7 +52,15 @@ fn barra_superior(
                 }
                 ui.separator();
                 if let Some(c) = camada_visivel {
-                    let texto = if c.0 { "🏛 Construções: [V] Ativas" } else { "🏛 Construções: [V] Ocultas" };
+                    let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
+                    ui_refinada::theme::icone::desenhar(
+                        ui.painter(),
+                        rect,
+                        "torre",
+                        ui_refinada::menu::TINTA,
+                        ui_refinada::menu::VERMELHO,
+                    );
+                    let texto = if c.0 { "Construções: [V] Ativas" } else { "Construções: [V] Ocultas" };
                     ui.label(egui::RichText::new(texto).color(ui_refinada::menu::TINTA));
                     ui.separator();
                 }
@@ -62,7 +70,7 @@ fn barra_superior(
     Ok(())
 }
 
-/// Relógio estilo Victoria 3/HOI4: data, pausa, − / + e barrinhas de velocidade (1–5).
+/// Relógio estilo Victoria 3/HOI4: placa de data, pausa, − / + e barrinhas de velocidade (1–5).
 fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) {
     // Em layout direita-para-esquerda: o último desenhado fica mais à esquerda.
     if ui.small_button("+").on_hover_text("Aumentar velocidade (+)").clicked() {
@@ -97,16 +105,19 @@ fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) {
     if b_pausa.clicked() {
         relogio.alternar_pausa();
     }
-    dica(
-        ui.label(
-            egui::RichText::new(relogio.data.formatar_pt_br())
-                .family(ui_refinada::familia_oswald(ui.ctx()))
-                .size(20.0)
-                .strong()
-                .color(ui_refinada::menu::TINTA),
-        ),
-        "tooltip_topbar_data",
-    );
+    let placa = egui::Frame::new().show(ui, |ui| {
+        ui_refinada::placa_data(ui, &relogio.data.formatar_pt_br());
+    });
+    let resp = dica(placa.response, "tooltip_topbar_data");
+    if relogio.pausado {
+        let rect = resp.rect;
+        ui.painter().rect_stroke(
+            rect.shrink(1.0),
+            0.0,
+            egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO_HOVER),
+            egui::StrokeKind::Inside,
+        );
+    }
 }
 
 fn barra_hud(
