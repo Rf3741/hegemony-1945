@@ -192,73 +192,124 @@ fn cor_saldo(v: f64) -> egui::Color32 {
     ui_refinada::cor_saldo(v)
 }
 
+/// Botão de painel na barra superior: vermelho quando o painel está aberto, cartão creme quando fechado.
+fn botao_painel(ui: &mut egui::Ui, texto: &str, ativo: bool) -> egui::Response {
+    let (fill, cor_texto, borda) = if ativo {
+        (
+            ui_refinada::menu::VERMELHO,
+            ui_refinada::menu::PAPEL,
+            egui::Stroke::new(1.0, ui_refinada::menu::TINTA),
+        )
+    } else {
+        (
+            ui_refinada::menu::PAPEL_CARD,
+            ui_refinada::menu::TINTA,
+            egui::Stroke::new(1.0, ui_refinada::menu::PAPEL_BORDA),
+        )
+    };
+    ui.add(
+        egui::Button::new(
+            egui::RichText::new(texto)
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(14.0)
+                .color(cor_texto),
+        )
+        .fill(fill)
+        .stroke(borda)
+        .min_size(egui::vec2(74.0, 24.0)),
+    )
+}
+
 /// Faixa do HUD com os indicadores do país do jogador (economia vinda do `sim_economia`).
 pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_aberto: &mut bool, mercado_aberto: &mut bool, comercio_aberto: &mut bool, construcao_aberta: &mut bool) {
+    let suave = ui_refinada::menu::TINTA_SUAVE;
     ui.horizontal_wrapped(|ui| {
-        if !super::bandeiras_ui::bandeira_ui(ui, &p.tag, 18.0) {
-            let (r, _) = ui.allocate_exact_size(egui::vec2(22.0, 14.0), egui::Sense::hover());
+        ui.spacing_mut().item_spacing.x = 6.0;
+        if !super::bandeiras_ui::bandeira_ui(ui, &p.tag, 22.0) {
+            let (r, _) = ui.allocate_exact_size(egui::vec2(24.0, 15.0), egui::Sense::hover());
             ui.painter().rect_filled(r, 2.0, cor_pais(p));
         }
-        ui.strong(&p.nome);
+        ui.label(
+            egui::RichText::new(&p.nome)
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(16.0)
+                .strong(),
+        );
         ui.separator();
         match (&eco.vista.pais, eco.vista.pais_id.is_empty()) {
             (Some(pe), false) => {
                 let o = &pe.orcamento;
-                dica_com(ui.label(format!("Tesouro: {}", fmt_din(o.tesouro))), "tooltip_topbar_tesouro", |ui| {
+                ui.label(egui::RichText::new("Tesouro").small().color(suave));
+                dica_com(ui.strong(fmt_din(o.tesouro)), "tooltip_topbar_tesouro", |ui| {
                     ui.label(format!("Tesouro atual: {} | Dívida: {} | Saldo/dia: {}", fmt_din(o.tesouro), fmt_din(o.divida), fmt_din(o.saldo_diario)));
                 });
-                dica_com(ui.colored_label(cor_saldo(o.saldo_diario), format!("Saldo/dia: {}", fmt_din(o.saldo_diario))), "tooltip_topbar_balanco_diario", |ui| {
+                ui.label(egui::RichText::new("Saldo/dia").small().color(suave));
+                let saldo_txt = if o.saldo_diario >= 0.0 { format!("+{}", fmt_din(o.saldo_diario)) } else { fmt_din(o.saldo_diario) };
+                dica_com(ui.colored_label(cor_saldo(o.saldo_diario), saldo_txt), "tooltip_topbar_balanco_diario", |ui| {
                     ui.label(format!("Saldo diário atual: {} (por ano: {})", fmt_din(o.saldo_diario), fmt_din(o.saldo_diario * 365.0)));
                 });
-                dica_conceito(ui.label(format!("Dívida: {}", fmt_din(o.divida))), "divida_publica");
+                ui.label(egui::RichText::new("Dívida").small().color(suave));
+                dica_conceito(ui.strong(fmt_din(o.divida)), "divida_publica");
                 ui.separator();
-                dica_conceito(ui.label(format!("PIB: {}", fmt_din(eco.vista.pib_anual))), "produtividade_do_trabalho");
-                dica_conceito(ui.label(format!("Pop.: {}", fmt_pop(eco.vista.populacao as u64))), "pop");
-                dica_conceito(ui.label(format!("Padrão de vida: {:.1}", eco.vista.padrao_vida)), "padrao_de_vida");
-                dica_conceito(ui.label(format!("Desemprego: {:.1}%", eco.vista.desemprego * 100.0)), "estrato_social");
+                ui.label(egui::RichText::new("PIB").small().color(suave));
+                dica_conceito(ui.strong(fmt_din(eco.vista.pib_anual)), "produtividade_do_trabalho");
+                ui.label(egui::RichText::new("Pop.").small().color(suave));
+                dica_conceito(ui.strong(fmt_pop(eco.vista.populacao as u64)), "pop");
+                ui.label(egui::RichText::new("Padrão de vida").small().color(suave));
+                dica_conceito(ui.strong(format!("{:.1}", eco.vista.padrao_vida)), "padrao_de_vida");
+                ui.label(egui::RichText::new("Desemprego").small().color(suave));
+                dica_conceito(ui.strong(format!("{:.1}%", eco.vista.desemprego * 100.0)), "estrato_social");
                 if o.em_calote {
-                    ui.colored_label(ui_refinada::menu::PERIGO, "CALOTE");
+                    ui.colored_label(ui_refinada::menu::PERIGO, egui::RichText::new("CALOTE").strong());
                 }
             }
             _ => {
-                ui.label(format!("PIB: {}", fmt_din(p.pib_anual_estimado)));
-                ui.label(format!("Pop.: {}", fmt_pop(p.populacao_total())));
-                ui.label("(economia detalhada indisponível para este país)");
+                ui.label(egui::RichText::new("PIB").small().color(suave));
+                ui.strong(fmt_din(p.pib_anual_estimado));
+                ui.label(egui::RichText::new("Pop.").small().color(suave));
+                ui.strong(fmt_pop(p.populacao_total()));
+                ui.label(egui::RichText::new("(economia detalhada indisponível)").italics().color(suave));
             }
         }
-        dica_com(ui.label(format!("Legitimidade: {:.0}%", p.politica.legitimidade)), "tooltip_topbar_legitimidade", |ui| {
+        ui.label(egui::RichText::new("Legitimidade").small().color(suave));
+        dica_com(ui.strong(format!("{:.0}%", p.politica.legitimidade)), "tooltip_topbar_legitimidade", |ui| {
             ui.label(format!("Legitimidade atual: {:.1}%", p.politica.legitimidade));
         });
         if eco.atraso_dias() > 10 || eco.dias_perdidos > 0 {
             ui.colored_label(ui_refinada::menu::AVISO, format!("Economia atrasada {} d", eco.atraso_dias()));
         }
-        ui.separator();
-        let b_constr = ui.add(
-            egui::Button::new(egui::RichText::new("🏗 Construir (B)").strong().size(16.0).color(ui_refinada::menu::PAPEL))
-                .fill(ui_refinada::menu::VERMELHO)
-                .stroke(egui::Stroke::new(1.0, ui_refinada::menu::TINTA)),
-        ).on_hover_text("Abre a tela de construção");
+    });
+    ui.add_space(2.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 6.0;
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
+        ui_refinada::theme::icone::desenhar(ui.painter(), rect, "torre", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
+        let b_constr = botao_painel(ui, "Construir (B)", *construcao_aberta).on_hover_text("Abre a tela de construção");
         super::tutorial_guiado::marcar(&b_constr, "btn_construir");
         if b_constr.clicked() {
             *construcao_aberta = !*construcao_aberta;
         }
-        let b_pais = ui.button("País (1)");
+        let b_pais = botao_painel(ui, "País (1)", *painel_aberto);
         super::tutorial_guiado::marcar(&b_pais, "btn_pais");
         if b_pais.clicked() {
             *painel_aberto = !*painel_aberto;
         }
-        let b_merc = ui.button("Mercado (2)");
+        let b_merc = botao_painel(ui, "Mercado (2)", *mercado_aberto);
         super::tutorial_guiado::marcar(&b_merc, "btn_mercado");
         if b_merc.clicked() {
             *mercado_aberto = !*mercado_aberto;
         }
-        let b_com = ui.button("Comércio (3)");
+        let b_com = botao_painel(ui, "Comércio (3)", *comercio_aberto);
         super::tutorial_guiado::marcar(&b_com, "btn_comercio");
         if b_com.clicked() {
             *comercio_aberto = !*comercio_aberto;
         }
-        ui.label("Tecnologia (5)");
-        ui.label("Enciclopédia (8)");
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
+        ui_refinada::theme::icone::desenhar(ui.painter(), rect, "estrela", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
+        ui.label(egui::RichText::new("Tecnologia (5)").color(ui_refinada::menu::TINTA_SUAVE));
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
+        ui_refinada::theme::icone::desenhar(ui.painter(), rect, "livro", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
+        ui.label(egui::RichText::new("Enciclopédia (8)").color(ui_refinada::menu::TINTA_SUAVE));
     });
 }
 
@@ -376,33 +427,113 @@ fn painel_pais(
         return Ok(());
     }
     let hoje = (relogio.data.ano, relogio.data.mes, relogio.data.dia);
-    let mut aberto = true;
+    let mut fechar_painel = false;
     let mut aba = painel.aba;
     let ctx = contextos.ctx_mut()?;
     let (tag_p, nome_p) = pol.as_ref().and_then(|p| p.vista.pais.as_ref().map(|x| (x.tag.clone(), x.nome.clone()))).unwrap_or_default();
-    ui_refinada::janela_estilo_menu("Painel do país (1)")
-        .open(&mut aberto)
+    let legado = if tag_p.is_empty() { String::new() } else { super::politica_sim::tag_legado_pub(&tag_p) };
+    ui_refinada::janela_dossie("Painel do país (1)", None)
+        .default_pos([20.0, 120.0])
         .default_size([720.0, 600.0])
         .show(ctx, |ui| {
             ui_refinada::decorar_janela(ui);
-            if !tag_p.is_empty() {
-                ui.horizontal(|ui| {
-                    let tl = super::politica_sim::tag_legado_pub(&tag_p);
-                    super::bandeiras_ui::bandeira_ui(ui, &tl, 40.0);
-                    let titulo_txt = format!("PAÍS (1) — {}", super::bandeiras_ui::nome_dinamico(ui, &tl).unwrap_or(nome_p.clone()));
-                    ui_refinada::cabecalho_painel(ui, &titulo_txt);
-                });
+            let nome_faixa = if legado.is_empty() {
+                "País".to_string()
             } else {
-                ui_refinada::cabecalho_painel(ui, "PAÍS (1)");
-            }
-            ui.horizontal(|ui| {
-                if ui_refinada::aba_estilo_menu(ui, aba == Aba::Economia, "Economia") { aba = Aba::Economia; }
-                if ui_refinada::aba_estilo_menu(ui, aba == Aba::Construcao, "Construção") { aba = Aba::Construcao; }
-                if ui_refinada::aba_estilo_menu(ui, aba == Aba::Politica, "Política") { aba = Aba::Politica; }
-                if ui_refinada::aba_estilo_menu(ui, aba == Aba::Ranking, "Ranking") { aba = Aba::Ranking; }
+                super::bandeiras_ui::nome_dinamico(ui, &legado).unwrap_or_else(|| nome_p.clone())
+            };
+            egui::Frame::new().fill(ui_refinada::menu::AZUL_MARINHO).inner_margin(egui::Margin::symmetric(10, 5)).show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    ui.label(
+                        egui::RichText::new("1")
+                            .family(ui_refinada::familia_oswald(ui.ctx()))
+                            .size(12.0)
+                            .color(ui_refinada::menu::AZUL_MARINHO)
+                            .background_color(ui_refinada::menu::PAPEL)
+                            .strong(),
+                    );
+                    if !legado.is_empty() {
+                        super::bandeiras_ui::bandeira_ui(ui, &legado, 22.0);
+                    }
+                    ui.label(
+                        egui::RichText::new(format!("{nome_faixa}").to_uppercase())
+                            .family(ui_refinada::familia_oswald(ui.ctx()))
+                            .size(17.0)
+                            .strong()
+                            .color(ui_refinada::menu::PAPEL_CLARO),
+                    );
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                egui::RichText::new("X")
+                                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                                    .size(13.0)
+                                    .strong()
+                                    .color(ui_refinada::menu::AZUL_MARINHO),
+                            )
+                            .fill(ui_refinada::menu::PAPEL)
+                            .stroke(egui::Stroke::new(1.0, ui_refinada::menu::PAPEL_CLARO)),
+                        )
+                        .on_hover_text("Fechar painel do país")
+                        .clicked()
+                    {
+                        fechar_painel = true;
+                    }
+                });
             });
-            ui.separator();
-            egui::ScrollArea::vertical().show(ui, |ui| match aba {
+            // Cartão do país: bandeira grande + retrato do chefe + indicadores-chave.
+            if let (Some(el), Some(r)) = (elenco.as_deref(), retratos.as_deref_mut()) {
+                if !tag_p.is_empty() {
+                    ui.add_space(4.0);
+                    ui_refinada::moldura_cartao().show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 10.0;
+                            if !legado.is_empty() {
+                                super::bandeiras_ui::bandeira_ui(ui, &legado, 56.0);
+                            }
+                            super::personagens_ui::retrato_chefe(ui, el, r, &tag_p, 56.0);
+                            if let Some(pais_pol) = pol.as_ref().and_then(|p| p.vista.pais.as_ref()) {
+                                let l = pais_pol.legitimidade as f32;
+                                let cor_l = if l >= 60.0 {
+                                    ui_refinada::menu::SUCESSO
+                                } else if l >= 35.0 {
+                                    ui_refinada::menu::AVISO
+                                } else {
+                                    ui_refinada::menu::PERIGO
+                                };
+                                ui.vertical(|ui| {
+                                    ui.label(
+                                        egui::RichText::new("LEGITIMIDADE")
+                                            .size(10.0)
+                                            .strong()
+                                            .color(ui_refinada::menu::TINTA_SUAVE),
+                                    );
+                                    ui_refinada::barra_status(
+                                        ui,
+                                        None,
+                                        l,
+                                        100.0,
+                                        cor_l,
+                                        180.0,
+                                        Some(&format!("{l:.0}% · {:?}", pais_pol.faixa_legitimidade)),
+                                    );
+                                });
+                            }
+                        });
+                    });
+                }
+            }
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                if ui_refinada::aba_glifo(ui, aba == Aba::Economia, Some("moeda"), "Economia") { aba = Aba::Economia; }
+                if ui_refinada::aba_glifo(ui, aba == Aba::Construcao, Some("torre"), "Construção") { aba = Aba::Construcao; }
+                if ui_refinada::aba_glifo(ui, aba == Aba::Politica, Some("balanca"), "Política") { aba = Aba::Politica; }
+                if ui_refinada::aba_glifo(ui, aba == Aba::Ranking, Some("grafico"), "Ranking") { aba = Aba::Ranking; }
+            });
+            ui_refinada::linha_decorativa(ui);
+            egui::ScrollArea::vertical().auto_shrink([false, false]).max_height(430.0).show(ui, |ui| match aba {
                 Aba::Economia => aba_economia(ui, &mut eco, &mut painel, &mut icones),
                 Aba::Construcao => aba_construcao(ui, &mut eco, &mut painel, &mut icones),
                 Aba::Politica => match pol.as_mut() {
@@ -421,14 +552,33 @@ fn painel_pais(
             });
         });
     painel.aba = aba;
-    painel.aberto = aberto;
+    if fechar_painel {
+        painel.aberto = false;
+    }
     Ok(())
 }
 
 fn linha_fluxo(ui: &mut egui::Ui, nome: &str, v: f64) {
-    ui.label(nome);
-    ui.colored_label(cor_saldo(v), fmt_din(v));
+    ui.label(egui::RichText::new(nome).size(13.0).color(ui_refinada::menu::TINTA));
+    ui.allocate_ui_with_layout(
+        egui::Vec2::new(96.0, 16.0),
+        egui::Layout::right_to_left(egui::Align::Center),
+        |ui| {
+            ui.add(egui::Label::new(egui::RichText::new(fmt_din(v)).size(13.0).strong().color(cor_saldo(v))).selectable(false));
+        },
+    );
     ui.end_row();
+}
+
+/// Título de coluna do orçamento (Receitas/Despesas) em caixa alta com acento de cor.
+fn cabecalho_fluxo(ui: &mut egui::Ui, texto: &str, cor: egui::Color32) {
+    ui.label(
+        egui::RichText::new(texto.to_uppercase())
+            .family(ui_refinada::familia_oswald(ui.ctx()))
+            .size(13.0)
+            .strong()
+            .color(cor),
+    );
 }
 
 fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPais, icones: &mut Icones) {
@@ -442,11 +592,11 @@ fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPai
         let o = &pais.orcamento;
 
         // ---------------- Orçamento ----------------
-        ui.heading("Orçamento (por dia)");
+        ui_refinada::titulo_secao(ui, "Orçamento (por dia)");
         ui.label(format!("Tesouro {} | Dívida {} | Limite de crédito {} | Juros {:.1}% a.a.", fmt_din(o.tesouro), fmt_din(o.divida), fmt_din(o.limite_credito), o.taxa_juros_efetiva_anual * 100.0));
         ui.columns(2, |cols| {
-            egui::Grid::new("receitas").num_columns(2).show(&mut cols[0], |ui| {
-                ui.strong("Receitas");
+            egui::Grid::new("receitas").num_columns(2).striped(true).spacing([8.0, 3.0]).show(&mut cols[0], |ui| {
+                cabecalho_fluxo(ui, "Receitas", ui_refinada::menu::SUCESSO);
                 ui.end_row();
                 linha_fluxo(ui, "Imposto de renda e dividendos", o.receita_imposto_renda);
                 linha_fluxo(ui, "Imposto de consumo", o.receita_imposto_consumo);
@@ -455,8 +605,8 @@ fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPai
                 linha_fluxo(ui, "Tarifas de importação", o.receita_tarifas);
                 linha_fluxo(ui, "Turismo e hotelaria", o.receita_turismo);
             });
-            egui::Grid::new("despesas").num_columns(2).show(&mut cols[1], |ui| {
-                ui.strong("Despesas");
+            egui::Grid::new("despesas").num_columns(2).striped(true).spacing([8.0, 3.0]).show(&mut cols[1], |ui| {
+                cabecalho_fluxo(ui, "Despesas", ui_refinada::menu::PERIGO);
                 ui.end_row();
                 linha_fluxo(ui, "Burocracia", -o.gasto_burocracia);
                 linha_fluxo(ui, "Forças armadas", -o.gasto_militar);
@@ -467,14 +617,14 @@ fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPai
             });
         });
         ui.horizontal(|ui| {
-            ui.strong("Saldo diário:");
-            ui.colored_label(cor_saldo(o.saldo_diario), fmt_din(o.saldo_diario));
+            ui.label(egui::RichText::new("Saldo diário:").size(13.0).strong().color(ui_refinada::menu::TINTA));
+            ui.colored_label(cor_saldo(o.saldo_diario), egui::RichText::new(fmt_din(o.saldo_diario)).size(13.0).strong().color(cor_saldo(o.saldo_diario)));
             if o.em_calote {
-                ui.colored_label(egui::Color32::LIGHT_RED, "País em calote (dívida no limite de crédito)!");
+                ui.colored_label(ui_refinada::menu::PERIGO, egui::RichText::new("País em calote (dívida no limite de crédito)!").size(13.0).strong().color(ui_refinada::menu::PERIGO));
             }
         });
         ui.horizontal(|ui| {
-            ui.colored_label(egui::Color32::from_rgb(120, 200, 255), format!("💼 Fundo de Investimento Privado: {}", fmt_din(pais.fundo_investimento_privado)));
+            ui.colored_label(ui_refinada::menu::INFO, egui::RichText::new(format!("Fundo de Investimento Privado: {}", fmt_din(pais.fundo_investimento_privado))).strong());
             ui.label(format!("(+{}/d aportes, -{}/d obras)", fmt_din(pais.aporte_fundo_privado_ultimo_tick), fmt_din(pais.gasto_fundo_privado_ultimo_tick)));
         });
         let pf = &pais.politica_fiscal;
@@ -497,14 +647,25 @@ fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPai
             }
         });
         ui.label(format!("Lei de comércio: {} | Eficiência de arrecadação {:.0}%", pf.lei_comercial_id.replace('_', " "), pais.eficiencia_arrecadacao * 100.0));
-        ui.separator();
+        ui.add_space(6.0);
+        ui_refinada::linha_decorativa(ui);
 
         // ---------------- População ----------------
-        ui.heading("População");
+        ui_refinada::titulo_secao(ui, "População");
         ui.label(format!("PIB {} | Padrão de vida médio {:.1} | Desemprego {:.1}%", fmt_din(v.pib_anual), v.padrao_vida, v.desemprego * 100.0));
-        egui::Grid::new("pops").striped(true).show(ui, |ui| {
-            for h in ["Tipo", "Habitantes", "Empregados", "Renda/pessoa/dia", "Padrão de vida"] {
-                ui.strong(h);
+        egui::Grid::new("pops").striped(true).spacing([8.0, 3.0]).show(ui, |ui| {
+            for (h, largura) in [("Tipo", 170.0_f32), ("Habitantes", 90.0), ("Empregados", 90.0), ("Renda/pessoa/dia", 110.0), ("Padrão de vida", 96.0)] {
+                ui.add_sized(
+                    [largura, 16.0],
+                    egui::Label::new(
+                        egui::RichText::new(h.to_uppercase())
+                            .family(ui_refinada::familia_oswald(ui.ctx()))
+                            .size(12.0)
+                            .strong()
+                            .color(ui_refinada::menu::TINTA_SUAVE),
+                    )
+                    .selectable(false),
+                );
             }
             ui.end_row();
             for p in &v.pops {
@@ -512,20 +673,23 @@ fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPai
                     icones.mostrar(ui, &p.id, 16.0);
                     ui.label(&p.nome);
                 });
-                ui.label(fmt_pop(p.populacao as u64));
-                ui.label(fmt_pop(p.empregados as u64));
-                ui.label(format!("{:.2}", p.renda_per_capita()));
-                ui.label(format!("{:.1}", p.padrao_vida()));
+                ui.add_sized([90.0, 16.0], egui::Label::new(fmt_pop(p.populacao as u64)).selectable(false));
+                ui.add_sized([90.0, 16.0], egui::Label::new(fmt_pop(p.empregados as u64)).selectable(false));
+                ui.add_sized([110.0, 16.0], egui::Label::new(format!("{:.2}", p.renda_per_capita())).selectable(false));
+                ui.add_sized([96.0, 16.0], egui::Label::new(format!("{:.1}", p.padrao_vida())).selectable(false));
                 ui.end_row();
             }
         });
-        ui.separator();
+        ui.add_space(6.0);
+        ui_refinada::linha_decorativa(ui);
 
         // ---------------- Construção & Prédios (Resumo) ----------------
-        ui.heading("Construção & Prédios");
+        ui_refinada::titulo_secao(ui, "Construção & Prédios");
         ui.horizontal_wrapped(|ui| {
             ui.label(format!("Capacidade: {:.0} pts/dia | Obras na fila: {} | Gasto diário em materiais: {}", v.pontos_construcao_dia, pais.fila_construcao.len(), fmt_din(o.gasto_obras_materiais)));
-            if ui.button("🏗 Ir para a aba Construção e Prédios (Gestão Completa)").clicked() {
+            let (rect_gl, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
+            ui_refinada::theme::icone::desenhar(ui.painter(), rect_gl, "torre", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
+            if ui.button("Ir para a aba Construção e Prédios (Gestão Completa)").clicked() {
                 painel.aba = Aba::Construcao;
             }
         });
@@ -539,23 +703,40 @@ fn aba_ranking(ui: &mut egui::Ui, v: &VistaEconomia) {
     let mut paises: Vec<&super::economia_sim::ResumoPaisEco> = v.ranking.iter().collect();
     ui.columns(3, |cols| {
         paises.sort_by(|a, b| b.pib_anual.total_cmp(&a.pib_anual));
-        cols[0].heading("Maiores PIBs");
-        for (i, p) in paises.iter().take(10).enumerate() {
-            let t = format!("{}. {} - {}", i + 1, p.nome, fmt_din(p.pib_anual));
-            if p.id == v.pais_id { cols[0].strong(t); } else { cols[0].label(t); }
-        }
+        ranking_coluna(&mut cols[0], "Maiores PIBs", &paises, &v.pais_id, |p| fmt_din(p.pib_anual));
         paises.sort_by(|a, b| b.populacao.total_cmp(&a.populacao));
-        cols[1].heading("Maiores populações");
-        for (i, p) in paises.iter().take(10).enumerate() {
-            let t = format!("{}. {} - {}", i + 1, p.nome, fmt_pop(p.populacao as u64));
-            if p.id == v.pais_id { cols[1].strong(t); } else { cols[1].label(t); }
-        }
+        ranking_coluna(&mut cols[1], "Maiores populações", &paises, &v.pais_id, |p| fmt_pop(p.populacao as u64));
         paises.retain(|p| p.populacao > 1.0e6);
         paises.sort_by(|a, b| b.padrao_vida.total_cmp(&a.padrao_vida));
-        cols[2].heading("Maior padrão de vida");
+        ranking_coluna(&mut cols[2], "Maior padrão de vida", &paises, &v.pais_id, |p| format!("{:.1}", p.padrao_vida));
+    });
+}
+
+/// Uma das três colunas de ranking do painel do país: cabeçalho em Oswald e linhas numeradas.
+fn ranking_coluna(ui: &mut egui::Ui, titulo: &str, paises: &[&super::economia_sim::ResumoPaisEco], pais_id: &str, valor: impl Fn(&super::economia_sim::ResumoPaisEco) -> String) {
+    ui_refinada::titulo_secao(ui, titulo);
+    egui::Grid::new(titulo).striped(true).spacing([8.0, 3.0]).show(ui, |ui| {
         for (i, p) in paises.iter().take(10).enumerate() {
-            let t = format!("{}. {} - {:.1}", i + 1, p.nome, p.padrao_vida);
-            if p.id == v.pais_id { cols[2].strong(t); } else { cols[2].label(t); }
+            let eu = p.id == pais_id;
+            let cor = if eu { ui_refinada::menu::VERMELHO } else { ui_refinada::menu::TINTA };
+            let nome = if eu {
+                egui::RichText::new(&p.nome).size(12.0).strong().color(cor)
+            } else {
+                egui::RichText::new(&p.nome).size(12.0).color(cor)
+            };
+            ui.add_sized(
+                [22.0, 16.0],
+                egui::Label::new(egui::RichText::new(format!("{}.", i + 1)).size(12.0).color(ui_refinada::menu::TINTA_SUAVE)).selectable(false),
+            );
+            ui.add_sized([150.0, 16.0], egui::Label::new(nome).selectable(false));
+            ui.allocate_ui_with_layout(
+                egui::Vec2::new(86.0, 16.0),
+                egui::Layout::right_to_left(egui::Align::Center),
+                |ui| {
+                    ui.add(egui::Label::new(egui::RichText::new(valor(p)).size(12.0).strong().color(cor)).selectable(false));
+                },
+            );
+            ui.end_row();
         }
     });
 }
@@ -780,7 +961,7 @@ fn formatar_efeito_troca_metodo(
         lines.push("\nEmpregos: Sem alteração".into());
     }
 
-    lines.push("\n👉 Clique para trocar o método de produção com 1 clique!".into());
+    lines.push("\nClique para trocar o método de produção com 1 clique!".into());
     lines.join("\n")
 }
 
@@ -837,13 +1018,12 @@ pub fn aba_construcao(
         if predios_com_prejuizo > 0 {
             ui.add_space(4.0);
             egui::Frame::new()
-                .fill(egui::Color32::from_rgba_unmultiplied(120, 20, 20, 60))
-                .stroke(egui::Stroke::new(1.0, egui::Color32::LIGHT_RED))
+                .fill(ui_refinada::menu::PERIGO.linear_multiply(0.12))
+                .stroke(egui::Stroke::new(1.5, ui_refinada::menu::PERIGO))
                 .inner_margin(8.0)
-                .corner_radius(4.0)
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui.colored_label(egui::Color32::LIGHT_RED, "⚠ ALERTA ECONÔMICO:");
+                        ui.colored_label(ui_refinada::menu::PERIGO, egui::RichText::new("ALERTA ECONÔMICO:").strong());
                         ui.label(format!(
                             "{} instalações estão operando com prejuízo no país (perda agregada de -{}/dia).",
                             predios_com_prejuizo,
@@ -868,7 +1048,7 @@ pub fn aba_construcao(
         let n_estatais = obras_estatais.len();
 
         ui.horizontal(|ui| {
-            ui.heading(format!("🏛 Obras Públicas e Estatais ({n_estatais})"));
+            ui.heading(format!("Obras Públicas e Estatais ({n_estatais})"));
             ui.label(format!("Cota reservada: {:.1} pts/dia | Financiamento: Orçamento Público", v.pontos_construcao_dia * cota_est));
         });
 
@@ -937,11 +1117,11 @@ pub fn aba_construcao(
 
                         // Ritmo
                         if pais.orcamento.em_calote {
-                            ui.colored_label(egui::Color32::LIGHT_RED, "Paralisado (Calote)");
+                            ui.colored_label(ui_refinada::menu::PERIGO, "Paralisado (Calote)");
                         } else if alocacao_hoje > 0.0 {
-                            ui.colored_label(egui::Color32::LIGHT_GREEN, format!("{alocacao_hoje:.1} pts/d"));
+                            ui.colored_label(ui_refinada::menu::SUCESSO, format!("{alocacao_hoje:.1} pts/d"));
                         } else {
-                            ui.colored_label(egui::Color32::GRAY, "Aguardando");
+                            ui.colored_label(ui_refinada::menu::TINTA_SUAVE, "Aguardando");
                         }
 
                         // Tempo Estimado
@@ -953,19 +1133,20 @@ pub fn aba_construcao(
 
                         // Reordenação na fila do país
                         ui.horizontal(|ui| {
-                            if ui.add_enabled(pos_ordem > 0, egui::Button::new("⤒")).on_hover_text("Mover para o topo").clicked() {
+                            ui.spacing_mut().item_spacing.x = 4.0;
+                            if ui.add_enabled(pos_ordem > 0, egui::Button::new(egui::RichText::new("Topo").size(11.0))).on_hover_text("Mover para o topo").clicked() {
                                 cmds.push(Comando::MoverObra { de: idx_original, para: 0 });
                             }
-                            if ui.add_enabled(pos_ordem > 0, egui::Button::new("⬆")).on_hover_text("Subir 1 posição").clicked() {
+                            if ui.add_enabled(pos_ordem > 0, egui::Button::new(egui::RichText::new("Subir").size(11.0))).on_hover_text("Subir 1 posição").clicked() {
                                 cmds.push(Comando::MoverObra { de: idx_original, para: idx_original.saturating_sub(1) });
                             }
-                            if ui.add_enabled(pos_ordem + 1 < n_estatais, egui::Button::new("⬇")).on_hover_text("Descer 1 posição").clicked() {
+                            if ui.add_enabled(pos_ordem + 1 < n_estatais, egui::Button::new(egui::RichText::new("Descer").size(11.0))).on_hover_text("Descer 1 posição").clicked() {
                                 cmds.push(Comando::MoverObra { de: idx_original, para: (idx_original + 1).min(pais.fila_construcao.len().saturating_sub(1)) });
                             }
                         });
 
                         // Ação (Cancelar obra pública)
-                        if ui.button("❌").on_hover_text("Cancelar esta obra pública").clicked() {
+                        if ui.button("X").on_hover_text("Cancelar esta obra pública").clicked() {
                             cmds.push(Comando::CancelarObra(idx_original));
                         }
 
@@ -979,24 +1160,23 @@ pub fn aba_construcao(
         // 2B. SETOR PRIVADO: FUNDO DE INVESTIMENTO E OBRAS AUTÔNOMAS (VICTORIA 3)
         // =========================================================================
         egui::Frame::new()
-            .fill(egui::Color32::from_rgba_unmultiplied(22, 32, 48, 220))
-            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(70, 130, 200)))
+            .fill(ui_refinada::menu::AZUL_MARINHO.linear_multiply(0.08))
+            .stroke(egui::Stroke::new(1.0, ui_refinada::menu::AZUL_MARINHO))
             .inner_margin(10.0)
-            .corner_radius(6.0)
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.heading("💼 Setor Privado: Fundo de Investimento & Obras Autônomas");
+                    ui.heading("Setor Privado: Fundo de Investimento & Obras Autônomas");
                     ui.label(format!("Cota por Lei: {:.0}% ({:.1} pts/dia)", cota_priv * 100.0, v.pontos_construcao_dia * cota_priv));
                 });
 
                 ui.horizontal_wrapped(|ui| {
-                    ui.colored_label(egui::Color32::from_rgb(100, 205, 255), format!("💰 Fundo Acumulado: {}", fmt_din(pais.fundo_investimento_privado)));
+                    ui.colored_label(ui_refinada::menu::INFO, format!("Fundo Acumulado: {}", fmt_din(pais.fundo_investimento_privado)));
                     ui.separator();
-                    ui.colored_label(egui::Color32::LIGHT_GREEN, format!("📥 Aportes de Dividendos: +{}/dia", fmt_din(pais.aporte_fundo_privado_ultimo_tick)));
+                    ui.colored_label(ui_refinada::menu::SUCESSO, format!("Aportes de Dividendos: +{}/dia", fmt_din(pais.aporte_fundo_privado_ultimo_tick)));
                     ui.separator();
-                    ui.colored_label(egui::Color32::from_rgb(255, 185, 110), format!("📤 Custo Materiais Privados: -{}/dia", fmt_din(pais.gasto_fundo_privado_ultimo_tick)));
+                    ui.colored_label(ui_refinada::menu::AVISO, format!("Custo Materiais Privados: -{}/dia", fmt_din(pais.gasto_fundo_privado_ultimo_tick)));
                     ui.separator();
-                    ui.colored_label(egui::Color32::WHITE, format!("⚡ Ritmo: {:.1} pts/dia alocados", pais.pontos_privados_ultimo_tick));
+                    ui.colored_label(ui_refinada::menu::TINTA, egui::RichText::new(format!("Ritmo: {:.1} pts/dia alocados", pais.pontos_privados_ultimo_tick)).strong());
                 });
                 ui.add_space(6.0);
 
@@ -1009,8 +1189,8 @@ pub fn aba_construcao(
                 if obras_privadas.is_empty() {
                     if pais.exige_propriedade_estatal() {
                         ui.colored_label(
-                            egui::Color32::from_rgb(255, 150, 150),
-                            "🏛 Economia Centralmente Planificada (Gosplan): O setor privado está desativado. 100% dos lucros e investimentos são estatais.",
+                            ui_refinada::menu::PERIGO,
+                            "Economia Centralmente Planificada (Gosplan): O setor privado está desativado. 100% dos lucros e investimentos são estatais.",
                         );
                     } else {
                         ui.label("Nenhuma obra privada em andamento no momento. Capitalistas e aristocratas acumulam reservas no Fundo e iniciam novas obras pelo retorno esperado, respeitando o potencial regional e a infraestrutura.");
@@ -1051,9 +1231,9 @@ pub fn aba_construcao(
                                         .text(format!("{:.0}% ({:.0}/{:.0})", frac * 100.0, item.progresso_pontos, item.custo_total_pontos))
                                 );
                                 if pais.pontos_privados_ultimo_tick > 0.0 {
-                                    ui.colored_label(egui::Color32::LIGHT_GREEN, "Ativo");
+                                    ui.colored_label(ui_refinada::menu::SUCESSO, "Ativo");
                                 } else {
-                                    ui.colored_label(egui::Color32::GRAY, "Aguardando");
+                                    ui.colored_label(ui_refinada::menu::TINTA_SUAVE, "Aguardando");
                                 }
                                 if !item.justificativa.is_empty() {
                                     ui.label(&item.justificativa);
@@ -1062,7 +1242,7 @@ pub fn aba_construcao(
                                 } else {
                                     ui.label("Lucrativo");
                                 }
-                                ui.colored_label(egui::Color32::from_rgb(120, 200, 255), "💼 100% Fundo Privado");
+                                ui.colored_label(ui_refinada::menu::INFO, "100% Fundo Privado");
                                 ui.end_row();
                             }
                         });
@@ -1074,7 +1254,7 @@ pub fn aba_construcao(
         // 3. PLANEJADOR DE OBRAS: ESCOLHER PRÉDIO E ESTADO
         //    (Custo em bens, pontos de construção e lucratividade esperada)
         // =========================================================================
-        egui::CollapsingHeader::new("🏗 Planejar Nova Construção")
+        egui::CollapsingHeader::new("Planejar Nova Construção")
             .default_open(true)
             .show(ui, |ui| {
                 if painel.construir_tipo >= cat.tipos_predio.len() {
@@ -1147,14 +1327,13 @@ pub fn aba_construcao(
 
                 ui.add_space(6.0);
                 egui::Frame::new()
-                    .fill(egui::Color32::from_rgba_unmultiplied(35, 45, 55, 120))
-                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(70, 90, 110)))
+                    .fill(ui_refinada::menu::PAPEL_ALT)
+                    .stroke(egui::Stroke::new(1.0, ui_refinada::menu::PAPEL_BORDA))
                     .inner_margin(10.0)
-                    .corner_radius(4.0)
                     .show(ui, |ui| {
                         ui.columns(2, |cols| {
                             // Coluna 1: Custo em Bens e Pontos de Construção
-                            cols[0].strong("📦 Custo da Obra (1 Nível)");
+                            cols[0].strong("Custo da Obra (1 Nível)");
                             cols[0].label(format!(
                                 "Pontos de Construção: {:.0} pts (~{:.0} dias de obra)",
                                 t.custo_pontos_construcao,
@@ -1168,9 +1347,9 @@ pub fn aba_construcao(
                             }
 
                             // Coluna 2: Lucratividade Esperada
-                            cols[1].strong("📈 Lucratividade Esperada (Por Nível Operando)");
+                            cols[1].strong("Lucratividade Esperada (Por Nível Operando)");
                             if t.financiado_pelo_governo {
-                                cols[1].colored_label(egui::Color32::LIGHT_BLUE, "🏛 Prédio Governamental / Serviço Público");
+                                cols[1].colored_label(ui_refinada::menu::INFO, "Prédio Governamental / Serviço Público");
                                 cols[1].label(format!("Custo Operacional ao Tesouro: -{}/dia", fmt_din(luc_esperada.custo_insumos + luc_esperada.custo_folha)));
                                 cols[1].label(format!("  • Custo de Insumos: -{}/dia", fmt_din(luc_esperada.custo_insumos)));
                                 cols[1].label(format!("  • Folha Salarial: -{}/dia ({} vagas)", fmt_din(luc_esperada.custo_folha), fmt_pop(luc_esperada.vagas_totais as u64)));
@@ -1200,13 +1379,12 @@ pub fn aba_construcao(
                 // Cartão de Potencial Regional (Victoria 3)
                 if let Some(est) = estado_sel {
                     egui::Frame::new()
-                        .fill(egui::Color32::from_rgba_unmultiplied(25, 35, 45, 90))
-                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 80, 100)))
+                        .fill(ui_refinada::menu::PAPEL_CLARO)
+                        .stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO))
                         .inner_margin(8.0)
-                        .corner_radius(4.0)
                         .show(ui, |ui| {
                             ui.horizontal_wrapped(|ui| {
-                                ui.strong(format!("🌍 Potencial de {nome_est_label}:"));
+                                ui.strong(format!("Potencial de {nome_est_label}:"));
                                 if est.terra_aravel > 0 {
                                     ui.label(format!("Terra Arável: {}/{} níveis", est.terra_aravel_ocupada(), est.terra_aravel));
                                 }
@@ -1252,7 +1430,7 @@ pub fn aba_construcao(
                             if let Some(est) = estado_sel {
                                 if t.usa_terra_aravel {
                                     if !est.cultura_permitida(&t.id) {
-                                        ui.colored_label(egui::Color32::LIGHT_RED, "❌ Cultura não permitida no estado");
+                                        ui.colored_label(ui_refinada::menu::PERIGO, "Cultura não permitida no estado");
                                         msg_bloqueio = "Cultura agrícola incompatível com o clima e solo deste estado.";
                                     } else {
                                         let niveis_agricolas: u32 = pr.predios.iter()
@@ -1268,7 +1446,7 @@ pub fn aba_construcao(
                                 } else if let Some(rec) = &t.recurso_natural_requerido {
                                     let lim_est = est.limite_recurso(rec);
                                     if lim_est == 0 {
-                                        ui.colored_label(egui::Color32::LIGHT_RED, format!("❌ Sem jazida de {rec} no estado"));
+                                        ui.colored_label(ui_refinada::menu::PERIGO, format!("Sem jazida de {rec} no estado"));
                                         msg_bloqueio = "Não há jazida deste recurso natural no estado.";
                                     } else {
                                         let max_rec = pr.limites_recursos.get(rec).copied().unwrap_or(lim_est);
@@ -1284,7 +1462,7 @@ pub fn aba_construcao(
                                 ui.label("Espaço urbano disponível");
                             }
 
-                            if ui.add_enabled(ok, egui::Button::new("➕ Construir +1"))
+                            if ui.add_enabled(ok, egui::Button::new("+1"))
                                 .on_disabled_hover_text(msg_bloqueio)
                                 .on_hover_text(format!("Enfileirar a construção de +1 nível de {} em {}", t.nome, pr.nome))
                                 .clicked()
@@ -1315,7 +1493,7 @@ pub fn aba_construcao(
                 painel.filtro_texto_predios.clear();
             }
             ui.separator();
-            ui.checkbox(&mut painel.apenas_prejuizo, "⚠ Apenas Prédios com Prejuízo");
+            ui.checkbox(&mut painel.apenas_prejuizo, "Apenas Prédios com Prejuízo");
         });
         ui.label("Agrupado por tipo. Troque métodos de produção com 1 clique (para o país todo no cabeçalho ou individualmente na província).");
 
@@ -1359,7 +1537,7 @@ pub fn aba_construcao(
 
             // Cabeçalho do Grupo
             let alerta_prej = if tem_prejuizo {
-                format!(" ⚠ [{} COM PREJUÍZO]", perdas.len())
+                format!(" [{} COM PREJUÍZO]", perdas.len())
             } else {
                 String::new()
             };
@@ -1413,7 +1591,7 @@ pub fn aba_construcao(
                             );
 
                             let rotulo_btn = if esta_ativo {
-                                format!("✓ {}", m.nome)
+                                format!("+ {}", m.nome)
                             } else {
                                 m.nome.clone()
                             };
@@ -1475,7 +1653,7 @@ pub fn aba_construcao(
 
                             // Província (com destaque vermelho se prejuízo)
                             if eh_prej {
-                                ui.colored_label(egui::Color32::LIGHT_RED, format!("⚠ {}", pr.nome));
+                                ui.colored_label(ui_refinada::menu::PERIGO, format!("{}", pr.nome));
                             } else {
                                 ui.label(&pr.nome);
                             }
@@ -1530,7 +1708,7 @@ pub fn aba_construcao(
 
                             // Lucro Diário (com destaque explícito em vermelho se prejuízo)
                             if eh_prej {
-                                ui.colored_label(egui::Color32::LIGHT_RED, format!("⚠ {}", fmt_din(b.lucro_ultimo_tick)));
+                                ui.colored_label(ui_refinada::menu::PERIGO, format!("{}", fmt_din(b.lucro_ultimo_tick)));
                             } else {
                                 ui.colored_label(cor_saldo(b.lucro_ultimo_tick), fmt_din(b.lucro_ultimo_tick));
                             }
@@ -1541,21 +1719,21 @@ pub fn aba_construcao(
                             // Status / Fluxo
                             if eh_prej {
                                 ui.colored_label(
-                                    egui::Color32::LIGHT_RED,
+                                    ui_refinada::menu::PERIGO,
                                     format!("PREJUÍZO (suprim. {:.0}%)", b.fator_insumos() * 100.0)
                                 );
                             } else if t.financiado_pelo_governo {
-                                ui.colored_label(egui::Color32::LIGHT_BLUE, "🏛 Governamental");
+                                ui.colored_label(ui_refinada::menu::INFO, "Governamental");
                             } else {
                                 ui.colored_label(
-                                    egui::Color32::LIGHT_GREEN,
+                                    ui_refinada::menu::SUCESSO,
                                     format!("Lucrativo (suprim. {:.0}%)", b.fator_insumos() * 100.0)
                                 );
                             }
 
                             // Ação rápida: Construir +1 se província comportar
                             let ok_mais_um = v.comporta(pr, ti);
-                            if ui.add_enabled(ok_mais_um, egui::Button::new("➕ +1"))
+                            if ui.add_enabled(ok_mais_um, egui::Button::new("+1"))
                                 .on_hover_text(format!("Construir +1 nível de {} em {}", t.nome, pr.nome))
                                 .on_disabled_hover_text("Sem terra livre ou limite de jazida atingido nesta província.")
                                 .clicked()
