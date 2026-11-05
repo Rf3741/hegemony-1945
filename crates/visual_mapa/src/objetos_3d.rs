@@ -1,8 +1,6 @@
 //! Acabamento 2.5D barato: faces iluminadas e sombras no chão.
 
-use crate::cidade_v3::PredioUrbano;
-use crate::config::{ConfiguracaoObjetos, QualidadeObjetos};
-use crate::industria::InstalacaoIndustrial;
+use crate::config::ConfiguracaoObjetos;
 use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
@@ -25,12 +23,14 @@ impl Material2d for VolumeMaterial {
 }
 
 #[derive(Component)]
+#[allow(dead_code)]
 pub(crate) struct VolumeAplicado;
 
 #[derive(Component)]
 pub(crate) struct SombraObjeto;
 
 #[derive(Resource)]
+#[allow(dead_code)]
 pub(crate) struct RecursosObjetos3d {
     quad: Handle<Mesh>,
 }
@@ -43,86 +43,14 @@ pub(crate) fn criar_recursos_objetos_3d(mut commands: Commands, mut meshes: ResM
 
 /// Adiciona faces oblíquas e uma sombra suave sem modificar o transform do objeto original.
 /// A direção (-noroeste) é fixa para manter a luz coerente com o relevo do mapa.
+/// Prédios urbanos (cidade_v3) já possuem acabamento 2.5D próprio com telhados,
+/// sombras laterais e janelas desenhados nos próprios sprites. Adicionar quads de volume
+/// (`VolumeMaterial` com `mat_topo` claro) criava manchas brancas no mapa ao dar zoom.
+/// Indústrias utilizam sprites isométricos de atlas e navios já haviam sido removidos.
 pub(crate) fn materializar_volumes_sistema(
-    mut commands: Commands,
-    cfg: Res<ConfiguracaoObjetos>,
-    rec: Option<Res<RecursosObjetos3d>>,
-    mut materiais: ResMut<Assets<VolumeMaterial>>,
-    predios: Query<(Entity, &Transform, Option<&VolumeAplicado>), With<PredioUrbano>>,
-    industrias: Query<(Entity, &Transform, Option<&VolumeAplicado>), With<InstalacaoIndustrial>>,
-    mut cache: Local<Option<[Handle<VolumeMaterial>; 3]>>,
+    _cfg: Res<ConfiguracaoObjetos>,
+    _rec: Option<Res<RecursosObjetos3d>>,
 ) {
-    let Some(rec) = rec else { return };
-    if cfg.qualidade == QualidadeObjetos::Baixo {
-        return;
-    }
-    // Só trabalha quando há objeto novo (antes criava 3 materiais por quadro, para sempre).
-    let mut novos = predios
-        .iter()
-        .chain(industrias.iter())
-        .filter(|(_, _, aplicado)| aplicado.is_none())
-        .peekable();
-    if novos.peek().is_none() {
-        return;
-    }
-    if cfg.is_changed() {
-        *cache = None;
-    }
-    let [mat_face, mat_topo, mat_sombra] = cache.get_or_insert_with(|| {
-    let mat_face = materiais.add(VolumeMaterial {
-        color: LinearRgba::new(0.20, 0.24, 0.30, 0.72),
-    });
-    let mat_topo = materiais.add(VolumeMaterial {
-        color: LinearRgba::new(0.92, 0.88, 0.70, 0.46),
-    });
-    let mat_sombra = materiais.add(VolumeMaterial {
-        color: LinearRgba::new(
-            0.02,
-            0.03,
-            0.05,
-            cfg.intensidade_sombra.clamp(0.0, 1.0) * 0.65,
-        ),
-    });
-    [mat_face, mat_topo, mat_sombra]
-    }).clone();
-
-    // Navios ficam de fora: são filhos girados ao longo da rota e o volume virava uma cruz
-    // gigante por cima do mar (escala do pai aplicada duas vezes).
-    for (entity, tr, _) in novos {
-        commands.entity(entity).insert(VolumeAplicado);
-        let escala = tr.scale;
-        commands.entity(entity).with_children(|c| {
-            c.spawn((
-                Mesh2d(rec.quad.clone()),
-                MeshMaterial2d(mat_face.clone()),
-                Transform::from_xyz(
-                    escala.x * 0.48 * cfg.extrusao,
-                    -escala.y * 0.10 * cfg.extrusao,
-                    -0.02,
-                )
-                .with_scale(Vec3::new(escala.x * 0.12, escala.y * 0.92, 1.0)),
-            ));
-            c.spawn((
-                Mesh2d(rec.quad.clone()),
-                MeshMaterial2d(mat_topo.clone()),
-                Transform::from_xyz(-escala.x * 0.05, escala.y * 0.48 * cfg.extrusao, 0.02)
-                    .with_scale(Vec3::new(
-                        escala.x * 0.92,
-                        escala.y * 0.10 * cfg.extrusao.max(0.5),
-                        1.0,
-                    )),
-            ));
-            if cfg.qualidade.tem_sombras() && cfg.sombras_ativas {
-                c.spawn((
-                    Mesh2d(rec.quad.clone()),
-                    MeshMaterial2d(mat_sombra.clone()),
-                    Transform::from_xyz(escala.x * 0.24, -escala.y * 0.24, -0.08)
-                        .with_scale(Vec3::new(escala.x * 1.25, escala.y * 0.30, 1.0)),
-                    SombraObjeto,
-                ));
-            }
-        });
-    }
 }
 
 pub(crate) fn atualizar_intensidade_noite_sistema(

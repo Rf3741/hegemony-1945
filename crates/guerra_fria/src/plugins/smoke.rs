@@ -41,6 +41,10 @@ pub struct OpcoesCli {
     pub painel: Option<u8>,
     /// Velocidade do relógio no smoke: 0 = pausado, 1..=5; `None` = máxima (5).
     pub velocidade: Option<u8>,
+    /// Posição inicial da câmera em coordenadas geográficas `(longitude, latitude)`.
+    pub camera: Option<(f32, f32)>,
+    /// Fator de escala/zoom da câmera ortográfica.
+    pub zoom: Option<f32>,
 }
 
 impl OpcoesCli {
@@ -93,6 +97,19 @@ where
                 op.velocidade = Some(v);
                 i += 2;
             }
+            "--camera" => {
+                if i + 2 >= argv.len() {
+                    return Err("--camera exige longitude e latitude".to_string());
+                }
+                let lon = parse_lon(&argv[i + 1])?;
+                let lat = parse_lat(&argv[i + 2])?;
+                op.camera = Some((lon, lat));
+                i += 3;
+            }
+            "--zoom" => {
+                op.zoom = Some(zoom(&valor()?)?);
+                i += 2;
+            }
             other if other.starts_with('-') => {
                 return Err(format!("bandeira desconhecida: {other}"));
             }
@@ -105,6 +122,12 @@ where
         }
         if op.painel.is_some() {
             return Err("--painel exige --smoke".to_string());
+        }
+        if op.camera.is_some() {
+            return Err("--camera exige --smoke".to_string());
+        }
+        if op.zoom.is_some() {
+            return Err("--zoom exige --smoke".to_string());
         }
     }
     Ok(op)
@@ -155,6 +178,39 @@ fn painel(texto: &str) -> Result<u8, String> {
     Ok(n)
 }
 
+fn parse_lon(texto: &str) -> Result<f32, String> {
+    let v: f32 = texto
+        .trim()
+        .parse()
+        .map_err(|_| format!("--camera exige números para longitude e latitude: {texto}"))?;
+    if !v.is_finite() || !(-180.0..=180.0).contains(&v) {
+        return Err(format!("--camera exige longitude entre -180 e 180: {texto}"));
+    }
+    Ok(v)
+}
+
+fn parse_lat(texto: &str) -> Result<f32, String> {
+    let v: f32 = texto
+        .trim()
+        .parse()
+        .map_err(|_| format!("--camera exige números para longitude e latitude: {texto}"))?;
+    if !v.is_finite() || !(-90.0..=90.0).contains(&v) {
+        return Err(format!("--camera exige latitude entre -90 e 90: {texto}"));
+    }
+    Ok(v)
+}
+
+fn zoom(texto: &str) -> Result<f32, String> {
+    let z: f32 = texto
+        .trim()
+        .parse()
+        .map_err(|_| format!("--zoom exige um fator numérico: {texto}"))?;
+    if !z.is_finite() || z <= 0.0 {
+        return Err(format!("--zoom exige um fator maior que zero: {texto}"));
+    }
+    Ok(z)
+}
+
 #[derive(Resource, Default)]
 struct Contagem {
     quadros: u64,
@@ -177,10 +233,11 @@ impl Plugin for SmokePlugin {
         app.insert_resource(self.0.clone())
             .init_resource::<Contagem>()
             .add_systems(OnEnter(AppState::Menu), iniciar_partida)
-            .add_systems(OnEnter(AppState::Jogando), lancar_relogio)
+            .add_systems(OnEnter(AppState::Jogando), (lancar_relogio, aplicar_camera_smoke))
             .add_systems(
                 Update,
                 (
+                    aplicar_camera_smoke.run_if(in_state(AppState::Jogando)),
                     manter_relogio_no_maximo.run_if(in_state(AppState::Jogando)),
                     reabrir_painel.run_if(in_state(AppState::Jogando)),
                     amostrar_fps.run_if(crate::estado::em_partida),
@@ -204,6 +261,26 @@ fn iniciar_partida(
 fn lancar_relogio(mut relogio: ResMut<RecursoRelogio>) {
     relogio.definir_velocidade(VelocidadeJogo::V5);
     relogio.pausado = false;
+}
+
+fn aplicar_camera_smoke(
+    op: Res<OpcoesCli>,
+    mut camera: Query<(&mut Transform, &mut Projection), With<Camera2d>>,
+) {
+    if op.camera.is_none() && op.zoom.is_none() {
+        return;
+    }
+    let Ok((mut tf, mut proj)) = camera.single_mut() else { return };
+    if let Some((lon, lat)) = op.camera {
+        let pos = visual_mapa::projecao::geo_para_mundo(lon, lat);
+        tf.translation.x = pos.x;
+        tf.translation.y = pos.y;
+    }
+    if let Some(z) = op.zoom {
+        if let Projection::Orthographic(ortho) = &mut *proj {
+            ortho.scale = z;
+        }
+    }
 }
 
 /// Eventos e formações pausam o tempo; a partida de smoke precisa dele correndo.
@@ -412,7 +489,21 @@ mod testes {
     fn painel_e_captura_exigem_smoke() {
         assert!(analisar_args(args(&["--painel", "3"])).is_err());
         assert!(analisar_args(args(&["--screenshot", "a.png"])).is_err());
+        assert!(analisar_args(args(&["--camera", "10", "20"])).is_err());
+        assert!(analisar_args(args(&["--zoom", "0.5"])).is_err());
         assert!(analisar_args(args(&["--smoke", "10", "--painel", "3"])).is_ok());
+    }
+
+    #[test]
+    fn camera_e_zoom_validos() {
+        let op = analisar_args(args(&[
+            "--smoke", "10",
+            "--camera", "-77.04", "38.91",
+            "--zoom", "0.15",
+        ]))
+        .unwrap();
+        assert_eq!(op.camera, Some((-77.04, 38.91)));
+        assert_eq!(op.zoom, Some(0.15));
     }
 
     #[test]
@@ -425,6 +516,13 @@ mod testes {
         assert!(analisar_args(args(&["--smoke", "10", "--painel", "10"])).is_err());
         assert!(analisar_args(args(&["--smoke", "10", "--painel", "x"])).is_err());
         assert!(analisar_args(args(&["--smoke", "10", "--screenshot", "foto.jpg"])).is_err());
+        assert!(analisar_args(args(&["--smoke", "10", "--camera", "200", "0"])).is_err());
+        assert!(analisar_args(args(&["--smoke", "10", "--camera", "0", "100"])).is_err());
+        assert!(analisar_args(args(&["--smoke", "10", "--camera", "abc", "0"])).is_err());
+        assert!(analisar_args(args(&["--smoke", "10", "--camera", "0"])).is_err());
+        assert!(analisar_args(args(&["--smoke", "10", "--zoom", "0"])).is_err());
+        assert!(analisar_args(args(&["--smoke", "10", "--zoom", "-1"])).is_err());
+        assert!(analisar_args(args(&["--smoke", "10", "--zoom", "xyz"])).is_err());
     }
 
     #[test]
