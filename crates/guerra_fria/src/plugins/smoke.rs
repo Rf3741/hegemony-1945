@@ -1205,9 +1205,14 @@ fn capturar_snapshot(
     let mut top10 = Vec::new();
     if let Some(ledger) = ledger && !ledger.rankings_cache.is_empty() {
         for e in ledger.rankings_cache.iter().take(10) {
+            let nome = bandeiras
+                .and_then(|b| b.variante(&e.tag))
+                .map(|v| v.nome)
+                .or_else(|| mundo.and_then(|m| m.0.paises.get(&e.tag)).map(|p| p.nome.clone()))
+                .unwrap_or_else(|| e.nome.clone());
             top10.push(EntradaTop10 {
                 pos: e.rank_geral,
-                nome: e.nome.clone(),
+                nome,
                 tag: e.tag.clone(),
                 grau: e.grau.rotulo().to_string(),
                 pontuacao: finito(e.pontuacao_total),
@@ -1218,12 +1223,19 @@ fn capturar_snapshot(
         }
     } else if let Some(eco) = eco {
         let mut r = eco.vista.ranking.clone();
+        r.retain(|p| p.populacao > 0.0 || p.pib_anual > 0.0);
         r.sort_by(|a, b| finito(b.pib_anual).total_cmp(&finito(a.pib_anual)));
         for (i, p) in r.iter().take(10).enumerate() {
+            let tag = if p.tag.is_empty() { p.id.to_uppercase() } else { p.tag.clone() };
+            let nome = bandeiras
+                .and_then(|b| b.variante(&tag))
+                .map(|v| v.nome)
+                .or_else(|| mundo.and_then(|m| m.0.paises.get(&tag)).map(|gp| gp.nome.clone()))
+                .unwrap_or_else(|| p.nome.clone());
             top10.push(EntradaTop10 {
                 pos: i + 1,
-                nome: p.nome.clone(),
-                tag: p.tag.clone(),
+                nome,
+                tag,
                 grau: if i < 2 {
                     "Superpotência".into()
                 } else if i < 8 {

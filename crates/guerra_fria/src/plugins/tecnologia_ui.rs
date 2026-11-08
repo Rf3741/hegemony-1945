@@ -157,11 +157,13 @@ fn alternar_tecnologia(teclas: Res<ButtonInput<KeyCode>>, mut t: ResMut<Tecnolog
 fn atualizar_entradas(t: &mut TecnologiaSim, eco: &EconomiaSim) {
     let mut por_pais: BTreeMap<&str, (f64, f64, f64)> = BTreeMap::new(); // univ, pop*alfa, pop
     let mut tags: BTreeMap<String, String> = BTreeMap::new(); // id -> tag
+    let mut pibs: BTreeMap<String, f64> = BTreeMap::new(); // id -> pib
     if let Some(n) = &eco.nucleo {
         for p in n.mundo.paises() {
             if let Some(tag) = &p.tag {
                 tags.insert(p.id.clone(), tag.clone());
             }
+            pibs.insert(p.id.clone(), p.pib_diario * 365.0);
         }
         for pr in n.mundo.provincias() {
             let e = por_pais.entry(pr.pais_id.as_str()).or_default();
@@ -178,7 +180,11 @@ fn atualizar_entradas(t: &mut TecnologiaSim, eco: &EconomiaSim) {
         for (id, (univ, pa, pop)) in &por_pais {
             if let Some(tag) = tags.get(*id) {
                 let alfa = if *pop > 0.0 { pa / pop } else { 0.5 };
-                t.entradas.insert(tag.clone(), EntradaPais { niveis_universidade: *univ, alfabetizacao: alfa, ..Default::default() });
+                let pib = pibs.get(*id).copied().unwrap_or(0.0);
+                let pib_pc = if *pop > 0.0 { pib / pop } else { 0.0 };
+                let univ_eco = ((pib / 4.0e10).sqrt() * 2.2 + (pib_pc / 400.0).clamp(0.0, 6.0)) * (0.3 + 0.7 * alfa);
+                let niveis_univ = (*univ).max(univ_eco);
+                t.entradas.insert(tag.clone(), EntradaPais { niveis_universidade: niveis_univ, alfabetizacao: alfa, ..Default::default() });
             }
         }
     } else {
@@ -186,7 +192,9 @@ fn atualizar_entradas(t: &mut TecnologiaSim, eco: &EconomiaSim) {
         for r in &eco.vista.ranking {
             let tag = r.id.to_uppercase();
             if r.populacao > 0.0 {
-                t.entradas.insert(tag, EntradaPais::por_pib_per_capita(r.pib_anual / r.populacao, 0.5));
+                let pib_pc = r.pib_anual / r.populacao;
+                let univ_eco = (r.pib_anual / 4.0e10).sqrt() * 2.2 + (pib_pc / 400.0).clamp(0.0, 6.0);
+                t.entradas.insert(tag, EntradaPais { niveis_universidade: univ_eco, alfabetizacao: 0.5, ..Default::default() });
             }
         }
     }

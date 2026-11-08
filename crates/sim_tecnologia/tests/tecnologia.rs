@@ -89,3 +89,41 @@ fn ia_escolhe_e_fila() {
     m.escolher_ia("BRA", 1945, &e);
     assert!(m.paises["BRA"].ativa.is_some());
 }
+
+#[test]
+fn corrida_espacial_sputnik_e_gagarin() {
+    let mut m = mundo();
+    let e = EntradaPais {
+        niveis_universidade: 8.0,
+        alfabetizacao: 0.95,
+        estabilidade: 1.0,
+        ..Default::default()
+    };
+    // Pre-requisito de Sputnik
+    m.paises.get_mut("USA").unwrap().conhecidas.insert("bomba_atomica_fissao_implosao".into());
+    m.paises.get_mut("USA").unwrap().progresso.remove("bomba_atomica_fissao_implosao");
+    m.paises.get_mut("USA").unwrap().conhecidas.insert("foguetes_combustivel_liquido_v2".into());
+    m.paises.get_mut("USA").unwrap().progresso.remove("foguetes_combustivel_liquido_v2");
+    m.paises.get_mut("USA").unwrap().conhecidas.insert("foguetes_sondagem_alta_atmosfera".into());
+    m.paises.get_mut("USA").unwrap().conhecidas.insert("missil_balistico_alcance_intermediario_irbm".into());
+    m.paises.get_mut("USA").unwrap().ativa = None;
+    m.escolher_ia("USA", 1957, &e);
+    assert_eq!(
+        m.paises["USA"].ativa.as_deref(),
+        Some("primeiro_satelite_artificial_orbita")
+    );
+
+    // Pre-requisito de Gagarin
+    m.paises.get_mut("SOV").unwrap().progresso.clear();
+    m.paises.get_mut("SOV").unwrap().conhecidas.insert("reator_nuclear_experimental_grafite".into());
+    m.paises.get_mut("SOV").unwrap().conhecidas.insert("foguetes_combustivel_liquido_v2".into());
+    m.paises.get_mut("SOV").unwrap().conhecidas.insert("foguetes_sondagem_alta_atmosfera".into());
+    m.paises.get_mut("SOV").unwrap().conhecidas.insert("missil_balistico_alcance_intermediario_irbm".into());
+    m.paises.get_mut("SOV").unwrap().conhecidas.insert("primeiro_satelite_artificial_orbita".into());
+    m.paises.get_mut("SOV").unwrap().ativa = None;
+    m.escolher_ia("SOV", 1961, &e);
+    assert_eq!(
+        m.paises["SOV"].ativa.as_deref(),
+        Some("voo_espacial_humano_orbital_vostok")
+    );
+}

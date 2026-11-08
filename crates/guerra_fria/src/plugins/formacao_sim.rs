@@ -8,7 +8,8 @@ use super::diplomacia_ui::{DiploSim, PainelDiplomacia};
 use super::economy::RecursoMundo;
 use super::enciclopedia;
 use super::eventos_ui::EstadoEv;
-use super::jogador::{PaisJogador, Notificacoes};
+use super::guerra_sim::{normalizar_tag, GuerraSim};
+use super::jogador::{Notificacoes, PaisJogador};
 use super::map::{CoresMapa, RaizProjeto, RecursoCatalogo};
 use super::rotulos_pais::{RotuloPais, RotulosPaisCriados};
 use super::time::{EventoTickDiario, RecursoRelogio};
@@ -90,6 +91,7 @@ fn tick_formacao(
     cores: Option<ResMut<CoresMapa>>,
     painel: Option<ResMut<PainelDiplomacia>>,
     diplo: Option<ResMut<DiploSim>>,
+    mut guerra: Option<ResMut<GuerraSim>>,
     mut ev: ResMut<EstadoEv>,
     jogador: Res<PaisJogador>,
     rotulos: Query<Entity, With<RotuloPais>>,
@@ -122,6 +124,60 @@ fn tick_formacao(
             }
             if let Some(c) = cores.as_deref_mut() {
                 repintar_provincias(c, &e.provincias, &e.tag, pais.cor);
+            }
+            if let Some(g) = guerra.as_deref_mut() {
+                let tag_norm = normalizar_tag(&e.tag);
+                for &p_id in &e.provincias {
+                    let adm_id = format!("prov_{p_id}");
+                    if let Some(r) = g.0.cenario.regioes.iter_mut().find(|r| r.adm1_code == adm_id) {
+                        r.dono_tag = tag_norm.clone();
+                        r.controlador_tag = tag_norm.clone();
+                    }
+                }
+                if !g.0.mapa_paises.contains_key(&tag_norm) {
+                    let capital = e.provincias.first().map(|p| format!("prov_{p}")).unwrap_or_else(|| "prov_1".to_string());
+                    let pop_mob = (pais.populacao_total() as f64 * 0.025) as u64;
+                    let idx = g.0.cenario.paises.len();
+                    g.0.cenario.paises.push(sim_guerra::PaisMilitar {
+                        tag: tag_norm.clone(),
+                        nome_pt: pais.nome.clone(),
+                        capital_adm1: capital.clone(),
+                        doutrina_id: "doutrina_padrao".to_string(),
+                        tecnologias_ativas: Vec::new(),
+                        cansaco_guerra: 0.0,
+                        baixas_totais: 0,
+                        populacao_mobilizavel: pop_mob.max(50_000),
+                        estoque_suprimento: 1.0,
+                        eficiencia_naval: 1.0,
+                    });
+                    g.0.mapa_paises.insert(tag_norm.clone(), idx);
+                    let div_id = format!("div_{}_{}", tag_norm.to_lowercase(), 1);
+                    g.0.cenario.divisoes.push(sim_guerra::Divisao {
+                        id: div_id.clone(),
+                        nome_pt: format!("1ª Divisão de {}", pais.nome),
+                        pais_tag: tag_norm.clone(),
+                        template_id: "divisao_infantaria_1945".to_string(),
+                        regiao_adm1: capital,
+                        efetivos_atuais: 15_000,
+                        equipamento_fracao: 0.8,
+                        organizacao: 45.0,
+                        moral: 0.9,
+                        entrincheiramento: 1.0,
+                        suprimento_atual: 0.9,
+                        experiencia: 0.3,
+                    });
+                    g.0.cenario.exercitos.push(sim_guerra::Exercito {
+                        id: format!("exe_{}_{}", tag_norm.to_lowercase(), 1),
+                        nome_pt: format!("Exército de {}", pais.nome),
+                        pais_tag: tag_norm.clone(),
+                        comandante_id: None,
+                        divisoes_ids: vec![div_id],
+                        postura: sim_guerra::PosturaOperacional::OfensivaEquilibrada,
+                        frente_id: None,
+                        regiao_objetivo_adm1: None,
+                    });
+                }
+                g.0.invalidar_cache_territorial();
             }
         }
         // Aviso ao jogador: só para países que ele "vê" (todos), com pausa.

@@ -117,14 +117,14 @@ impl Plugin for BandeirasPlugin {
             .map(|r| r.0.clone())
             .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."));
         app.insert_resource(Bandeiras::novo(&raiz))
-            .insert_resource(UltimaVersao(0))
+            .insert_resource(UltimaVersao(0, (0, 0, 0)))
             .add_systems(Update, atualizar_bandeiras.run_if(resource_exists::<PoliticaSim>).run_if(resource_exists::<PaisJogador>).run_if(crate::estado::em_partida))
             .add_systems(EguiPrimaryContextPass, publicar.run_if(crate::estado::em_partida_ou_menu));
     }
 }
 
 #[derive(Resource)]
-struct UltimaVersao(u64);
+struct UltimaVersao(u64, (i32, u8, u8));
 
 fn publicar(mut ctxs: EguiContexts, b: Res<Bandeiras>) -> Result {
     let ctx = ctxs.ctx_mut()?;
@@ -201,13 +201,14 @@ fn atualizar_bandeiras(
     mut commands: Commands,
     mut ultima: ResMut<UltimaVersao>,
 ) {
-    if pol.versao_bandeiras == ultima.0 {
+    let d = mundo.0.data;
+    let data = (d.ano, d.mes, d.dia);
+    if pol.versao_bandeiras == ultima.0 && ultima.1 == data {
         return;
     }
     ultima.0 = pol.versao_bandeiras;
+    ultima.1 = data;
     let cat = catalogo_embutido();
-    let d = mundo.0.data;
-    let data = (d.ano, d.mes, d.dia);
     let entradas = pol.bandeiras.clone();
     let mut mudou_nome = false;
     let mut repintar: Vec<(String, (u8, u8, u8))> = Vec::new();

@@ -47,6 +47,7 @@
             tag: "SOV",
             base: Variante(id: "base", arquivo: "svg/SOV.svg", nome: "União das Repúblicas Socialistas Soviéticas", cor: (175, 25, 25)),
             variantes: [
+                Variante(id: "sov_federacao_datada", arquivo: "svg/sov_federacao.svg", nome: "Federação Russa", cor: (60, 90, 160), condicao: (flags: ["rus_federacao"]), prioridade: 70, historica: true, descricao: "Dissolução da União Soviética em 26 de dezembro de 1991."),
                 Variante(id: "sov_comunista", arquivo: "svg/SOV.svg", nome: "União das Repúblicas Socialistas Soviéticas", cor: (184, 28, 28), condicao: (categoria_ideologia: ["comunista"]), prioridade: 50, historica: true, descricao: "Bandeira vermelha com foice, martelo e estrela (arquivo base)."),
                 Variante(id: "sov_federacao", arquivo: "svg/sov_federacao.svg", nome: "Federação Russa", cor: (60, 90, 160), condicao: (forma_governo: ["republica_presidencialista", "republica_parlamentarista"], categoria_ideologia: ["liberal"]), prioridade: 60, historica: true, descricao: "Tricolor branco-azul-vermelho (1991)."),
                 Variante(id: "sov_imperio", arquivo: "svg/sov_imperio.svg", nome: "Império Russo", cor: (40, 40, 40), condicao: (forma_governo: ["autocracia_monarquica", "monarquia_constitucional"]), prioridade: 25, historica: true, descricao: "Bandeira preto-amarelo-branco imperial (restauração monárquica)."),
@@ -146,6 +147,7 @@
             tag: "JAP",
             base: Variante(id: "base", arquivo: "svg/JAP.svg", nome: "Império do Japão", cor: (235, 220, 180)),
             variantes: [
+                Variante(id: "jap_constituicao_1947", arquivo: "svg/JAP.svg", nome: "Japão", cor: (235, 220, 180), condicao: (flags: ["jap_constituicao_1947"]), prioridade: 60, historica: true, descricao: "Constituição de 1947: Estado democrático pós-guerra."),
                 Variante(id: "comunista", arquivo: "svg/JAP_comunista.svg", nome: "República Popular do Japão", cor: (208, 106, 90), condicao: (categoria_ideologia: ["comunista"]), prioridade: 50, historica: false, descricao: "Regra genérica de ideologia."),
                 Variante(id: "socialista", arquivo: "svg/JAP_socialista.svg", nome: "República Social do Japão", cor: (229, 168, 152), condicao: (categoria_ideologia: ["socialista"]), prioridade: 25, historica: false, descricao: "Regra genérica de ideologia."),
                 Variante(id: "autoritaria", arquivo: "svg/JAP_autoritaria.svg", nome: "Estado do Japão", cor: (139, 129, 111), condicao: (categoria_ideologia: ["autoritario_direita"]), prioridade: 40, historica: false, descricao: "Regra genérica de ideologia."),
@@ -1071,7 +1073,7 @@
             tag: "IND",
             base: Variante(id: "base", arquivo: "svg/IND.svg", nome: "Índia Britânica (Raj)", cor: (220, 150, 100)),
             variantes: [
-                Variante(id: "ind_republica", arquivo: "svg/ind_republica.svg", nome: "República da Índia", cor: (255, 153, 51), condicao: (status: [Independente]), prioridade: 25, historica: true, descricao: "Tricolor açafrão-branco-verde com o chakra de Ashoka (1947)."),
+                Variante(id: "ind_republica", arquivo: "svg/ind_republica.svg", nome: "República da Índia", cor: (255, 153, 51), condicao: (flags: ["ind_republica"]), prioridade: 60, historica: true, descricao: "Tricolor açafrão-branco-verde com o chakra de Ashoka (1947)."),
                 Variante(id: "comunista", arquivo: "svg/IND_comunista.svg", nome: "República Popular da Índia", cor: (202, 78, 58), condicao: (status: [Independente], categoria_ideologia: ["comunista"]), prioridade: 50, historica: false, descricao: "Independência sob regime desta ideologia (regra genérica)."),
                 Variante(id: "socialista", arquivo: "svg/IND_socialista.svg", nome: "República Social da Índia", cor: (220, 126, 104), condicao: (status: [Independente], categoria_ideologia: ["socialista"]), prioridade: 25, historica: false, descricao: "Independência sob regime desta ideologia (regra genérica)."),
                 Variante(id: "autoritaria", arquivo: "svg/IND_autoritaria.svg", nome: "Estado da Índia", cor: (132, 98, 75), condicao: (status: [Independente], categoria_ideologia: ["autoritario_direita"]), prioridade: 40, historica: false, descricao: "Independência sob regime desta ideologia (regra genérica)."),
