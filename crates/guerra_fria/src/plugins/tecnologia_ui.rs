@@ -318,7 +318,7 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
     {
         let m = &t.mundo;
         let est = m.paises.get(&tag);
-        ui_refinada::janela_dossie("Tecnologia (5)", None)
+        let resp_janela = ui_refinada::janela_dossie("Tecnologia (5)", None)
             .default_pos([20.0, 96.0])
             .default_size([1180.0, 700.0])
             .show(ctx, |ui| {
@@ -416,6 +416,9 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
                 arvore(ui, m, &tag, ramo_atual, est, ano, &entrada, &mut pan_zoom, &mut acoes, cache);
             }
         });
+        if let Some(r) = resp_janela {
+            super::tutorial_guiado::marcar(&r.response, "janela_tec");
+        }
     }
     let tec = &mut *t;
     tec.pan = pan_zoom.0;

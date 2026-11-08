@@ -86,7 +86,7 @@ fn janela_saves(
     let mut acao_final: Option<(Acao, Slot)> = None;
     let mut carregar_slot: Option<Slot> = None;
     let ordem: Vec<Slot> = (1..=SLOTS_MANUAIS).map(Slot::Manual).chain([Slot::Auto, Slot::Rapido]).collect();
-    egui::Window::new("saves")
+    let resp_janela = egui::Window::new("saves")
         .title_bar(false)
         .collapsible(false)
         .resizable(false)
@@ -178,6 +178,9 @@ fn janela_saves(
                 fechar = true;
             }
         });
+    if let Some(r) = resp_janela {
+        super::tutorial_guiado::marcar(&r.response, "janela_saves");
+    }
     j.confirmar = nova_conf;
     match acao_final {
         Some((Acao::Salvar, s)) => {

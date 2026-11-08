@@ -235,7 +235,8 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
             egui::RichText::new(&p.nome)
                 .family(ui_refinada::familia_oswald(ui.ctx()))
                 .size(16.0)
-                .strong(),
+                .strong()
+                .color(ui_refinada::menu::TINTA),
         );
         ui.separator();
         match (&eco.vista.pais, eco.vista.pais_id.is_empty()) {
@@ -306,9 +307,6 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
         if b_com.clicked() {
             *comercio_aberto = !*comercio_aberto;
         }
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
-        ui_refinada::theme::icone::desenhar(ui.painter(), rect, "estrela", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
-        ui.label(egui::RichText::new("Tecnologia (5)").color(ui_refinada::menu::TINTA_SUAVE));
         let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
         ui_refinada::theme::icone::desenhar(ui.painter(), rect, "livro", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
         ui.label(egui::RichText::new("Enciclopédia (8)").color(ui_refinada::menu::TINTA_SUAVE));
@@ -383,10 +381,15 @@ fn detectar_eventos(
     ant.negativo = negativo;
 }
 
-fn toasts(mut contextos: EguiContexts, tempo: Res<Time<Real>>, mut notas: ResMut<Notificacoes>) -> Result {
+fn toasts(
+    mut contextos: EguiContexts,
+    tempo: Res<Time<Real>>,
+    mut notas: ResMut<Notificacoes>,
+    tutorial: Option<Res<super::tutorial_guiado::TutorialGuiado>>,
+) -> Result {
     let agora = tempo.elapsed_secs_f64();
     notas.0.retain(|(_, t, _)| agora - t < 6.0);
-    if notas.0.is_empty() {
+    if notas.0.is_empty() || tutorial.as_ref().is_some_and(|t| t.ativo) {
         return Ok(());
     }
     // Acima dos botões fixos "Rankings (7)" e "Configurações" (canto inferior esquerdo).
@@ -434,8 +437,8 @@ fn painel_pais(
     let ctx = contextos.ctx_mut()?;
     let (tag_p, nome_p) = pol.as_ref().and_then(|p| p.vista.pais.as_ref().map(|x| (x.tag.clone(), x.nome.clone()))).unwrap_or_default();
     let legado = if tag_p.is_empty() { String::new() } else { super::politica_sim::tag_legado_pub(&tag_p) };
-    ui_refinada::janela_dossie("Painel do país (1)", None)
-        .default_pos([20.0, 120.0])
+    let resp_janela = ui_refinada::janela_dossie("Painel do país (1)", None)
+        .default_pos([420.0, 118.0])
         .default_size([720.0, 600.0])
         .show(ctx, |ui| {
             ui_refinada::decorar_janela(ui);
@@ -540,11 +543,11 @@ fn painel_pais(
                 Aba::Construcao => aba_construcao(ui, &mut eco, &mut painel, &mut icones),
                 Aba::Politica => match pol.as_mut() {
                     Some(p) => {
+                        super::politica_ui::aba_politica(ui, p);
                         if let (Some(el), Some(r), Some(tag)) = (elenco.as_deref(), retratos.as_deref_mut(), p.tag.clone()) {
-                            super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
                             ui.separator();
+                            super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
                         }
-                        super::politica_ui::aba_politica(ui, p)
                     }
                     None => {
                         ui.label("Política ainda carregando...");
@@ -553,6 +556,9 @@ fn painel_pais(
                 Aba::Ranking => aba_ranking(ui, &eco.vista),
             });
         });
+    if let Some(r) = resp_janela {
+        super::tutorial_guiado::marcar(&r.response, "janela_pais");
+    }
     painel.aba = aba;
     if fechar_painel {
         painel.aberto = false;

@@ -44,11 +44,11 @@ pub fn aba_politica(ui: &mut egui::Ui, pol: &mut PoliticaSim) {
     let mut cmds: Vec<ComandoPol> = Vec::new();
     cabecalho(ui, &p, &pol.vista.data.map(|d| d.to_string()).unwrap_or_default());
     ui.add_space(8.0);
+    leis(ui, pol, &p, &mut cmds);
+    ui.add_space(8.0);
     grupos(ui, &p);
     ui.add_space(8.0);
     partidos(ui, &p);
-    ui.add_space(8.0);
-    leis(ui, pol, &p, &mut cmds);
     ui.add_space(8.0);
     movimentos(ui, &p);
     for c in cmds {
@@ -75,7 +75,7 @@ fn cabecalho(ui: &mut egui::Ui, p: &PaisPolitica, data: &str) {
             ui,
             "coroa",
             "Chefe de Estado",
-            &format!("{} · popularidade {:.0}%", c.nome, c.popularidade * 100.0),
+            &format!("{} · popularidade {:.0}%", c.nome, c.popularidade.clamp(0.0, 100.0)),
             None,
         );
     }
