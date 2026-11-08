@@ -724,6 +724,13 @@ fn materializar_nivel_predio(
             folha_salarial_ultimo_tick: 0.0,
             lucro_ultimo_tick: 0.0,
             dividendos_ultimo_tick: 0.0,
+            fechado: false,
+            dias_retomada: 0,
+            dias_prejuizo: 0,
+            dias_fechado: 0,
+            lucro_ema: 0.0,
+            tendencia_lucro: 0.0,
+            dia_ultima_mudanca_estado: 0,
             cache: PredioCompilado::default(),
         };
         let _ = compilar_cache_predio(catalogo, &mut novo);
@@ -837,6 +844,15 @@ fn tentar_enfileirar_obra_privada(
                 continue;
             }
 
+            // Não expandir um prédio que está atualmente fechado nesta província (reabrir primeiro)
+            if prov
+                .predios
+                .iter()
+                .any(|b| b.cache.tipo_idx == tp_idx && b.fechado)
+            {
+                continue;
+            }
+
             // Não duplicar a mesma obra na mesma província enquanto pendente
             if pais
                 .fila_construcao
@@ -870,7 +886,8 @@ fn tentar_enfileirar_obra_privada(
             let vagas_abertas: f64 = prov
                 .predios
                 .iter()
-                .map(|b| (b.total_vagas() - b.total_empregados()).max(0.0))
+                .filter(|b| !b.fechado)
+                .map(|b| (b.total_vagas() * b.fator_retomada() - b.total_empregados()).max(0.0))
                 .sum();
             let mao_de_obra_liquida = desempregados + camponeses * 0.25 - vagas_abertas;
             if mao_de_obra_liquida < 250.0 {

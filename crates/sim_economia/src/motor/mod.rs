@@ -6,6 +6,7 @@ pub mod ciclos_demanda;
 pub mod consumo;
 pub mod demografia;
 pub mod distribuicao;
+pub mod gestao_predios;
 pub mod global;
 pub mod governo;
 pub mod mercado;
