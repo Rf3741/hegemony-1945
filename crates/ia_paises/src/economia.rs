@@ -10,8 +10,8 @@ const COOLDOWN_EMERGENCIA: u64 = 30;
 /// Maximo (minimo garantido) de obras estatais simultaneas na fila; cresce com a capacidade de construcao.
 const MAX_OBRAS_ESTATAIS: usize = 6;
 /// Meta de niveis do setor de construcao como fracao do total de niveis de predios do pais.
-/// Cada nivel gera ~22 pontos/dia (~70 niveis de predio por ano), logo 0,02% sustenta ~1,5%/ano de expansao.
-const META_CONSTRUCAO: f64 = 0.0002;
+/// Cada nivel gera ~22 pontos/dia (~70 niveis de predio por ano); ~2,2% sustenta a reposicao e expansao demografica.
+const META_CONSTRUCAO: f64 = 0.022;
 /// Reconstrucao pos-guerra (tag, multiplicador inicial da meta de construcao). O efeito decai
 /// linearmente ate 1,0 em `ANOS_RECONSTRUCAO` anos (Plano Marshall, milagres alemao e japones etc.).
 const RECONSTRUCAO: [(&str, f64); 14] = [
@@ -147,12 +147,25 @@ impl IaEconomia {
         let Some(p) = mundo.obter_pais_mut(id) else { return };
         let pf = &mut p.politica_fiscal;
         let antes = (pf.aliquota_imposto_renda_baixo, pf.aliquota_imposto_renda_medio, pf.aliquota_imposto_renda_alto, pf.aliquota_imposto_dividendos, pf.aliquota_consumo_geral);
+        let pib_anual = p.pib_diario * 365.0;
+        let superavit_acumulado = p.orcamento.tesouro > pib_anual * 0.60;
         match postura {
             PosturaFiscal::ExpansaoAgressiva => {
-                pf.aliquota_consumo_geral = (pf.aliquota_consumo_geral - 0.02).max(0.0);
-                pf.aliquota_imposto_renda_baixo = (pf.aliquota_imposto_renda_baixo - 0.02).max(0.0);
+                pf.aliquota_consumo_geral = (pf.aliquota_consumo_geral - 0.02).max(0.02);
+                pf.aliquota_imposto_renda_baixo = (pf.aliquota_imposto_renda_baixo - 0.02).max(0.02);
+                pf.aliquota_imposto_renda_medio = (pf.aliquota_imposto_renda_medio - 0.02).max(0.04);
+                pf.aliquota_imposto_renda_alto = (pf.aliquota_imposto_renda_alto - 0.02).max(0.06);
+                pf.aliquota_imposto_dividendos = (pf.aliquota_imposto_dividendos - 0.02).max(0.05);
             }
-            PosturaFiscal::EquilibrioSustentado => {}
+            PosturaFiscal::EquilibrioSustentado => {
+                if superavit_acumulado {
+                    pf.aliquota_consumo_geral = (pf.aliquota_consumo_geral - 0.015).max(0.03);
+                    pf.aliquota_imposto_renda_baixo = (pf.aliquota_imposto_renda_baixo - 0.015).max(0.03);
+                    pf.aliquota_imposto_renda_medio = (pf.aliquota_imposto_renda_medio - 0.015).max(0.05);
+                    pf.aliquota_imposto_renda_alto = (pf.aliquota_imposto_renda_alto - 0.015).max(0.08);
+                    pf.aliquota_imposto_dividendos = (pf.aliquota_imposto_dividendos - 0.015).max(0.06);
+                }
+            }
             PosturaFiscal::AjusteModerado => {
                 pf.aliquota_imposto_renda_alto = (pf.aliquota_imposto_renda_alto + 0.02).min(0.70);
                 pf.aliquota_imposto_dividendos = (pf.aliquota_imposto_dividendos + 0.02).min(0.60);
@@ -279,18 +292,30 @@ impl IaEconomia {
         let fila_cheia = estatais >= max_estatais;
         // Teto de gasto com construcao estatal por postura (fracao da receita).
         let receita = p.orcamento.receita_total().max(1.0);
-        let teto = match postura {
+        let teto: f64 = match postura {
             PosturaFiscal::ExpansaoAgressiva => 0.45,
             PosturaFiscal::EquilibrioSustentado => 0.30,
             PosturaFiscal::AjusteModerado => 0.15,
             _ => 0.0,
         };
-        if p.orcamento.gasto_construcao + p.orcamento.gasto_obras_materiais > teto * receita {
+        let caixa_dias = p.orcamento.tesouro / p.orcamento.despesa_total().max(1.0);
+        let pib_anual = p.pib_diario * 365.0;
+        let teto_ajustado: f64 = if p.orcamento.tesouro > 0.5 * pib_anual || caixa_dias > 180.0 {
+            (teto + 0.35).min(0.85)
+        } else if p.orcamento.tesouro > 0.2 * pib_anual || caixa_dias > 60.0 {
+            (teto + 0.20).min(0.70)
+        } else {
+            teto
+        };
+        if p.orcamento.gasto_construcao + p.orcamento.gasto_obras_materiais > teto_ajustado * receita {
             return;
         }
         let cat = mundo.catalogo();
         // Ritmo de expansao do pais: convergencia (pobres crescem mais, ricos menos) e reconstrucao.
         let pop_pais: f64 = idx.iter().map(|&pi| mundo.provincias()[pi].populacao_total()).sum();
+        let desemp_pais: f64 = idx.iter().flat_map(|&pi| mundo.provincias()[pi].pops.iter()).map(|p| p.desempregados()).sum();
+        let taxa_desemp = if pop_pais > 0.0 { desemp_pais / pop_pais } else { 0.0 };
+        let boost_desemp = (1.0 + (taxa_desemp - 0.08).max(0.0) * 4.0).clamp(1.0, 2.5);
         let pc_rel = if pop_pais > 0.0 && self.pib_pc_mundial > 0.0 {
             (p.pib_diario / pop_pais / self.pib_pc_mundial).max(0.05)
         } else {
@@ -343,6 +368,7 @@ impl IaEconomia {
         // Candidatos (score, tipo_idx, provincia_idx)
         let mut cands: Vec<(f64, usize, usize)> = Vec::new();
         for (ti, t) in cat.tipos_predio.iter().enumerate() {
+            let is_transporte = t.id == "rodovia" || t.id == "rede_ferroviaria" || t.id == "porto_comercial";
             let base = match t.categoria {
                 CategoriaPredio::Governamental if t.financiado_pelo_governo => {
                     if burocracia_sobra || burocracia_falta <= 0.0 { continue }
@@ -351,12 +377,13 @@ impl IaEconomia {
                 _ if fila_cheia && t.categoria != CategoriaPredio::Construcao => continue,
                 CategoriaPredio::Militar => continue,
                 CategoriaPredio::Construcao => {
-                    // Capacidade de construcao proporcional ao tamanho da economia (gargalo do crescimento).
-                    let falta = meta * niveis_total.max(100.0) - niveis_construcao;
+                    // Capacidade de construcao proporcional ao tamanho da economia e populacao (gargalo do crescimento).
+                    let meta_niveis = (meta * niveis_total.max(120.0)).max(pop_pais / 2_500_000.0) * boost_desemp;
+                    let falta = meta_niveis - niveis_construcao;
                     if falta - a_caminho_constr <= 0.0 { continue }
                     500.0
                 }
-                CategoriaPredio::Infraestrutura => 0.0, // decidido por estado, abaixo
+                CategoriaPredio::Infraestrutura if is_transporte => 0.0, // transporte fisico decidido por acesso ao mercado abaixo
                 _ => {
                     if !postura.permite_obras_de_retorno() { continue }
                     // Setores já presentes são priorizados pelo lucro; setores novos recebem
@@ -367,7 +394,7 @@ impl IaEconomia {
                     } else {
                         match t.categoria {
                             CategoriaPredio::Industrial | CategoriaPredio::Extrativo | CategoriaPredio::RuralAgricola => 18.0,
-                            CategoriaPredio::Infraestrutura => 12.0,
+                            CategoriaPredio::Infraestrutura => 16.0,
                             _ => 0.0,
                         }
                     };
@@ -384,8 +411,8 @@ impl IaEconomia {
                     continue;
                 }
                 let acesso = mundo.obter_estado(&pr.estado_id).map_or(1.0, |e| e.acesso_mercado);
-                let score = if t.categoria == CategoriaPredio::Infraestrutura {
-                    if acesso >= 0.92 { continue }
+                let score = if is_transporte {
+                    if acesso >= 0.95 { continue }
                     180.0 * (1.0 - acesso)
                 } else {
                     let regional = Self::pontuacao_regional(mundo, pr, ti, t, &perfil, &precos);
@@ -397,7 +424,13 @@ impl IaEconomia {
                         CategoriaPredio::Extrativo | CategoriaPredio::RuralAgricola => regional,
                         _ => regional.max(base * 0.25),
                     };
-                    score_base - pr.predios.len() as f64 * 0.5
+                    let desemp_prov = pr.pops.iter().map(|p| p.desempregados()).sum::<f64>();
+                    let bonus_desemp = if pr.populacao_total() > 0.0 {
+                        (desemp_prov / pr.populacao_total() * 25.0).min(15.0)
+                    } else {
+                        0.0
+                    };
+                    score_base + bonus_desemp - pr.predios.len() as f64 * 0.5
                 };
                 if melhor.is_none_or(|(s, _)| score > s) {
                     melhor = Some((score, pi));
@@ -409,7 +442,8 @@ impl IaEconomia {
                 cands.push((s, ti, pi));
                 if t.categoria == CategoriaPredio::Construcao {
                     // Varios niveis de uma vez (a mesma provincia comporta); nao contam no limite semanal.
-                    let falta = meta * niveis_total.max(100.0) - niveis_construcao - a_caminho_constr;
+                    let meta_niveis = (meta * niveis_total.max(120.0)).max(pop_pais / 2_500_000.0) * boost_desemp;
+                    let falta = meta_niveis - niveis_construcao - a_caminho_constr;
                     for _ in 1..((falta / lote as f64).ceil() as usize).min(4) {
                         cands.push((s, ti, pi));
                     }

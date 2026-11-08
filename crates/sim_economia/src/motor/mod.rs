@@ -900,6 +900,7 @@ impl MundoEconomico {
                 &self.paises,
                 &mut self.provincias,
                 dias_passo,
+                self.dias_decorridos,
                 &mut self.buffers.scratch_tipo_a,
                 &mut self.buffers.lotes_migrantes,
             );
@@ -959,10 +960,9 @@ impl MundoEconomico {
     }
 
     /// Progresso técnico endógeno (a cada 30 dias): a produtividade total dos fatores de cada país cresce
-    /// ~0,2%/ano de base (aprendizado na prática), mais até ~0,8%/ano conforme a alfabetização média
-    /// (capital humano), mais um bônus de convergência (difusão de tecnologia da fronteira: até ~0,8%/ano
-    /// para quem tem renda per capita bem abaixo da líder). Em linha com a contabilidade do crescimento
-    /// dos anos 1950. Ganhos de tecnologias pesquisadas entram à parte, por `aplicar_ganho_produtividade`.
+    /// com a expansão da fronteira tecnológica global (~1,4%/ano de base), até ~1,2%/ano conforme a
+    /// alfabetização média (capital humano e difusão interna) e convergência acelerada para países
+    /// em catching-up (difusão de tecnologias já maduras da fronteira: até ~2,1%/ano adicionais).
     fn atualizar_produtividade(&mut self) {
         if !self.dias_decorridos.is_multiple_of(30) {
             return;
@@ -987,8 +987,12 @@ impl MundoEconomico {
         for (i, pais) in self.paises.iter_mut().enumerate() {
             let a = if pop[i] > 0.0 { alfa[i] / pop[i] } else { 0.3 };
             let pc = if pop[i] > 0.0 { pais.pib_diario / pop[i] } else { 0.0 };
-            let convergencia = if pc > 0.0 && fronteira > 0.0 { (fronteira / pc).ln().clamp(0.0, 2.0) * 0.004 } else { 0.0 };
-            let g_ano = 0.002 + 0.008 * a.clamp(0.0, 1.0) + convergencia;
+            let convergencia = if pc > 0.0 && fronteira > 0.0 {
+                (fronteira / pc).ln().clamp(0.0, 3.0) * 0.007
+            } else {
+                0.0
+            };
+            let g_ano = 0.014 + 0.012 * a.clamp(0.0, 1.0) + convergencia;
             pais.produtividade *= 1.0 + g_ano * 30.0 / 365.0;
         }
     }
@@ -1150,6 +1154,7 @@ impl MundoEconomico {
                 &self.paises,
                 &mut self.provincias,
                 dias_passo,
+                self.dias_decorridos,
                 &mut self.buffers.scratch_tipo_a,
                 &mut self.buffers.lotes_migrantes,
             );

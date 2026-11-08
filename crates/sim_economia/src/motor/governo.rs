@@ -275,6 +275,30 @@ pub fn parametros_sistema_economico(lei_id: &str) -> (f64, f64, f64) {
     }
 }
 
+/// Distribui parte do excedente orçamentário do Estado como serviços públicos e dividendos de bem-estar
+/// diretamente para a reserva monetária dos cidadãos, fortalecendo a demanda agregada interna.
+fn redistribuir_excedente_populacao(pais: &Pais, provincias: &mut [Provincia], valor: f64) {
+    if valor <= 1e-6 {
+        return;
+    }
+    let mut pop_total = 0.0f64;
+    for &p_idx in &pais.provincias_indices {
+        pop_total += provincias[p_idx].populacao_total();
+    }
+    if pop_total <= 0.0 {
+        return;
+    }
+    let valor_per_capita = valor / pop_total;
+    for &p_idx in &pais.provincias_indices {
+        for pop in &mut provincias[p_idx].pops {
+            if pop.populacao > 0.0 {
+                let parcela = valor_per_capita * pop.populacao;
+                pop.riqueza_reservas += parcela;
+            }
+        }
+    }
+}
+
 /// Executa o fechamento fiscal diário (juros, dívida, limite de crédito e calote)
 /// e avança a fila nacional de construção civil, retornando o total de prédios concluídos no dia.
 #[allow(clippy::too_many_arguments)]
@@ -327,15 +351,45 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
             }
         }
 
-        // 4. Consolidação do saldo diário no tesouro / dívida
+        // 4. Consolidação do saldo diário no tesouro / dívida e equilíbrio orçamentário
         let saldo = pais.orcamento.receita_total() - pais.orcamento.despesa_total();
         pais.orcamento.saldo_diario = saldo;
+
+        let pib_anual = (pais.pib_diario * 365.0).max(10_000.0);
+        let despesa_anual = (pais.orcamento.despesa_total() * 365.0).max(5_000.0);
+        let reserva_alvo = (pib_anual * 1.0).max(despesa_anual * 1.5);
+        let teto_maximo_tesouro = (pib_anual * 1.8).max(despesa_anual * 2.5);
 
         if saldo >= 0.0 {
             if pais.orcamento.divida > 0.0 {
                 let amortizacao = saldo.min(pais.orcamento.divida);
                 pais.orcamento.divida -= amortizacao;
-                pais.orcamento.tesouro += saldo - amortizacao;
+                let sobra = saldo - amortizacao;
+                if pais.orcamento.tesouro >= reserva_alvo {
+                    // Excedente além da reserva alvo vira fomento produtivo e serviços públicos
+                    let aporte_fomento = sobra * 0.45;
+                    let aporte_servicos = sobra * 0.35;
+                    let aporte_tesouro = sobra - aporte_fomento - aporte_servicos;
+                    if !pais.exige_propriedade_estatal_lei {
+                        pais.fundo_investimento_privado += aporte_fomento;
+                        pais.aporte_fundo_privado_ultimo_tick += aporte_fomento;
+                    }
+                    redistribuir_excedente_populacao(pais, provincias, aporte_servicos);
+                    pais.orcamento.tesouro += aporte_tesouro;
+                } else {
+                    pais.orcamento.tesouro += sobra;
+                }
+            } else if pais.orcamento.tesouro >= reserva_alvo {
+                // Com dívida zerada e tesouro cheio: o excedente vira fomento e investimento nos cidadãos
+                let aporte_fomento = saldo * 0.50;
+                let aporte_servicos = saldo * 0.35;
+                let aporte_tesouro = saldo - aporte_fomento - aporte_servicos;
+                if !pais.exige_propriedade_estatal_lei {
+                    pais.fundo_investimento_privado += aporte_fomento;
+                    pais.aporte_fundo_privado_ultimo_tick += aporte_fomento;
+                }
+                redistribuir_excedente_populacao(pais, provincias, aporte_servicos);
+                pais.orcamento.tesouro += aporte_tesouro;
             } else {
                 pais.orcamento.tesouro += saldo;
             }
@@ -344,6 +398,17 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
             let uso_tesouro = deficit.min(pais.orcamento.tesouro);
             pais.orcamento.tesouro -= uso_tesouro;
             pais.orcamento.divida += deficit - uso_tesouro;
+        }
+
+        // Teto estrutural sobre o tesouro: impede superávit infinito e explosão de trilhões
+        if pais.orcamento.tesouro > teto_maximo_tesouro {
+            let excesso = pais.orcamento.tesouro - teto_maximo_tesouro;
+            pais.orcamento.tesouro = teto_maximo_tesouro;
+            if !pais.exige_propriedade_estatal_lei {
+                pais.fundo_investimento_privado += excesso * 0.60;
+                pais.aporte_fundo_privado_ultimo_tick += excesso * 0.60;
+            }
+            redistribuir_excedente_populacao(pais, provincias, excesso * 0.40);
         }
 
         // 5. Verificação de calote soberano / reestruturação no teto de crédito
@@ -358,11 +423,10 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
         let (_, _, cota_priv) = parametros_sistema_economico(&pais.politica_fiscal.lei_sistema_economico_id);
         let pts_totais = (pais.pontos_construcao_base + pontos_construcao_setores_pais[c_idx])
             * pais.mult_eficiencia_construcao_lei;
-        // Obras simultâneas acompanham a capacidade de construção (cada obra absorve no máximo
-        // `pontos_maximos_por_obra_dia` por dia); antes o teto fixo de 3 travava economias grandes.
-        let max_obras_privadas = ((pts_totais * cota_priv) / config.pontos_maximos_por_obra_dia.max(1.0))
+        // Obras simultâneas acompanham a capacidade de construção e porte do país
+        let max_obras_privadas = (((pts_totais * cota_priv) / config.pontos_maximos_por_obra_dia.max(1.0)) * 1.5)
             .ceil()
-            .clamp(1.0, 60.0) as usize;
+            .clamp(1.0, 4.0) as usize;
         let obras_priv_ativas = pais.fila_construcao.iter().filter(|i| i.privado).count();
 
         if config.habilitar_investimento_privado_automatico
@@ -387,7 +451,7 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
             && obras_priv_ativas < max_obras_privadas
             && !pais.orcamento.em_calote
         {
-            let vagas_fila = (max_obras_privadas - obras_priv_ativas).min(8);
+            let vagas_fila = (max_obras_privadas - obras_priv_ativas).min(2);
             tentar_enfileirar_obra_privada(catalogo, mercados, estados, pais, provincias, vagas_fila);
         }
 
@@ -424,14 +488,18 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
 }
 
 /// Tamanho do lote de obra para o porte do país: economias grandes constroem vários níveis por obra,
-/// senão a fila (e a IA que a preenche) não acompanha a capacidade de construção.
+/// senão a fila (e a IA que a preenche) não acompanha a capacidade de construção e o crescimento populacional.
 pub fn tamanho_lote_obra(provincias: &[Provincia], pais: &Pais) -> u32 {
-    let niveis: f64 = pais
-        .provincias_indices
-        .iter()
-        .map(|&p| provincias[p].predios.iter().map(|b| b.nivel as f64).sum::<f64>())
-        .sum();
-    ((niveis / 12_000.0).round() as u32).clamp(1, 24)
+    let mut niveis = 0.0f64;
+    let mut pop = 0.0f64;
+    for &p in &pais.provincias_indices {
+        let prov = &provincias[p];
+        niveis += prov.predios.iter().map(|b| b.nivel as f64).sum::<f64>();
+        pop += prov.populacao_total();
+    }
+    let lote_niveis = niveis / 2_000.0;
+    let lote_pop = pop / 12_000_000.0;
+    ((lote_niveis.max(lote_pop)).round() as u32).clamp(1, 24)
 }
 
 /// Receita de materiais consumidos por ponto de construção, conforme a categoria do prédio:
@@ -811,7 +879,8 @@ fn tentar_enfileirar_obra_privada(
             fator_insumos_min = fator_insumos_min.min(suprimentos[g]);
             custo_insumos += q * precos[g];
         }
-        if fator_insumos_min < 0.65 {
+        let threshold_insumo = if def_tipo.id == "setor_servicos_comercio" || def_tipo.id == "setor_bancario_financeiro" { 0.35 } else { 0.65 };
+        if fator_insumos_min < threshold_insumo {
             continue; // Falta de matéria-prima estrangularia o prédio de imediato
         }
 
@@ -907,7 +976,8 @@ fn tentar_enfileirar_obra_privada(
             if mao_de_obra_liquida < 250.0 {
                 continue;
             }
-            let mod_labor = (1.0 + (mao_de_obra_liquida / 40_000.0).min(0.50)).clamp(0.80, 1.50);
+            let desemp_ratio = if prov.populacao_total() > 0.0 { desempregados / prov.populacao_total() } else { 0.0 };
+            let mod_labor = (1.0 + (mao_de_obra_liquida / 20_000.0).min(1.50) + desemp_ratio * 3.0).clamp(0.80, 3.50);
 
             // Bônus de qualidade de jazida mineral ou fertilidade agrícola
             let mod_qualidade = estado.fator_qualidade_predio(def_tipo).clamp(0.80, 1.50);

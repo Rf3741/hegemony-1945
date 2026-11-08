@@ -16,26 +16,46 @@ pub(crate) struct LoteMigrante {
     pub alfabetizacao: f64,
 }
 
-/// Taxa líquida anual de crescimento populacional conforme padrão de vida e alfabetização.
+/// Taxa líquida anual de crescimento populacional conforme padrão de vida, alfabetização e época histórica.
 ///
-/// Transição demográfica do pós-guerra: a mortalidade cai com a medicina moderna (penicilina, vacinas,
-/// saneamento) antes de a natalidade cair, então o crescimento é máximo em padrões de vida intermediários
-/// (~2%/ano) e menor nos países ricos e alfabetizados (baby boom ocidental ~1%/ano). Abaixo de 5 há fome.
-#[inline]
-pub fn taxa_crescimento_anual_pop(padrao_de_vida: f64, alfabetizacao: f64) -> f64 {
+/// Transição demográfica do pós-guerra e contemporânea: a mortalidade despenca com a medicina moderna
+/// (antibióticos, DDT, vacinas, saneamento) antes da natalidade cair, gerando pico nos anos 50-70 em países
+/// pobres e médios (~2,2% a 2,8%/ano) e menor nos países ricos (baby boom ocidental ~1,2%/ano).
+/// A partir de 1975, a fecundidade cai progressivamente com a urbanização, anticoncepção e educação.
+pub fn taxa_crescimento_anual_pop_epoca(padrao_de_vida: f64, alfabetizacao: f64, ano: f64) -> f64 {
     let sol = padrao_de_vida.clamp(1.0, 99.0);
     let alfa = alfabetizacao.clamp(0.0, 1.0);
     if sol < 5.0 {
         return -0.015 * ((5.0 - sol) / 4.0).clamp(0.0, 1.0);
     }
-    let base = if sol <= 12.0 {
-        0.010 + 0.012 * (sol - 5.0) / 7.0
+    // 1. Curva por padrão de vida (renda): pico em SoL baixo-médio (8 a 13)
+    let base_sol = if sol <= 11.0 {
+        0.014 + 0.012 * (sol - 5.0) / 6.0
     } else if sol <= 22.0 {
-        0.022 - 0.006 * (sol - 12.0) / 10.0
+        0.026 - 0.014 * (sol - 11.0) / 11.0
     } else {
-        (0.016 - 0.0002 * (sol - 22.0)).max(0.008)
+        (0.012 - 0.0003 * (sol - 22.0)).max(0.004)
     };
-    (base - 0.007 * alfa).clamp(0.002, 0.022)
+
+    // 2. Fator época (transição demográfica global da Guerra Fria até o século XXI):
+    // 1945 a 1970: ápice da explosão demográfica nos países em desenvolvimento (fator ~1.0 a 1.12).
+    // A partir de 1975: queda contínua da natalidade mundial (fator cai para ~0.45 em 2045).
+    let fator_epoca = if ano <= 1970.0 {
+        1.0 + 0.12 * ((ano - 1945.0) / 25.0).clamp(0.0, 1.0)
+    } else {
+        let progresso = ((ano - 1970.0) / 75.0).clamp(0.0, 1.0);
+        1.12 - 0.67 * progresso
+    };
+
+    // 3. Efeito da alfabetização e educação feminina (acelera a queda da natalidade)
+    let peso_alfa = 0.006 + 0.006 * ((ano - 1960.0).max(0.0) / 70.0).min(1.0);
+    (base_sol * fator_epoca - peso_alfa * alfa).clamp(0.002, 0.030)
+}
+
+/// Taxa líquida anual de crescimento populacional (compatibilidade: época padrão 1950).
+#[inline]
+pub fn taxa_crescimento_anual_pop(padrao_de_vida: f64, alfabetizacao: f64) -> f64 {
+    taxa_crescimento_anual_pop_epoca(padrao_de_vida, alfabetizacao, 1950.0)
 }
 
 /// Executa o crescimento demográfico natural e a migração interprovincial.
@@ -47,11 +67,13 @@ pub(crate) fn executar_crescimento_e_migracao(
     paises: &[Pais],
     provincias: &mut [Provincia],
     dias_passo: u32,
+    dias_decorridos: u64,
     pop_emp_por_tipo_scratch: &mut [f64],
     lotes_migrantes: &mut Vec<LoteMigrante>,
 ) {
     let fator_dias = dias_passo.max(1) as f64;
     let inv_ano = fator_dias / 365.0;
+    let ano = 1945.0 + (dias_decorridos as f64) / 365.25;
 
     // 1. Crescimento natural e cálculo da atração migratória em passagem única por província
     for prov in provincias.iter_mut() {
@@ -66,7 +88,7 @@ pub(crate) fn executar_crescimento_e_migracao(
                 pop.empregados = 0.0;
                 continue;
             }
-            let r_anual = taxa_crescimento_anual_pop(pop.padrao_de_vida, pop.alfabetizacao);
+            let r_anual = taxa_crescimento_anual_pop_epoca(pop.padrao_de_vida, pop.alfabetizacao, ano);
             let r_passo = (r_anual * inv_ano).clamp(-0.05, 0.05);
             pop.populacao = (pop.populacao * (1.0 + r_passo)).max(0.0);
             if pop.empregados > pop.populacao {

@@ -99,7 +99,7 @@ pub(crate) fn executar_contratacao_e_demissao(
             };
 
             let quer_contratar =
-                b.cache.financiado_pelo_governo || (b.subsidiado && !em_calote) || margem > 0.015;
+                b.cache.financiado_pelo_governo || (b.subsidiado && !em_calote) || margem > -0.01;
 
             if quer_contratar {
                 let nivel_f = (b.nivel as f64) * b.fator_retomada();
@@ -207,16 +207,16 @@ pub(crate) fn executar_contratacao_e_demissao(
                 if !b.cache.financiado_pelo_governo {
                     if faltou_trabalhador && margem > 0.12 {
                         b.salario_base =
-                            (b.salario_base * (1.0 + 0.004 * fator_dias)).clamp(1.2, 40.0);
+                            (b.salario_base * (1.0 + 0.004 * fator_dias)).clamp(1.2, 350.0);
                     } else if margem > 0.35 && b.taxa_ocupacao() > 0.95 {
                         b.salario_base =
-                            (b.salario_base * (1.0 + 0.0015 * fator_dias)).clamp(1.2, 40.0);
+                            (b.salario_base * (1.0 + 0.0015 * fator_dias)).clamp(1.2, 350.0);
                     }
                 }
             } else if !b.cache.financiado_pelo_governo && !b.subsidiado && b.dias_retomada == 0 && margem < -0.03 {
                 // Salário cede primeiro (proporcional ao prejuízo); só demite quando já está no piso.
                 let queda = ((0.01 + 0.05 * (-margem).min(1.0)) * fator_dias).min(0.5);
-                b.salario_base = (b.salario_base * (1.0 - queda)).clamp(1.2, 40.0);
+                b.salario_base = (b.salario_base * (1.0 - queda)).clamp(1.2, 350.0);
 
                 let colchao_minimo = (b.nivel as f64) * 300.0;
                 if b.reservas_caixa < colchao_minimo && margem < -0.05 && (b.salario_base < 1.6 || margem < -0.5) {

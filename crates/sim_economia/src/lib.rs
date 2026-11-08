@@ -40,7 +40,7 @@ pub use entidades::{
 pub use erro::{ErroEconomia, ResultadoEconomia, validar_id_snake_case};
 pub use gerador::{ParametrosEscalaMundial, gerar_cenario_escala_mundial};
 pub use motor::consumo::calcular_fatias_substituicao;
-pub use motor::demografia::taxa_crescimento_anual_pop;
+pub use motor::demografia::{taxa_crescimento_anual_pop, taxa_crescimento_anual_pop_epoca};
 pub use motor::mercado::{atualizar_precos_mercado_isolado, calcular_preco_alvo};
 pub use motor::producao::atualizar_infraestrutura_estados;
 pub use motor::ciclos_demanda::{
