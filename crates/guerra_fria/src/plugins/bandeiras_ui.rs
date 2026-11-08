@@ -12,7 +12,10 @@ use super::jogador::PaisJogador;
 use super::map::{CoresMapa, RaizProjeto};
 use super::politica_sim::PoliticaSim;
 use super::rotulos_pais::{RotuloPais, RotulosPaisCriados};
-use bandeiras_resolver::{EstadoPais as EstadoBandeira, Sobreposicao, Status, VarianteBandeira, catalogo_embutido};
+use bandeiras_resolver::{
+    EstadoPais as EstadoBandeira, Sobreposicao, Status, VarianteBandeira, catalogo_embutido,
+    flags_do_pais,
+};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use eventos::Noticia;
@@ -127,18 +130,6 @@ fn publicar(mut ctxs: EguiContexts, b: Res<Bandeiras>) -> Result {
     let ctx = ctxs.ctx_mut()?;
     ctx.data_mut(|d| d.insert_temp(egui::Id::new("bandeiras_jogo"), b.clone()));
     Ok(())
-}
-
-/// Flags de eventos por data (tag, flag, desde, até) para variantes que dependem da história.
-const FLAGS_DATADAS: [(&str, &str, (i32, u8, u8), (i32, u8, u8)); 4] = [
-    ("CAN", "bandeira_folha_de_bordo", (1965, 2, 15), (9999, 1, 1)),
-    ("LBY", "jamahiriya", (1977, 9, 2), (9999, 1, 1)),
-    ("EGY", "uniao_arabe", (1958, 2, 1), (1961, 9, 28)),
-    ("SYR", "uniao_arabe", (1958, 2, 1), (1961, 9, 28)),
-];
-
-pub fn flags_do_pais(tag: &str, d: (i32, u8, u8)) -> Vec<String> {
-    FLAGS_DATADAS.iter().filter(|(t, _, de, ate)| *t == tag && d >= *de && d <= *ate).map(|(_, f, _, _)| f.to_string()).collect()
 }
 
 /// Ocupações aliadas que dão nome ao país no cenário ("Alemanha Ocupada", "Japão Ocupado",

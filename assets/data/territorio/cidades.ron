@@ -3099,7 +3099,7 @@
     ),
     "chaozhou_chi_so": (
         id: "chaozhou_chi_so",
-        nome: "Chaozhou",
+        nome: "Gaozhou",
         populacao_1945: 340960,
         latitude: 21.9204,
         longitude: 110.8700,
@@ -10105,15 +10105,15 @@
         eh_capital_estado: true,
         eh_porto: false,
     ),
-    "natal": (
-        id: "natal",
-        nome: "Natal",
-        populacao_1945: 274564,
-        latitude: -6.9838,
-        longitude: -60.2699,
+    "manaus": (
+        id: "manaus",
+        nome: "Manaus",
+        populacao_1945: 140000,
+        latitude: -3.1190,
+        longitude: -60.0217,
         estado_id: "bra_amazonas",
         pais_tag: "BRA",
-        eh_capital_estado: false,
+        eh_capital_estado: true,
         eh_porto: true,
     ),
     "natal_bra_ri": (
@@ -15465,7 +15465,7 @@
     ),
     "vila_velha": (
         id: "vila_velha",
-        nome: "Vila Velha",
+        nome: "Vila Velha do Cassiporé",
         populacao_1945: 338545,
         latitude: 3.2167,
         longitude: -51.2167,

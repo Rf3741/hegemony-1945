@@ -275,7 +275,6 @@ pub struct InsumosAlertas {
     pub lei_pronta: Option<String>,
     pub dias_eleicao: Option<u32>,
     pub em_campanha: bool,
-    pub pesquisa_concluida: Option<String>,
 }
 
 pub fn calcular_alertas(i: &InsumosAlertas) -> Vec<Alerta> {
@@ -302,9 +301,6 @@ pub fn calcular_alertas(i: &InsumosAlertas) -> Vec<Alerta> {
         && d <= 60
     {
         v.push(Alerta { icone: "urna", texto: format!("Eleição em {d} dias"), gravidade: 0 });
-    }
-    if let Some(t) = &i.pesquisa_concluida {
-        v.push(Alerta { icone: "estrela", texto: format!("Pesquisa concluída: {t}"), gravidade: 0 });
     }
     v
 }
@@ -351,9 +347,6 @@ pub fn barra_extra(
         alertas_in.dias_eleicao = Some(pp.dias_para_proxima_eleicao);
         alertas_in.em_campanha = pp.campanha_eleitoral.is_some();
     }
-    if let Some(t) = &tec {
-        alertas_in.pesquisa_concluida = t.concluidas_jogador.last().cloned();
-    }
     let alertas = calcular_alertas(&alertas_in);
     let _ = (&jogador, &relogio);
     let resp = egui::Panel::top("barra_modulos")
@@ -387,26 +380,35 @@ pub fn barra_extra(
                     }
                 }
             });
-            if !alertas.is_empty() {
+        });
+    if !alertas.is_empty() {
+        egui::Panel::top("barra_alertas")
+            .frame(
+                egui::Frame::NONE
+                    .fill(ui_refinada::menu::PAPEL)
+                    .stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO))
+                    .inner_margin(egui::Margin::symmetric(6, 2)),
+            )
+            .show(&mut raiz, |ui| {
                 ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing.x = 6.0;
                     for a in &alertas {
                         let cor = cor_gravidade(a.gravidade);
                         egui::Frame::new()
                             .fill(ui_refinada::menu::PAPEL_CARD)
                             .stroke(egui::Stroke::new(1.0, cor))
-                            .inner_margin(egui::Margin::symmetric(6, 2))
+                            .inner_margin(egui::Margin::symmetric(5, 2))
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
-                                    ui.spacing_mut().item_spacing.x = 5.0;
-                                    ui_refinada::glifo_ui(ui, a.icone, 14.0, Some(cor));
-                                    ui.label(egui::RichText::new(&a.texto).size(12.0).strong().color(cor));
+                                    ui.spacing_mut().item_spacing.x = 4.0;
+                                    ui_refinada::glifo_ui(ui, a.icone, 13.0, Some(cor));
+                                    ui.label(egui::RichText::new(&a.texto).size(11.5).strong().color(cor));
                                 });
                             });
                     }
                 });
-            }
-        });
-    consumir_topo(&ctx, resp.response.rect.max.y);
+            });
+    }
     Ok(())
 }
 

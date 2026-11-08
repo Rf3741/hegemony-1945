@@ -136,6 +136,7 @@ struct Anterior {
     negativo: bool,
     obras_na_fila: usize,
     calote: bool,
+    tecnologias_concluidas: usize,
 }
 
 pub struct JogadorPlugin;
@@ -341,6 +342,7 @@ fn detectar_eventos(
     mundo: Res<RecursoMundo>,
     mut eco: Option<ResMut<EconomiaSim>>,
     mut pol: Option<ResMut<PoliticaSim>>,
+    mut tec: Option<ResMut<super::tecnologia_ui::TecnologiaSim>>,
     tempo: Res<Time<Real>>,
     mut ant: ResMut<Anterior>,
     mut notas: ResMut<Notificacoes>,
@@ -365,6 +367,16 @@ fn detectar_eventos(
                 let txt = super::enciclopedia::texto_notificacao("msg_tesouro_insolvente", &[("pais", p.nome.clone()), ("taxa_juros", juros)], "Calote soberano: dívida acima do limite de crédito!");
                 notas.push(txt, agora);
             }
+        }
+    }
+    if let Some(tec) = tec.as_mut() {
+        if ant.tag != jogador.0 {
+            ant.tecnologias_concluidas = tec.concluidas_jogador.len();
+        } else if tec.concluidas_jogador.len() > ant.tecnologias_concluidas {
+            for t in &tec.concluidas_jogador[ant.tecnologias_concluidas..] {
+                notas.push(format!("Pesquisa concluída: {t}"), agora);
+            }
+            ant.tecnologias_concluidas = tec.concluidas_jogador.len();
         }
     }
 
@@ -394,6 +406,7 @@ fn toasts(
     }
     // Acima dos botões fixos "Rankings (7)" e "Configurações" (canto inferior esquerdo).
     egui::Area::new("toasts".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -64.0]).show(contextos.ctx_mut()?, |ui| {
+        ui.set_width(260.0);
         for (txt, _, repeticoes) in notas.0.iter().rev().take(3) {
             egui::Frame::NONE
                 .fill(ui_refinada::menu::PAPEL)
@@ -406,12 +419,21 @@ fn toasts(
                     color: egui::Color32::from_black_alpha(70),
                 })
                 .show(ui, |ui| {
+                    ui.set_min_width(260.0);
                     let msg = if *repeticoes > 1 {
                         format!("{txt} ×{repeticoes}")
                     } else {
                         txt.clone()
                     };
-                    ui.label(egui::RichText::new(msg).color(ui_refinada::menu::TINTA).strong());
+                    let mut job = egui::text::LayoutJob::simple(
+                        msg,
+                        egui::FontId::proportional(12.5),
+                        ui_refinada::menu::TINTA,
+                        244.0,
+                    );
+                    job.wrap.max_rows = 2;
+                    job.wrap.break_anywhere = false;
+                    ui.label(job);
                 });
         }
     });

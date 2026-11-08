@@ -123,6 +123,46 @@ pub struct VarianteBandeira {
     pub e_base: bool,
 }
 
+/// Flags de eventos e regimes históricos por data (tag, flag, desde, até).
+pub const FLAGS_DATADAS: &[(&str, &str, (i32, u8, u8), (i32, u8, u8))] = &[
+    // Canadá: a Folha de Bordo (15 fev 1965)
+    ("CAN", "bandeira_folha_de_bordo", (1965, 2, 15), (9999, 1, 1)),
+    // Líbia: Jamahiriya (2 set 1977)
+    ("LBY", "jamahiriya", (1977, 9, 2), (9999, 1, 1)),
+    // RAU: união Egito e Síria (1 fev 1958 a 28 set 1961)
+    ("EGY", "uniao_arabe", (1958, 2, 1), (1961, 9, 28)),
+    ("SYR", "uniao_arabe", (1958, 2, 1), (1961, 9, 28)),
+    // França: Quarta República (27 out 1946 a 3 out 1958) e Quinta República (4 out 1958 em diante)
+    ("FRA", "quarta_republica", (1946, 10, 27), (1958, 10, 3)),
+    ("FRA", "quinta_republica", (1958, 10, 4), (9999, 1, 1)),
+    // Itália: República Italiana após o referendo de 2 jun 1946
+    ("ITA", "ita_republica", (1946, 6, 2), (9999, 1, 1)),
+    // Alemanha: RFA (23 mai 1949 a 2 out 1990) e reunificação (3 out 1990 em diante)
+    ("GER", "rfa", (1949, 5, 23), (1990, 10, 2)),
+    ("GER", "reunificacao_alema", (1990, 10, 3), (9999, 1, 1)),
+    // Egito: República de 18 jun 1953 (exceto no período RAU)
+    ("EGY", "republica_egito", (1953, 6, 18), (1958, 1, 31)),
+    ("EGY", "republica_egito", (1961, 9, 29), (9999, 1, 1)),
+    // Iraque: Revolução de 14 jul 1958
+    ("IRQ", "republica_iraque", (1958, 7, 14), (9999, 1, 1)),
+    // Brasil: República Federativa do Brasil pela Constituição de 15 mar 1967
+    ("BRA", "bra_federativa", (1967, 3, 15), (9999, 1, 1)),
+    // Portugal: Revolução dos Cravos (25 abr 1974)
+    ("POR", "por_democratica", (1974, 4, 25), (9999, 1, 1)),
+    // Espanha: Restauração/Constituição democrática (20 nov 1975 em diante)
+    ("ESP", "esp_transicao", (1975, 11, 20), (9999, 1, 1)),
+    // Grécia: Terceira República Helênica (8 dez 1974 em diante)
+    ("GRE", "gre_republica", (1974, 12, 8), (9999, 1, 1)),
+];
+
+pub fn flags_do_pais(tag: &str, d: (i32, u8, u8)) -> Vec<String> {
+    FLAGS_DATADAS
+        .iter()
+        .filter(|(t, _, de, ate)| *t == tag && d >= *de && d <= *ate)
+        .map(|(_, f, _, _)| f.to_string())
+        .collect()
+}
+
 pub struct Catalogo {
     dados: Dados,
     indice: HashMap<String, usize>,
@@ -244,11 +284,25 @@ impl Catalogo {
     }
 
     pub fn resolver_bandeira(&self, tag: &str, e: &EstadoPais) -> VarianteBandeira {
+        let e_efetivo;
+        let e_ref = if e.ano > 0 {
+            let mut clone = e.clone();
+            let d = (e.ano, e.mes.max(1), 1);
+            for f in flags_do_pais(tag, d) {
+                if !clone.flags.contains(&f) {
+                    clone.flags.push(f);
+                }
+            }
+            e_efetivo = clone;
+            &e_efetivo
+        } else {
+            e
+        };
         let Some(p) = self.pais(tag) else {
             return VarianteBandeira {
                 id: "desconhecida".into(),
                 arquivo: String::new(),
-                nome: if e.nome_cenario.is_empty() { tag.into() } else { nome_de_cenario(e) },
+                nome: if e_ref.nome_cenario.is_empty() { tag.into() } else { nome_de_cenario(e_ref) },
                 cor: (128, 128, 128),
                 sobreposicao: Sobreposicao::Nenhuma,
                 tag_cantao: None,
@@ -258,7 +312,7 @@ impl Catalogo {
         };
         let mut melhor: Option<(&Variante, (usize, i32))> = None;
         for v in &p.variantes {
-            if !self.casa(v, e) {
+            if !self.casa(v, e_ref) {
                 continue;
             }
             let chave = (v.condicao.especificidade(), v.prioridade);
@@ -273,14 +327,14 @@ impl Catalogo {
         // Enquanto o país está com o regime com que nasceu no cenário, o nome mostrado é o do
         // cenário; a legenda de ocupação só sai quando não há mais ocupante. Exceção: variantes
         // ligadas a um marco datado (flag de evento), que valem na data.
-        let nome = if e.mudanca_regime || e.nome_cenario.is_empty() || !v.condicao.flags.is_empty() {
+        let nome = if e_ref.mudanca_regime || e_ref.nome_cenario.is_empty() || !v.condicao.flags.is_empty() {
             v.nome.clone()
         } else {
-            nome_de_cenario(e)
+            nome_de_cenario(e_ref)
         };
         let tag_cantao = match v.sobreposicao {
-            Sobreposicao::CantaoSuserano => e.suserano.clone(),
-            Sobreposicao::CantaoOcupante => e.ocupante.clone(),
+            Sobreposicao::CantaoSuserano => e_ref.suserano.clone(),
+            Sobreposicao::CantaoOcupante => e_ref.ocupante.clone(),
             Sobreposicao::Nenhuma => None,
         };
         VarianteBandeira {
