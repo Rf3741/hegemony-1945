@@ -285,7 +285,7 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
     {
         let m = &t.mundo;
         let est = m.paises.get(&tag);
-        egui::Window::new("Tecnologia (5)").open(&mut aberto).default_size([1180.0, 700.0]).show(ctx, |ui| {
+        let resp_janela = egui::Window::new("Tecnologia (5)").open(&mut aberto).default_size([1180.0, 700.0]).show(ctx, |ui| {
             ui_refinada::decorar_janela(ui);
             ui_refinada::cabecalho_painel(ui, "ÁRVORE TECNOLÓGICA (5)");
             let Some(est) = est else {
@@ -347,6 +347,9 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
 
             arvore(ui, m, &tag, ramo_atual, est, ano, &entrada, &mut pan_zoom, &mut acoes);
         });
+        if let Some(r) = resp_janela {
+            super::tutorial_guiado::marcar(&r.response, "janela_tec");
+        }
     }
     let tec = &mut *t;
     tec.pan = pan_zoom.0;

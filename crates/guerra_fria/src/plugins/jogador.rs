@@ -330,10 +330,15 @@ fn detectar_eventos(
     ant.negativo = negativo;
 }
 
-fn toasts(mut contextos: EguiContexts, tempo: Res<Time<Real>>, mut notas: ResMut<Notificacoes>) -> Result {
+fn toasts(
+    mut contextos: EguiContexts,
+    tempo: Res<Time<Real>>,
+    mut notas: ResMut<Notificacoes>,
+    tutorial: Option<Res<super::tutorial_guiado::TutorialGuiado>>,
+) -> Result {
     let agora = tempo.elapsed_secs_f64();
     notas.0.retain(|(_, t, _)| agora - t < 6.0);
-    if notas.0.is_empty() {
+    if notas.0.is_empty() || tutorial.as_ref().is_some_and(|t| t.ativo) {
         return Ok(());
     }
     // Acima dos botões fixos "Rankings (7)" e "Configurações" (canto inferior esquerdo).
@@ -380,8 +385,9 @@ fn painel_pais(
     let mut aba = painel.aba;
     let ctx = contextos.ctx_mut()?;
     let (tag_p, nome_p) = pol.as_ref().and_then(|p| p.vista.pais.as_ref().map(|x| (x.tag.clone(), x.nome.clone()))).unwrap_or_default();
-    ui_refinada::janela_estilo_menu("Painel do país (1)")
+    let resp_janela = ui_refinada::janela_estilo_menu("Painel do país (1)")
         .open(&mut aberto)
+        .default_pos([420.0, 118.0])
         .default_size([720.0, 600.0])
         .show(ctx, |ui| {
             ui_refinada::decorar_janela(ui);
@@ -407,11 +413,11 @@ fn painel_pais(
                 Aba::Construcao => aba_construcao(ui, &mut eco, &mut painel, &mut icones),
                 Aba::Politica => match pol.as_mut() {
                     Some(p) => {
+                        super::politica_ui::aba_politica(ui, p);
                         if let (Some(el), Some(r), Some(tag)) = (elenco.as_deref(), retratos.as_deref_mut(), p.tag.clone()) {
-                            super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
                             ui.separator();
+                            super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
                         }
-                        super::politica_ui::aba_politica(ui, p)
                     }
                     None => {
                         ui.label("Política ainda carregando...");
@@ -420,6 +426,9 @@ fn painel_pais(
                 Aba::Ranking => aba_ranking(ui, &eco.vista),
             });
         });
+    if let Some(r) = resp_janela {
+        super::tutorial_guiado::marcar(&r.response, "janela_pais");
+    }
     painel.aba = aba;
     painel.aberto = aberto;
     Ok(())

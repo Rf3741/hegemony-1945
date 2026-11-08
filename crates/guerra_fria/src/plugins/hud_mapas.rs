@@ -8,7 +8,7 @@ use super::mapa_provincial::{Escala, Metrica, PesosProvincias};
 use super::politica_sim::PoliticaSim;
 use super::tecnologia_ui::TecnologiaSim;
 use super::time::{EventoTickDiario, RecursoRelogio};
-use super::ui::ui_raiz;
+use super::ui::{area_livre_mapa, consumir_topo, ui_raiz};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use simulacao::mundo::EstadoPais;
@@ -355,7 +355,7 @@ pub fn barra_extra(
     }
     let alertas = calcular_alertas(&alertas_in);
     let _ = (&jogador, &relogio);
-    egui::Panel::top("barra_modulos")
+    let resp = egui::Panel::top("barra_modulos")
         .frame(egui::Frame::NONE.fill(ui_refinada::menu::PAPEL).stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO)).inner_margin(4.0))
         .show(&mut raiz, |ui| {
             ui.horizontal_wrapped(|ui| {
@@ -395,13 +395,17 @@ pub fn barra_extra(
                 });
             }
         });
+    consumir_topo(&ctx, resp.response.rect.max.y);
     Ok(())
 }
 
-/// Seletor de modo no canto do mapa (canto inferior direito).
+/// Seletor de modo no canto do mapa (canto inferior direito da área livre do mapa).
 fn seletor_canto(mut contextos: EguiContexts, mut modo: ResMut<ModoTematico>) -> Result {
     let ctx = contextos.ctx_mut()?;
-    egui::Area::new("seletor_modo_mapa".into()).anchor(egui::Align2::RIGHT_BOTTOM, [-10.0, -10.0]).show(ctx, |ui| {
+    let tela = ctx.viewport_rect();
+    let livre = area_livre_mapa(ctx);
+    let dx = -(tela.max.x - livre.max.x).max(0.0) - 10.0;
+    egui::Area::new("seletor_modo_mapa".into()).anchor(egui::Align2::RIGHT_BOTTOM, [dx, -10.0]).show(ctx, |ui| {
         let quadro = egui::Frame::popup(ui.style())
             .fill(ui_refinada::menu::PAPEL)
             .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
@@ -426,13 +430,20 @@ fn seletor_canto(mut contextos: EguiContexts, mut modo: ResMut<ModoTematico>) ->
     Ok(())
 }
 
-/// Legenda do modo ativo (canto inferior esquerdo).
-fn legenda(mut contextos: EguiContexts, modo: Res<ModoTematico>, escala: Res<EscalaAtiva>) -> Result {
+/// Legenda do modo ativo (canto inferior esquerdo; sobe durante o tutorial para não colidir com a caixa).
+fn legenda(
+    mut contextos: EguiContexts,
+    modo: Res<ModoTematico>,
+    escala: Res<EscalaAtiva>,
+    tutorial: Option<Res<super::tutorial_guiado::TutorialGuiado>>,
+) -> Result {
     if matches!(*modo, ModoTematico::Politico) {
         return Ok(());
     }
     let ctx = contextos.ctx_mut()?;
-    egui::Area::new("legenda_mapa".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(ctx, |ui| {
+    let em_tutorial = tutorial.as_ref().is_some_and(|t| t.ativo);
+    let pos = if em_tutorial { [16.0, -340.0] } else { [10.0, -10.0] };
+    egui::Area::new("legenda_mapa".into()).anchor(egui::Align2::LEFT_BOTTOM, pos).show(ctx, |ui| {
         egui::Frame::popup(ui.style())
             .fill(ui_refinada::menu::PAPEL)
             .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
@@ -502,7 +513,12 @@ impl Plugin for HudMapasPlugin {
         app.init_resource::<ModoTematico>()
             .init_resource::<EscalaAtiva>()
             .add_systems(Update, (teclas_modos, repintar_tematico).chain().run_if(crate::estado::em_partida))
-            .add_systems(EguiPrimaryContextPass, (legenda, seletor_canto).run_if(crate::estado::em_partida));
+            .add_systems(
+                EguiPrimaryContextPass,
+                (legenda, seletor_canto)
+                    .after(super::ui::painel_provincia)
+                    .run_if(crate::estado::em_partida),
+            );
     }
 }
 

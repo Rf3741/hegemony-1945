@@ -5,18 +5,26 @@
 use std::path::PathBuf;
 
 use bevy::diagnostic::{Diagnostic, DiagnosticsStore, FrameTimeDiagnosticsPlugin};
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::render::view::window::screenshot::{save_to_disk, Screenshot};
 
 use super::comercio_ui::PainelComercio;
 use super::config::QualidadeGrafica;
-use super::diplomacia_ui::PainelDiplomacia;
+use super::construcao_ui::ConstrucaoUi;
+use super::diplomacia_ui::{DiploSim, PainelDiplomacia};
+use super::economy::RecursoMundo;
 use super::enciclopedia::EnciclopediaUi;
 use super::estatisticas::RecursoLedger;
+use super::eventos_ui::EstadoEv;
 use super::guerra_sim::PainelGuerra;
-use super::jogador::{PaisJogador, PainelPais};
-use super::mercado_ui::PainelMercado;
+use super::hud_mapas::ModoTematico;
+use super::jogador::{Aba, PaisJogador, PainelPais};
+use super::map::{ProvinciaSelecionada, RecursoCatalogo};
 use super::menu_pausa::{AbaConfig, JanelaConfig};
+use super::mercado_ui::PainelMercado;
+use super::politica_sim::{ComandoPol, PoliticaSim};
+use super::saveload::{PedirSalvar, Slot};
 use super::tecnologia_ui::TecnologiaSim;
 use super::time::RecursoRelogio;
 use super::tutorial_guiado::TutorialGuiado;
@@ -45,6 +53,8 @@ pub struct OpcoesCli {
     pub camera: Option<(f32, f32)>,
     /// Fator de escala/zoom da câmera ortográfica.
     pub zoom: Option<f32>,
+    /// Executa o tutorial guiado completo simulando as ações e tirando capturas por passo.
+    pub tutorial: bool,
 }
 
 impl OpcoesCli {
@@ -110,6 +120,10 @@ where
                 op.zoom = Some(zoom(&valor()?)?);
                 i += 2;
             }
+            "--tutorial" => {
+                op.tutorial = true;
+                i += 1;
+            }
             other if other.starts_with('-') => {
                 return Err(format!("bandeira desconhecida: {other}"));
             }
@@ -128,6 +142,9 @@ where
         }
         if op.zoom.is_some() {
             return Err("--zoom exige --smoke".to_string());
+        }
+        if op.tutorial {
+            return Err("--tutorial exige --smoke".to_string());
         }
     }
     Ok(op)
@@ -241,6 +258,9 @@ impl Plugin for SmokePlugin {
                     manter_relogio_no_maximo.run_if(in_state(AppState::Jogando)),
                     reabrir_painel.run_if(in_state(AppState::Jogando)),
                     amostrar_fps.run_if(crate::estado::em_partida),
+                    conduzir_tutorial_smoke
+                        .before(super::tutorial_guiado::avancar_passos)
+                        .run_if(in_state(AppState::Jogando)),
                     vigiar_prazo,
                 ),
             );
@@ -248,17 +268,25 @@ impl Plugin for SmokePlugin {
 }
 
 fn iniciar_partida(
+    op: Res<OpcoesCli>,
     mut commands: Commands,
     mut proximo: ResMut<NextState<AppState>>,
     mut tutorial: ResMut<TutorialGuiado>,
 ) {
-    tutorial.ativo = false;
-    tutorial.pendente = false;
+    if op.tutorial {
+        tutorial.iniciar();
+    } else {
+        tutorial.ativo = false;
+        tutorial.pendente = false;
+    }
     commands.insert_resource(PaisJogador(PAIS_SMOKE.to_string()));
     proximo.set(AppState::Jogando);
 }
 
-fn lancar_relogio(mut relogio: ResMut<RecursoRelogio>) {
+fn lancar_relogio(op: Res<OpcoesCli>, mut relogio: ResMut<RecursoRelogio>) {
+    if op.tutorial {
+        return;
+    }
     relogio.definir_velocidade(VelocidadeJogo::V5);
     relogio.pausado = false;
 }
@@ -287,6 +315,9 @@ fn aplicar_camera_smoke(
 /// Mantém o relógio na velocidade pedida (`--velocidade`, padrão a máxima; 0 = pausado), para
 /// separar o custo da simulação do custo de desenho nas medições de FPS.
 fn manter_relogio_no_maximo(op: Res<OpcoesCli>, mut relogio: ResMut<RecursoRelogio>) {
+    if op.tutorial {
+        return;
+    }
     let alvo = match op.velocidade.unwrap_or(5) {
         0 => {
             relogio.pausado = true;
@@ -387,11 +418,283 @@ fn amostrar_fps(store: Res<DiagnosticsStore>, mut contagem: ResMut<Contagem>) {
     contagem.fps_min = Some(contagem.fps_min.map_or(fps, |menor| menor.min(fps)));
 }
 
+#[derive(SystemParam)]
+struct EntradasTutorialSmoke<'w, 's> {
+    commands: Commands<'w, 's>,
+    tutorial: Option<ResMut<'w, TutorialGuiado>>,
+    catalogo: Option<Res<'w, RecursoCatalogo>>,
+    mundo: Option<Res<'w, RecursoMundo>>,
+    eco: Option<Res<'w, super::economia_sim::EconomiaSim>>,
+    camera: Query<'w, 's, &'static mut Transform, With<Camera2d>>,
+    selecionada: Option<ResMut<'w, ProvinciaSelecionada>>,
+    relogio: Option<ResMut<'w, RecursoRelogio>>,
+    modo: Option<ResMut<'w, ModoTematico>>,
+    constr: Option<ResMut<'w, ConstrucaoUi>>,
+    mercado: Option<ResMut<'w, PainelMercado>>,
+    comercio: Option<ResMut<'w, PainelComercio>>,
+    painel_pais: Option<ResMut<'w, PainelPais>>,
+    pol: Option<ResMut<'w, PoliticaSim>>,
+    diplo: Option<ResMut<'w, PainelDiplomacia>>,
+    diplo_sim: Option<ResMut<'w, DiploSim>>,
+    tec: Option<ResMut<'w, TecnologiaSim>>,
+    eventos: Option<ResMut<'w, EstadoEv>>,
+    pedir_salvar: MessageWriter<'w, PedirSalvar>,
+    saida: MessageWriter<'w, AppExit>,
+}
+
+#[derive(Default)]
+struct AutoTutorialState {
+    passo_anterior: Option<usize>,
+    quadros_no_passo: u32,
+    captura_feita: bool,
+    acao_executada: bool,
+    concluido: bool,
+    espera_saida: u32,
+    /// Passos que avançaram sozinhos antes de a captura/ação do smoke acontecer (ex.: um evento
+    /// pausou o relógio e cumpriu o objetivo de "pausar").
+    saltados: Vec<usize>,
+}
+
+fn conduzir_tutorial_smoke(
+    op: Res<OpcoesCli>,
+    mut estado: Local<AutoTutorialState>,
+    mut e: EntradasTutorialSmoke,
+) {
+    if !op.tutorial {
+        return;
+    }
+    let Some(tut) = e.tutorial.as_mut() else { return };
+    if estado.concluido {
+        estado.espera_saida += 1;
+        if estado.espera_saida > 15 {
+            if !estado.saltados.is_empty() {
+                eprintln!(
+                    "SMOKE FALHA motivo=tutorial_passos_saltados saltados={:?}",
+                    estado.saltados
+                );
+                e.saida.write(AppExit::error());
+            } else {
+                println!(
+                    "SMOKE OK tutorial_concluido passos=18 saltados={:?}",
+                    estado.saltados
+                );
+                e.saida.write(AppExit::Success);
+            }
+        }
+        return;
+    }
+
+    let Some(passo) = tut.passo_atual() else { return };
+
+    if estado.passo_anterior != Some(passo) {
+        if let Some(anterior) = estado.passo_anterior {
+            for pulado in (anterior + 1)..passo {
+                estado.saltados.push(pulado);
+            }
+        }
+        estado.passo_anterior = Some(passo);
+        estado.quadros_no_passo = 0;
+        estado.captura_feita = false;
+        estado.acao_executada = false;
+    }
+
+    estado.quadros_no_passo += 1;
+
+    // Em passos de duas etapas ("abra o painel e execute a ação nele"), abre o painel antes
+    // da captura para que a imagem do passo mostre o painel aberto e o destaque real.
+    if estado.quadros_no_passo == 4 {
+        match passo {
+            12 => {
+                if let Some(p) = e.painel_pais.as_mut() {
+                    p.aberto = true;
+                    p.aba = Aba::Politica;
+                }
+            }
+            13 => {
+                if let Some(d) = e.diplo.as_mut() {
+                    d.aberto = true;
+                    d.alvo = "GBR".to_string();
+                }
+            }
+            14 => {
+                if let Some(t) = e.tec.as_mut() {
+                    t.aberto = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Aguarda alguns quadros para egui renderizar elementos do passo antes da captura
+    if estado.quadros_no_passo == 14 && !estado.captura_feita {
+        estado.captura_feita = true;
+        let caminho_foto = if let Some(ref base) = op.captura {
+            let stem = base.file_stem().and_then(|s| s.to_str()).unwrap_or("tutorial");
+            let ext = base.extension().and_then(|s| s.to_str()).unwrap_or("png");
+            let parent = base.parent().unwrap_or_else(|| std::path::Path::new(""));
+            parent.join(format!("{stem}_passo_{passo:02}.{ext}"))
+        } else {
+            PathBuf::from(format!("capturas/tutorial_passo_{passo:02}.png"))
+        };
+        if let Some(p) = caminho_foto.parent() {
+            if !p.as_os_str().is_empty() {
+                let _ = std::fs::create_dir_all(p);
+            }
+        }
+        e.commands
+            .spawn(Screenshot::primary_window())
+            .observe(save_to_disk(caminho_foto.clone()));
+        println!("TUTORIAL SMOKE: passo {}/18 capturado em {}", passo + 1, caminho_foto.display());
+    }
+
+    // Após a captura, executa a ação para avançar o passo
+    if estado.quadros_no_passo >= 20 && !estado.acao_executada {
+        estado.acao_executada = true;
+        match passo {
+            0 => {
+                if let Ok(mut tf) = e.camera.single_mut() {
+                    tf.translation.x += 160.0;
+                }
+            }
+            1 => {
+                if let (Some(cat), Some(mundo), Some(sel)) = (e.catalogo.as_ref(), e.mundo.as_ref(), e.selecionada.as_mut()) {
+                    if let Some(p) = cat.0.provincias.iter().find(|p| p.estado == "Califórnia" && mundo.dono_por_provincia.get(&p.id).is_some_and(|d| d == "USA")) {
+                        sel.0 = p.id;
+                    }
+                }
+            }
+            2 => {
+                tut.pedir_proximo();
+            }
+            3 => {
+                if let Some(r) = e.relogio.as_mut() {
+                    r.pausado = false;
+                }
+            }
+            4 => {
+                if let Some(r) = e.relogio.as_mut() {
+                    let nova = if r.velocidade == VelocidadeJogo::V3 { VelocidadeJogo::V4 } else { VelocidadeJogo::V3 };
+                    r.definir_velocidade(nova);
+                }
+            }
+            5 => {
+                if let Some(r) = e.relogio.as_mut() {
+                    r.pausado = true;
+                }
+            }
+            6 => {
+                if let Some(m) = e.modo.as_mut() {
+                    let viz = m.vizinho(false);
+                    **m = viz;
+                }
+            }
+            7 => {
+                if let (Some(cat), Some(mundo), Some(sel)) = (e.catalogo.as_ref(), e.mundo.as_ref(), e.selecionada.as_mut()) {
+                    if let Some(p) = cat.0.provincias.iter().find(|p| p.estado == "Texas" && mundo.dono_por_provincia.get(&p.id).is_some_and(|d| d == "USA")) {
+                        sel.0 = p.id;
+                    }
+                }
+            }
+            8 => {
+                let pedido = e
+                    .selecionada
+                    .as_ref()
+                    .and_then(|s| e.catalogo.as_ref()?.0.obter_por_id(s.0))
+                    .and_then(|p| {
+                        let eco = e.eco.as_ref()?;
+                        let pr = super::construcao_ui::provincia_por_adm1(&eco.vista, &p.adm1_code)?;
+                        let tipo = super::construcao_ui::opcoes_para_provincia(&eco.vista, pr)
+                            .into_iter()
+                            .find(|o| o.comporta)
+                            .map(|o| o.tipo_id)?;
+                        Some((pr.id.clone(), tipo))
+                    })
+                    .unwrap_or_else(|| ("US.TX".to_string(), "fabrica_moveis".to_string()));
+                if let Some(c) = e.constr.as_mut() {
+                    c.pedidos.push(pedido);
+                }
+            }
+            9 => {
+                if let Some(c) = e.constr.as_mut() {
+                    c.aberta = true;
+                }
+            }
+            10 => {
+                if let Some(m) = e.mercado.as_mut() {
+                    m.aberto = true;
+                }
+            }
+            11 => {
+                if let Some(c) = e.comercio.as_mut() {
+                    c.aberto = true;
+                }
+            }
+            12 => {
+                if let Some(p_sim) = e.pol.as_mut() {
+                    p_sim.enviar(ComandoPol::ProporLei {
+                        categoria: "tributacao".to_string(),
+                        lei: "imposto_regressivo_consumo".to_string(),
+                    });
+                }
+            }
+            13 => {
+                let tesouro = e
+                    .eco
+                    .as_ref()
+                    .and_then(|ec| ec.vista.pais.as_ref())
+                    .map_or(1_000_000.0, |p| p.orcamento.tesouro);
+                if let Some(ds) = e.diplo_sim.as_mut() {
+                    if ds
+                        .0
+                        .executar("USA", "GBR", sim_diplomacia::Acao::MelhorarRelacoes, tesouro)
+                        .is_err()
+                    {
+                        let atual = ds.0.relacao("USA", "GBR");
+                        ds.0.definir_relacao("USA", "GBR", atual + 10.0);
+                    }
+                }
+            }
+            14 => {
+                if let Some(t) = e.tec.as_mut() {
+                    let tech_id = t
+                        .mundo
+                        .catalogo
+                        .techs
+                        .iter()
+                        .find(|tech| t.mundo.pode_iniciar("USA", tech, 1945))
+                        .map(|tech| tech.id.clone())
+                        .unwrap_or_else(|| "siderurgia_moderna_siemens".to_string());
+                    let _ = t.mundo.iniciar("USA", &tech_id, 1945);
+                }
+            }
+            15 => {
+                if let Some(ev) = e.eventos.as_mut() {
+                    ev.jornal_aberto = true;
+                }
+            }
+            16 => {
+                e.pedir_salvar.write(PedirSalvar(Slot::Rapido));
+            }
+            17 => {
+                if let Some(ref base) = op.captura {
+                    e.commands
+                        .spawn(Screenshot::primary_window())
+                        .observe(save_to_disk(base.clone()));
+                }
+                tut.pedir_proximo();
+                estado.concluido = true;
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Abre a partida, pede a captura e encerra no prazo, imprimindo o resultado.
 fn vigiar_prazo(
     op: Res<OpcoesCli>,
     tempo: Res<Time<Real>>,
     jogador: Option<Res<PaisJogador>>,
+    tutorial: Option<Res<TutorialGuiado>>,
     relogio: Res<RecursoRelogio>,
     mut contagem: ResMut<Contagem>,
     mut commands: Commands,
@@ -403,6 +706,7 @@ fn vigiar_prazo(
     let decorrido = agora - inicio;
 
     if let Some(caminho) = &op.captura
+        && !op.tutorial
         && !contagem.captura_pedida
         && decorrido >= (alvo - ANTECEDENCIA_CAPTURE).max(1.0)
     {
@@ -419,6 +723,12 @@ fn vigiar_prazo(
 
     if jogador.is_none() {
         eprintln!("SMOKE FALHA motivo=partida_nao_iniciada segundos={decorrido:.1}");
+        saida.write(AppExit::error());
+        return;
+    }
+    if op.tutorial {
+        let passo = tutorial.as_ref().and_then(|t| t.passo_atual());
+        eprintln!("SMOKE FALHA motivo=tutorial_incompleto passo={passo:?} segundos={decorrido:.1}");
         saida.write(AppExit::error());
         return;
     }
@@ -491,7 +801,15 @@ mod testes {
         assert!(analisar_args(args(&["--screenshot", "a.png"])).is_err());
         assert!(analisar_args(args(&["--camera", "10", "20"])).is_err());
         assert!(analisar_args(args(&["--zoom", "0.5"])).is_err());
+        assert!(analisar_args(args(&["--tutorial"])).is_err());
         assert!(analisar_args(args(&["--smoke", "10", "--painel", "3"])).is_ok());
+        assert!(analisar_args(args(&["--smoke", "10", "--tutorial"])).is_ok());
+    }
+
+    #[test]
+    fn tutorial_smoke_valido() {
+        let op = analisar_args(args(&["--smoke", "30", "--tutorial"])).unwrap();
+        assert!(op.tutorial);
     }
 
     #[test]

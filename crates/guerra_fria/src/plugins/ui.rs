@@ -1,26 +1,77 @@
 //! Interface egui: barra superior (data e controles de tempo) e painel de província.
-use super::economia_sim::EconomiaSim;
-use super::economy::RecursoMundo;
 use super::comercio_ui::PainelComercio;
 use super::construcao_ui::{ConstrucaoUi, secao_construir_aqui};
-use super::mercado_ui::PainelMercado;
+use super::economia_sim::EconomiaSim;
+use super::economy::RecursoMundo;
+use super::enciclopedia::dica;
 use super::jogador::{PainelPais, PaisJogador, hud_pais, resumo_pais};
 use super::map::{ProvinciaSelecionada, RecursoCatalogo};
+use super::mercado_ui::PainelMercado;
 use super::time::RecursoRelogio;
 use bevy::prelude::*;
-use super::enciclopedia::dica;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
+use gf_mapa::tempo::VelocidadeJogo;
 
+/// Estado por quadro do retângulo livre da janela principal: `(quadro, rect_atual)`.
+type EstadoLayoutRaiz = (u64, egui::Rect);
+
+fn id_layout_raiz() -> egui::Id {
+    egui::Id::new("layout_raiz_partida")
+}
+
+/// Cria um `egui::Ui` para o próximo painel da cadeia (`barra_superior` -> `barra_hud` -> `barra_extra` -> `painel_provincia`),
+/// usando apenas o retângulo restante deixado pelos painéis já desenhados neste quadro.
 pub(crate) fn ui_raiz(ctx: &egui::Context) -> egui::Ui {
+    let quadro = ctx.cumulative_frame_nr();
+    let tela = ctx.viewport_rect();
+    let rect = ctx.data_mut(|d| {
+        let est = d.get_temp_mut_or_insert_with::<EstadoLayoutRaiz>(id_layout_raiz(), || (quadro, tela));
+        if est.0 != quadro {
+            *est = (quadro, tela);
+        }
+        est.1
+    });
     egui::Ui::new(
         ctx.clone(),
         "viewport_raiz".into(),
         egui::UiBuilder::new()
             .layer_id(egui::LayerId::background())
-            .max_rect(ctx.viewport_rect()),
+            .max_rect(rect),
     )
 }
-use gf_mapa::tempo::VelocidadeJogo;
+
+/// Desconta a altura de um painel de topo recém-desenhado (`max_y`) do retângulo livre do quadro.
+pub(crate) fn consumir_topo(ctx: &egui::Context, max_y: f32) {
+    let quadro = ctx.cumulative_frame_nr();
+    let tela = ctx.viewport_rect();
+    ctx.data_mut(|d| {
+        let est = d.get_temp_mut_or_insert_with::<EstadoLayoutRaiz>(id_layout_raiz(), || (quadro, tela));
+        if est.0 != quadro {
+            *est = (quadro, tela);
+        }
+        est.1.min.y = est.1.min.y.max(max_y).min(est.1.max.y);
+    });
+}
+
+/// Desconta a largura de um painel lateral direito recém-desenhado (`min_x`) do retângulo livre do quadro.
+pub(crate) fn consumir_direita(ctx: &egui::Context, min_x: f32) {
+    let quadro = ctx.cumulative_frame_nr();
+    let tela = ctx.viewport_rect();
+    ctx.data_mut(|d| {
+        let est = d.get_temp_mut_or_insert_with::<EstadoLayoutRaiz>(id_layout_raiz(), || (quadro, tela));
+        if est.0 != quadro {
+            *est = (quadro, tela);
+        }
+        est.1.max.x = est.1.max.x.min(min_x).max(est.1.min.x);
+    });
+}
+
+/// Retângulo central livre do mapa (abaixo das barras superiores e à esquerda do painel de província).
+pub(crate) fn area_livre_mapa(ctx: &egui::Context) -> egui::Rect {
+    let tela = ctx.viewport_rect();
+    ctx.data(|d| d.get_temp::<EstadoLayoutRaiz>(id_layout_raiz()))
+        .map_or(tela, |(_, r)| r.intersect(tela))
+}
 
 pub struct UiPlugin;
 
@@ -39,13 +90,21 @@ fn barra_superior(
     mut contextos: EguiContexts,
     camada_visivel: Option<Res<visual_mapa::CamadaConstrucoesVisivel>>,
     mut janela_saves: ResMut<super::menu_saves::JanelaSaves>,
+    mut relogio: ResMut<RecursoRelogio>,
 ) -> Result {
-    let mut raiz = ui_raiz(contextos.ctx_mut()?);
-    egui::Panel::top("barra_superior")
-        .frame(egui::Frame::NONE.fill(ui_refinada::menu::PAPEL).stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO)).inner_margin(6.0))
+    let ctx = contextos.ctx_mut()?.clone();
+    let mut raiz = ui_raiz(&ctx);
+    let resp = egui::Panel::top("barra_superior")
+        .frame(
+            egui::Frame::NONE
+                .fill(ui_refinada::menu::PAPEL)
+                .stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO))
+                .inner_margin(6.0),
+        )
         .show(&mut raiz, |ui| {
             ui.horizontal(|ui| {
-                let b_salvar = ui_refinada::botao_estilo_secundario(ui, "Salvar / Carregar").on_hover_text("Abre o menu de jogos salvos (Ctrl+S salva rápido, Ctrl+L carrega)");
+                let b_salvar = ui_refinada::botao_estilo_secundario(ui, "Salvar / Carregar")
+                    .on_hover_text("Abre o menu de jogos salvos (Ctrl+S salva rápido, Ctrl+L carrega)");
                 super::tutorial_guiado::marcar(&b_salvar, "salvar");
                 if b_salvar.clicked() {
                     janela_saves.abrir(false);
@@ -56,22 +115,33 @@ fn barra_superior(
                     ui.label(egui::RichText::new(texto).color(ui_refinada::menu::TINTA));
                     ui.separator();
                 }
-                ui.label(egui::RichText::new("?").color(ui_refinada::menu::TINTA_SUAVE)).on_hover_text("Espaço: pausa | +/−: velocidade | WASD: mover | scroll: zoom | V: construções | M: modos de mapa | 1-9: painéis | Ctrl+S/L: salvar/carregar");
+                ui.label(egui::RichText::new("?").color(ui_refinada::menu::TINTA_SUAVE)).on_hover_text(
+                    "Espaço: pausa | +/−: velocidade | WASD: mover | scroll: zoom | V: construções | M: modos de mapa | 1-9: painéis | Ctrl+S/L: salvar/carregar",
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let r_rel = widget_relogio(ui, &mut relogio);
+                    super::tutorial_guiado::alvo(ui.ctx(), "relogio", r_rel);
+                });
             });
         });
+    consumir_topo(&ctx, resp.response.rect.max.y);
     Ok(())
 }
 
 /// Relógio estilo Victoria 3/HOI4: data, pausa, − / + e barrinhas de velocidade (1–5).
-fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) {
+/// Retorna o retângulo exato ocupado pelos controles do relógio.
+fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) -> egui::Rect {
     // Em layout direita-para-esquerda: o último desenhado fica mais à esquerda.
-    if ui.small_button("+").on_hover_text("Aumentar velocidade (+)").clicked() {
+    let r_mais = ui.small_button("+").on_hover_text("Aumentar velocidade (+)");
+    if r_mais.clicked() {
         let v = relogio.velocidade.aumentar();
         relogio.definir_velocidade(v);
     }
+    let mut rect = r_mais.rect;
     for v in VelocidadeJogo::TODAS.iter().rev() {
         let n = v.nivel();
         let (r, resp) = ui.allocate_exact_size(egui::vec2(8.0, 18.0), egui::Sense::click());
+        rect = rect.union(r);
         let acesa = !relogio.pausado && n <= relogio.velocidade.nivel();
         let cor = if acesa {
             ui_refinada::menu::VERMELHO
@@ -81,23 +151,29 @@ fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) {
             ui_refinada::menu::PAPEL_CARD
         };
         let alto = 6.0 + 3.0 * n as f32;
-        let barra = egui::Rect::from_min_max(egui::pos2(r.left() + 1.0, r.bottom() - alto), egui::pos2(r.right() - 1.0, r.bottom()));
+        let barra = egui::Rect::from_min_max(
+            egui::pos2(r.left() + 1.0, r.bottom() - alto),
+            egui::pos2(r.right() - 1.0, r.bottom()),
+        );
         ui.painter().rect_filled(barra, 1.0, cor);
         if resp.on_hover_text(v.rotulo_pt()).clicked() {
             relogio.definir_velocidade(*v);
         }
     }
-    if ui.small_button("-").on_hover_text("Diminuir velocidade (−)").clicked() {
+    let r_menos = ui.small_button("-").on_hover_text("Diminuir velocidade (−)");
+    rect = rect.union(r_menos.rect);
+    if r_menos.clicked() {
         let v = relogio.velocidade.diminuir();
         relogio.definir_velocidade(v);
     }
     let rotulo = if relogio.pausado { "Continuar" } else { "Pausar" };
     let b_pausa = dica(ui_refinada::botao_estilo_menu(ui, rotulo), "tooltip_topbar_botao_pausar");
     super::tutorial_guiado::marcar(&b_pausa, "pausa");
+    rect = rect.union(b_pausa.rect);
     if b_pausa.clicked() {
         relogio.alternar_pausa();
     }
-    dica(
+    let r_data = dica(
         ui.label(
             egui::RichText::new(relogio.data.formatar_pt_br())
                 .family(ui_refinada::familia_oswald(ui.ctx()))
@@ -107,11 +183,11 @@ fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) {
         ),
         "tooltip_topbar_data",
     );
+    rect.union(r_data.rect)
 }
 
 fn barra_hud(
     mut contextos: EguiContexts,
-    mut relogio: ResMut<RecursoRelogio>,
     jogador: Option<Res<PaisJogador>>,
     mundo: Res<RecursoMundo>,
     eco: Option<Res<EconomiaSim>>,
@@ -122,21 +198,24 @@ fn barra_hud(
 ) -> Result {
     let Some(eco) = eco else { return Ok(()) };
     let Some(p) = jogador.and_then(|j| mundo.paises.get(&j.0)) else { return Ok(()) };
-    let mut raiz = ui_raiz(contextos.ctx_mut()?);
-    egui::Panel::top("barra_hud")
-        .frame(egui::Frame::NONE.fill(ui_refinada::menu::PAPEL).stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO)).inner_margin(6.0))
+    let ctx = contextos.ctx_mut()?.clone();
+    let mut raiz = ui_raiz(&ctx);
+    let resp = egui::Panel::top("barra_hud")
+        .frame(
+            egui::Frame::NONE
+                .fill(ui_refinada::menu::PAPEL)
+                .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
+                .inner_margin(6.0),
+        )
         .show(&mut raiz, |ui| {
             hud_pais(ui, p, &eco, &mut painel.aberto, &mut mercado.aberto, &mut comercio.aberto, &mut constr.aberta);
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                widget_relogio(ui, &mut relogio);
-                super::tutorial_guiado::alvo(ui.ctx(), "relogio", ui.min_rect());
-            });
             super::tutorial_guiado::alvo(ui.ctx(), "hud", ui.min_rect());
         });
+    consumir_topo(&ctx, resp.response.rect.max.y);
     Ok(())
 }
 
-fn painel_provincia(
+pub(crate) fn painel_provincia(
     mut contextos: EguiContexts,
     selecionada: Res<ProvinciaSelecionada>,
     catalogo: Res<RecursoCatalogo>,
@@ -148,12 +227,12 @@ fn painel_provincia(
         return Ok(());
     }
     let Some(prov) = catalogo.0.obter_por_id(selecionada.0) else { return Ok(()) };
-    let mut raiz = ui_raiz(contextos.ctx_mut()?);
-    egui::Panel::right("painel_provincia")
+    let ctx = contextos.ctx_mut()?.clone();
+    let mut raiz = ui_raiz(&ctx);
+    let resp = egui::Panel::right("painel_provincia")
         .frame(ui_refinada::moldura_janela_papel())
         .min_size(260.0)
         .show(&mut raiz, |ui| {
-            super::tutorial_guiado::alvo(ui.ctx(), "painel_provincia", ui.max_rect());
             ui_refinada::cabecalho_painel(ui, &prov.nome);
             let estado = if prov.estado.is_empty() { prov.adm1_code.as_str() } else { prov.estado.as_str() };
             ui.label(format!("Estado: {estado}"));
@@ -176,8 +255,12 @@ fn painel_provincia(
             ui.label(format!("Vizinhas: {} | Províncias do estado: {irmas}", prov.vizinhos.len()));
             ui.label("Construção, economia e política são por estado.");
             if let Some(eco) = &eco {
-                egui::ScrollArea::vertical().id_salt("scroll_painel_prov").show(ui, |ui| secao_construir_aqui(ui, &eco.vista, &prov.adm1_code, &mut constr));
+                egui::ScrollArea::vertical()
+                    .id_salt("scroll_painel_prov")
+                    .show(ui, |ui| secao_construir_aqui(ui, &eco.vista, &prov.adm1_code, &mut constr));
             }
         });
+    super::tutorial_guiado::alvo(&ctx, "painel_provincia", resp.response.rect);
+    consumir_direita(&ctx, resp.response.rect.min.x);
     Ok(())
 }

@@ -26,6 +26,7 @@ cargo run -p guerra_fria -- --smoke 30 --screenshot /tmp/fim.png
 | `--painel <1-9>` | o mesmo número do atalho no jogo | Abre o painel já no início da partida, para exercitar a UI dele. Exige `--smoke`. |
 | `--camera <lon> <lat>` | coordenadas geográficas em graus | Posiciona a câmera nas coordenadas dadas. Exige `--smoke`. |
 | `--zoom <fator>` | fator real > 0 | Define a escala/zoom da câmera ortográfica. Exige `--smoke`. |
+| `--tutorial` | (nenhum) | Executa o tutorial guiado dos EUA passo a passo de forma automatizada, simulando a ação certa de cada passo e tirando uma captura por passo (`<--screenshot>_passo_NN.png`; sem `--screenshot`, `capturas/tutorial_passo_NN.png`). Ao concluir o último passo imprime `SMOKE OK tutorial_concluido passos=18 saltados=[...]` (passos que avançaram sozinhos, p.ex. por um evento ter pausado o relógio) e encerra. Exige `--smoke` (use um prazo folgado, p.ex. 240). |
 
 Os números de painel são os atalhos do jogo (ver `docs/ESTADO_ATUAL.md`):
 1 país · 2 mercado · 3 comércio · 4 diplomacia · 5 tecnologia · 6 guerra ·

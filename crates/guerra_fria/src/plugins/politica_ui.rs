@@ -39,11 +39,11 @@ pub fn aba_politica(ui: &mut egui::Ui, pol: &mut PoliticaSim) {
     let mut cmds: Vec<ComandoPol> = Vec::new();
     cabecalho(ui, &p, &pol.vista.data.map(|d| d.to_string()).unwrap_or_default());
     ui.separator();
+    leis(ui, pol, &p, &mut cmds);
+    ui.separator();
     grupos(ui, &p);
     ui.separator();
     partidos(ui, &p);
-    ui.separator();
-    leis(ui, pol, &p, &mut cmds);
     ui.separator();
     movimentos(ui, &p);
     for c in cmds {
