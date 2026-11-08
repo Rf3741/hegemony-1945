@@ -137,9 +137,10 @@ fn main() -> AppExit {
     .add_plugins(plugins::tutorial_guiado::TutorialGuiadoPlugin)
     .add_plugins(plugins::polimento_visual::PolimentoVisualPlugin);
 
-    if opcoes.smoke_ativo() {
-        app.add_plugins(plugins::smoke::SmokePlugin(opcoes));
+    if opcoes.ativo() {
+        app.add_plugins(plugins::smoke::SmokePlugin(opcoes.clone()));
     }
+    app.insert_resource(opcoes);
 
     app.run()
 }

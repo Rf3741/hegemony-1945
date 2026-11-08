@@ -47,8 +47,12 @@ fn tecla_esc(
     mut config: ResMut<crate::plugins::menu_pausa::JanelaConfig>,
     mut saves: ResMut<crate::plugins::menu_saves::JanelaSaves>,
     mut ledger: ResMut<crate::plugins::estatisticas::RecursoLedger>,
+    opcoes: Option<Res<crate::plugins::smoke::OpcoesCli>>,
 ) {
     if !teclas.just_pressed(KeyCode::Escape) {
+        return;
+    }
+    if opcoes.as_ref().is_some_and(|o| o.espectador_ativo()) {
         return;
     }
     // Esc fecha primeiro a janela que estiver aberta por cima.

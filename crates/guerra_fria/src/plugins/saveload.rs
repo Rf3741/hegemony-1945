@@ -311,7 +311,16 @@ fn teclas_rapidas(teclas: Res<ButtonInput<KeyCode>>, mut s: MessageWriter<PedirS
 }
 
 /// Grava o autosave a cada N meses (Configurações > Jogo; padrão 12 = todo 1º de janeiro).
-fn autosave_anual(mut ticks: MessageReader<EventoTickDiario>, mut s: MessageWriter<PedirSalvar>, cfg: Res<super::config::ConfigJogo>) {
+fn autosave_anual(
+    mut ticks: MessageReader<EventoTickDiario>,
+    mut s: MessageWriter<PedirSalvar>,
+    cfg: Res<super::config::ConfigJogo>,
+    opcoes: Option<Res<super::smoke::OpcoesCli>>,
+) {
+    if opcoes.as_ref().is_some_and(|o| o.ativo()) {
+        ticks.clear();
+        return;
+    }
     for t in ticks.read() {
         if super::config::dia_de_autosave(t.nova_data.ano, t.nova_data.mes, t.nova_data.dia, cfg.partida.autosave_meses) {
             s.write(PedirSalvar(Slot::Auto));
