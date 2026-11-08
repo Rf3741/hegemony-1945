@@ -38,6 +38,10 @@ pub struct ConstrucaoUi {
     pub tutorial: Option<usize>,
     /// Pedidos de obra feitos pela interface: (província, tipo).
     pub pedidos: Vec<(String, String)>,
+    /// Ações diretas sobre prédios existentes (fechar, reabrir, demolir).
+    pub acoes_predios: Vec<Comando>,
+    /// Confirmação pendente de demolição: `(provincia_id, tipo_predio_id)`.
+    pub confirmar_demolicao: Option<(String, String)>,
     /// Última província do mapa processada (para sincronizar o estado destacado).
     ultima_selecao: u32,
 }
@@ -53,6 +57,8 @@ impl Default for ConstrucaoUi {
             modo_mapa: ModoMapa::Normal,
             tutorial: None,
             pedidos: Vec::new(),
+            acoes_predios: Vec::new(),
+            confirmar_demolicao: None,
             ultima_selecao: 0,
         }
     }
@@ -421,6 +427,133 @@ fn cor_lucro(v: f64) -> egui::Color32 {
     if v >= 0.0 { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::PERIGO }
 }
 
+/// Calcula `(rotulo_tendencia, cor_tendencia, custo_reabrir, reembolso_demolir_1nv)` para um prédio existente.
+pub fn resumo_gestao_predio(
+    v: &VistaEconomia,
+    b: &sim_economia::Predio,
+) -> (String, egui::Color32, f64, f64) {
+    let Some(cat) = v.catalogo.as_ref() else {
+        return ("→ estável".into(), ui_refinada::menu::TINTA_SUAVE, 0.0, 0.0);
+    };
+    let Some(tipo) = cat.obter_tipo_predio(&b.tipo_predio_id) else {
+        return ("→ estável".into(), ui_refinada::menu::TINTA_SUAVE, 0.0, 0.0);
+    };
+    let preco_bem = |id: &str| {
+        v.bens
+            .iter()
+            .find(|x| x.id == id)
+            .map_or(20.0, |x| x.preco_nacional)
+    };
+    let custo_reabrir =
+        sim_economia::calcular_custo_reabertura_por_precos(cat, tipo, b.nivel, preco_bem);
+    let reembolso_demolir =
+        sim_economia::calcular_reembolso_demolicao_por_precos(cat, tipo, 1, preco_bem);
+
+    let var30 = b
+        .produtos_por_nivel()
+        .first()
+        .and_then(|&(idx, _)| v.bens.get(idx as usize))
+        .map_or(0.0, |bem| bem.var30_nacional);
+
+    let (seta, cor) = if b.tendencia_lucro > 3.0 || var30 > 0.04 {
+        ("↗ em alta", ui_refinada::menu::SUCESSO)
+    } else if b.tendencia_lucro < -3.0 || var30 < -0.04 || b.dias_prejuizo >= 15 {
+        ("↘ em queda", ui_refinada::menu::PERIGO)
+    } else {
+        ("→ estável", ui_refinada::menu::TINTA_SUAVE)
+    };
+    let rotulo = if var30.abs() >= 0.005 {
+        format!("{seta} ({:+.0}%/30d)", var30 * 100.0)
+    } else {
+        seta.to_string()
+    };
+    (rotulo, cor, custo_reabrir, reembolso_demolir)
+}
+
+/// Desenha os controles de Fechar / Reabrir e Demolir (com confirmação) para um prédio instalado.
+pub fn botoes_gestao_predio_inline(
+    ui: &mut egui::Ui,
+    v: &VistaEconomia,
+    provincia_id: &str,
+    b: &sim_economia::Predio,
+    confirmar_demolicao: &mut Option<(String, String)>,
+    acoes: &mut Vec<Comando>,
+) {
+    let (rotulo_tend, cor_tend, custo_reabrir, reembolso_demolir) = resumo_gestao_predio(v, b);
+    ui.colored_label(cor_tend, &rotulo_tend)
+        .on_hover_text("Tendência recente de rentabilidade do prédio e do preço de venda do produto");
+
+    if b.fechado {
+        let txt_reabrir = format!("Reabrir ({})", fmt_din(custo_reabrir));
+        if ui
+            .small_button(
+                egui::RichText::new(txt_reabrir)
+                    .color(ui_refinada::menu::SUCESSO)
+                    .strong(),
+            )
+            .on_hover_text(format!(
+                "Reabre o prédio pagando {} de remobilização. A produção retoma gradualmente em {} dias.",
+                fmt_din(custo_reabrir),
+                sim_economia::Predio::TEMPO_RETOMADA_DIAS
+            ))
+            .clicked()
+        {
+            acoes.push(Comando::ReabrirPredio {
+                provincia_id: provincia_id.to_string(),
+                tipo_id: b.tipo_predio_id.clone(),
+            });
+        }
+    } else if ui
+        .small_button(egui::RichText::new("Fechar").color(ui_refinada::menu::AVISO))
+        .on_hover_text(format!(
+            "Fecha temporariamente: cessa produção e consumo de insumos, dispensa {:.0} trabalhadores e mantém custo de conservação baixo (£{:.0}/dia).",
+            b.total_empregados(),
+            (b.nivel as f64) * sim_economia::CUSTO_MANUTENCAO_FECHADO_POR_NIVEL
+        ))
+        .clicked()
+    {
+        acoes.push(Comando::FecharPredio {
+            provincia_id: provincia_id.to_string(),
+            tipo_id: b.tipo_predio_id.clone(),
+        });
+    }
+
+    let chave = (provincia_id.to_string(), b.tipo_predio_id.clone());
+    if confirmar_demolicao.as_ref() == Some(&chave) {
+        ui.colored_label(ui_refinada::menu::PERIGO, "Confirmar?");
+        if ui
+            .small_button(
+                egui::RichText::new(format!("Demolir (+{})", fmt_din(reembolso_demolir)))
+                    .color(ui_refinada::menu::PERIGO)
+                    .strong(),
+            )
+            .on_hover_text(
+                "Confirma a demolição de 1 nível, liberando espaço regional e recuperando parte dos materiais.",
+            )
+            .clicked()
+        {
+            acoes.push(Comando::DemolirPredio {
+                provincia_id: provincia_id.to_string(),
+                tipo_id: b.tipo_predio_id.clone(),
+                niveis: 1,
+            });
+            *confirmar_demolicao = None;
+        }
+        if ui.small_button("Cancelar").clicked() {
+            *confirmar_demolicao = None;
+        }
+    } else if ui
+        .small_button(egui::RichText::new("Demolir (-1 nv)").color(ui_refinada::menu::PERIGO))
+        .on_hover_text(format!(
+            "Reduz 1 nível do prédio, libera capacidade regional e devolve {} em materiais recuperados.",
+            fmt_din(reembolso_demolir)
+        ))
+        .clicked()
+    {
+        *confirmar_demolicao = Some(chave);
+    }
+}
+
 /// Seção "Construir aqui" do painel de província/estado. `adm1` é o código da província clicada no mapa.
 pub fn secao_construir_aqui(ui: &mut egui::Ui, v: &VistaEconomia, adm1: &str, c: &mut ConstrucaoUi) {
     ui.add_space(6.0);
@@ -460,6 +593,82 @@ pub fn secao_construir_aqui(ui: &mut egui::Ui, v: &VistaEconomia, adm1: &str, c:
             )),
         );
         ui.small(format!("Terra arável livre: {}", e.terra_aravel_livre()));
+    }
+
+    // Prédios já instalados nesta província: lucro atual, tendência, Fechar/Reabrir e Demolir com confirmação
+    if let Some(cat) = v.catalogo.as_ref()
+        && prov.predios.iter().any(|b| b.nivel > 0)
+    {
+        ui.add_space(4.0);
+        ui_refinada::titulo_secao(ui, "Prédios instalados nesta província");
+        egui::ScrollArea::vertical()
+            .id_salt("scroll_instalados_prov")
+            .max_height(190.0)
+            .show(ui, |ui| {
+                for b in prov.predios.iter().filter(|b| b.nivel > 0) {
+                    let nome_b = cat
+                        .obter_tipo_predio(&b.tipo_predio_id)
+                        .map_or(b.tipo_predio_id.as_str(), |t| t.nome.as_str());
+                    let eh_gov = cat
+                        .obter_tipo_predio(&b.tipo_predio_id)
+                        .is_some_and(|t| t.financiado_pelo_governo);
+                    ui_refinada::moldura_cartao().show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&b.tipo_predio_id), 14.0, None);
+                            ui.label(egui::RichText::new(format!("{nome_b} (Nv. {})", b.nivel)).strong());
+                            if b.fechado {
+                                ui.colored_label(
+                                    ui_refinada::menu::PERIGO,
+                                    format!("FECHADO ({}d)", b.dias_fechado),
+                                );
+                            } else if b.esta_em_retomada() {
+                                ui.colored_label(
+                                    ui_refinada::menu::AVISO,
+                                    format!(
+                                        "Retomando ({}d · {:.0}%)",
+                                        b.dias_retomada,
+                                        b.fator_retomada() * 100.0
+                                    ),
+                                );
+                            } else {
+                                ui.weak(format!(
+                                    "{:.0}/{:.0} trab.",
+                                    b.total_empregados(),
+                                    b.total_vagas()
+                                ));
+                            }
+                            if eh_gov {
+                                ui.colored_label(
+                                    ui_refinada::menu::INFO,
+                                    format!("Custo {}/d", fmt_din(b.folha_salarial_ultimo_tick + b.custo_insumos_ultimo_tick)),
+                                );
+                            } else {
+                                ui.colored_label(
+                                    cor_lucro(b.lucro_ultimo_tick),
+                                    format!("{}/d", fmt_din(b.lucro_ultimo_tick)),
+                                );
+                                if b.dias_prejuizo > 0 && !b.fechado {
+                                    ui.colored_label(
+                                        ui_refinada::menu::PERIGO,
+                                        format!("({}d prejuízo)", b.dias_prejuizo),
+                                    );
+                                }
+                            }
+                        });
+                        ui.horizontal_wrapped(|ui| {
+                            botoes_gestao_predio_inline(
+                                ui,
+                                v,
+                                &prov.id,
+                                b,
+                                &mut c.confirmar_demolicao,
+                                &mut c.acoes_predios,
+                            );
+                        });
+                    });
+                }
+            });
+        ui.add_space(4.0);
     }
     ui.horizontal_wrapped(|ui| {
         if ui_refinada::aba_glifo(ui, c.filtro_cat.is_none(), Some("lupa"), "Todas") {
@@ -752,11 +961,11 @@ fn tecla_b(teclas: Res<ButtonInput<KeyCode>>, mut c: ResMut<ConstrucaoUi>, mut e
 
 /// Converte os pedidos da interface em comandos para a economia.
 pub fn aplicar_pedidos(mut c: ResMut<ConstrucaoUi>, mut eco: ResMut<EconomiaSim>) {
-    if c.pedidos.is_empty() {
-        return;
-    }
     for (provincia_id, tipo_id) in std::mem::take(&mut c.pedidos) {
         eco.enviar(Comando::Construir { provincia_id, tipo_id });
+    }
+    for cmd in std::mem::take(&mut c.acoes_predios) {
+        eco.enviar(cmd);
     }
 }
 
@@ -1049,5 +1258,67 @@ mod testes {
                 "em Cuba o jogador deve ter dezenas de opções construíveis (deu {construiveis})"
             );
         }
+    }
+
+    #[test]
+    fn fechar_reabrir_demolir_ui_e_consequencias() {
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut nucleo = crate::plugins::economia_sim::Nucleo::carregar(&raiz.join("assets/data/economia"), 5).expect("nucleo");
+        let usa = nucleo.id_pais("USA").unwrap();
+        let (prov_id, tipo_id, nivel_ini) = nucleo
+            .mundo
+            .provincias()
+            .iter()
+            .filter(|p| p.pais_id == usa)
+            .find_map(|p| {
+                p.predios
+                    .iter()
+                    .find(|b| b.nivel >= 2 && !b.fechado && b.total_empregados() >= 500.0)
+                    .map(|b| (p.id.clone(), b.tipo_predio_id.clone(), b.nivel))
+            })
+            .expect("prédio grande nos EUA");
+
+        // 1. Fechar via Comando::FecharPredio
+        let msg_fechar = nucleo
+            .aplicar(&usa, Comando::FecharPredio { provincia_id: prov_id.clone(), tipo_id: tipo_id.clone() })
+            .expect("fechar");
+        assert!(msg_fechar.contains("fechado"));
+        assert!(!nucleo.acoes_predio_recentes.is_empty());
+        assert!(nucleo.acoes_predio_recentes[0].trabalhadores_demitidos >= 500.0);
+
+        let v_fechado = nucleo.vista(&usa);
+        let b_fechado = v_fechado
+            .provincias
+            .iter()
+            .find(|p| p.id == prov_id)
+            .unwrap()
+            .predios
+            .iter()
+            .find(|b| b.tipo_predio_id == tipo_id)
+            .unwrap();
+        assert!(b_fechado.fechado);
+        let (rotulo_tend, _, custo_reabrir, reembolso_demolir) = resumo_gestao_predio(&v_fechado, b_fechado);
+        assert!(!rotulo_tend.is_empty() && custo_reabrir > 0.0 && reembolso_demolir > 0.0);
+
+        // 2. Reabrir via Comando::ReabrirPredio
+        let msg_reabrir = nucleo
+            .aplicar(&usa, Comando::ReabrirPredio { provincia_id: prov_id.clone(), tipo_id: tipo_id.clone() })
+            .expect("reabrir");
+        assert!(msg_reabrir.contains("reaberto"));
+
+        // 3. Demolir 1 nível via Comando::DemolirPredio
+        let msg_demolir = nucleo
+            .aplicar(&usa, Comando::DemolirPredio { provincia_id: prov_id.clone(), tipo_id: tipo_id.clone(), niveis: 1 })
+            .expect("demolir");
+        assert!(msg_demolir.contains("demolido"));
+        let b_demolido = nucleo
+            .mundo
+            .obter_provincia(&prov_id)
+            .unwrap()
+            .predios
+            .iter()
+            .find(|b| b.tipo_predio_id == tipo_id)
+            .unwrap();
+        assert_eq!(b_demolido.nivel, nivel_ini - 1);
     }
 }

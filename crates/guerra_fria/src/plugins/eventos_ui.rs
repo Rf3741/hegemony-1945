@@ -50,10 +50,17 @@ fn tick_eventos(
     mut ev: ResMut<EstadoEv>,
     mut relogio: ResMut<RecursoRelogio>,
     cfg: Res<super::config::ConfigJogo>,
+    mut eco: Option<ResMut<super::economia_sim::EconomiaSim>>,
 ) {
     if leitor.read().count() > 0 {
         let est = &mut ev.estado;
+        let antes = est.disparados.clone();
         avaliar_dia(&cat.0, est, &mut mundo.0, &pais.0);
+        if let Some(eco) = eco.as_mut() {
+            for id in est.disparados.keys().filter(|k| !antes.contains_key(*k)) {
+                eco.registrar_evento_historico(id);
+            }
+        }
     }
     // Enquanto houver decisão pendente o tempo fica parado.
     if !ev.estado.pendentes.is_empty() && cfg.partida.pausar_em_eventos {

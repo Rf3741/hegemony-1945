@@ -40,6 +40,8 @@ pub struct PainelPais {
     pub apenas_prejuizo: bool,
     /// Filtro de texto para pesquisar prédios/províncias
     pub filtro_texto_predios: String,
+    /// Confirmação pendente de demolição na aba de construção: `(provincia_id, tipo_predio_id)`.
+    pub confirmar_demolicao: Option<(String, String)>,
 }
 
 /// Mensagens recentes (texto, instante em segundos de relógio real, repetições).
@@ -1717,32 +1719,61 @@ pub fn aba_construcao(
                             ui.label(format!("{}/trab", fmt_din(prod_b)));
 
                             // Status / Fluxo
-                            if eh_prej {
+                            if b.fechado {
                                 ui.colored_label(
                                     ui_refinada::menu::PERIGO,
-                                    format!("PREJUÍZO (suprim. {:.0}%)", b.fator_insumos() * 100.0)
+                                    format!("FECHADO ({}d)", b.dias_fechado),
+                                );
+                            } else if b.esta_em_retomada() {
+                                ui.colored_label(
+                                    ui_refinada::menu::AVISO,
+                                    format!(
+                                        "Retomando ({}d · {:.0}%)",
+                                        b.dias_retomada,
+                                        b.fator_retomada() * 100.0
+                                    ),
+                                );
+                            } else if eh_prej {
+                                ui.colored_label(
+                                    ui_refinada::menu::PERIGO,
+                                    format!(
+                                        "PREJUÍZO ({}d · suprim. {:.0}%)",
+                                        b.dias_prejuizo,
+                                        b.fator_insumos() * 100.0
+                                    ),
                                 );
                             } else if t.financiado_pelo_governo {
                                 ui.colored_label(ui_refinada::menu::INFO, "Governamental");
                             } else {
                                 ui.colored_label(
                                     ui_refinada::menu::SUCESSO,
-                                    format!("Lucrativo (suprim. {:.0}%)", b.fator_insumos() * 100.0)
+                                    format!("Lucrativo (suprim. {:.0}%)", b.fator_insumos() * 100.0),
                                 );
                             }
 
-                            // Ação rápida: Construir +1 se província comportar
-                            let ok_mais_um = v.comporta(pr, ti);
-                            if ui.add_enabled(ok_mais_um, egui::Button::new("+1"))
-                                .on_hover_text(format!("Construir +1 nível de {} em {}", t.nome, pr.nome))
-                                .on_disabled_hover_text("Sem terra livre ou limite de jazida atingido nesta província.")
-                                .clicked()
-                            {
-                                cmds.push(Comando::Construir {
-                                    provincia_id: pr.id.clone(),
-                                    tipo_id: t.id.clone(),
-                                });
-                            }
+                            // Ação rápida: Construir +1, Fechar/Reabrir e Demolir com confirmação
+                            ui.horizontal(|ui| {
+                                let ok_mais_um = v.comporta(pr, ti);
+                                if ui
+                                    .add_enabled(ok_mais_um, egui::Button::new("+1"))
+                                    .on_hover_text(format!("Construir +1 nível de {} em {}", t.nome, pr.nome))
+                                    .on_disabled_hover_text("Sem terra livre ou limite de jazida atingido nesta província.")
+                                    .clicked()
+                                {
+                                    cmds.push(Comando::Construir {
+                                        provincia_id: pr.id.clone(),
+                                        tipo_id: t.id.clone(),
+                                    });
+                                }
+                                super::construcao_ui::botoes_gestao_predio_inline(
+                                    ui,
+                                    v,
+                                    &pr.id,
+                                    b,
+                                    &mut painel.confirmar_demolicao,
+                                    &mut cmds,
+                                );
+                            });
 
                             ui.end_row();
                         }

@@ -56,6 +56,7 @@ pub struct Nucleo {
     /// IA dos países (impostos e obras) e id do país do jogador, que ela não toca.
     pub ia: ia_paises::IaEconomia,
     pub jogador: Option<String>,
+    pub acoes_predio_recentes: Vec<sim_economia::ResultadoAcaoPredio>,
 }
 
 /// Ação do jogador sobre a economia (aplicada pela thread antes do próximo lote).
@@ -65,6 +66,12 @@ pub enum Comando {
     Construir { provincia_id: String, tipo_id: String },
     CancelarObra(usize),
     MoverObra { de: usize, para: usize },
+    /// Fecha temporariamente um prédio (para de produzir e consumir, demite trabalhadores, mantém manutenção baixa).
+    FecharPredio { provincia_id: String, tipo_id: String },
+    /// Reabre um prédio fechado pagando o custo de reativação e iniciando período de retomada.
+    ReabrirPredio { provincia_id: String, tipo_id: String },
+    /// Demole `niveis` de um prédio, liberando espaço regional e devolvendo fração do valor.
+    DemolirPredio { provincia_id: String, tipo_id: String, niveis: u32 },
     /// Troca, em todos os prédios do tipo no país, o método do slot do `metodo_id`.
     TrocarMetodoTodos { tipo_id: String, metodo_id: String },
     TrocarMetodo { provincia_id: String, tipo_id: String, metodo_id: String },
@@ -123,7 +130,15 @@ impl Nucleo {
             .iter()
             .filter_map(|p| p.tag.clone().map(|t| (t, p.id.clone())))
             .collect();
-        Ok(Self { mundo, global, catalogo, tags, ia: ia_paises::IaEconomia::novo(), jogador: None })
+        Ok(Self {
+            mundo,
+            global,
+            catalogo,
+            tags,
+            ia: ia_paises::IaEconomia::novo(),
+            jogador: None,
+            acoes_predio_recentes: Vec::new(),
+        })
     }
 
     /// Id econômico do país a partir da tag do legado.
@@ -173,6 +188,37 @@ impl Nucleo {
                 } else {
                     Ok("Posição mantida na fila.".into())
                 }
+            }
+            Comando::FecharPredio { provincia_id, tipo_id } => {
+                let res = self.mundo.fechar_predio(pais_id, &provincia_id, &tipo_id).map_err(|e| e.to_string())?;
+                let msg = format!(
+                    "{} fechado em {} ({:.0} trabalhadores dispensados).",
+                    res.tipo_predio_nome, res.provincia_nome, res.trabalhadores_demitidos
+                );
+                self.acoes_predio_recentes.push(res);
+                Ok(msg)
+            }
+            Comando::ReabrirPredio { provincia_id, tipo_id } => {
+                let res = self.mundo.reabrir_predio(pais_id, &provincia_id, &tipo_id, false).map_err(|e| e.to_string())?;
+                let msg = format!(
+                    "{} reaberto em {} (custo £{:.0}; retomada em {}d).",
+                    res.tipo_predio_nome,
+                    res.provincia_nome,
+                    res.valor_monetario,
+                    sim_economia::Predio::TEMPO_RETOMADA_DIAS
+                );
+                self.acoes_predio_recentes.push(res);
+                Ok(msg)
+            }
+            Comando::DemolirPredio { provincia_id, tipo_id, niveis } => {
+                let res = self.mundo.demolir_predio(pais_id, &provincia_id, &tipo_id, niveis, false).map_err(|e| e.to_string())?;
+                let removidos = niveis.max(1);
+                let msg = format!(
+                    "{} demolido (-{removidos} nv) em {} (reembolso +£{:.0}).",
+                    res.tipo_predio_nome, res.provincia_nome, res.valor_monetario
+                );
+                self.acoes_predio_recentes.push(res);
+                Ok(msg)
             }
             Comando::TrocarMetodo { provincia_id, tipo_id, metodo_id } => {
                 let atuais = self
@@ -628,6 +674,17 @@ pub struct EconomiaSim {
     comandos: Vec<Comando>,
     /// Ganhos de produtividade por tecnologias civis concluídas (id do país, ganho relativo), aplicados no próximo lote.
     ganhos_tec: Vec<(String, f64)>,
+    /// Tecnologias concluídas para alimentar os ciclos de demanda de recursos `(pais_id, tec_id)`.
+    tecs_pesquisadas: Vec<(String, String)>,
+    /// Eventos históricos disparados para alimentar os choques de demanda de recursos.
+    eventos_historicos: Vec<String>,
+    /// Ações recentes de fechar/reabrir/demolir prédios no país do jogador.
+    pub acoes_predio_recentes: Vec<sim_economia::ResultadoAcaoPredio>,
+    /// Cooldown de alertas do jornal para prédios em prejuízo `(provincia_id, tipo_predio_id) -> dia`.
+    alertas_prejuizo_dia: BTreeMap<(String, String), u64>,
+    /// Cooldown de alertas do jornal para queda acentuada no preço de bens `bem_id -> dia`.
+    alertas_preco_dia: BTreeMap<String, u64>,
+    ultimo_dia_alerta: u64,
     /// País econômico do jogador (None antes da escolha).
     pub pais_id: Option<String>,
     pub mensagens: Vec<String>,
@@ -658,6 +715,16 @@ impl EconomiaSim {
         if let Some(id) = self.id_pais(tag) {
             self.ganhos_tec.push((id, ganho));
         }
+    }
+    /// Registra que o país `tag` concluiu a tecnologia `tec_id`, atualizando os ciclos de demanda de recursos.
+    pub fn registrar_tecnologia_pesquisada(&mut self, tag: &str, tec_id: &str) {
+        if let Some(id) = self.id_pais(tag) {
+            self.tecs_pesquisadas.push((id, tec_id.to_string()));
+        }
+    }
+    /// Registra que o evento histórico `evento_id` disparou, ativando choques de demanda/oferta correspondentes.
+    pub fn registrar_evento_historico(&mut self, evento_id: &str) {
+        self.eventos_historicos.push(evento_id.to_string());
     }
     #[allow(dead_code)]
     pub fn ocupada(&self) -> bool {
@@ -707,6 +774,7 @@ impl Plugin for EconomiaSimPlugin {
                     acumular_dias,
                     definir_pais_economico,
                     conduzir_economia_recolher.in_set(EconomiaSimSet::Recolher),
+                    processar_consequencias_e_alertas_economia.after(EconomiaSimSet::Recolher),
                     aplicar_formacoes_economia,
                     conduzir_economia_despachar
                         .in_set(EconomiaSimSet::Despachar)
@@ -762,6 +830,12 @@ fn aguardar_economia(mut commands: Commands, carga: Option<ResMut<CargaEconomia>
                 pendentes: 0,
                 comandos: Vec::new(),
                 ganhos_tec: Vec::new(),
+                tecs_pesquisadas: Vec::new(),
+                eventos_historicos: Vec::new(),
+                acoes_predio_recentes: Vec::new(),
+                alertas_prejuizo_dia: BTreeMap::new(),
+                alertas_preco_dia: BTreeMap::new(),
+                ultimo_dia_alerta: 0,
                 pais_id: None,
                 mensagens: Vec::new(),
                 ms_por_dia: 0.0,
@@ -799,14 +873,17 @@ fn definir_pais_economico(jogador: Option<Res<super::jogador::PaisJogador>>, mut
 
 fn recolher_interno(eco: &mut EconomiaSim) {
     if let Some(t) = eco.tarefa.as_mut()
-        && let Some((nucleo, vista, msgs, ms, obras)) = block_on(future::poll_once(t))
+        && let Some((mut nucleo, vista, msgs, ms, obras)) = block_on(future::poll_once(t))
     {
+        let acoes = std::mem::take(&mut nucleo.acoes_predio_recentes);
+        let mudou_predios = !acoes.is_empty();
+        eco.acoes_predio_recentes.extend(acoes);
         eco.tarefa = None;
         eco.nucleo = Some(nucleo);
         eco.vista = vista;
         eco.mensagens.extend(msgs);
         eco.ms_por_dia = if eco.ms_por_dia == 0.0 { ms } else { 0.8 * eco.ms_por_dia + 0.2 * ms };
-        if obras > 0 {
+        if obras > 0 || mudou_predios {
             eco.obras_novas_lote += obras;
             eco.versao_construcao = eco.versao_construcao.wrapping_add(1);
         }
@@ -815,22 +892,180 @@ fn recolher_interno(eco: &mut EconomiaSim) {
 
 fn despachar_interno(eco: &mut EconomiaSim) {
     let precisa_vista = eco.pais_id.is_some() && eco.vista.pais_id.as_str() != eco.pais_id.as_deref().unwrap_or("");
-    if eco.nucleo.is_none() || (eco.pendentes == 0 && eco.comandos.is_empty() && !precisa_vista) {
+    if eco.nucleo.is_none()
+        || (eco.pendentes == 0
+            && eco.comandos.is_empty()
+            && eco.tecs_pesquisadas.is_empty()
+            && eco.eventos_historicos.is_empty()
+            && !precisa_vista)
+    {
         return;
     }
     let dias = eco.pendentes.min(DIAS_POR_LOTE);
     eco.pendentes -= dias;
     let cmds = std::mem::take(&mut eco.comandos);
     let ganhos = std::mem::take(&mut eco.ganhos_tec);
+    let tecs = std::mem::take(&mut eco.tecs_pesquisadas);
+    let evs = std::mem::take(&mut eco.eventos_historicos);
     let pais = eco.pais_id.clone();
     let mut nucleo = eco.nucleo.take().expect("núcleo presente");
     eco.tarefa = Some(AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move {
         for (id, g) in ganhos {
             nucleo.mundo.aplicar_ganho_produtividade(&id, g);
         }
+        for (id, tec) in tecs {
+            nucleo.mundo.registrar_tecnologia_pesquisada(&id, &tec);
+        }
+        for ev in evs {
+            nucleo.mundo.registrar_evento_historico(&ev);
+        }
         let (vista, msgs, ms, obras) = executar_lote(&mut nucleo, pais.as_deref(), cmds, dias);
         (nucleo, vista, msgs, ms, obras)
     }));
+}
+
+/// Processa consequências sociais/políticas de fechar ou demolir grandes empregadores e emite avisos no Jornal
+/// quando um prédio do jogador acumula prejuízo por muito tempo ou quando o preço de um bem despenca.
+pub fn processar_consequencias_e_alertas_economia(
+    mut eco: ResMut<EconomiaSim>,
+    jogador: Option<Res<super::jogador::PaisJogador>>,
+    relogio: Option<Res<super::time::RecursoRelogio>>,
+    mut pol: Option<ResMut<super::politica_sim::PoliticaSim>>,
+    mut mundo_legado: Option<ResMut<super::economy::RecursoMundo>>,
+    mut estado_ev: Option<ResMut<super::eventos_ui::EstadoEv>>,
+) {
+    let data = relogio
+        .as_ref()
+        .map(|r| (r.data.ano as i32, r.data.mes, r.data.dia))
+        .unwrap_or((1945, 1, 1));
+    let tag_jog = jogador.as_ref().map(|j| j.0.clone());
+
+    // 1. Consequências de demissão ao fechar/demolir grande empregador
+    let acoes = std::mem::take(&mut eco.acoes_predio_recentes);
+    for acao in acoes {
+        if acao.trabalhadores_demitidos >= 400.0 || acao.fracao_forca_trabalho_provincia >= 0.02 {
+            let motivo = format!(
+                "{} em {} ({:.0} demitidos)",
+                acao.tipo_predio_nome, acao.provincia_nome, acao.trabalhadores_demitidos
+            );
+            if let Some(pol) = pol.as_mut() {
+                pol.enviar(super::politica_sim::ComandoPol::QuedaAprovacaoDesemprego {
+                    demitidos: acao.trabalhadores_demitidos,
+                    fracao_provincia: acao.fracao_forca_trabalho_provincia,
+                    motivo: motivo.clone(),
+                });
+            }
+            if let (Some(tag), Some(m)) = (tag_jog.as_deref(), mundo_legado.as_mut())
+                && let Some(p) = m.0.paises.get_mut(tag)
+            {
+                let queda = (1.5 + (acao.trabalhadores_demitidos / 800.0).min(4.0)).clamp(1.5, 5.5);
+                p.politica.legitimidade = (p.politica.legitimidade as f64 - queda).clamp(5.0, 100.0) as _;
+            }
+            let titulo = format!(
+                "Demissões em massa em {}: {} fecha vagas",
+                acao.provincia_nome, acao.tipo_predio_nome
+            );
+            let texto = format!(
+                "{titulo} — O fechamento ou redução de {} em {} deixou {:.0} trabalhadores ({:.1}% da força local) desempregados, provocando protestos sindicais e queda na aprovação do governo.",
+                acao.tipo_predio_nome,
+                acao.provincia_nome,
+                acao.trabalhadores_demitidos,
+                acao.fracao_forca_trabalho_provincia * 100.0
+            );
+            if let Some(ev) = estado_ev.as_mut() {
+                ev.estado.jornal.push(eventos::Noticia { data, texto });
+            }
+            eco.mensagens.push(format!("Impacto social: {titulo}"));
+        }
+    }
+
+    // 2. Avisos periódicos no Jornal (prédio no prejuízo persistente e queda forte de preço de recurso)
+    let eco = &mut *eco;
+    let dia_atual = eco.vista.dias;
+    if dia_atual == 0 || dia_atual < eco.ultimo_dia_alerta + 15 {
+        return;
+    }
+    eco.ultimo_dia_alerta = dia_atual;
+
+    let Some(cat) = eco.vista.catalogo.clone() else { return };
+    let mut novos_alertas_jornal: Vec<(String, String)> = Vec::new();
+
+    for prov in &eco.vista.provincias {
+        for b in &prov.predios {
+            if b.nivel == 0 || b.fechado || b.dias_prejuizo < 45 || b.lucro_ultimo_tick >= -10.0 {
+                continue;
+            }
+            let eh_gov = cat
+                .obter_tipo_predio(&b.tipo_predio_id)
+                .is_some_and(|t| t.financiado_pelo_governo);
+            if eh_gov {
+                continue;
+            }
+            let chave = (prov.id.clone(), b.tipo_predio_id.clone());
+            if eco
+                .alertas_prejuizo_dia
+                .get(&chave)
+                .is_some_and(|&u| dia_atual < u + 120)
+            {
+                continue;
+            }
+            eco.alertas_prejuizo_dia.insert(chave, dia_atual);
+            let nome_tipo = cat
+                .obter_tipo_predio(&b.tipo_predio_id)
+                .map_or(b.tipo_predio_id.as_str(), |t| t.nome.as_str());
+            let titulo = format!("Prejuízo persistente: {} em {}", nome_tipo, prov.nome);
+            let texto = format!(
+                "{} (Nv. {}) em {} opera no vermelho há {} dias (saldo diário £{:.0}). Considere fechar temporariamente ou demolir níveis excedentes.",
+                nome_tipo, b.nivel, prov.nome, b.dias_prejuizo, b.lucro_ultimo_tick
+            );
+            novos_alertas_jornal.push((titulo, texto));
+            if novos_alertas_jornal.len() >= 2 {
+                break;
+            }
+        }
+        if novos_alertas_jornal.len() >= 2 {
+            break;
+        }
+    }
+
+    for bem in &eco.vista.bens {
+        if bem.var30_nacional <= -0.15
+            || (bem.preco_nacional <= bem.preco_base * 0.72 && bem.var30_nacional <= -0.06)
+        {
+            if eco
+                .alertas_preco_dia
+                .get(&bem.id)
+                .is_some_and(|&u| dia_atual < u + 120)
+            {
+                continue;
+            }
+            eco.alertas_preco_dia.insert(bem.id.clone(), dia_atual);
+            let titulo = format!(
+                "Queda acentuada no preço de {} ({:+.0}%)",
+                bem.nome,
+                bem.var30_nacional * 100.0
+            );
+            let texto = format!(
+                "A cotação de {} recuou {:+.1}% nos últimos 30 dias (preço atual £{:.1} vs base £{:.1}), pressionando a rentabilidade dos produtores.",
+                bem.nome,
+                bem.var30_nacional * 100.0,
+                bem.preco_nacional,
+                bem.preco_base
+            );
+            novos_alertas_jornal.push((titulo, texto));
+            break;
+        }
+    }
+
+    for (titulo, texto) in novos_alertas_jornal {
+        if let Some(ev) = estado_ev.as_mut() {
+            ev.estado.jornal.push(eventos::Noticia {
+                data,
+                texto: format!("{titulo} — {texto}"),
+            });
+        }
+        eco.mensagens.push(format!("Jornal: {titulo}"));
+    }
 }
 
 pub fn conduzir_economia_recolher(mut eco: ResMut<EconomiaSim>) {

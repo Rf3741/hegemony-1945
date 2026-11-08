@@ -451,6 +451,17 @@ mod testes {
     fn salvar_carregar_bate_checksum() {
         let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let mut nucleo = super::super::economia_sim::Nucleo::carregar(&super::super::economia_sim::dir_economia(&raiz), 3).expect("economia");
+        let usa = nucleo.id_pais("USA").unwrap();
+        let (prov_usa, tipo_usa) = nucleo
+            .mundo
+            .provincias()
+            .iter()
+            .filter(|p| p.pais_id == usa)
+            .find_map(|p| p.predios.iter().find(|b| b.nivel > 0 && !b.fechado).map(|b| (p.id.clone(), b.tipo_predio_id.clone())))
+            .expect("prédio aberto nos EUA");
+        nucleo.mundo.fechar_predio(&usa, &prov_usa, &tipo_usa).expect("fecha prédio antes de salvar");
+        nucleo.mundo.registrar_tecnologia_pesquisada(&usa, "reator_nuclear_experimental");
+        nucleo.mundo.registrar_evento_historico("crise_suez");
         nucleo.avancar(5);
         let mut mundo = mundo_teste();
         mundo.tensao_mundial = 42.5;
@@ -487,6 +498,16 @@ mod testes {
         assert_ron("provincias", &reg.provincias, &p2.economia.provincias);
         assert_ron("rotas", &reg.rotas_comerciais, &p2.economia.rotas_comerciais);
         assert_ron("blocos", &reg.blocos_comerciais, &p2.economia.blocos_comerciais);
+        assert_ron("ciclos_demanda", &reg.ciclos_demanda, &p2.economia.ciclos_demanda);
+        let b_restaurado = n2
+            .mundo
+            .obter_provincia(&prov_usa)
+            .unwrap()
+            .predios
+            .iter()
+            .find(|b| b.tipo_predio_id == tipo_usa)
+            .unwrap();
+        assert!(b_restaurado.fechado && b_restaurado.dias_fechado >= 5);
         // Corrupção é detectada.
         let mut ruim = bytes.clone();
         let n = ruim.len();
