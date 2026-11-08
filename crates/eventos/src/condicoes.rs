@@ -31,12 +31,23 @@ pub enum Condicao {
     Compara(String, Op, f32),
     /// Líder ativo no país (`lider_ativo:winston_churchill`).
     LiderAtivo(String),
+    /// Conflito militar em andamento (`guerra_em_curso:guerra_da_coreia`).
+    GuerraEmCurso(String),
     /// Abertura da Cortina de Ferro (desgelo nas relações Leste-Oeste).
     AberturaCortinaDeFerro,
     /// Abertura socialista em curso (reformas no bloco oriental).
     AberturaSocialistaEmCurso,
+    /// Condição contextual/sistêmica histórica (`corrida_armamentista_nuclear`, `era_destensao`, etc.).
+    ContextoHistorico(String),
     /// Sem dado no cliente para avaliar: assume verdadeira e avisa no log.
     Desconhecida(String),
+}
+
+fn eh_identificador_contexto(s: &str) -> bool {
+    !s.is_empty()
+        && s.as_bytes()[0].is_ascii_lowercase()
+        && s.bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
 impl Condicao {
@@ -62,6 +73,7 @@ impl Condicao {
                 "abertura_cortina_de_ferro" => Condicao::AberturaCortinaDeFerro,
                 "abertura_socialista_em_curso" => Condicao::AberturaSocialistaEmCurso,
                 "lider_ativo" => Condicao::LiderAtivo(v.to_string()),
+                "guerra_em_curso" => Condicao::GuerraEmCurso(v.to_string()),
                 _ => {
                     if k.starts_with("relacao_min_") {
                         let tag = k.trim_start_matches("relacao_min_");
@@ -101,6 +113,9 @@ impl Condicao {
         }
         if s == "abertura_socialista_em_curso" {
             return Condicao::AberturaSocialistaEmCurso;
+        }
+        if eh_identificador_contexto(s) {
+            return Condicao::ContextoHistorico(s.to_string());
         }
         Condicao::Desconhecida(s.to_string())
     }

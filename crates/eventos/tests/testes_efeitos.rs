@@ -536,3 +536,97 @@ fn teste_disparo_evento_politico_generico() {
     assert_eq!(est.pendentes.len(), 1);
     assert_eq!(est.pendentes[0].evento_id, "crise_teste_mocao");
 }
+
+#[test]
+fn teste_integridade_catalogo_todos_eventos() {
+    let r = raiz();
+    let m = mundo_teste();
+    let cat = CatalogoEventos::carregar(&r.join("assets/data/eventos")).expect("catalogo");
+
+    let mut tags_validas: std::collections::BTreeSet<String> = m.paises.keys().cloned().collect();
+    let txt_formaveis =
+        std::fs::read_to_string(r.join("data/formaveis/formaveis.ron")).expect("formaveis.ron");
+    let formaveis: Vec<simulacao::formacao::Formavel> =
+        ron::from_str(&txt_formaveis).expect("parse formaveis.ron");
+    for f in formaveis {
+        tags_validas.insert(f.tag);
+    }
+
+    let ids_catalogo: std::collections::BTreeSet<String> =
+        cat.eventos.iter().map(|e| e.id.clone()).collect();
+
+    let mut tags_inexistentes = Vec::new();
+    let mut pos_evento_quebrados = Vec::new();
+    let mut condicoes_desconhecidas = Vec::new();
+
+    for ev in &cat.eventos {
+        for tag in &ev.paises {
+            if !tags_validas.contains(tag) {
+                tags_inexistentes.push(format!("{}: tag de país '{}' inexistente", ev.id, tag));
+            }
+        }
+        for c in &ev.condicoes {
+            match c {
+                Condicao::Soberano(tag)
+                | Condicao::RelacaoMin(tag, _)
+                | Condicao::RelacaoMax(tag, _) => {
+                    if !tags_validas.contains(tag) {
+                        tags_inexistentes.push(format!(
+                            "{}: tag '{}' em condição {:?} inexistente",
+                            ev.id, tag, c
+                        ));
+                    }
+                }
+                Condicao::PosEvento(ref_id) => {
+                    if !ids_catalogo.contains(ref_id) {
+                        pos_evento_quebrados
+                            .push(format!("{}: pos_evento '{}' inexistente", ev.id, ref_id));
+                    }
+                }
+                Condicao::Desconhecida(raw) => {
+                    condicoes_desconhecidas
+                        .push(format!("{}: condição desconhecida '{}'", ev.id, raw));
+                }
+                _ => {}
+            }
+        }
+    }
+
+    assert!(
+        tags_inexistentes.is_empty(),
+        "Tags inexistentes encontradas:\n{}",
+        tags_inexistentes.join("\n")
+    );
+    assert!(
+        pos_evento_quebrados.is_empty(),
+        "Referências pos_evento quebradas:\n{}",
+        pos_evento_quebrados.join("\n")
+    );
+    assert!(
+        condicoes_desconhecidas.is_empty(),
+        "Condições desconhecidas encontradas:\n{}",
+        condicoes_desconhecidas.join("\n")
+    );
+}
+
+#[test]
+fn teste_condicoes_abertura_cortina_e_socialista() {
+    let mut m = mundo_teste();
+    let mut est = EstadoEventos::default();
+
+    let c_cortina = Condicao::parse("abertura_cortina_de_ferro");
+    let c_socialista = Condicao::parse("abertura_socialista_em_curso");
+    assert_eq!(c_cortina, Condicao::AberturaCortinaDeFerro);
+    assert_eq!(c_socialista, Condicao::AberturaSocialistaEmCurso);
+
+    m.data.ano = 1950;
+    m.tensao_mundial = 75.0;
+    assert!(!est.avaliar(&m, "HUN", &c_cortina));
+    assert!(!est.avaliar(&m, "CZE", &c_socialista));
+
+    est.definir_flag("HUN", "desgelo_cortina_ferro");
+    assert!(est.avaliar(&m, "HUN", &c_cortina));
+
+    est.definir_flag("CZE", "reforma_socialista");
+    assert!(est.avaliar(&m, "CZE", &c_socialista));
+}
