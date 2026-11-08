@@ -49,10 +49,12 @@ pub use motor::ciclos_demanda::{
 };
 pub use motor::distribuicao::CUSTO_MANUTENCAO_FECHADO_POR_NIVEL;
 pub use motor::gestao_predios::{
-    CUSTO_MINIMO_REABRIR_POR_NIVEL, FRACAO_CUSTO_REABRIR, FRACAO_REEMBOLSO_DEMOLIR,
-    REEMBOLSO_MINIMO_DEMOLIR_POR_NIVEL, ResultadoAcaoPredio,
+    CUSTO_MINIMO_REABRIR_POR_NIVEL, DIAS_FECHADO_DEMOLIR_IA, DIAS_FECHADO_REABRIR_IA,
+    DIAS_PREJUIZO_FECHAR_IA, FRACAO_CUSTO_REABRIR, FRACAO_REEMBOLSO_DEMOLIR,
+    HISTERESE_MUDANCA_PREDIO_DIAS, REEMBOLSO_MINIMO_DEMOLIR_POR_NIVEL, ResultadoAcaoPredio,
     calcular_custo_reabertura_por_precos, calcular_reembolso_demolicao_por_precos,
-    estimar_margem_operacional_predio, valor_materiais_construcao_niveis,
+    estimar_margem_operacional_predio, predio_elegivel_gestao_automatica,
+    valor_materiais_construcao_niveis,
 };
 pub use motor::global::{ConfigMercadoGlobal, MercadoGlobal};
 pub mod estimativa;

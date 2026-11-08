@@ -3,12 +3,11 @@
 use crate::catalogo::{CatalogoEconomia, TipoPredio};
 use crate::entidades::{Estado, Mercado, Pais, Predio, Provincia};
 use crate::erro::{ErroEconomia, ResultadoEconomia};
+use crate::motor::MundoEconomico;
 use crate::motor::distribuicao::RESERVA_CAIXA_POR_NIVEL;
-use crate::motor::governo::{
-    atualizar_terra_aravel_estados, atualizar_terra_aravel_ocupada, materiais_por_ponto,
-};
+use crate::motor::governo::{atualizar_terra_aravel_ocupada, materiais_por_ponto};
 use crate::motor::trabalho::reconciliar_empregados_provincia;
-use crate::motor::{MundoEconomico, cadeia, producao};
+use crate::tipos::CategoriaPredio;
 
 /// Fração do valor em materiais de construção cobrada para reabrir e remobilizar um prédio fechado.
 pub const FRACAO_CUSTO_REABRIR: f64 = 0.12;
@@ -18,6 +17,14 @@ pub const FRACAO_REEMBOLSO_DEMOLIR: f64 = 0.15;
 pub const CUSTO_MINIMO_REABRIR_POR_NIVEL: f64 = 50.0;
 /// Piso mínimo por nível do reembolso de demolição.
 pub const REEMBOLSO_MINIMO_DEMOLIR_POR_NIVEL: f64 = 40.0;
+/// Intervalo mínimo (em dias) entre mudanças automáticas de estado de um mesmo prédio pela IA/setor privado.
+pub const HISTERESE_MUDANCA_PREDIO_DIAS: u64 = 120;
+/// Dias acumulados de prejuízo exigidos para a IA ou setor privado fechar um prédio deficitário.
+pub const DIAS_PREJUIZO_FECHAR_IA: u16 = 75;
+/// Dias mínimos fechado antes de a IA ou setor privado considerar reabrir um prédio.
+pub const DIAS_FECHADO_REABRIR_IA: u16 = 60;
+/// Dias mínimos fechado no prejuízo estrutural antes de a IA ou setor privado demolir níveis.
+pub const DIAS_FECHADO_DEMOLIR_IA: u16 = 270;
 
 /// Resumo retornado pelas ações de fechar, reabrir ou demolir um prédio.
 #[derive(Debug, Clone, PartialEq)]
@@ -159,6 +166,71 @@ fn recalcular_vagas_abertas_provincia(prov: &mut Provincia) {
         .filter(|b| b.nivel > 0 && !b.fechado)
         .map(|b| (b.total_vagas() * b.fator_retomada() - b.total_empregados()).max(0.0))
         .sum();
+}
+
+/// Atualiza em O(províncias do estado) os agregados locais do `estado` após fechar, reabrir ou demolir
+/// um prédio em uma de suas províncias, sem varrer o mundo inteiro.
+fn atualizar_estado_local(
+    catalogo: &CatalogoEconomia,
+    estado: &mut Estado,
+    provincias: &[Provincia],
+) {
+    let nt = catalogo.tipos_predio.len();
+    if estado.niveis_por_tipo.len() != nt {
+        estado.niveis_por_tipo.resize(nt, 0);
+    }
+    estado.niveis_por_tipo.fill(0);
+    estado.terra_aravel_ocupada = 0;
+
+    let mut uso_infra = 0.0;
+    for &pi in &estado.provincias_indices {
+        let prov = &provincias[pi];
+        estado.terra_aravel_ocupada = estado
+            .terra_aravel_ocupada
+            .saturating_add(prov.terra_aravel_ocupada);
+        for b in &prov.predios {
+            if b.nivel == 0 {
+                continue;
+            }
+            if b.cache.tipo_idx < nt {
+                estado.niveis_por_tipo[b.cache.tipo_idx] += b.nivel;
+            }
+            if b.fechado {
+                continue;
+            }
+            let vagas = b.total_vagas();
+            let r_emp = if vagas <= 0.0 {
+                1.0
+            } else {
+                (b.total_empregados() / vagas).clamp(0.0, 1.0)
+            };
+            if r_emp <= 1e-7 {
+                continue;
+            }
+            let escala_inst = (b.nivel as f64) * r_emp;
+            let peso_uso = match catalogo.tipos_predio[b.cache.tipo_idx].categoria {
+                CategoriaPredio::Industrial | CategoriaPredio::Extrativo => 2.0,
+                CategoriaPredio::RuralAgricola
+                | CategoriaPredio::Governamental
+                | CategoriaPredio::Militar
+                | CategoriaPredio::Construcao => 1.0,
+                CategoriaPredio::Infraestrutura => 0.0,
+            };
+            uso_infra += escala_inst * peso_uso;
+        }
+    }
+    estado.infraestrutura_uso = uso_infra;
+    if estado.infraestrutura_uso <= estado.infraestrutura_capacidade
+        || estado.infraestrutura_uso <= 1.0
+    {
+        estado.acesso_mercado = 1.0;
+        estado.penalidade_infraestrutura = 0.0;
+    } else {
+        let cap = estado.infraestrutura_capacidade.max(0.0);
+        let acesso = (cap / estado.infraestrutura_uso).clamp(0.05, 1.0);
+        estado.acesso_mercado = acesso;
+        estado.penalidade_infraestrutura = 1.0 - acesso;
+    }
 }
 
 impl MundoEconomico {
@@ -343,12 +415,10 @@ impl MundoEconomico {
             )
         };
 
-        producao::atualizar_infraestrutura_estados(
-            &self.catalogo,
-            &mut self.estados,
-            &self.provincias,
-        );
-        cadeia::atualizar_indices_estados(&self.catalogo, &mut self.estados, &self.provincias);
+        let e_idx = self.provincias[p_idx].estado_idx;
+        if e_idx < self.estados.len() {
+            atualizar_estado_local(&self.catalogo, &mut self.estados[e_idx], &self.provincias);
+        }
 
         Ok(ResultadoAcaoPredio {
             pais_id: pais_id.to_string(),
@@ -472,12 +542,10 @@ impl MundoEconomico {
             (prov.nome.clone(), niv)
         };
 
-        producao::atualizar_infraestrutura_estados(
-            &self.catalogo,
-            &mut self.estados,
-            &self.provincias,
-        );
-        cadeia::atualizar_indices_estados(&self.catalogo, &mut self.estados, &self.provincias);
+        let e_idx = self.provincias[p_idx].estado_idx;
+        if e_idx < self.estados.len() {
+            atualizar_estado_local(&self.catalogo, &mut self.estados[e_idx], &self.provincias);
+        }
 
         Ok(ResultadoAcaoPredio {
             pais_id: pais_id.to_string(),
@@ -574,13 +642,10 @@ impl MundoEconomico {
             self.paises[c_idx].orcamento.tesouro += credito_total;
         }
 
-        atualizar_terra_aravel_estados(&mut self.estados, &self.provincias);
-        producao::atualizar_infraestrutura_estados(
-            &self.catalogo,
-            &mut self.estados,
-            &self.provincias,
-        );
-        cadeia::atualizar_indices_estados(&self.catalogo, &mut self.estados, &self.provincias);
+        let e_idx = self.provincias[p_idx].estado_idx;
+        if e_idx < self.estados.len() {
+            atualizar_estado_local(&self.catalogo, &mut self.estados[e_idx], &self.provincias);
+        }
 
         Ok(ResultadoAcaoPredio {
             pais_id: pais_id.to_string(),
@@ -593,5 +658,339 @@ impl MundoEconomico {
             valor_monetario: reembolso_materiais,
             nivel_restante,
         })
+    }
+
+    /// Avalia os prédios de um país com histerese e fecha os que acumulam prejuízo persistente,
+    /// reabre os que voltaram a ser sólidos ou demole 1 nível dos que estão fechados há muito tempo
+    /// sem perspectiva de retorno. Retorna `(fechados, reabertos, demolidos)`.
+    ///
+    /// Complexidade: O(prédios do país), executado no máximo 1 vez por mês por país,
+    /// limitando as ações a no máximo 2 por chamada.
+    pub fn gerir_predios_ia_pais(&mut self, pais_id: &str) -> (u32, u32, u32) {
+        let Some(&c_idx) = self.indice_paises.get(pais_id) else {
+            return (0, 0, 0);
+        };
+        let dia_atual = self.dias_decorridos;
+        let m_idx = self.paises[c_idx].mercado_idx;
+        let exige_estatal = self.paises[c_idx].exige_propriedade_estatal_lei;
+        let em_calote = self.paises[c_idx].orcamento.em_calote;
+        let tesouro_disp = self.paises[c_idx].orcamento.tesouro;
+        let fundo_priv_disp = self.paises[c_idx].fundo_investimento_privado;
+
+        // Coleta até 2 ações candidatas em uma única passagem O(prédios do país)
+        #[derive(Clone)]
+        enum AcaoIa {
+            Fechar { prov_id: String, tipo_id: String },
+            Reabrir { prov_id: String, tipo_id: String, privado: bool },
+            Demolir { prov_id: String, tipo_id: String, privado: bool },
+        }
+
+        let mut acoes: Vec<AcaoIa> = Vec::new();
+        for &p_idx in &self.paises[c_idx].provincias_indices {
+            if acoes.len() >= 2 {
+                break;
+            }
+            let prov = &self.provincias[p_idx];
+            let estado = &self.estados[prov.estado_idx];
+            for b in &prov.predios {
+                if acoes.len() >= 2 {
+                    break;
+                }
+                if !predio_elegivel_gestao_automatica(&self.catalogo, b) {
+                    continue;
+                }
+                if b.dia_ultima_mudanca_estado > 0
+                    && dia_atual < b.dia_ultima_mudanca_estado + HISTERESE_MUDANCA_PREDIO_DIAS
+                {
+                    continue;
+                }
+
+                let eh_privado = !exige_estatal
+                    && b.cache.regime_propriedade != crate::tipos::RegimePropriedade::Estatal;
+                let margem_est = estimar_margem_operacional_predio(
+                    &self.catalogo,
+                    &self.mercados[m_idx],
+                    estado,
+                    &self.paises[c_idx],
+                    b,
+                );
+
+                if !b.fechado {
+                    let margem_atual = if b.escala_efetiva() > 0.0 {
+                        b.margem_lucro().min(margem_est)
+                    } else {
+                        margem_est
+                    };
+                    if b.dias_retomada == 0
+                        && b.dias_prejuizo >= DIAS_PREJUIZO_FECHAR_IA
+                        && margem_atual < -0.10
+                        && b.lucro_ultimo_tick <= 0.0
+                        && b.reservas_caixa < (b.nivel as f64) * 350.0
+                    {
+                        acoes.push(AcaoIa::Fechar {
+                            prov_id: prov.id.clone(),
+                            tipo_id: b.tipo_predio_id.clone(),
+                        });
+                    }
+                } else if b.dias_fechado >= DIAS_FECHADO_REABRIR_IA && margem_est >= 0.12 {
+                    let def = &self.catalogo.tipos_predio[b.cache.tipo_idx];
+                    let custo = calcular_custo_reabertura_por_precos(
+                        &self.catalogo,
+                        def,
+                        b.nivel,
+                        |bem_id| {
+                            self.catalogo
+                                .indice_bens
+                                .get(bem_id)
+                                .map_or(20.0, |&g| self.mercados[m_idx].precos_idx[g])
+                        },
+                    );
+                    let pode_pagar = if eh_privado {
+                        fundo_priv_disp >= custo * 1.3
+                    } else {
+                        !em_calote && tesouro_disp >= custo * 1.2
+                    };
+                    if pode_pagar {
+                        acoes.push(AcaoIa::Reabrir {
+                            prov_id: prov.id.clone(),
+                            tipo_id: b.tipo_predio_id.clone(),
+                            privado: eh_privado,
+                        });
+                    }
+                } else if b.dias_fechado >= DIAS_FECHADO_DEMOLIR_IA && margem_est < -0.18 {
+                    acoes.push(AcaoIa::Demolir {
+                        prov_id: prov.id.clone(),
+                        tipo_id: b.tipo_predio_id.clone(),
+                        privado: eh_privado,
+                    });
+                }
+            }
+        }
+
+        let (mut fechados, mut reabertos, mut demolidos) = (0u32, 0u32, 0u32);
+        for acao in acoes {
+            match acao {
+                AcaoIa::Fechar { prov_id, tipo_id } => {
+                    if self.fechar_predio(pais_id, &prov_id, &tipo_id).is_ok() {
+                        fechados += 1;
+                    }
+                }
+                AcaoIa::Reabrir {
+                    prov_id,
+                    tipo_id,
+                    privado,
+                } => {
+                    if self
+                        .reabrir_predio(pais_id, &prov_id, &tipo_id, privado)
+                        .is_ok()
+                    {
+                        reabertos += 1;
+                    }
+                }
+                AcaoIa::Demolir {
+                    prov_id,
+                    tipo_id,
+                    privado,
+                } => {
+                    if self
+                        .demolir_predio(pais_id, &prov_id, &tipo_id, 1, privado)
+                        .is_ok()
+                    {
+                        demolidos += 1;
+                    }
+                }
+            }
+        }
+        (fechados, reabertos, demolidos)
+    }
+}
+
+/// Verifica se um prédio pode ser fechado/reaberto/demolido automaticamente pela IA ou setor privado.
+/// Protege prédios governamentais, subsidiados, militares, de construção, de infraestrutura e
+/// alimentos básicos essenciais (exceto em colapso severo prolongado).
+pub fn predio_elegivel_gestao_automatica(catalogo: &CatalogoEconomia, b: &Predio) -> bool {
+    if b.nivel == 0 || b.cache.financiado_pelo_governo || b.subsidiado {
+        return false;
+    }
+    let Some(def) = catalogo.tipos_predio.get(b.cache.tipo_idx) else {
+        return false;
+    };
+    if matches!(
+        def.categoria,
+        crate::tipos::CategoriaPredio::Infraestrutura
+            | crate::tipos::CategoriaPredio::Construcao
+            | crate::tipos::CategoriaPredio::Governamental
+            | crate::tipos::CategoriaPredio::Militar
+    ) {
+        return false;
+    }
+    if matches!(
+        def.id.as_str(),
+        "fazenda_graos" | "rancho_pecuario" | "pecuaria_pesca" | "porto_pesca" | "centro_urbano"
+    ) && !b.fechado
+        && b.dias_prejuizo < 240
+    {
+        return false;
+    }
+    true
+}
+
+/// Passo mensal enxuto do setor privado autônomo (executado em `governo.rs` a cada 30 dias por país):
+/// fecha instalações privadas com prejuízo persistente, reabre quando voltam a dar margem >= 12%
+/// e demole 1 nível das instalações fechadas há mais de 270 dias sem viabilidade.
+pub(crate) fn gerir_predios_setor_privado_pais(
+    catalogo: &CatalogoEconomia,
+    mercado: &Mercado,
+    estados: &[Estado],
+    pais: &mut Pais,
+    provincias: &mut [Provincia],
+    dias_decorridos: u64,
+) {
+    if pais.exige_propriedade_estatal_lei {
+        return;
+    }
+    let mut acoes_restantes = 2usize;
+    let mut scratch_a = [0.0_f64; 32];
+    let mut scratch_b = [0.0_f64; 32];
+    let mut scratch_c = [0.0_f64; 32];
+    let n_tp = catalogo.tipos_pop.len().min(32);
+
+    for &p_idx in &pais.provincias_indices {
+        if acoes_restantes == 0 {
+            break;
+        }
+        let e_idx = provincias[p_idx].estado_idx;
+        if e_idx >= estados.len() {
+            continue;
+        }
+        let estado = &estados[e_idx];
+        let mut mudou_prov = false;
+        let mut remover_pos: Option<usize> = None;
+
+        for (pos, b) in provincias[p_idx].predios.iter_mut().enumerate() {
+            if acoes_restantes == 0 {
+                break;
+            }
+            if !predio_elegivel_gestao_automatica(catalogo, b)
+                || b.cache.regime_propriedade == crate::tipos::RegimePropriedade::Estatal
+            {
+                continue;
+            }
+            if b.dia_ultima_mudanca_estado > 0
+                && dias_decorridos < b.dia_ultima_mudanca_estado + HISTERESE_MUDANCA_PREDIO_DIAS
+            {
+                continue;
+            }
+
+            let margem_est =
+                estimar_margem_operacional_predio(catalogo, mercado, estado, pais, b);
+
+            if !b.fechado {
+                let margem_atual = if b.escala_efetiva() > 0.0 {
+                    b.margem_lucro().min(margem_est)
+                } else {
+                    margem_est
+                };
+                if b.dias_retomada == 0
+                    && b.dias_prejuizo >= DIAS_PREJUIZO_FECHAR_IA
+                    && margem_atual < -0.10
+                    && b.lucro_ultimo_tick <= 0.0
+                    && b.reservas_caixa < (b.nivel as f64) * 350.0
+                {
+                    for slot in b.cache.vagas_mut() {
+                        slot.empregados = 0.0;
+                    }
+                    b.empregados_por_tipo.clear();
+                    b.fechado = true;
+                    b.dias_retomada = 0;
+                    b.dias_fechado = 1;
+                    b.dias_prejuizo = 0;
+                    b.cache.escala_efetiva_ultimo_tick = 0.0;
+                    b.dia_ultima_mudanca_estado = dias_decorridos;
+                    mudou_prov = true;
+                    acoes_restantes -= 1;
+                }
+            } else if b.dias_fechado >= DIAS_FECHADO_REABRIR_IA && margem_est >= 0.12 {
+                let def = &catalogo.tipos_predio[b.cache.tipo_idx];
+                let custo =
+                    calcular_custo_reabertura_por_precos(catalogo, def, b.nivel, |bem_id| {
+                        catalogo
+                            .indice_bens
+                            .get(bem_id)
+                            .map_or(20.0, |&g| mercado.precos_idx[g])
+                    });
+                if pais.fundo_investimento_privado >= custo * 1.4 {
+                    pais.fundo_investimento_privado =
+                        (pais.fundo_investimento_privado - custo).max(0.0);
+                    b.fechado = false;
+                    b.dias_retomada = Predio::TEMPO_RETOMADA_DIAS;
+                    b.dias_fechado = 0;
+                    b.dias_prejuizo = 0;
+                    b.dia_ultima_mudanca_estado = dias_decorridos;
+                    mudou_prov = true;
+                    acoes_restantes -= 1;
+                }
+            } else if b.dias_fechado >= DIAS_FECHADO_DEMOLIR_IA && margem_est < -0.18 {
+                let def = &catalogo.tipos_predio[b.cache.tipo_idx];
+                let reembolso =
+                    calcular_reembolso_demolicao_por_precos(catalogo, def, 1, |bem_id| {
+                        catalogo
+                            .indice_bens
+                            .get(bem_id)
+                            .map_or(20.0, |&g| mercado.precos_idx[g])
+                    });
+                pais.fundo_investimento_privado += reembolso;
+                if b.nivel <= 1 {
+                    pais.fundo_investimento_privado += b.reservas_caixa.max(0.0);
+                    remover_pos = Some(pos);
+                } else {
+                    b.nivel -= 1;
+                    b.dia_ultima_mudanca_estado = dias_decorridos;
+                    let teto_caixa = (b.nivel as f64) * RESERVA_CAIXA_POR_NIVEL;
+                    if b.reservas_caixa > teto_caixa {
+                        pais.fundo_investimento_privado += b.reservas_caixa - teto_caixa;
+                        b.reservas_caixa = teto_caixa;
+                    }
+                }
+                mudou_prov = true;
+                acoes_restantes -= 1;
+                break;
+            }
+        }
+
+        if let Some(pos) = remover_pos {
+            provincias[p_idx].predios.remove(pos);
+        }
+        if mudou_prov {
+            let prov = &mut provincias[p_idx];
+            // Se algum prédio acabou de reabrir, aloca até 25% das vagas dos desempregados locais
+            scratch_c[..n_tp].fill(0.0);
+            for pop in &prov.pops {
+                if pop.populacao > 0.0 && pop.tipo_idx < n_tp {
+                    scratch_c[pop.tipo_idx] += pop.desempregados();
+                }
+            }
+            for b in &mut prov.predios {
+                if !b.fechado
+                    && b.dias_retomada == Predio::TEMPO_RETOMADA_DIAS
+                    && b.total_empregados() <= 0.0
+                {
+                    let cap_ini = (b.nivel as f64) * b.fator_retomada();
+                    for slot in b.cache.vagas_mut() {
+                        let tp_i = slot.tipo_pop_idx as usize;
+                        if tp_i < n_tp {
+                            let meta = (slot.vagas_por_nivel as f64) * cap_ini;
+                            let contrata = meta.min(scratch_c[tp_i]);
+                            slot.empregados = contrata;
+                            scratch_c[tp_i] = (scratch_c[tp_i] - contrata).max(0.0);
+                        }
+                    }
+                    sincronizar_mapa_empregados(catalogo, b);
+                }
+            }
+            reconciliar_empregados_provincia(prov, &mut scratch_a[..n_tp], &mut scratch_b[..n_tp]);
+            atualizar_terra_aravel_ocupada(catalogo, prov);
+            recalcular_vagas_abertas_provincia(prov);
+        }
     }
 }

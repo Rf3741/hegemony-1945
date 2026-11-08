@@ -366,6 +366,20 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
         let obras_priv_ativas = pais.fila_construcao.iter().filter(|i| i.privado).count();
 
         if config.habilitar_investimento_privado_automatico
+            && (dias_decorridos + c_idx as u64).is_multiple_of(30)
+            && !pais.exige_propriedade_estatal_lei
+        {
+            crate::motor::gestao_predios::gerir_predios_setor_privado_pais(
+                catalogo,
+                &mercados[pais.mercado_idx],
+                estados,
+                pais,
+                provincias,
+                dias_decorridos,
+            );
+        }
+
+        if config.habilitar_investimento_privado_automatico
             && (dias_decorridos + c_idx as u64).is_multiple_of(7)
             && !pais.exige_propriedade_estatal_lei
             && cota_priv > 0.0

@@ -2125,6 +2125,12 @@ impl MundoEconomico {
         opcoes
     }
 
+    /// Obtém referência mutável para uma província pelo ID.
+    pub fn obter_provincia_mut(&mut self, id: &str) -> Option<&mut Provincia> {
+        let &idx = self.indice_provincias.get(id)?;
+        self.provincias.get_mut(idx)
+    }
+
     /// Sincroniza os vetores numéricos rápidos de volta para os `BTreeMap<String, f64>` legíveis em RON.
     pub fn sincronizar_mapas_ron(&mut self) {
         for m in &mut self.mercados {

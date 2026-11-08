@@ -195,8 +195,13 @@ pub(crate) fn executar_distribuicao_rendas(
                         }
                         if fol_u > 1e-9 {
                             let m_teorica = (rec_u - ins_u - fol_u) / fol_u;
+                            b.cache.margem_lucro_ultimo_tick = m_teorica;
                             if m_teorica < -0.05 {
                                 b.dias_prejuizo = b.dias_prejuizo.saturating_add(1);
+                                let perda_pot = (rec_u - ins_u - fol_u) * (b.nivel as f64);
+                                b.lucro_ultimo_tick = perda_pot;
+                                b.lucro_ema = 0.90 * b.lucro_ema + 0.10 * perda_pot;
+                                b.tendencia_lucro = b.lucro_ultimo_tick - b.lucro_ema;
                             } else if m_teorica > 0.05 {
                                 b.dias_prejuizo = b.dias_prejuizo.saturating_sub(1);
                             }
