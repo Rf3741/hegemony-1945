@@ -109,8 +109,13 @@ fn atualizar_abertura(
     mut proximo: ResMut<NextState<AppState>>,
     teclas: Res<ButtonInput<KeyCode>>,
     botoes: Res<ButtonInput<MouseButton>>,
+    opcoes: Option<Res<super::smoke::OpcoesCli>>,
 ) {
     estado.inicio += time.delta_secs();
+    if opcoes.as_ref().is_some_and(|o| o.ativo()) && pronto.0 {
+        proximo.set(AppState::Menu);
+        return;
+    }
     // Depois que o decodificador termina, o receptor fica None: não pode haver `return` aqui,
     // senão a regra de saída abaixo nunca mais roda e a tela trava no último quadro.
     if let Some(receptor) = estado.receptor.take() {

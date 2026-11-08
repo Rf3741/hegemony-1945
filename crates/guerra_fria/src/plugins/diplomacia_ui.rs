@@ -13,6 +13,15 @@ use simulacao::mapa::AlinhamentoGeopolitico;
 #[derive(Resource)]
 pub struct DiploSim(pub Diplomacia);
 
+#[derive(Clone, Debug)]
+pub struct ItemDiploCache {
+    pub tag: String,
+    pub nome: String,
+    pub relacao: f32,
+    pub esfera: Esfera,
+    pub tag_legado: String,
+}
+
 #[derive(Resource, Default)]
 pub struct PainelDiplomacia {
     pub aberto: bool,
@@ -25,6 +34,9 @@ pub struct PainelDiplomacia {
     /// Pede repintura do mapa.
     pub repintar: bool,
     pub dias_desde_pintura: u32,
+    pub cache_lista: Vec<ItemDiploCache>,
+    pub cache_busca: String,
+    pub versao_diplo: u64,
 }
 
 pub struct DiplomaciaUiPlugin;
@@ -97,17 +109,119 @@ fn alternar(teclas: Res<ButtonInput<KeyCode>>, mut p: ResMut<PainelDiplomacia>) 
 fn tick_diplomacia(
     mut eventos: MessageReader<EventoTickDiario>,
     mut d: Option<ResMut<DiploSim>>,
+    mut eco: Option<ResMut<EconomiaSim>>,
+    mut ev: Option<ResMut<super::eventos_ui::EstadoEv>>,
     jogador: Res<PaisJogador>,
+    opcoes: Option<Res<super::smoke::OpcoesCli>>,
     mut painel: ResMut<PainelDiplomacia>,
 ) {
     let Some(d) = d.as_deref_mut() else { return };
     let jog = normalizar(&jogador.0);
+    let eh_espectador = opcoes.as_ref().is_some_and(|o| o.espectador_ativo());
+    let jog_arg = if eh_espectador { None } else { Some(jog.as_str()) };
     for e in eventos.read() {
-        d.0.tick_dia(e.nova_data.ano, e.nova_data.mes, e.nova_data.dia, Some(&jog));
+        let hoje = (e.nova_data.ano, e.nova_data.mes, e.nova_data.dia);
+        d.0.tick_dia(hoje.0, hoje.1, hoje.2, jog_arg);
+        if eh_espectador {
+            if hoje.2 == 1 {
+                let t = d.0.tesouro_ia.entry(jog.clone()).or_insert(500.0);
+                *t = (*t + 60.0).min(1500.0);
+            }
+            if hoje.2 == 15 {
+                ia_diplomatica_jogador(&mut d.0, &jog, hoje, eco.as_deref_mut(), ev.as_deref_mut());
+            }
+        }
         painel.dias_desde_pintura += 1;
+    }
+    if d.0.log.len() > 300 {
+        d.0.log.drain(..150);
     }
     if painel.mapa_esferas && painel.dias_desde_pintura >= 30 {
         painel.repintar = true;
+    }
+}
+
+pub(crate) fn ia_diplomatica_jogador(
+    d: &mut Diplomacia,
+    eu: &str,
+    hoje: (i32, u8, u8),
+    eco: Option<&mut EconomiaSim>,
+    ev: Option<&mut super::eventos_ui::EstadoEv>,
+) {
+    if d.pontos.get(eu).copied().unwrap_or(0.0) < 15.0 {
+        return;
+    }
+    let tes = d.tesouro_ia.get(eu).copied().unwrap_or(500.0);
+    let minha_esfera = d.esfera(eu);
+    let parceiros_prioritarios = ["USA", "ARG", "GBR", "FRA", "MEX", "CHL", "COL", "POR", "ITA", "FRG", "GER", "CAN", "VEN", "URY", "JAP", "SOV", "IND", "CHN"];
+    let mut candidatos: Vec<String> = d
+        .paises
+        .iter()
+        .map(|p| p.tag.clone())
+        .filter(|t| t != eu)
+        .collect();
+    if candidatos.is_empty() {
+        return;
+    }
+    let rotacao = ((hoje.0 as usize).wrapping_mul(12) + hoje.1 as usize) % candidatos.len();
+    candidatos.rotate_left(rotacao);
+    candidatos.sort_by_key(|alvo| {
+        let prio = if parceiros_prioritarios.contains(&alvo.as_str()) { 0 } else { 1 };
+        let mesma_esfera = if d.esfera(alvo) == minha_esfera { 0 } else { 1 };
+        (prio, mesma_esfera)
+    });
+    // Rotaciona entre os melhores parceiros a cada mês para diversificar tratados ao longo das décadas.
+    let topo = candidatos.len().min(12);
+    if topo > 1 {
+        let r = ((hoje.0 as usize).wrapping_mul(12) + hoje.1 as usize) % topo;
+        candidatos[..topo].rotate_left(r);
+    }
+
+    let seq = [
+        Acao::AcordoComercial,
+        Acao::PactoDefesa,
+        Acao::Alianca,
+        Acao::MelhorarRelacoes,
+        Acao::AjudaEconomica,
+    ];
+    for alvo in &candidatos {
+        for acao in seq {
+            if d.pode(eu, alvo, acao, tes).is_err() {
+                continue;
+            }
+            if d.aceitacao(eu, alvo, acao).is_some_and(|a| a < 0.0) {
+                continue;
+            }
+            if let Ok(r) = d.executar(eu, alvo, acao, tes) {
+                if r.custo_tesouro > 0.0 {
+                    *d.tesouro_ia.entry(eu.into()).or_insert(500.0) -= r.custo_tesouro;
+                }
+                d.log.push(format!(
+                    "Diplomacia {eu} -> {alvo}: {} ({})",
+                    acao.nome(),
+                    if r.aceita { "aceita" } else { "recusada" }
+                ));
+                if r.acordo_comercial
+                    && let Some(eco) = eco
+                    && let Some(id) = eco.id_pais(&tag_diplo_para_legado(alvo))
+                {
+                    eco.enviar(Comando::AssinarAcordo(id));
+                }
+                if r.aceita
+                    && matches!(acao, Acao::AcordoComercial | Acao::PactoDefesa | Acao::Alianca)
+                    && let Some(ev) = ev
+                {
+                    ev.estado.jornal.push(eventos::Noticia {
+                        data: hoje,
+                        texto: format!("Diplomacia: {eu} firma {} com {alvo}.", acao.nome()),
+                    });
+                    if ev.estado.jornal.len() > 200 {
+                        ev.estado.jornal.remove(0);
+                    }
+                }
+                return;
+            }
+        }
     }
 }
 
@@ -180,28 +294,38 @@ fn tela_diplomacia(
     let nomes: std::collections::HashMap<String, String> = mundo.0.paises.values().map(|p| (normalizar(&p.tag), p.nome.clone())).collect();
     let nome = |t: &str| nomes.get(t).cloned().unwrap_or_else(|| t.to_string());
 
-    let resp_janela = ui_refinada::janela_estilo_menu("DIPLOMACIA E RELAÇÕES EXTERIORES (4)")
-        .open(&mut aberto)
-        .default_size([900.0, 600.0])
+    let resp_janela = ui_refinada::janela_dossie("DIPLOMACIA E RELAÇÕES EXTERIORES (4)", None)
+        .default_pos([20.0, 96.0])
+        .default_size([980.0, 660.0])
         .show(ctx, |ui| {
-            ui_refinada::decorar_janela(ui);
-            ui_refinada::cabecalho_painel(ui, "DIPLOMACIA E RELAÇÕES EXTERIORES (4)");
+            ui_refinada::faixa_titulo(ui, "Diplomacia e Relações Exteriores", Some("4"), Some(&mut aberto));
             ui.horizontal_wrapped(|ui| {
-                ui.group(|ui| {
-                    ui.label("Tensão mundial:");
-                    let t = d.0.tensao;
-                    let cor = if t > 60.0 { ui_refinada::menu::PERIGO } else if t > 30.0 { ui_refinada::menu::AVISO } else { ui_refinada::menu::SUCESSO };
-                    ui.colored_label(cor, format!("{t:.0}/100"));
-                });
-                ui.group(|ui| {
-                    ui.label("Pontos de influência:");
-                    ui.strong(format!("{:.0}", d.0.pontos.get(&eu).copied().unwrap_or(0.0)));
-                });
-                ui.group(|ui| {
-                    ui.label("Sua esfera:");
-                    let e = d.0.esfera(&eu);
-                    ui.colored_label(cor_egui(e), nome_esfera(e));
-                });
+                let t = d.0.tensao;
+                let cor_t = if t > 60.0 {
+                    ui_refinada::menu::PERIGO
+                } else if t > 30.0 {
+                    ui_refinada::menu::AVISO
+                } else {
+                    ui_refinada::menu::SUCESSO
+                };
+                ui_refinada::barra_status(
+                    ui,
+                    Some("Tensão mundial"),
+                    t as f32,
+                    100.0,
+                    cor_t,
+                    150.0,
+                    Some(&format!("{t:.0}/100")),
+                );
+                ui_refinada::chapa(
+                    ui,
+                    "moeda",
+                    "Pontos de influência",
+                    &format!("{:.0}", d.0.pontos.get(&eu).copied().unwrap_or(0.0)),
+                    Some(ui_refinada::menu::OURO),
+                );
+                let e = d.0.esfera(&eu);
+                ui_refinada::chapa(ui, "estrela", "Sua esfera", nome_esfera(e), Some(cor_egui(e)));
                 if ui.checkbox(&mut painel.mapa_esferas, "Mapa: Esferas").changed() {
                     mudou_mapa = true;
                 }
@@ -209,101 +333,168 @@ fn tela_diplomacia(
         ui.separator();
         ui.columns(2, |cols| {
             // ---- Coluna esquerda: lista de países ----
+            ui_refinada::titulo_secao(&mut cols[0], "Nações Reconhecidas");
             cols[0].horizontal(|ui| {
-                ui.label("Buscar:");
-                ui.text_edit_singleline(&mut painel.busca);
+                ui.small("Buscar:");
+                ui.add(egui::TextEdit::singleline(&mut painel.busca).hint_text("nome ou sigla").desired_width(150.0));
             });
-            egui::ScrollArea::vertical().id_salt("diplo_lista").max_height(480.0).show(&mut cols[0], |ui| {
+            cols[0].horizontal(|ui| {
+                ui.weak("País");
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.weak("Relação");
+                });
+            });
+            cols[0].separator();
+
+            // Cache da lista de países: só recalcula se a busca ou os dados diplomáticos mudarem
+            if painel.cache_busca != painel.busca || painel.cache_lista.is_empty() || d.is_changed() {
+                painel.cache_busca = painel.busca.clone();
                 let busca = painel.busca.to_lowercase();
-                let tags: Vec<String> = d.0.paises.iter().map(|p| p.tag.clone()).collect();
-                for t in tags {
-                    if t == eu || (!busca.is_empty() && !nome(&t).to_lowercase().contains(&busca) && !t.to_lowercase().contains(&busca)) {
+                let mut nova_lista = Vec::new();
+                for p in &d.0.paises {
+                    let t = &p.tag;
+                    if *t == eu {
                         continue;
                     }
-                    let r = d.0.relacao(&eu, &t);
-                    let e = d.0.esfera(&t);
+                    let n = nome(t);
+                    if !busca.is_empty() && !n.to_lowercase().contains(&busca) && !t.to_lowercase().contains(&busca) {
+                        continue;
+                    }
+                    let r = d.0.relacao(&eu, t);
+                    let e = d.0.esfera(t);
+                    nova_lista.push(ItemDiploCache {
+                        tag: t.clone(),
+                        nome: n,
+                        relacao: r,
+                        esfera: e,
+                        tag_legado: tag_diplo_para_legado(t),
+                    });
+                }
+                painel.cache_lista = nova_lista;
+            }
+            let total_linhas = painel.cache_lista.len();
+            let mut novo_alvo = None;
+            egui::ScrollArea::vertical().id_salt("diplo_lista").max_height(480.0).show_rows(&mut cols[0], 22.0, total_linhas, |ui, row_range| {
+                for idx in row_range {
+                    let item = &painel.cache_lista[idx];
                     ui.horizontal(|ui| {
-                        if !super::bandeiras_ui::bandeira_ui(ui, &tag_diplo_para_legado(&t), 14.0) {
-                            ui.colored_label(cor_egui(e), "■");
+                        if !super::bandeiras_ui::bandeira_ui(ui, &item.tag_legado, 14.0) {
+                            ui.colored_label(cor_egui(item.esfera), "■");
                         }
-                        let sel = painel.alvo == t;
-                        if ui.selectable_label(sel, format!("{} ({t})", nome(&t))).clicked() {
-                            painel.alvo = t.clone();
+                        let sel = painel.alvo == item.tag;
+                        if ui.selectable_label(sel, format!("{} ({})", item.nome, item.tag)).clicked() {
+                            novo_alvo = Some(item.tag.clone());
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let r = item.relacao;
                             let c = if r >= 21.0 { ui_refinada::menu::SUCESSO } else if r <= -21.0 { ui_refinada::menu::PERIGO } else { ui_refinada::menu::TINTA_SUAVE };
                             ui.colored_label(c, format!("{r:+.0}"));
+                            ui_refinada::barra_relacao(ui, (r / 100.0) as f32, 58.0);
                         });
                     });
                 }
             });
+            if let Some(alvo) = novo_alvo {
+                painel.alvo = alvo;
+            }
             // ---- Coluna direita: detalhes e ações ----
             let ui = &mut cols[1];
             if painel.alvo.is_empty() {
-                ui.label("Selecione um país na lista.");
+                ui.centered_and_justified(|ui| ui.weak("Selecione um país na lista."));
             } else {
                 let alvo = painel.alvo.clone();
                 let r = d.0.relacao(&eu, &alvo);
-                ui.horizontal(|ui| {
-                    super::bandeiras_ui::bandeira_ui(ui, &tag_diplo_para_legado(&alvo), 32.0);
-                    ui.heading(nome(&alvo));
-                });
-                if let (Some(el), Some(r)) = (elenco.as_deref(), retratos.as_deref_mut()) {
-                    super::personagens_ui::retrato_chefe(ui, el, r, &alvo, 72.0);
-                }
-                ui.label(format!("Relação: {r:+.0} ({})", Diplomacia::nivel_relacao(r)));
-                let e = d.0.esfera(&alvo);
-                let (iu, is) = d.0.influencia(&alvo);
-                ui.horizontal(|ui| {
-                    ui.label("Esfera:");
-                    ui.colored_label(cor_egui(e), nome_esfera(e));
-                    ui.label(format!("(influência EUA {iu:.0} / URSS {is:.0})"));
-                });
-                for p in d.0.pactos_de(&alvo).filter(|p| p.a == eu || p.b == eu) {
-                    ui.label(format!("• {} com você", p.tipo.nome()));
-                }
-                ui.separator();
-                ui.strong("Ações");
-                for acao in Acao::TODAS {
-                    let custo = d.0.custo_efetivo(&eu, acao);
-                    let ct = acao.custo_tesouro();
-                    let txt = if ct > 0.0 { format!("{} ({custo:.0} pts, {ct:.0} M)", acao.nome()) } else { format!("{} ({custo:.0} pts)", acao.nome()) };
-                    let pode = d.0.pode(&eu, &alvo, acao, tesouro);
-                    let mut dica = match &pode {
-                        Ok(()) => "Disponível.".to_string(),
-                        Err(m) => m.clone(),
-                    };
-                    if let Some(a) = d.0.aceitacao(&eu, &alvo, acao) {
-                        dica += &format!("\nAceitação da IA: {a:.1} (precisa ser >= 0)");
+                ui_refinada::moldura_cartao().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        super::bandeiras_ui::bandeira_ui(ui, &tag_diplo_para_legado(&alvo), 32.0);
+                        ui.label(
+                            egui::RichText::new(nome(&alvo))
+                                .family(ui_refinada::familia_oswald(ui.ctx()))
+                                .size(20.0)
+                                .strong()
+                                .color(ui_refinada::menu::AZUL_MARINHO),
+                        );
+                    });
+                    if let (Some(el), Some(rt)) = (elenco.as_deref(), retratos.as_deref_mut()) {
+                        super::personagens_ui::retrato_chefe(ui, el, rt, &alvo, 72.0);
                     }
-                    if ui.add_enabled(pode.is_ok(), egui::Button::new(txt)).on_hover_text(dica).clicked() {
-                        match d.0.executar(&eu, &alvo, acao, tesouro) {
-                            Ok(res) => {
-                                gasto += res.custo_tesouro;
-                                if res.acordo_comercial {
-                                    cmd_acordo = Some(alvo.clone());
+                    ui.horizontal(|ui| {
+                        ui_refinada::barra_relacao(ui, (r / 100.0) as f32, 130.0);
+                        ui.label(format!("{r:+.0} · {}", Diplomacia::nivel_relacao(r)));
+                    });
+                    let e = d.0.esfera(&alvo);
+                    let (iu, is) = d.0.influencia(&alvo);
+                    ui.horizontal(|ui| {
+                        ui_refinada::chapa(ui, "estrela", "Esfera", nome_esfera(e), Some(cor_egui(e)));
+                        ui_refinada::chapa(ui, "navio", "EUA", &format!("{iu:.0}"), None);
+                        ui_refinada::chapa(ui, "canhao", "URSS", &format!("{is:.0}"), None);
+                    });
+                    for p in d.0.pactos_de(&alvo).filter(|p| p.a == eu || p.b == eu) {
+                        ui.horizontal(|ui| {
+                            ui_refinada::glifo_ui(ui, "balanca", 14.0, Some(ui_refinada::menu::AZUL_MARINHO));
+                            ui.label(format!("{} com você", p.tipo.nome()));
+                        });
+                    }
+                });
+                ui.add_space(6.0);
+                ui_refinada::moldura_cartao().show(ui, |ui| {
+                    ui_refinada::titulo_secao(ui, "Ações Diplomáticas");
+                    for acao in Acao::TODAS {
+                        let custo = d.0.custo_efetivo(&eu, acao);
+                        let ct = acao.custo_tesouro();
+                        let txt = if ct > 0.0 { format!("{} ({custo:.0} pts, {ct:.0} M)", acao.nome()) } else { format!("{} ({custo:.0} pts)", acao.nome()) };
+                        let pode = d.0.pode(&eu, &alvo, acao, tesouro);
+                        let mut dica = match &pode {
+                            Ok(()) => "Disponível.".to_string(),
+                            Err(m) => m.clone(),
+                        };
+                        if let Some(a) = d.0.aceitacao(&eu, &alvo, acao) {
+                            dica += &format!("\nAceitação da IA: {a:.1} (precisa ser >= 0)");
+                        }
+                        if ui.add_enabled(pode.is_ok(), egui::Button::new(txt)).on_hover_text(dica).clicked() {
+                            match d.0.executar(&eu, &alvo, acao, tesouro) {
+                                Ok(res) => {
+                                    gasto += res.custo_tesouro;
+                                    if res.acordo_comercial {
+                                        cmd_acordo = Some(alvo.clone());
+                                    }
+                                    painel.mensagem = res.mensagem;
+                                    if painel.mapa_esferas {
+                                        mudou_mapa = true;
+                                    }
                                 }
-                                painel.mensagem = res.mensagem;
-                                if painel.mapa_esferas {
-                                    mudou_mapa = true;
-                                }
+                                Err(m) => painel.mensagem = m,
                             }
-                            Err(m) => painel.mensagem = m,
                         }
                     }
-                }
-                ui.separator();
-                ui.strong("Operações Militares");
-                if let Some(ref mut g_sim) = guerra_sim {
+                });
+                ui.add_space(6.0);
+                ui_refinada::moldura_cartao().show(ui, |ui| {
+                    ui_refinada::titulo_secao(ui, "Operações Militares");
+                    if let Some(ref mut g_sim) = guerra_sim {
                     let guerra_ativa = g_sim.0.guerras().iter().find(|gw| gw.ativa && gw.sao_inimigos(&eu, &alvo)).cloned();
                     if let Some(gw) = guerra_ativa {
-                        ui.colored_label(ui_refinada::menu::PERIGO, "⚔ VOCÊ ESTÁ EM GUERRA COM ESTE PAÍS");
+                        ui.horizontal(|ui| {
+                            ui_refinada::glifo_ui(ui, "canhao", 16.0, Some(ui_refinada::menu::VERMELHO));
+                            ui.label(
+                                egui::RichText::new("VOCÊ ESTÁ EM GUERRA COM ESTE PAÍS")
+                                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                                    .size(15.0)
+                                    .strong()
+                                    .color(ui_refinada::menu::VERMELHO),
+                            );
+                        });
                         let score = if gw.eh_atacante(&eu) { gw.pontuacao_guerra } else { -gw.pontuacao_guerra };
                         let cor_s = if score > 0.0 { ui_refinada::menu::SUCESSO } else if score < 0.0 { ui_refinada::menu::PERIGO } else { ui_refinada::menu::TINTA_SUAVE };
-                        ui.horizontal(|ui| {
-                            ui.label("Pontuação de Guerra:");
-                            ui.colored_label(cor_s, format!("{score:+.1}%"));
-                        });
+                        ui_refinada::barra_status(
+                            ui,
+                            Some("Pontuação de guerra"),
+                            (score + 100.0) as f32,
+                            200.0,
+                            cor_s,
+                            150.0,
+                            Some(&format!("{score:+.1}%")),
+                        );
                         if ui_refinada::botao_estilo_menu(ui, "Abrir Painel de Guerra e Paz (6)").clicked() {
                             if let Some(ref mut pg) = painel_guerra {
                                 pg.aberto = true;
@@ -328,9 +519,12 @@ fn tela_diplomacia(
                                     }
                                 });
                             ui.label(format!("Descrição: {}", cb_atual.descricao));
-                            ui.label(format!("Tensão gerada: +{:.0} | Infâmia: +{:.0}", cb_atual.tensao_mundial_gerada, cb_atual.penalidade_infamia));
+                            ui.horizontal(|ui| {
+                                ui_refinada::chapa(ui, "raio", "Tensão gerada", &format!("+{:.0}", cb_atual.tensao_mundial_gerada), Some(ui_refinada::menu::AVISO));
+                                ui_refinada::chapa(ui, "jornal", "Infâmia", &format!("+{:.0}", cb_atual.penalidade_infamia), Some(ui_refinada::menu::PERIGO));
+                            });
 
-                            let btn_decl = ui.button(egui::RichText::new("⚔ DECLARAR GUERRA").color(egui::Color32::from_rgb(255, 90, 90)));
+                            let btn_decl = ui_refinada::botao_estilo_menu(ui, "Declarar Guerra");
                             if btn_decl.clicked() {
                                 let nome_guerra = format!("{} de {} contra {}", cb_atual.nome, nome(&eu), nome(&alvo));
                                 match super::guerra_sim::acao_declarar_guerra(g_sim, &eu, &alvo, &nome_guerra) {
@@ -350,23 +544,32 @@ fn tela_diplomacia(
                         }
                     }
                 }
+                });
                 if !painel.mensagem.is_empty() {
-                    ui.colored_label(egui::Color32::YELLOW, &painel.mensagem);
+                    ui.horizontal(|ui| {
+                        ui_refinada::glifo_ui(ui, "jornal", 14.0, Some(ui_refinada::menu::AVISO));
+                        ui.colored_label(ui_refinada::menu::AVISO, &painel.mensagem);
+                    });
                 }
             }
-            ui.separator();
-            ui.strong("Organizações");
-            for o in &d.0.orgs {
-                match o.formada {
-                    Some((a, m)) => {
-                        let sou = o.membros.contains(&eu);
-                        ui.label(format!("{} — {m:02}/{a} — {} membros{}", o.nome, o.membros.len(), if sou { " (você é membro)" } else { "" }));
-                    }
-                    None => {
-                        ui.weak(format!("{} — não formada (a partir de {:02}/{})", o.nome, o.data_min.1, o.data_min.0));
+            ui.add_space(6.0);
+            ui_refinada::moldura_cartao().show(ui, |ui| {
+                ui_refinada::titulo_secao(ui, "Organizações Internacionais");
+                for o in &d.0.orgs {
+                    match o.formada {
+                        Some((a, m)) => {
+                            let sou = o.membros.contains(&eu);
+                            ui.horizontal(|ui| {
+                                ui_refinada::glifo_ui(ui, "urna", 14.0, Some(ui_refinada::menu::AZUL_MARINHO));
+                                ui.label(format!("{} — {m:02}/{a} — {} membros{}", o.nome, o.membros.len(), if sou { " (você é membro)" } else { "" }));
+                            });
+                        }
+                        None => {
+                            ui.weak(format!("{} — não formada (a partir de {:02}/{})", o.nome, o.data_min.1, o.data_min.0));
+                        }
                     }
                 }
-            }
+            });
             if let Some(l) = d.0.log.last() {
                 ui.weak(l);
             }

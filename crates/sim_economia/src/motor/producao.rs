@@ -100,7 +100,6 @@ pub(crate) fn executar_producao_diaria(
     // das províncias é a global, então toda soma de ponto flutuante é idêntica à versão sequencial
     // (resultado determinístico, independente do número de threads).
     let num_alimentos = bens_alimento_basico.len();
-    let estados_ro: &[Estado] = &*estados;
     let mut tarefas: Vec<TarefaMercadoProducao> = proxima_oferta
         .chunks_mut(num_bens)
         .zip(proxima_demanda.chunks_mut(num_bens))
@@ -158,19 +157,25 @@ pub(crate) fn executar_producao_diaria(
             let mut vagas_abertas_prov = 0.0;
 
             for b in &mut prov.predios {
-                if b.nivel == 0 {
+                if b.nivel == 0 || b.fechado {
                     b.cache.escala_efetiva_ultimo_tick = 0.0;
+                    b.cache.fator_insumos_ultimo_tick = 1.0;
                     continue;
                 }
+                let fator_retomada = b.fator_retomada();
+                if b.dias_retomada > 0 {
+                    b.dias_retomada = b.dias_retomada.saturating_sub(1);
+                }
                 let vagas_totais = b.total_vagas();
+                let vagas_ativas = vagas_totais * fator_retomada;
                 let emp_totais = b.total_empregados();
-                if vagas_totais > emp_totais {
-                    vagas_abertas_prov += vagas_totais - emp_totais;
+                if vagas_ativas > emp_totais {
+                    vagas_abertas_prov += vagas_ativas - emp_totais;
                 }
                 let r_emp = if vagas_totais <= 0.0 {
-                    1.0
+                    fator_retomada
                 } else {
-                    (emp_totais / vagas_totais).clamp(0.0, 1.0)
+                    (emp_totais / vagas_totais).clamp(0.0, fator_retomada)
                 };
                 if r_emp <= 1e-7 {
                     b.cache.escala_efetiva_ultimo_tick = 0.0;
@@ -331,7 +336,7 @@ pub fn atualizar_infraestrutura_estados(
 
         // Prédios formais
         for b in &prov.predios {
-            if b.nivel == 0 {
+            if b.nivel == 0 || b.fechado {
                 continue;
             }
             let vagas_totais = b.total_vagas();
@@ -500,6 +505,13 @@ pub(crate) fn calibrar_infraestrutura_inicial(
                 folha_salarial_ultimo_tick: 0.0,
                 lucro_ultimo_tick: 0.0,
                 dividendos_ultimo_tick: 0.0,
+                fechado: false,
+                dias_retomada: 0,
+                dias_prejuizo: 0,
+                dias_fechado: 0,
+                lucro_ema: 0.0,
+                tendencia_lucro: 0.0,
+                dia_ultima_mudanca_estado: 0,
                 cache: PredioCompilado::default(),
             };
             if compilar_cache_predio(catalogo, &mut modelo).is_none() {

@@ -27,6 +27,8 @@ struct TarefaPaisDistribuicao<'a> {
 
 /// Capacidade máxima de reserva de caixa operacional por nível de prédio.
 pub const RESERVA_CAIXA_POR_NIVEL: f64 = 5_000.0;
+/// Custo diário baixo de conservação predial por nível enquanto o prédio permanece fechado.
+pub const CUSTO_MANUTENCAO_FECHADO_POR_NIVEL: f64 = 15.0;
 
 /// Executa o fechamento operacional diário de todos os prédios, creditando salários por profissão,
 /// reservas de caixa, gastos governamentais, fundo de investimento privado e pools de dividendos.
@@ -123,14 +125,88 @@ pub(crate) fn executar_distribuicao_rendas(
             let mut reservas_prov = 0.0;
 
             for b in &mut prov.predios {
-                let escala = b.cache.escala_efetiva_ultimo_tick;
-                if b.nivel == 0 || escala <= 0.0 {
+                if b.nivel == 0 {
                     b.receita_ultimo_tick = 0.0;
                     b.custo_insumos_ultimo_tick = 0.0;
                     b.folha_salarial_ultimo_tick = 0.0;
                     b.lucro_ultimo_tick = 0.0;
                     b.dividendos_ultimo_tick = 0.0;
                     b.cache.margem_lucro_ultimo_tick = 0.0;
+                    b.dias_prejuizo = 0;
+                    b.dias_fechado = 0;
+                    b.tendencia_lucro = 0.0;
+                    reservas_prov += b.reservas_caixa;
+                    continue;
+                }
+
+                if b.fechado {
+                    let manut = (b.nivel as f64) * CUSTO_MANUTENCAO_FECHADO_POR_NIVEL;
+                    let saque = manut.min(b.reservas_caixa);
+                    b.reservas_caixa = (b.reservas_caixa - saque).max(0.0);
+                    let descoberto = (manut - saque).max(0.0);
+                    if descoberto > 0.0 {
+                        let cobre_estatal = b.cache.financiado_pelo_governo
+                            || exige_estatal
+                            || b.cache.regime_propriedade == RegimePropriedade::Estatal
+                            || (b.subsidiado && !em_calote);
+                        if cobre_estatal {
+                            pais.orcamento.gasto_burocracia += descoberto;
+                        } else {
+                            pais.fundo_investimento_privado =
+                                (pais.fundo_investimento_privado - descoberto).max(0.0);
+                        }
+                    }
+                    b.receita_ultimo_tick = 0.0;
+                    b.custo_insumos_ultimo_tick = manut;
+                    b.folha_salarial_ultimo_tick = 0.0;
+                    b.lucro_ultimo_tick = -manut;
+                    b.dividendos_ultimo_tick = 0.0;
+                    b.cache.margem_lucro_ultimo_tick = 0.0;
+                    b.dias_fechado = b.dias_fechado.saturating_add(1);
+                    b.dias_prejuizo = 0;
+                    b.lucro_ema = -manut;
+                    b.tendencia_lucro = 0.0;
+                    reservas_prov += b.reservas_caixa;
+                    continue;
+                }
+
+                let escala = b.cache.escala_efetiva_ultimo_tick;
+                if escala <= 0.0 {
+                    b.receita_ultimo_tick = 0.0;
+                    b.custo_insumos_ultimo_tick = 0.0;
+                    b.folha_salarial_ultimo_tick = 0.0;
+                    b.lucro_ultimo_tick = 0.0;
+                    b.dividendos_ultimo_tick = 0.0;
+                    b.cache.margem_lucro_ultimo_tick = 0.0;
+                    b.dias_fechado = 0;
+                    if !b.cache.financiado_pelo_governo && b.dias_retomada == 0 {
+                        let mut rec_u = 0.0;
+                        for &(g_out, q) in b.cache.produtos() {
+                            rec_u += q * pais.produtividade * precos[g_out as usize];
+                        }
+                        let mut ins_u = 0.0;
+                        for &(g_in, q) in b.cache.insumos() {
+                            ins_u += q * precos[g_in as usize];
+                        }
+                        let mut fol_u = 0.0;
+                        for s in b.cache.vagas() {
+                            let mult = catalogo.tipos_pop[s.tipo_pop_idx as usize].multiplicador_salario;
+                            fol_u += (s.vagas_por_nivel as f64) * b.salario_base * mult;
+                        }
+                        if fol_u > 1e-9 {
+                            let m_teorica = (rec_u - ins_u - fol_u) / fol_u;
+                            b.cache.margem_lucro_ultimo_tick = m_teorica;
+                            if m_teorica < -0.05 {
+                                b.dias_prejuizo = b.dias_prejuizo.saturating_add(1);
+                                let perda_pot = (rec_u - ins_u - fol_u) * (b.nivel as f64);
+                                b.lucro_ultimo_tick = perda_pot;
+                                b.lucro_ema = 0.90 * b.lucro_ema + 0.10 * perda_pot;
+                                b.tendencia_lucro = b.lucro_ultimo_tick - b.lucro_ema;
+                            } else if m_teorica > 0.05 {
+                                b.dias_prejuizo = b.dias_prejuizo.saturating_sub(1);
+                            }
+                        }
+                    }
                     reservas_prov += b.reservas_caixa;
                     continue;
                 }
@@ -184,6 +260,10 @@ pub(crate) fn executar_distribuicao_rendas(
                     b.lucro_ultimo_tick = 0.0;
                     b.dividendos_ultimo_tick = 0.0;
                     b.cache.margem_lucro_ultimo_tick = 0.0;
+                    b.dias_fechado = 0;
+                    b.dias_prejuizo = 0;
+                    b.lucro_ema = 0.0;
+                    b.tendencia_lucro = 0.0;
                     pais.pib_diario += folha_total;
                     reservas_prov += b.reservas_caixa;
                     continue;
@@ -239,6 +319,20 @@ pub(crate) fn executar_distribuicao_rendas(
                         folha_efetiva = (valor_adicionado + saque_caixa).clamp(0.0, folha_alvo);
                     }
                 }
+
+                b.dias_fechado = 0;
+                if b.lucro_ultimo_tick < -0.5 {
+                    b.dias_prejuizo = b.dias_prejuizo.saturating_add(1);
+                } else if b.lucro_ultimo_tick > 1.0 {
+                    b.dias_prejuizo = b.dias_prejuizo.saturating_sub(2);
+                }
+                let ema_ant = b.lucro_ema;
+                b.lucro_ema = if ema_ant == 0.0 {
+                    b.lucro_ultimo_tick
+                } else {
+                    0.90 * ema_ant + 0.10 * b.lucro_ultimo_tick
+                };
+                b.tendencia_lucro = b.lucro_ultimo_tick - b.lucro_ema;
 
                 let razao_pagamento = if folha_alvo <= 1e-9 {
                     0.0

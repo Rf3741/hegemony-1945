@@ -80,6 +80,108 @@ impl MetricaGrafico {
             Self::ProducaoBem => format!("{:.1}", v),
         }
     }
+
+    /// Fator de divisão aplicado ao eixo do gráfico, para os números caberem na régua.
+    pub fn escala(self) -> f64 {
+        match self {
+            Self::Pib | Self::Divida | Self::Tesouro => 1e9,
+            Self::Populacao => 1e6,
+            Self::ProducaoBem => 1e3,
+            _ => 1.0,
+        }
+    }
+
+    /// Nome da unidade já na escala do eixo (ex.: `US$ bi`).
+    pub fn unidade_eixo(self) -> &'static str {
+        match self {
+            Self::Pib | Self::Divida | Self::Tesouro => "US$ bi",
+            Self::Populacao => "mi de habitantes",
+            Self::ProducaoBem => "mil unidades/dia",
+            other => other.unidade(),
+        }
+    }
+}
+
+/// Cabeçalho fixo de tabela (coluna sem ordenação).
+fn cabecalho_fixo(ui: &mut egui::Ui, nome: &str) {
+    ui.add(
+        egui::Label::new(
+            egui::RichText::new(nome.to_uppercase())
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(11.0)
+                .strong()
+                .color(ui_refinada::menu::TINTA_SUAVE),
+        )
+        .selectable(false),
+    );
+}
+
+fn cabecalho_fixo_w(ui: &mut egui::Ui, nome: &str, largura: f32) {
+    ui.add_sized(
+        [largura, 20.0],
+        egui::Label::new(
+            egui::RichText::new(nome.to_uppercase())
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(11.0)
+                .strong()
+                .color(ui_refinada::menu::TINTA_SUAVE),
+        )
+        .selectable(false),
+    );
+}
+
+/// Cabeçalho clicável: fundo azul-marinho na coluna ordenada, com triângulo desenhado pelo painter.
+fn botao_coluna(ui: &mut egui::Ui, nome: &str, ativa: bool, desc: bool) -> bool {
+    let resp = ui.add(
+        egui::Button::new(
+            egui::RichText::new(format!("{nome}   ").to_uppercase())
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(11.0)
+                .strong()
+                .color(if ativa { ui_refinada::menu::PAPEL } else { ui_refinada::menu::TINTA }),
+        )
+        .fill(if ativa { ui_refinada::menu::AZUL_MARINHO } else { ui_refinada::menu::PAPEL_ALT })
+        .stroke(egui::Stroke::new(1.0, ui_refinada::menu::PAPEL_BORDA)),
+    );
+    if ativa {
+        let r = resp.rect;
+        let x = r.max.x - 9.0;
+        let y = r.center().y;
+        let tri: Vec<egui::Pos2> = if desc {
+            vec![egui::pos2(x - 4.0, y - 2.5), egui::pos2(x + 4.0, y - 2.5), egui::pos2(x, y + 3.0)]
+        } else {
+            vec![egui::pos2(x, y - 3.0), egui::pos2(x + 4.0, y + 2.5), egui::pos2(x - 4.0, y + 2.5)]
+        };
+        ui.painter().add(egui::Shape::convex_polygon(tri, ui_refinada::menu::PAPEL, egui::Stroke::NONE));
+    }
+    resp.clicked()
+}
+
+fn botao_coluna_w(ui: &mut egui::Ui, nome: &str, largura: f32, ativa: bool, desc: bool) -> bool {
+    let resp = ui.add_sized(
+        [largura, 20.0],
+        egui::Button::new(
+            egui::RichText::new(format!("{nome}   ").to_uppercase())
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(11.0)
+                .strong()
+                .color(if ativa { ui_refinada::menu::PAPEL } else { ui_refinada::menu::TINTA }),
+        )
+        .fill(if ativa { ui_refinada::menu::AZUL_MARINHO } else { ui_refinada::menu::PAPEL_ALT })
+        .stroke(egui::Stroke::new(1.0, ui_refinada::menu::PAPEL_BORDA)),
+    );
+    if ativa {
+        let r = resp.rect;
+        let x = r.max.x - 9.0;
+        let y = r.center().y;
+        let tri: Vec<egui::Pos2> = if desc {
+            vec![egui::pos2(x - 4.0, y - 2.5), egui::pos2(x + 4.0, y - 2.5), egui::pos2(x, y + 3.0)]
+        } else {
+            vec![egui::pos2(x, y - 3.0), egui::pos2(x + 4.0, y + 2.5), egui::pos2(x - 4.0, y + 2.5)]
+        };
+        ui.painter().add(egui::Shape::convex_polygon(tri, ui_refinada::menu::PAPEL, egui::Stroke::NONE));
+    }
+    resp.clicked()
 }
 
 /// Registro compacto de um ponto mensal para um país (4 bytes por campo escalar).
@@ -161,17 +263,18 @@ impl GrauPotencia {
 
     pub fn badge_cor(self) -> egui::Color32 {
         match self {
-            Self::GrandePotencia => egui::Color32::from_rgb(255, 215, 0), // Dourado
-            Self::PotenciaMaior => egui::Color32::from_rgb(180, 200, 240), // Prateado-azulado
-            Self::PotenciaMenor => egui::Color32::from_rgb(160, 160, 160), // Cinza
+            Self::GrandePotencia => ui_refinada::menu::OURO,
+            Self::PotenciaMaior => ui_refinada::menu::AZUL_MARINHO,
+            Self::PotenciaMenor => ui_refinada::menu::TINTA_SUAVE,
         }
     }
 
-    pub fn icone(self) -> &'static str {
+    /// Chave de glifo vetorial (painter) do grau, no lugar de emoji.
+    pub fn glifo(self) -> &'static str {
         match self {
-            Self::GrandePotencia => "👑",
-            Self::PotenciaMaior => "⭐",
-            Self::PotenciaMenor => "🔹",
+            Self::GrandePotencia => "coroa",
+            Self::PotenciaMaior => "estrela",
+            Self::PotenciaMenor => "caixa",
         }
     }
 }
@@ -263,6 +366,18 @@ pub struct RecursoLedger {
     pub cat_ordem: Categoria,
     pub cat_desc: bool,
     pub linhas_cat: Vec<LinhaCategoria>,
+    pub top_economicas: Vec<EntradaRankingPotencia>,
+    pub top_militares: Vec<EntradaRankingPotencia>,
+    pub top_influencia: Vec<EntradaRankingPotencia>,
+    pub tabela_cache: Vec<EntradaRankingPotencia>,
+    pub tabela_cache_busca: String,
+    pub tabela_cache_bloco: Option<String>,
+    pub tabela_cache_col: ColunaLedger,
+    pub tabela_cache_desc: bool,
+    pub tabela_cache_versao: usize,
+    pub lista_grafico_cache: Vec<(usize, String, String, String)>,
+    pub lista_grafico_busca: String,
+    pub lista_grafico_versao: usize,
 }
 
 impl Default for RecursoLedger {
@@ -286,6 +401,18 @@ impl Default for RecursoLedger {
             cat_ordem: Categoria::Pib,
             cat_desc: true,
             linhas_cat: Vec::new(),
+            top_economicas: Vec::new(),
+            top_militares: Vec::new(),
+            top_influencia: Vec::new(),
+            tabela_cache: Vec::new(),
+            tabela_cache_busca: String::new(),
+            tabela_cache_bloco: None,
+            tabela_cache_col: ColunaLedger::PontuacaoTotal,
+            tabela_cache_desc: true,
+            tabela_cache_versao: 0,
+            lista_grafico_cache: Vec::new(),
+            lista_grafico_busca: String::new(),
+            lista_grafico_versao: 0,
         }
     }
 }
@@ -294,23 +421,24 @@ impl Default for RecursoLedger {
 // Paleta de cores para gráficos
 // -------------------------------------------------------------------------------------------------
 
+/// Tintas de série para gráficos: todas escuras o bastante para ler sobre o papel creme.
 const PALETA_CORES_GRAFICO: [egui::Color32; 16] = [
-    egui::Color32::from_rgb(80, 160, 240),  // Azul claro
-    egui::Color32::from_rgb(240, 80, 80),   // Vermelho vívido
-    egui::Color32::from_rgb(80, 220, 120),  // Verde esmeralda
-    egui::Color32::from_rgb(250, 200, 60),  // Dourado / Amarelo
-    egui::Color32::from_rgb(190, 100, 240), // Roxo / Violeta
-    egui::Color32::from_rgb(250, 140, 60),  // Laranja
-    egui::Color32::from_rgb(60, 230, 230),  // Ciano
-    egui::Color32::from_rgb(255, 120, 180), // Rosa
-    egui::Color32::from_rgb(160, 230, 80),  // Lima
-    egui::Color32::from_rgb(140, 180, 255), // Azul céu
-    egui::Color32::from_rgb(255, 180, 120), // Pêssego
-    egui::Color32::from_rgb(180, 220, 200), // Menta
-    egui::Color32::from_rgb(220, 160, 255), // Lavanda
-    egui::Color32::from_rgb(255, 230, 140), // Creme
-    egui::Color32::from_rgb(140, 210, 240), // Turquesa
-    egui::Color32::from_rgb(230, 130, 130), // Coral
+    egui::Color32::from_rgb(25, 55, 96),   // azul-marinho
+    egui::Color32::from_rgb(140, 37, 30),  // vermelho cartaz
+    egui::Color32::from_rgb(27, 110, 40),  // verde-escuro
+    egui::Color32::from_rgb(162, 92, 8),   // ocre
+    egui::Color32::from_rgb(23, 22, 20),   // tinta
+    egui::Color32::from_rgb(90, 60, 120),  // ameixa
+    egui::Color32::from_rgb(176, 90, 40),  // laranja queimado
+    egui::Color32::from_rgb(30, 100, 110), // verde-petróleo
+    egui::Color32::from_rgb(110, 110, 45), // oliva
+    egui::Color32::from_rgb(105, 25, 45),  // bordô
+    egui::Color32::from_rgb(60, 95, 140),  // azul-aço
+    egui::Color32::from_rgb(120, 80, 35),  // sépia
+    egui::Color32::from_rgb(40, 80, 60),   // floresta
+    egui::Color32::from_rgb(75, 50, 90),   // uva
+    egui::Color32::from_rgb(150, 60, 50),  // telha
+    egui::Color32::from_rgb(45, 75, 90),   // azul-grafite
 ];
 
 fn cor_para_indice(idx: usize) -> egui::Color32 {
@@ -478,6 +606,11 @@ fn atualizar_rankings_sistema(
     if eco.vista.ranking.is_empty() {
         return;
     }
+    let eco_mudou = eco.is_changed();
+    let diplo_mudou = diplo.as_ref().is_some_and(|d| d.is_changed());
+    if !eco_mudou && !diplo_mudou && !ledger.rankings_cache.is_empty() {
+        return;
+    }
 
     // Calcula os maiores valores para normalização relativa
     let mut max_pib = 1.0_f64;
@@ -609,7 +742,23 @@ fn atualizar_rankings_sistema(
         };
     }
 
+    let mut eco_top = entradas.clone();
+    eco_top.sort_by(|a, b| b.pib_anual.total_cmp(&a.pib_anual));
+    eco_top.truncate(10);
+    ledger.top_economicas = eco_top;
+
+    let mut mil_top = entradas.clone();
+    mil_top.sort_by(|a, b| b.pontuacao_mil.total_cmp(&a.pontuacao_mil));
+    mil_top.truncate(10);
+    ledger.top_militares = mil_top;
+
+    let mut inf_top = entradas.clone();
+    inf_top.sort_by(|a, b| b.pontuacao_inf.total_cmp(&a.pontuacao_inf));
+    inf_top.truncate(10);
+    ledger.top_influencia = inf_top;
+
     ledger.rankings_cache = entradas;
+    ledger.tabela_cache.clear();
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -632,28 +781,26 @@ fn desenhar_tela_ledger(
 
     let mut aberto = ledger.aberto;
 
-    ui_refinada::janela_estilo_menu("ESTATÍSTICAS & LEDGER GERAL (7)")
-        .open(&mut aberto)
+    ui_refinada::janela_dossie("ESTATÍSTICAS & LEDGER GERAL (7)", None)
+        .default_pos([16.0, 96.0])
         .default_width(1200.0)
         .default_height(720.0)
         .min_width(900.0)
         .min_height(550.0)
-        .resizable(true)
         .show(ctx, |ui| {
-            ui_refinada::decorar_janela(ui);
-            ui_refinada::cabecalho_painel(ui, "ESTATÍSTICAS & LEDGER MUNDIAL (7)");
+            ui_refinada::faixa_titulo(ui, "Estatísticas & Ledger Mundial", Some("7"), Some(&mut aberto));
             ui.horizontal(|ui| {
-                let rotulo_aba1 = format!("📈 Gráficos Históricos ({})", ledger.metrica_grafico.titulo());
-                if ui_refinada::aba_estilo_menu(ui, ledger.aba_ativa == AbaLedger::GraficosHistoricos, &rotulo_aba1) {
+                let rotulo_aba1 = format!("Gráficos · {}", ledger.metrica_grafico.titulo());
+                if ui_refinada::aba_glifo(ui, ledger.aba_ativa == AbaLedger::GraficosHistoricos, Some("grafico"), &rotulo_aba1) {
                     ledger.aba_ativa = AbaLedger::GraficosHistoricos;
                 }
-                if ui_refinada::aba_estilo_menu(ui, ledger.aba_ativa == AbaLedger::RankingsPotencias, "👑 Grandes Potências (Top 8)") {
+                if ui_refinada::aba_glifo(ui, ledger.aba_ativa == AbaLedger::RankingsPotencias, Some("coroa"), "Grandes Potências (Top 8)") {
                     ledger.aba_ativa = AbaLedger::RankingsPotencias;
                 }
-                if ui_refinada::aba_estilo_menu(ui, ledger.aba_ativa == AbaLedger::TabelaPaises, "📋 Ledger de Países (Tabela)") {
+                if ui_refinada::aba_glifo(ui, ledger.aba_ativa == AbaLedger::TabelaPaises, Some("caixa"), "Ledger de Países") {
                     ledger.aba_ativa = AbaLedger::TabelaPaises;
                 }
-                if ui_refinada::aba_estilo_menu(ui, ledger.aba_ativa == AbaLedger::RankingsCategoria, "🏆 Rankings Globais") {
+                if ui_refinada::aba_glifo(ui, ledger.aba_ativa == AbaLedger::RankingsCategoria, Some("estrela"), "Rankings Globais") {
                     ledger.aba_ativa = AbaLedger::RankingsCategoria;
                 }
             });
@@ -689,11 +836,10 @@ fn desenhar_aba_graficos(
     ledger: &mut RecursoLedger,
     id_jogador: &str,
 ) {
-    ui.horizontal(|ui| {
-        ui.strong("Métrica:");
+    ui.horizontal_wrapped(|ui| {
+        ui.label(egui::RichText::new("MÉTRICA").small().strong().color(ui_refinada::menu::TINTA_SUAVE));
         for metrica in MetricaGrafico::TODAS {
-            let ativa = ledger.metrica_grafico == metrica;
-            if ui.selectable_label(ativa, metrica.titulo()).clicked() {
+            if ui_refinada::aba_glifo(ui, ledger.metrica_grafico == metrica, Some("grafico"), metrica.titulo()) {
                 ledger.metrica_grafico = metrica;
             }
         }
@@ -729,47 +875,62 @@ fn desenhar_aba_graficos(
         cols[0].vertical(|ui| {
             ui.strong("Países para Comparação:");
             ui.horizontal(|ui| {
-                if ui.button("Meu País").on_hover_text("Seleciona apenas o seu país").clicked() {
+                if ui_refinada::botao_estilo_secundario(ui, "Meu País").on_hover_text("Seleciona apenas o seu país").clicked() {
                     ledger.paises_selecionados.clear();
                     ledger.paises_selecionados.insert(id_jogador.to_string());
                 }
-                if ui.button("Top 8").on_hover_text("Seleciona as 8 Grandes Potências").clicked() {
+                if ui_refinada::botao_estilo_secundario(ui, "Top 8").on_hover_text("Seleciona as 8 Grandes Potências").clicked() {
                     ledger.paises_selecionados.clear();
                     for e in ledger.rankings_cache.iter().take(8) {
                         ledger.paises_selecionados.insert(e.id.clone());
                     }
                 }
-                if ui.button("Limpar").clicked() {
+                if ui_refinada::botao_estilo_secundario(ui, "Limpar").clicked() {
                     ledger.paises_selecionados.clear();
                 }
             });
 
             ui.add_space(2.0);
             ui.horizontal(|ui| {
-                ui.label("🔍");
+                ui_refinada::glifo_ui(ui, "lupa", 14.0, None);
                 ui.text_edit_singleline(&mut ledger.filtro_busca);
             });
 
             ui.add_space(4.0);
             let termo = ledger.filtro_busca.trim().to_lowercase();
 
+            // Cache dos países para o gráfico
+            if ledger.lista_grafico_cache.is_empty()
+                || ledger.lista_grafico_busca != termo
+                || ledger.lista_grafico_versao != ledger.historico_paises.len()
+            {
+                ledger.lista_grafico_busca = termo.clone();
+                ledger.lista_grafico_versao = ledger.historico_paises.len();
+                let mut paises_lista: Vec<_> = ledger.historico_paises.values().collect();
+                paises_lista.sort_by(|a, b| a.nome.cmp(&b.nome));
+                let mut filtrada = Vec::new();
+                for (idx, p) in paises_lista.iter().enumerate() {
+                    if !termo.is_empty()
+                        && !p.nome.to_lowercase().contains(&termo)
+                        && !p.tag.to_lowercase().contains(&termo)
+                    {
+                        continue;
+                    }
+                    filtrada.push((idx, p.id.clone(), p.nome.clone(), p.tag.clone()));
+                }
+                ledger.lista_grafico_cache = filtrada;
+            }
+
+            let total_itens = ledger.lista_grafico_cache.len();
+            let mut alternar_selecao = None;
             egui::ScrollArea::vertical()
                 .id_salt("scroll_paises_grafico")
                 .max_height(480.0)
-                .show(ui, |ui| {
-                    let mut paises_lista: Vec<_> = ledger.historico_paises.values().collect();
-                    paises_lista.sort_by(|a, b| a.nome.cmp(&b.nome));
-
-                    for (idx, p) in paises_lista.iter().enumerate() {
-                        if !termo.is_empty()
-                            && !p.nome.to_lowercase().contains(&termo)
-                            && !p.tag.to_lowercase().contains(&termo)
-                        {
-                            continue;
-                        }
-
-                        let marcado = ledger.paises_selecionados.contains(&p.id);
-                        let eh_jogador = p.id == id_jogador;
+                .show_rows(ui, 22.0, total_itens, |ui, row_range| {
+                    for i in row_range {
+                        let (idx, ref pid, ref pnome, ref ptag) = ledger.lista_grafico_cache[i];
+                        let marcado = ledger.paises_selecionados.contains(pid);
+                        let eh_jogador = pid == id_jogador;
                         let cor_item = cor_para_indice(idx);
 
                         ui.horizontal(|ui| {
@@ -778,21 +939,25 @@ fn desenhar_aba_graficos(
 
                             let mut checked = marcado;
                             let rotulo = if eh_jogador {
-                                format!("{} (Você)", p.nome)
+                                format!("{pnome} (Você)")
                             } else {
-                                format!("{} ({})", p.nome, p.tag)
+                                format!("{pnome} ({ptag})")
                             };
 
                             if ui.checkbox(&mut checked, rotulo).changed() {
-                                if checked {
-                                    ledger.paises_selecionados.insert(p.id.clone());
-                                } else {
-                                    ledger.paises_selecionados.remove(&p.id);
-                                }
+                                alternar_selecao = Some((pid.clone(), checked));
                             }
                         });
                     }
                 });
+
+            if let Some((pid, checked)) = alternar_selecao {
+                if checked {
+                    ledger.paises_selecionados.insert(pid);
+                } else {
+                    ledger.paises_selecionados.remove(&pid);
+                }
+            }
         });
 
         // Coluna 2: Gráfico Histórico Interativo com egui_plot
@@ -806,10 +971,15 @@ fn desenhar_aba_graficos(
                 metrica.titulo().to_string()
             };
 
-            ui.horizontal(|ui| {
-                ui.heading(&nome_metrica);
-                ui.label(format!("(em {})", metrica.unidade()));
-                ui.label(format!("— {} meses simulados", ledger.meses.len()));
+            ui.horizontal_wrapped(|ui| {
+                ui.label(
+                    egui::RichText::new(&nome_metrica)
+                        .family(ui_refinada::familia_oswald(ui.ctx()))
+                        .size(17.0)
+                        .strong()
+                        .color(ui_refinada::menu::AZUL_MARINHO),
+                );
+                ui.weak(format!("(em {}) · {} meses simulados", metrica.unidade_eixo(), ledger.meses.len()));
             });
 
             if ledger.meses.is_empty() {
@@ -826,6 +996,7 @@ fn desenhar_aba_graficos(
 
             // Monta as linhas para cada país selecionado
             let mut linhas: Vec<(String, egui::Color32, PlotPoints<'static>)> = Vec::new();
+            let escala = metrica.escala();
 
             for (idx, p_id) in ledger.paises_selecionados.iter().enumerate() {
                 if let Some(hist) = ledger.historico_paises.get(p_id) {
@@ -849,7 +1020,7 @@ fn desenhar_aba_graficos(
                                     pt.producao_bens.get(bem_idx).copied().unwrap_or(0.0) as f64
                                 }
                             };
-                            [mes_i as f64, val]
+                            [mes_i as f64, val / escala]
                         })
                         .collect();
 
@@ -860,7 +1031,9 @@ fn desenhar_aba_graficos(
             let num_meses = ledger.meses.len();
 
             Plot::new("plot_historico_ledger")
-                .height(480.0)
+                .height(420.0)
+                .grid_color(ui_refinada::menu::PAPEL_BORDA)
+                .y_axis_label(metrica.unidade_eixo())
                 .legend(Legend::default().position(Corner::RightTop))
                 .x_axis_label("mês da simulação")
                 .allow_scroll(true)
@@ -876,14 +1049,14 @@ fn desenhar_aba_graficos(
                     }
                 });
 
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if let Some(primeiro) = meses_nomes.first() {
-                    ui.label(format!("Início: {}", primeiro));
+                    ui.weak(format!("Início: {}", primeiro));
                 }
                 if let Some(ultimo) = meses_nomes.last() {
-                    ui.label(format!("| Data atual: {} (mês {})", ultimo, num_meses));
+                    ui.weak(format!("· Data atual: {} (mês {})", ultimo, num_meses));
                 }
-                ui.label("| Dica: use roda do mouse para zoom e arraste com botão esquerdo para navegar");
+                ui.weak("· roda do mouse = zoom, arrastar = navegar");
             });
         });
     });
@@ -898,68 +1071,127 @@ fn desenhar_aba_potencias(
     ledger: &RecursoLedger,
     id_jogador: &str,
 ) {
-    ui.horizontal(|ui| {
-        ui.heading("👑 Grandes Potências de 1945");
-        ui.label("— Classificação geopolítica oficial estilo Victoria 3 (Top 8)");
+    ui.horizontal_wrapped(|ui| {
+        ui_refinada::glifo_ui(ui, "coroa", 20.0, Some(ui_refinada::menu::OURO));
+        ui.label(
+            egui::RichText::new("GRANDES POTÊNCIAS DE 1945")
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(19.0)
+                .strong()
+                .color(ui_refinada::menu::AZUL_MARINHO),
+        );
+        ui.weak("— classificação geopolítica (Top 8)");
     });
-    ui.label("A pontuação de potência combina poder econômico (PIB e SoL), poder militar (forças armadas e gastos) e projeção de influência global.");
+    ui.weak("A pontuação combina poder econômico (PIB e padrão de vida), poder militar (forças armadas e gastos) e projeção de influência.");
 
     ui.add_space(8.0);
 
-    // Grid dos 8 primeiros colocados em cartões luxuosos estilo Victoria 3
+    // Normalizadores das barras (máximo entre os oito primeiros)
+    let topo: Vec<&EntradaRankingPotencia> = ledger.rankings_cache.iter().take(8).collect();
+    let max_de = |get: fn(&EntradaRankingPotencia) -> f64| {
+        topo.iter().map(|p| get(p)).fold(0.0f64, f64::max).max(1.0)
+    };
+    let max_total = max_de(|p| p.pontuacao_total);
+    let max_eco = max_de(|p| p.pontuacao_eco);
+    let max_mil = max_de(|p| p.pontuacao_mil);
+    let max_inf = max_de(|p| p.pontuacao_inf);
+
     egui::ScrollArea::vertical()
         .id_salt("scroll_potencias")
         .show(ui, |ui| {
             ui.columns(4, |cols| {
                 for (i, p) in ledger.rankings_cache.iter().take(8).enumerate() {
                     let col_idx = i % 4;
-                    cols[col_idx].group(|ui| {
-                        let eh_jogador = p.id == id_jogador;
-                        let moldura_cor = if eh_jogador {
-                            egui::Color32::from_rgb(255, 215, 0)
-                        } else {
-                            p.grau.badge_cor()
-                        };
-
-                        ui.horizontal(|ui| {
-                            ui.colored_label(moldura_cor, egui::RichText::new(format!("#{}: {}", p.rank_geral, p.grau.icone())).strong().size(18.0));
-                            let (r, _) = ui.allocate_exact_size(egui::vec2(16.0, 12.0), egui::Sense::hover());
-                            ui.painter().rect_filled(r, 2.0, p.cor);
-                            ui.strong(&p.nome);
+                    let eh_jogador = p.id == id_jogador;
+                    let cor_borda = if eh_jogador {
+                        ui_refinada::menu::VERMELHO
+                    } else {
+                        ui_refinada::menu::PAPEL_BORDA
+                    };
+                    egui::Frame::new()
+                        .fill(ui_refinada::menu::PAPEL_CARD)
+                        .stroke(egui::Stroke::new(if eh_jogador { 2.0 } else { 1.0 }, cor_borda))
+                        .inner_margin(egui::Margin::symmetric(9, 6))
+                        .show(&mut cols[col_idx], |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    egui::RichText::new(format!("#{}", p.rank_geral))
+                                        .family(ui_refinada::familia_oswald(ui.ctx()))
+                                        .size(16.0)
+                                        .strong()
+                                        .color(ui_refinada::menu::AZUL_MARINHO)
+                                        .background_color(ui_refinada::menu::PAPEL_CLARO),
+                                );
+                                ui_refinada::glifo_ui(ui, p.grau.glifo(), 16.0, Some(p.grau.badge_cor()));
+                                ui.label(
+                                    egui::RichText::new(&p.nome)
+                                        .family(ui_refinada::familia_oswald(ui.ctx()))
+                                        .size(15.0)
+                                        .strong()
+                                        .color(ui_refinada::menu::TINTA),
+                                );
+                                let (r, _) = ui.allocate_exact_size(egui::vec2(16.0, 11.0), egui::Sense::hover());
+                                ui.painter().rect_filled(r, 0.0, p.cor);
+                                ui.painter().rect_stroke(r, 0.0, egui::Stroke::new(1.0, ui_refinada::menu::TINTA), egui::StrokeKind::Inside);
+                            });
+                            ui.label(egui::RichText::new(p.grau.rotulo()).small().color(ui_refinada::menu::TINTA_SUAVE));
+                            if eh_jogador {
+                                ui.colored_label(ui_refinada::menu::VERMELHO, egui::RichText::new("SEU PAÍS").small().strong());
+                            }
+                            ui_refinada::linha_decorativa(ui);
+                            let barra = |ui: &mut egui::Ui, rot: &str, v: f64, m: f64, cor: egui::Color32| {
+                                ui.horizontal(|ui| {
+                                    ui.add_sized([58.0, 12.0], egui::Label::new(egui::RichText::new(rot).size(10.0).color(ui_refinada::menu::TINTA_SUAVE)));
+                                    let (rect, _) = ui.allocate_exact_size(egui::vec2(72.0, 9.0), egui::Sense::hover());
+                                    let pt = ui.painter_at(rect);
+                                    pt.rect_filled(rect, 0.0, ui_refinada::menu::PAPEL_CLARO);
+                                    let cheio = egui::Rect::from_min_max(rect.min, egui::pos2(rect.min.x + rect.width() * (v / m).clamp(0.0, 1.0) as f32, rect.max.y));
+                                    pt.rect_filled(cheio, 0.0, cor);
+                                    pt.rect_stroke(rect, 0.0, egui::Stroke::new(1.0, ui_refinada::menu::TINTA_SUAVE), egui::StrokeKind::Inside);
+                                    ui.add_sized([46.0, 12.0], egui::Label::new(egui::RichText::new(format!("{:.0}", v)).small()));
+                                });
+                            };
+                            barra(ui, "Total", p.pontuacao_total, max_total, ui_refinada::menu::TINTA);
+                            barra(ui, "Economia", p.pontuacao_eco, max_eco, ui_refinada::menu::AZUL_MARINHO);
+                            barra(ui, "Militar", p.pontuacao_mil, max_mil, ui_refinada::menu::VERMELHO);
+                            barra(ui, "Influência", p.pontuacao_inf, max_inf, ui_refinada::menu::SUCESSO);
+                            ui.add_space(2.0);
+                            ui.small(format!("PIB · {}", fmt_din(p.pib_anual)));
+                            ui.small(format!("População · {}", fmt_pop(p.populacao as u64)));
+                            ui.small(format!("Padrão de vida · {:.1}", p.padrao_vida));
                         });
-
-                        if eh_jogador {
-                            ui.colored_label(ui_refinada::menu::SUCESSO, "★ SEU PAÍS ★");
-                        }
-
-                        ui.separator();
-                        ui.horizontal(|ui| {
-                            ui.label("Pontuação Total:");
-                            ui.colored_label(ui_refinada::menu::OURO, egui::RichText::new(format!("{:.0} pts", p.pontuacao_total)).strong());
-                        });
-
-                        ui.add_space(4.0);
-                        ui.label(format!("• Economia: {:.0} pts ({})", p.pontuacao_eco, fmt_din(p.pib_anual)));
-                        ui.label(format!("• Força Militar: {:.0} pts", p.pontuacao_mil));
-                        ui.label(format!("• Influência: {:.0} pts ({})", p.pontuacao_inf, p.esfera));
-                        ui.label(format!("• População: {}", fmt_pop(p.populacao as u64)));
-                        ui.label(format!("• Padrão de Vida: {:.1}", p.padrao_vida));
-                    });
                     cols[col_idx].add_space(8.0);
                 }
             });
 
             ui.add_space(16.0);
             ui.separator();
-            ui.heading("Pilares Comparativos de Potência (Top 10 por Dimensão)");
+            ui.label(
+                egui::RichText::new("PILARES COMPARATIVOS DE POTÊNCIA (TOP 10 POR DIMENSÃO)")
+                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                    .size(16.0)
+                    .strong()
+                    .color(ui_refinada::menu::AZUL_MARINHO),
+            );
 
             ui.columns(3, |cols| {
+                let cab = |ui: &mut egui::Ui, glifo: &str, t: &str| {
+                    ui.horizontal(|ui| {
+                        ui_refinada::glifo_ui(ui, glifo, 15.0, None);
+                        ui.label(
+                            egui::RichText::new(t)
+                                .family(ui_refinada::familia_oswald(ui.ctx()))
+                                .size(14.0)
+                                .strong()
+                                .color(ui_refinada::menu::TINTA),
+                        );
+                    });
+                    ui_refinada::linha_decorativa(ui);
+                };
                 // Coluna 1: Maiores Potências Econômicas
                 cols[0].group(|ui| {
-                    ui.strong("📈 Potência Econômica (PIB)");
-                    let mut lista = ledger.rankings_cache.clone();
-                    lista.sort_by(|a, b| b.pib_anual.total_cmp(&a.pib_anual));
-                    for (i, p) in lista.iter().take(10).enumerate() {
+                    cab(ui, "moeda", "Potência Econômica (PIB)");
+                    for (i, p) in ledger.top_economicas.iter().take(10).enumerate() {
                         let eh_jog = p.id == id_jogador;
                         let txt = format!("{}. {} — {}", i + 1, p.nome, fmt_din(p.pib_anual));
                         if eh_jog {
@@ -972,10 +1204,8 @@ fn desenhar_aba_potencias(
 
                 // Coluna 2: Maiores Potências Militares
                 cols[1].group(|ui| {
-                    ui.strong("⚔️ Potência Militar (Força Armada)");
-                    let mut lista = ledger.rankings_cache.clone();
-                    lista.sort_by(|a, b| b.pontuacao_mil.total_cmp(&a.pontuacao_mil));
-                    for (i, p) in lista.iter().take(10).enumerate() {
+                    cab(ui, "canhao", "Potência Militar (Força Armada)");
+                    for (i, p) in ledger.top_militares.iter().take(10).enumerate() {
                         let eh_jog = p.id == id_jogador;
                         let txt = format!("{}. {} — {:.0} pts", i + 1, p.nome, p.pontuacao_mil);
                         if eh_jog {
@@ -988,10 +1218,8 @@ fn desenhar_aba_potencias(
 
                 // Coluna 3: Maior Influência & Geopolítica
                 cols[2].group(|ui| {
-                    ui.strong("🌐 Projeção de Influência");
-                    let mut lista = ledger.rankings_cache.clone();
-                    lista.sort_by(|a, b| b.pontuacao_inf.total_cmp(&a.pontuacao_inf));
-                    for (i, p) in lista.iter().take(10).enumerate() {
+                    cab(ui, "torre", "Projeção de Influência");
+                    for (i, p) in ledger.top_influencia.iter().take(10).enumerate() {
                         let eh_jog = p.id == id_jogador;
                         let txt = format!("{}. {} — {:.0} pts ({})", i + 1, p.nome, p.pontuacao_inf, p.esfera);
                         if eh_jog {
@@ -1036,131 +1264,117 @@ fn desenhar_aba_tabela(
 
     ui.add_space(4.0);
 
-    let mut lista = ledger.rankings_cache.clone();
+    let precisa_recalcular = ledger.tabela_cache.is_empty()
+        || ledger.tabela_cache_busca != ledger.filtro_busca
+        || ledger.tabela_cache_bloco != ledger.filtro_bloco
+        || ledger.tabela_cache_col != ledger.coluna_ordenacao
+        || ledger.tabela_cache_desc != ledger.ordenacao_decrescente;
 
-    // Filtra busca e bloco
-    let termo = ledger.filtro_busca.trim().to_lowercase();
-    if !termo.is_empty() {
-        lista.retain(|p| p.nome.to_lowercase().contains(&termo) || p.tag.to_lowercase().contains(&termo));
+    if precisa_recalcular {
+        let mut lista = ledger.rankings_cache.clone();
+
+        // Filtra busca e bloco
+        let termo = ledger.filtro_busca.trim().to_lowercase();
+        if !termo.is_empty() {
+            lista.retain(|p| p.nome.to_lowercase().contains(&termo) || p.tag.to_lowercase().contains(&termo));
+        }
+        if let Some(b) = &ledger.filtro_bloco {
+            lista.retain(|p| p.esfera == b.as_str());
+        }
+
+        // Ordenação
+        let col = ledger.coluna_ordenacao;
+        let desc = ledger.ordenacao_decrescente;
+
+        lista.sort_by(|a, b| {
+            let cmp = match col {
+                ColunaLedger::RankGeral => a.rank_geral.cmp(&b.rank_geral),
+                ColunaLedger::Nome => a.nome.cmp(&b.nome),
+                ColunaLedger::PontuacaoTotal => a.pontuacao_total.total_cmp(&b.pontuacao_total),
+                ColunaLedger::PontuacaoEco => a.pontuacao_eco.total_cmp(&b.pontuacao_eco),
+                ColunaLedger::Pib => a.pib_anual.total_cmp(&b.pib_anual),
+                ColunaLedger::PontuacaoMil => a.pontuacao_mil.total_cmp(&b.pontuacao_mil),
+                ColunaLedger::ForcaMil => a.forca_militar.total_cmp(&b.forca_militar),
+                ColunaLedger::PontuacaoInf => a.pontuacao_inf.total_cmp(&b.pontuacao_inf),
+                ColunaLedger::Populacao => a.populacao.total_cmp(&b.populacao),
+                ColunaLedger::PadraoVida => a.padrao_vida.total_cmp(&b.padrao_vida),
+                ColunaLedger::Desemprego => a.desemprego.total_cmp(&b.desemprego),
+                ColunaLedger::Tesouro => a.tesouro.total_cmp(&b.tesouro),
+                ColunaLedger::Divida => a.divida.total_cmp(&b.divida),
+            };
+            if desc { cmp.reverse() } else { cmp }
+        });
+
+        ledger.tabela_cache_busca = ledger.filtro_busca.clone();
+        ledger.tabela_cache_bloco = ledger.filtro_bloco.clone();
+        ledger.tabela_cache_col = ledger.coluna_ordenacao;
+        ledger.tabela_cache_desc = ledger.ordenacao_decrescente;
+        ledger.tabela_cache = lista;
     }
-    if let Some(b) = &ledger.filtro_bloco {
-        lista.retain(|p| p.esfera == b.as_str());
-    }
-
-    // Ordenação
-    let col = ledger.coluna_ordenacao;
-    let desc = ledger.ordenacao_decrescente;
-
-    lista.sort_by(|a, b| {
-        let cmp = match col {
-            ColunaLedger::RankGeral => a.rank_geral.cmp(&b.rank_geral),
-            ColunaLedger::Nome => a.nome.cmp(&b.nome),
-            ColunaLedger::PontuacaoTotal => a.pontuacao_total.total_cmp(&b.pontuacao_total),
-            ColunaLedger::PontuacaoEco => a.pontuacao_eco.total_cmp(&b.pontuacao_eco),
-            ColunaLedger::Pib => a.pib_anual.total_cmp(&b.pib_anual),
-            ColunaLedger::PontuacaoMil => a.pontuacao_mil.total_cmp(&b.pontuacao_mil),
-            ColunaLedger::ForcaMil => a.forca_militar.total_cmp(&b.forca_militar),
-            ColunaLedger::PontuacaoInf => a.pontuacao_inf.total_cmp(&b.pontuacao_inf),
-            ColunaLedger::Populacao => a.populacao.total_cmp(&b.populacao),
-            ColunaLedger::PadraoVida => a.padrao_vida.total_cmp(&b.padrao_vida),
-            ColunaLedger::Desemprego => a.desemprego.total_cmp(&b.desemprego),
-            ColunaLedger::Tesouro => a.tesouro.total_cmp(&b.tesouro),
-            ColunaLedger::Divida => a.divida.total_cmp(&b.divida),
-        };
-        if desc { cmp.reverse() } else { cmp }
-    });
 
     let col_ord = ledger.coluna_ordenacao;
     let desc_ord = ledger.ordenacao_decrescente;
     let mut nova_col_ord = None;
 
-    let rotulo_cabecalho = |col_target: ColunaLedger, nome: &str| -> String {
-        if col_ord == col_target {
-            let seta = if desc_ord { " ▼" } else { " ▲" };
-            format!("{}{}", nome, seta)
-        } else {
-            nome.to_string()
-        }
-    };
+    // Cabeçalho fixo da tabela
+    ui.horizontal(|ui| {
+        if botao_coluna_w(ui, "Rank", 50.0, col_ord == ColunaLedger::RankGeral, desc_ord) { nova_col_ord = Some(ColunaLedger::RankGeral); }
+        if botao_coluna_w(ui, "País", 180.0, col_ord == ColunaLedger::Nome, desc_ord) { nova_col_ord = Some(ColunaLedger::Nome); }
+        cabecalho_fixo_w(ui, "Grau", 110.0);
+        if botao_coluna_w(ui, "Pontos", 65.0, col_ord == ColunaLedger::PontuacaoTotal, desc_ord) { nova_col_ord = Some(ColunaLedger::PontuacaoTotal); }
+        if botao_coluna_w(ui, "PIB", 80.0, col_ord == ColunaLedger::Pib, desc_ord) { nova_col_ord = Some(ColunaLedger::Pib); }
+        if botao_coluna_w(ui, "Militar", 65.0, col_ord == ColunaLedger::PontuacaoMil, desc_ord) { nova_col_ord = Some(ColunaLedger::PontuacaoMil); }
+        if botao_coluna_w(ui, "Influência", 75.0, col_ord == ColunaLedger::PontuacaoInf, desc_ord) { nova_col_ord = Some(ColunaLedger::PontuacaoInf); }
+        if botao_coluna_w(ui, "População", 80.0, col_ord == ColunaLedger::Populacao, desc_ord) { nova_col_ord = Some(ColunaLedger::Populacao); }
+        if botao_coluna_w(ui, "SoL", 50.0, col_ord == ColunaLedger::PadraoVida, desc_ord) { nova_col_ord = Some(ColunaLedger::PadraoVida); }
+        if botao_coluna_w(ui, "Desemp.", 65.0, col_ord == ColunaLedger::Desemprego, desc_ord) { nova_col_ord = Some(ColunaLedger::Desemprego); }
+        if botao_coluna_w(ui, "Tesouro", 80.0, col_ord == ColunaLedger::Tesouro, desc_ord) { nova_col_ord = Some(ColunaLedger::Tesouro); }
+        if botao_coluna_w(ui, "Dívida", 80.0, col_ord == ColunaLedger::Divida, desc_ord) { nova_col_ord = Some(ColunaLedger::Divida); }
+        cabecalho_fixo_w(ui, "Esfera", 120.0);
+    });
+    ui.separator();
 
+    let total_linhas = ledger.tabela_cache.len();
     egui::ScrollArea::vertical()
         .id_salt("scroll_tabela_ledger")
         .max_height(580.0)
-        .show(ui, |ui| {
-            egui::Grid::new("grid_ledger_paises")
-                .striped(true)
-                .min_col_width(70.0)
-                .spacing([12.0, 6.0])
-                .show(ui, |ui| {
-                    // Cabeçalho da tabela
-                    if ui.button(rotulo_cabecalho(ColunaLedger::RankGeral, "Rank")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::RankGeral);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Nome, "País")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Nome);
-                    }
-                    ui.strong("Grau");
-                    if ui.button(rotulo_cabecalho(ColunaLedger::PontuacaoTotal, "Pontos")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::PontuacaoTotal);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Pib, "PIB Anual")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Pib);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::PontuacaoMil, "Militar")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::PontuacaoMil);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::PontuacaoInf, "Influência")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::PontuacaoInf);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Populacao, "População")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Populacao);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::PadraoVida, "SoL")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::PadraoVida);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Desemprego, "Desemp.")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Desemprego);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Tesouro, "Tesouro")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Tesouro);
-                    }
-                    if ui.button(rotulo_cabecalho(ColunaLedger::Divida, "Dívida")).clicked() {
-                        nova_col_ord = Some(ColunaLedger::Divida);
-                    }
-                    ui.strong("Esfera");
-                    ui.end_row();
+        .show_rows(ui, 22.0, total_linhas, |ui, row_range| {
+            for idx in row_range {
+                let p = &ledger.tabela_cache[idx];
+                let eh_jogador = p.id == id_jogador;
+                let cor_destaque = if eh_jogador { ui_refinada::menu::VERMELHO } else { ui_refinada::menu::TINTA };
 
-                    // Linhas dos países
-                    for p in &lista {
-                        let eh_jogador = p.id == id_jogador;
-                        let cor_destaque = if eh_jogador { ui_refinada::menu::VERMELHO } else { ui_refinada::menu::TINTA };
+                ui.horizontal(|ui| {
+                    ui.add_sized([50.0, 20.0], egui::Label::new(egui::RichText::new(format!("#{}", p.rank_geral)).color(cor_destaque)));
 
-                        ui.colored_label(cor_destaque, format!("#{}", p.rank_geral));
+                    ui.allocate_ui_with_layout(egui::vec2(180.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        let (r, _) = ui.allocate_exact_size(egui::vec2(14.0, 10.0), egui::Sense::hover());
+                        ui.painter().rect_filled(r, 0.0, p.cor);
+                        ui.painter().rect_stroke(r, 0.0, egui::Stroke::new(1.0, ui_refinada::menu::TINTA_SUAVE), egui::StrokeKind::Inside);
+                        if eh_jogador {
+                            ui.colored_label(cor_destaque, egui::RichText::new(format!("{} ({}) · você", p.nome, p.tag)).strong());
+                        } else {
+                            ui.colored_label(cor_destaque, format!("{} ({})", p.nome, p.tag));
+                        }
+                    });
 
-                        ui.horizontal(|ui| {
-                            let (r, _) = ui.allocate_exact_size(egui::vec2(14.0, 10.0), egui::Sense::hover());
-                            ui.painter().rect_filled(r, 1.5, p.cor);
-                            if eh_jogador {
-                                ui.colored_label(cor_destaque, egui::RichText::new(format!("{} ({}) ★", p.nome, p.tag)).strong());
-                            } else {
-                                ui.colored_label(cor_destaque, format!("{} ({})", p.nome, p.tag));
-                            }
-                        });
+                    ui.allocate_ui_with_layout(egui::vec2(110.0, 20.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        ui_refinada::glifo_ui(ui, p.grau.glifo(), 13.0, Some(p.grau.badge_cor()));
+                        ui.colored_label(ui_refinada::menu::TINTA_SUAVE, p.grau.rotulo());
+                    });
 
-                        ui.colored_label(p.grau.badge_cor(), format!("{} {}", p.grau.icone(), p.grau.rotulo()));
-                        ui.colored_label(egui::Color32::from_rgb(250, 220, 90), format!("{:.0}", p.pontuacao_total));
-                        ui.label(fmt_din(p.pib_anual));
-                        ui.label(format!("{:.0}", p.pontuacao_mil));
-                        ui.label(format!("{:.0}", p.pontuacao_inf));
-                        ui.label(fmt_pop(p.populacao as u64));
-                        ui.label(format!("{:.1}", p.padrao_vida));
-                        ui.label(format!("{:.1}%", p.desemprego * 100.0));
-                        ui.label(fmt_din(p.tesouro));
-                        ui.label(fmt_din(p.divida));
-                        ui.label(p.esfera);
-                        ui.end_row();
-                    }
+                    ui.add_sized([65.0, 20.0], egui::Label::new(egui::RichText::new(format!("{:.0}", p.pontuacao_total)).color(cor_destaque).strong()));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_din(p.pib_anual)));
+                    ui.add_sized([65.0, 20.0], egui::Label::new(format!("{:.0}", p.pontuacao_mil)));
+                    ui.add_sized([75.0, 20.0], egui::Label::new(format!("{:.0}", p.pontuacao_inf)));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_pop(p.populacao as u64)));
+                    ui.add_sized([50.0, 20.0], egui::Label::new(format!("{:.1}", p.padrao_vida)));
+                    ui.add_sized([65.0, 20.0], egui::Label::new(format!("{:.1}%", p.desemprego * 100.0)));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_din(p.tesouro)));
+                    ui.add_sized([80.0, 20.0], egui::Label::new(fmt_din(p.divida)));
+                    ui.add_sized([120.0, 20.0], egui::Label::new(p.esfera));
                 });
+            }
         });
 
     if let Some(nova_col) = nova_col_ord {
@@ -1170,6 +1384,7 @@ fn desenhar_aba_tabela(
             ledger.coluna_ordenacao = nova_col;
             ledger.ordenacao_decrescente = true;
         }
+        ledger.tabela_cache.clear();
     }
 }
 
@@ -1340,13 +1555,20 @@ fn bandeira_ou_cor(ui: &mut egui::Ui, l: &LinhaCategoria) {
 }
 
 fn desenhar_aba_categorias(ui: &mut egui::Ui, ledger: &mut RecursoLedger, tag_jogador: &str) {
-    ui.horizontal(|ui| {
-        ui.heading("🏆 Rankings Globais");
-        ui.label("— escolha a categoria para ver o Top 10; clique no cabeçalho da tabela para ordenar.");
+    ui.horizontal_wrapped(|ui| {
+        ui_refinada::glifo_ui(ui, "estrela", 19.0, Some(ui_refinada::menu::OURO));
+        ui.label(
+            egui::RichText::new("RANKINGS GLOBAIS POR CATEGORIA")
+                .family(ui_refinada::familia_oswald(ui.ctx()))
+                .size(18.0)
+                .strong()
+                .color(ui_refinada::menu::AZUL_MARINHO),
+        );
+        ui.weak("— escolha a categoria; clique no cabeçalho da tabela para ordenar.");
     });
     ui.horizontal_wrapped(|ui| {
         for c in Categoria::TODAS {
-            if ui.selectable_label(ledger.cat_selecionada == c, c.nome()).clicked() {
+            if ui_refinada::aba_glifo(ui, ledger.cat_selecionada == c, Some(ui_refinada::chave_para(c.nome())), c.nome()) {
                 ledger.cat_selecionada = c;
                 ledger.cat_ordem = c;
                 ledger.cat_desc = true;
@@ -1367,17 +1589,24 @@ fn desenhar_aba_categorias(ui: &mut egui::Ui, ledger: &mut RecursoLedger, tag_jo
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             ui.set_width(380.0);
-            ui.strong(format!("Top 10 — {}", cat.nome()));
+            ui.label(
+                egui::RichText::new(format!("TOP 10 · {}", cat.nome().to_uppercase()))
+                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                    .size(15.0)
+                    .strong()
+                    .color(ui_refinada::menu::TINTA),
+            );
             for (i, l) in top.iter().take(10).enumerate() {
                 ui.horizontal(|ui| {
                     ui.add_sized([26.0, 18.0], egui::Label::new(egui::RichText::new(format!("{}º", i + 1)).monospace()));
                     bandeira_ou_cor(ui, l);
-                    let nome = if l.tag == tag_jogador { egui::RichText::new(&l.nome).strong().color(egui::Color32::from_rgb(250, 200, 60)) } else { egui::RichText::new(&l.nome) };
+                    let nome = if l.tag == tag_jogador { egui::RichText::new(&l.nome).strong().color(ui_refinada::menu::VERMELHO) } else { egui::RichText::new(&l.nome) };
                     ui.add_sized([110.0, 18.0], egui::Label::new(nome).truncate());
                     let (r, _) = ui.allocate_exact_size(egui::vec2(70.0, 14.0), egui::Sense::hover());
                     let frac = (l.valor(cat).abs() / maximo).clamp(0.0, 1.0) as f32;
-                    ui.painter().rect_filled(r, 2.0, egui::Color32::from_black_alpha(90));
-                    ui.painter().rect_filled(egui::Rect::from_min_size(r.min, egui::vec2(r.width() * frac, r.height())), 2.0, l.cor);
+                    ui.painter().rect_filled(r, 0.0, ui_refinada::menu::PAPEL_CLARO);
+                    ui.painter().rect_filled(egui::Rect::from_min_size(r.min, egui::vec2(r.width() * frac, r.height())), 0.0, l.cor);
+                    ui.painter().rect_stroke(r, 0.0, egui::Stroke::new(1.0, ui_refinada::menu::TINTA_SUAVE), egui::StrokeKind::Inside);
                     ui.label(egui::RichText::new(cat.formatar(l.valor(cat))).monospace().size(12.0));
                 });
             }
@@ -1400,24 +1629,23 @@ fn desenhar_aba_categorias(ui: &mut egui::Ui, ledger: &mut RecursoLedger, tag_jo
         let mut nova_ord = None;
         egui::ScrollArea::both().id_salt("scroll_rank_categorias").max_height(500.0).show(ui, |ui| {
             egui::Grid::new("grid_rank_categorias").striped(true).spacing([10.0, 4.0]).show(ui, |ui| {
-                ui.strong("#");
-                ui.strong("País");
+                cabecalho_fixo(ui, "#");
+                cabecalho_fixo(ui, "País");
                 for c in Categoria::TODAS {
-                    let seta = if ord == c { if desc { " ▼" } else { " ▲" } } else { "" };
-                    if ui.button(format!("{}{}", c.nome(), seta)).clicked() {
+                    if botao_coluna(ui, c.nome(), ord == c, desc) {
                         nova_ord = Some(c);
                     }
                 }
                 ui.end_row();
                 for (i, l) in linhas.iter().enumerate() {
-                    ui.label(format!("{}", i + 1));
+                    ui.label(egui::RichText::new(format!("{}", i + 1)).size(12.0).color(ui_refinada::menu::TINTA_SUAVE));
                     ui.horizontal(|ui| {
                         bandeira_ou_cor(ui, l);
-                        let t = if l.tag == tag_jogador { egui::RichText::new(&l.nome).strong().color(egui::Color32::from_rgb(250, 200, 60)) } else { egui::RichText::new(&l.nome) };
+                        let t = if l.tag == tag_jogador { egui::RichText::new(&l.nome).size(12.0).strong().color(ui_refinada::menu::VERMELHO) } else { egui::RichText::new(&l.nome).size(12.0).color(ui_refinada::menu::TINTA) };
                         ui.label(t);
                     });
                     for c in Categoria::TODAS {
-                        ui.label(egui::RichText::new(c.formatar(l.valor(c))).monospace().size(12.0));
+                        ui.label(egui::RichText::new(c.formatar(l.valor(c))).size(12.0).color(ui_refinada::menu::TINTA));
                     }
                     ui.end_row();
                 }

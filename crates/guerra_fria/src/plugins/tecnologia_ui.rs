@@ -21,6 +21,13 @@ const GRANDES_POTENCIAS: [&str; 4] = ["USA", "SOV", "GBR", "FRA"];
 const BLOCO_SOVIETICO: [&str; 10] = ["SOV", "POL", "ROM", "BUL", "HUN", "CZE", "ALB", "MON", "CCP", "YUG"];
 const INTERVALO_ENTRADAS: u64 = 30;
 
+#[derive(Clone, Default)]
+pub struct LayoutRamoCache {
+    pub pres: Vec<Vec<usize>>,
+    pub anos: Vec<i32>,
+    pub lay: Vec<(usize, usize)>,
+}
+
 #[derive(Resource)]
 pub struct TecnologiaSim {
     pub mundo: MundoTec,
@@ -39,6 +46,7 @@ pub struct TecnologiaSim {
     zoom: f32,
     /// Avisos de pesquisas concluídas do jogador, para o HUD/tela.
     pub concluidas_jogador: Vec<String>,
+    pub cache_layout: BTreeMap<Ramo, LayoutRamoCache>,
 }
 
 impl TecnologiaSim {
@@ -54,6 +62,18 @@ impl TecnologiaSim {
     pub fn carregar(raiz: &std::path::Path) -> Result<Self, String> {
         let cat = CatalogoTec::carregar(&raiz.join("assets/data/tecnologia")).map_err(|e| e.to_string())?;
         let blocos = blocos_para(&cat);
+
+        let mut cache_layout = BTreeMap::new();
+        for &ramo in &Ramo::TODOS {
+            let techs: Vec<&Tecnologia> = cat.techs.iter().filter(|x| x.ramo == ramo).collect();
+            let idx: BTreeMap<&str, usize> = techs.iter().enumerate().map(|(i, x)| (x.id.as_str(), i)).collect();
+            let pres: Vec<Vec<usize>> = techs.iter().map(|x| x.pre_requisitos.iter().filter_map(|p| idx.get(p.as_str()).copied()).collect()).collect();
+            let eras: Vec<u32> = techs.iter().map(|x| x.era_visual).collect();
+            let anos: Vec<i32> = techs.iter().map(|x| x.ano_historico).collect();
+            let lay = layout_arvore(&eras, &anos, &pres);
+            cache_layout.insert(ramo, LayoutRamoCache { pres, anos, lay });
+        }
+
         let mundo = MundoTec::novo(Arc::new(cat), blocos);
         Ok(Self {
             mundo,
@@ -70,6 +90,7 @@ impl TecnologiaSim {
             pan: egui::vec2(16.0, 16.0),
             zoom: 1.0,
             concluidas_jogador: Vec::new(),
+            cache_layout,
         })
     }
 
@@ -179,6 +200,7 @@ fn avancar_tecnologia(
     mut t: ResMut<TecnologiaSim>,
     mut eco: ResMut<EconomiaSim>,
     jogador: Option<Res<PaisJogador>>,
+    op: Option<Res<super::smoke::OpcoesCli>>,
 ) {
     if let Some(j) = jogador {
         let tag = tag_economica(&j.0);
@@ -187,6 +209,7 @@ fn avancar_tecnologia(
             t.sujo = true;
         }
     }
+    let eh_espectador = op.as_ref().is_some_and(|o| o.espectador_ativo());
     let t = &mut *t;
     for ev in leitor.read() {
         if ev.total_ticks.abs_diff(t.ultimo_refresh) >= INTERVALO_ENTRADAS || t.ultimo_refresh == u64::MAX {
@@ -202,7 +225,7 @@ fn avancar_tecnologia(
         for tag in tags {
             let e = t.entrada(&tag);
             let eh_jogador = t.tag_jogador.as_deref() == Some(tag.as_str());
-            if !eh_jogador {
+            if !eh_jogador || eh_espectador {
                 t.mundo.escolher_ia(&tag, ano, &e);
             }
             if let Some(feita) = t.mundo.tick_pais(&tag, ano, &e) {
@@ -210,6 +233,7 @@ fn avancar_tecnologia(
                 if t.mundo.catalogo.obter(&feita).is_some_and(|x| matches!(x.ramo, Ramo::Producao | Ramo::Sociedade)) {
                     eco.registrar_ganho_tecnologico(&tag, GANHO_PRODUTIVIDADE_TECNOLOGIA);
                 }
+                eco.registrar_tecnologia_pesquisada(&tag, &feita);
                 if eh_jogador {
                     let nome = t.mundo.catalogo.obter(&feita).map_or(feita.clone(), |x| x.nome.clone());
                     t.concluidas_jogador.push(nome.clone());
@@ -264,10 +288,19 @@ fn nome_tec(m: &MundoTec, id: &str) -> String {
 
 fn cor_ramo(r: Ramo) -> egui::Color32 {
     match r {
-        Ramo::Producao => egui::Color32::from_rgb(214, 160, 70),
-        Ramo::Sociedade => egui::Color32::from_rgb(110, 180, 120),
-        Ramo::Militar => egui::Color32::from_rgb(200, 90, 80),
-        Ramo::EspacialNuclear => egui::Color32::from_rgb(120, 150, 220),
+        Ramo::Producao => ui_refinada::menu::AVISO,
+        Ramo::Sociedade => ui_refinada::menu::SUCESSO,
+        Ramo::Militar => ui_refinada::menu::VERMELHO,
+        Ramo::EspacialNuclear => ui_refinada::menu::AZUL_MARINHO,
+    }
+}
+
+fn glifo_ramo(r: Ramo) -> &'static str {
+    match r {
+        Ramo::Producao => "fabrica",
+        Ramo::Sociedade => "pessoa",
+        Ramo::Militar => "canhao",
+        Ramo::EspacialNuclear => "estrela",
     }
 }
 
@@ -285,39 +318,73 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
     {
         let m = &t.mundo;
         let est = m.paises.get(&tag);
-        let resp_janela = egui::Window::new("Tecnologia (5)").open(&mut aberto).default_size([1180.0, 700.0]).show(ctx, |ui| {
-            ui_refinada::decorar_janela(ui);
-            ui_refinada::cabecalho_painel(ui, "ÁRVORE TECNOLÓGICA (5)");
+        let resp_janela = ui_refinada::janela_dossie("Tecnologia (5)", None)
+            .default_pos([20.0, 96.0])
+            .default_size([1180.0, 700.0])
+            .show(ctx, |ui| {
+            ui_refinada::faixa_titulo(ui, "Árvore Tecnológica", Some("5"), Some(&mut aberto));
             let Some(est) = est else {
                 ui.label("Este país não tem dados de tecnologia.");
                 return;
             };
-            // ---- Cabeçalho: pesquisa atual, fila, pontos ----
+            // ---- Placar: pontos, reserva, conhecidas, era ----
             ui.horizontal_wrapped(|ui| {
-                ui.strong(format!("Pontos/dia: {:.1}", est.pontos_dia.max(sim_tecnologia::pontos_diarios(&entrada))));
-                ui.separator();
-                ui.label(format!("Reserva: {:.0}/{:.0}", est.buffer, sim_tecnologia::TETO_BUFFER));
-                ui.separator();
-                ui.label(format!("Conhecidas: {}/{}", est.conhecidas.len(), m.catalogo.techs.len()));
-                ui.separator();
-                ui.label(format!("Era visual: {}", m.era_visual(&tag)));
+                ui_refinada::chapa(
+                    ui,
+                    "raio",
+                    "Pontos/dia",
+                    &format!("{:.1}", est.pontos_dia.max(sim_tecnologia::pontos_diarios(&entrada))),
+                    Some(ui_refinada::menu::VERMELHO),
+                );
+                ui_refinada::chapa(
+                    ui,
+                    "moeda",
+                    "Reserva",
+                    &format!("{:.0}/{:.0}", est.buffer, sim_tecnologia::TETO_BUFFER),
+                    None,
+                );
+                ui_refinada::chapa(
+                    ui,
+                    "livro",
+                    "Conhecidas",
+                    &format!("{}/{}", est.conhecidas.len(), m.catalogo.techs.len()),
+                    None,
+                );
+                ui_refinada::chapa(ui, "estrela", "Era visual", &format!("{}", m.era_visual(&tag)), None);
                 if !t.mensagem.is_empty() {
-                    ui.separator();
                     ui.colored_label(ui_refinada::menu::SUCESSO, &t.mensagem);
                 }
             });
-            ui.group(|ui| {
+            ui_refinada::moldura_cartao().show(ui, |ui| {
                 match est.ativa.as_deref().and_then(|id| m.catalogo.obter(id)) {
                     Some(tec) => {
                         let custo = m.custo_efetivo(&tag, tec, ano, &entrada);
                         let prog = est.progresso.get(&tec.id).copied().unwrap_or(0.0);
                         let pts = sim_tecnologia::pontos_diarios(&entrada).max(0.1);
                         let dias = custo * (1.0 - prog) / pts;
+                        let cor = cor_ramo(tec.ramo);
+                        let rotulo = format!("Pesquisando · {} ", tec.nome);
                         ui.horizontal(|ui| {
-                            ui.colored_label(cor_ramo(tec.ramo), egui::RichText::new(format!("Pesquisando: {}", tec.nome)).strong().size(16.0));
-                            ui.label(format!("{:.0} d restantes", dias));
+                            ui_refinada::glifo_ui(ui, glifo_ramo(tec.ramo), 17.0, Some(cor));
+                            ui.label(
+                                egui::RichText::new(rotulo.as_str())
+                                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                                    .size(16.0)
+                                    .strong()
+                                    .color(cor),
+                            );
+                            ui.weak(format!("termina em {:.0} d", dias));
                         });
-                        ui.add(egui::ProgressBar::new(prog.clamp(0.0, 1.0) as f32).text(format!("{:.0}% de {:.0} pts", prog * 100.0, custo)).desired_width(ui.available_width()));
+                        let restante = format!("{:.0}% de {:.0} pts", prog * 100.0, custo);
+                        ui_refinada::widgets::barra_status(
+                            ui,
+                            None,
+                            (prog.clamp(0.0, 1.0) * custo) as f32,
+                            custo as f32,
+                            cor,
+                            ui.available_width(),
+                            Some(&restante),
+                        );
                     }
                     None => {
                         ui.colored_label(ui_refinada::menu::AVISO, "Nenhuma pesquisa ativa: escolha uma tecnologia (os pontos ficam acumulados na reserva).");
@@ -327,7 +394,7 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
                     ui.horizontal_wrapped(|ui| {
                         ui.label("Fila:");
                         for id in &est.fila {
-                            if ui.small_button(format!("{} x", nome_tec(m, id))).on_hover_text("Remover da fila").clicked() {
+                            if ui.small_button(format!("{}  x", nome_tec(m, id))).on_hover_text("Remover da fila").clicked() {
                                 acoes.push(Acao::Remover(id.clone()));
                             }
                         }
@@ -337,7 +404,7 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
             let ramo_atual = t.ramo.unwrap_or(Ramo::Producao);
             ui.horizontal(|ui| {
                 for r in Ramo::TODOS {
-                    if ui_refinada::aba_estilo_menu(ui, ramo_atual == r, r.nome()) {
+                    if ui_refinada::aba_glifo(ui, ramo_atual == r, Some(glifo_ramo(r)), r.nome()) {
                         acoes.push(Acao::Ramo(Some(r)));
                     }
                 }
@@ -345,7 +412,9 @@ fn tela_tecnologia(mut contextos: EguiContexts, mut t: ResMut<TecnologiaSim>, re
             });
             ui.separator();
 
-            arvore(ui, m, &tag, ramo_atual, est, ano, &entrada, &mut pan_zoom, &mut acoes);
+            if let Some(cache) = t.cache_layout.get(&ramo_atual) {
+                arvore(ui, m, &tag, ramo_atual, est, ano, &entrada, &mut pan_zoom, &mut acoes, cache);
+            }
         });
         if let Some(r) = resp_janela {
             super::tutorial_guiado::marcar(&r.response, "janela_tec");
@@ -379,6 +448,33 @@ const NO_L: f32 = 180.0;
 const NO_A: f32 = 66.0;
 const GAP_X: f32 = 56.0;
 const GAP_Y: f32 = 14.0;
+
+/// Nome do nó dividido em no máximo duas linhas (`max` caracteres por linha), com reticências
+/// quando ainda sobra texto. Evita rótulo cortado no cartão da árvore.
+fn nome_em_linhas(nome: &str, max: usize) -> (String, Option<String>) {
+    let mut l1 = String::new();
+    let mut l2 = String::new();
+    let mut transbordou = false;
+    for p in nome.split_whitespace() {
+        let alvo = if l2.is_empty() && (l1.is_empty() || l1.chars().count() + 1 + p.chars().count() <= max) {
+            &mut l1
+        } else if l2.is_empty() || l2.chars().count() + 1 + p.chars().count() <= max {
+            &mut l2
+        } else {
+            transbordou = true;
+            break;
+        };
+        if !alvo.is_empty() {
+            alvo.push(' ');
+        }
+        alvo.push_str(p);
+    }
+    if transbordou {
+        let base: String = l2.chars().take(max.saturating_sub(3)).collect();
+        l2 = format!("{base}...");
+    }
+    (l1, if l2.is_empty() { None } else { Some(l2) })
+}
 
 /// Layout em colunas: coluna = max(índice da era no ramo, coluna dos pré-requisitos + 1);
 /// linha = ordem por média da posição dos pré-requisitos (baricentro), sem sobreposição.
@@ -446,9 +542,9 @@ pub fn layout_arvore(eras: &[u32], anos: &[i32], pres: &[Vec<usize>]) -> Vec<(us
 
 fn cor_estado(conhecida: bool, ativa: bool, disp: bool) -> egui::Color32 {
     if conhecida {
-        egui::Color32::from_rgb(215, 235, 215)
+        ui_refinada::menu::SUCESSO.gamma_multiply(0.20)
     } else if ativa {
-        egui::Color32::from_rgb(220, 230, 248)
+        ui_refinada::menu::AZUL_MARINHO.gamma_multiply(0.22)
     } else if disp {
         ui_refinada::menu::PAPEL_CLARO
     } else {
@@ -457,15 +553,25 @@ fn cor_estado(conhecida: bool, ativa: bool, disp: bool) -> egui::Color32 {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn arvore(ui: &mut egui::Ui, m: &MundoTec, tag: &str, ramo: Ramo, est: &sim_tecnologia::EstadoPais, ano: i32, entrada: &EntradaPais, pan_zoom: &mut (egui::Vec2, f32), acoes: &mut Vec<Acao>) {
+fn arvore(
+    ui: &mut egui::Ui,
+    m: &MundoTec,
+    tag: &str,
+    ramo: Ramo,
+    est: &sim_tecnologia::EstadoPais,
+    ano: i32,
+    entrada: &EntradaPais,
+    pan_zoom: &mut (egui::Vec2, f32),
+    acoes: &mut Vec<Acao>,
+    cache: &LayoutRamoCache,
+) {
     let techs: Vec<&Tecnologia> = m.catalogo.techs.iter().filter(|x| x.ramo == ramo).collect();
-    let idx: BTreeMap<&str, usize> = techs.iter().enumerate().map(|(i, x)| (x.id.as_str(), i)).collect();
-    let pres: Vec<Vec<usize>> = techs.iter().map(|x| x.pre_requisitos.iter().filter_map(|p| idx.get(p.as_str()).copied()).collect()).collect();
-    let eras: Vec<u32> = techs.iter().map(|x| x.era_visual).collect();
-    let anos: Vec<i32> = techs.iter().map(|x| x.ano_historico).collect();
-    let lay = layout_arvore(&eras, &anos, &pres);
+    let pres = &cache.pres;
+    let anos = &cache.anos;
+    let lay = &cache.lay;
 
     let tam = egui::vec2(ui.available_width(), ui.available_height().max(420.0));
+    let oswald = ui_refinada::familia_oswald(ui.ctx());
     let (resp, painter) = ui.allocate_painter(tam, egui::Sense::click_and_drag());
     let rect = resp.rect;
     let painter = painter.with_clip_rect(rect);
@@ -545,9 +651,24 @@ fn arvore(ui: &mut egui::Ui, m: &MundoTec, tag: &str, ramo: Ramo, est: &sim_tecn
         let txt_cor = if conhecida || disp || ativa { ui_refinada::menu::TINTA } else { ui_refinada::menu::TINTA_SUAVE };
         let fs = (13.0 * z).max(7.0);
         if z >= 0.45 {
-            painter.text(r.min + egui::vec2(8.0, 6.0) * z, egui::Align2::LEFT_TOP, &tec.nome, egui::FontId::proportional(fs), txt_cor);
-            let sub = if conhecida { "✓ pesquisada".to_string() } else { format!("{:.0} pts · ~{:.0} d · {}", custo, custo / pts, tec.ano_historico) };
-            painter.text(r.min + egui::vec2(8.0, 28.0) * z, egui::Align2::LEFT_TOP, sub, egui::FontId::proportional((11.0 * z).max(7.0)), if conhecida { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::TINTA_SUAVE });
+            let max_chars = (((NO_L - 16.0) / (fs * 0.5)) as usize).clamp(8, 60);
+            let (l1, l2) = nome_em_linhas(&tec.nome, max_chars);
+            painter.text(r.min + egui::vec2(8.0, 5.0) * z, egui::Align2::LEFT_TOP, &l1, egui::FontId::new(fs, oswald.clone()), txt_cor);
+            let sub_y = if let Some(l2) = &l2 {
+                painter.text(r.min + egui::vec2(8.0, 19.0) * z, egui::Align2::LEFT_TOP, l2, egui::FontId::new(fs, oswald.clone()), txt_cor);
+                33.0
+            } else {
+                28.0
+            };
+            let sub = if conhecida { "pesquisada".to_string() } else { format!("{:.0} pts · ~{:.0} d · {}", custo, custo / pts, tec.ano_historico) };
+            painter.text(r.min + egui::vec2(8.0, sub_y) * z, egui::Align2::LEFT_TOP, sub, egui::FontId::proportional((11.0 * z).max(7.0)), if conhecida { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::TINTA_SUAVE });
+            if conhecida {
+                let o = r.max - egui::vec2(15.0, 17.0) * z;
+                let s = egui::Stroke::new((2.2 * z).max(1.2), ui_refinada::menu::SUCESSO);
+                let vin = o + egui::vec2(3.4, 3.6) * z;
+                painter.line_segment([o, vin], s);
+                painter.line_segment([vin, o + egui::vec2(8.0, -3.6) * z], s);
+            }
         }
         if ativa {
             let prog = est.progresso.get(&tec.id).copied().unwrap_or(0.0).clamp(0.0, 1.0) as f32;
@@ -557,7 +678,7 @@ fn arvore(ui: &mut egui::Ui, m: &MundoTec, tag: &str, ramo: Ramo, est: &sim_tecn
         } else if !conhecida {
             if let Some(&p) = est.progresso.get(&tec.id) {
                 let barra = egui::Rect::from_min_max(egui::pos2(r.min.x + 6.0 * z, r.max.y - 9.0 * z), egui::pos2(r.max.x - 6.0 * z, r.max.y - 6.0 * z));
-                painter.rect_filled(egui::Rect::from_min_size(barra.min, egui::vec2(barra.width() * p.clamp(0.0, 1.0) as f32, barra.height())), 1.0, egui::Color32::from_rgb(160, 130, 60));
+                painter.rect_filled(egui::Rect::from_min_size(barra.min, egui::vec2(barra.width() * p.clamp(0.0, 1.0) as f32, barra.height())), 1.0, ui_refinada::menu::OURO);
             }
         }
         if r_int.clicked() && !conhecida && !ativa {
@@ -608,7 +729,7 @@ fn tooltip(ui: &mut egui::Ui, m: &MundoTec, tec: &Tecnologia, est: &sim_tecnolog
     u.extend(d.leis.iter().map(|x| format!("lei {}", bonito(x))));
     u.extend(d.unidades_militares.iter().map(|x| format!("unidade {}", bonito(x))));
     if !u.is_empty() {
-        ui.small(egui::RichText::new(format!("Libera: {}", u.join(", "))).color(ui_refinada::menu::OURO));
+        ui.small(egui::RichText::new(format!("Libera: {}", u.join(", "))).color(ui_refinada::menu::VERMELHO));
     }
 }
 

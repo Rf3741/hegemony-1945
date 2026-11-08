@@ -350,7 +350,7 @@ pub fn lod_rotas_sistema(
     mut q: Query<&mut Visibility, With<CamadaRotas>>,
 ) {
     let ligada = camada.is_none_or(|c| c.0);
-    let alvo = if ligada && lod.escala_camera > 0.0 && lod.escala_camera < estilo.rotas_escala_max { Visibility::Inherited } else { Visibility::Hidden };
+    let alvo = if ligada && lod.escala_camera > 0.0 && lod.escala_camera < estilo.rotas_escala_max && lod.nivel_atual != crate::lod::NivelLod::Global { Visibility::Inherited } else { Visibility::Hidden };
     for mut v in &mut q {
         if *v != alvo {
             *v = alvo;

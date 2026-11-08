@@ -211,12 +211,55 @@ pub struct Predio {
     pub lucro_ultimo_tick: f64,
     #[serde(default)]
     pub dividendos_ultimo_tick: f64,
+    /// Se `true`, o prédio está temporariamente fechado (inativo): para de produzir e consumir insumos,
+    /// demite os trabalhadores e mantém apenas custo baixo de conservação.
+    #[serde(default)]
+    pub fechado: bool,
+    /// Dias restantes de retomada gradual após reabrir (`0` = operando sem restrição de retomada).
+    #[serde(default)]
+    pub dias_retomada: u16,
+    /// Dias acumulados operando no prejuízo (usado para alertas no Jornal e histerese da IA).
+    #[serde(default)]
+    pub dias_prejuizo: u16,
+    /// Dias consecutivos desde que o prédio foi fechado.
+    #[serde(default)]
+    pub dias_fechado: u16,
+    /// Média móvel exponencial do lucro diário.
+    #[serde(default)]
+    pub lucro_ema: f64,
+    /// Tendência recente do lucro diário (`lucro_ultimo_tick - lucro_ema`).
+    #[serde(default)]
+    pub tendencia_lucro: f64,
+    /// Dia global (`dias_decorridos`) da última mudança de estado (fechar/reabrir/demolir).
+    #[serde(default)]
+    pub dia_ultima_mudanca_estado: u64,
 
     #[serde(skip)]
     pub(crate) cache: PredioCompilado,
 }
 
 impl Predio {
+    /// Duração padrão do período de retomada gradual ao reabrir um prédio fechado (em dias).
+    pub const TEMPO_RETOMADA_DIAS: u16 = 21;
+
+    /// Indica se o prédio está aberto porém ainda em fase de retomada gradual de capacidade.
+    #[inline]
+    pub fn esta_em_retomada(&self) -> bool {
+        !self.fechado && self.dias_retomada > 0
+    }
+
+    /// Fator multiplicador de capacidade ativa durante a retomada (`0.0` se fechado, `0.25..1.0` em retomada, `1.0` normal).
+    #[inline]
+    pub fn fator_retomada(&self) -> f64 {
+        if self.fechado {
+            0.0
+        } else if self.dias_retomada == 0 {
+            1.0
+        } else {
+            let frac = (self.dias_retomada as f64) / (Self::TEMPO_RETOMADA_DIAS as f64);
+            (1.0 - 0.75 * frac).clamp(0.25, 1.0)
+        }
+    }
     /// Escala efetiva de produção no último tick (níveis equivalentes, já com ocupação, insumos e acesso).
     #[inline]
     pub fn escala_efetiva(&self) -> f64 {
@@ -476,15 +519,25 @@ impl Estado {
     }
 
     /// Rendimento do recurso local para um prédio extrativo: qualidade do depósito x riqueza
-    /// (quantidade do depósito, 0.8..1.2). Sem depósito, 0. Demais prédios: só a qualidade.
+    /// (quantidade do depósito, 0.8..1.2). Sem depósito, rendimento baixo (0.20).
+    /// Demais prédios: qualidade do recurso (cultura não permitida rende 0.25).
     pub fn rendimento_recurso(&self, def: &TipoPredio) -> f64 {
         let q = self.fator_qualidade_predio(def).max(0.0);
         match &def.recurso_natural_requerido {
             Some(rec) if !self.limites_recursos.is_empty() => {
                 let lim = self.limite_recurso(rec);
-                // Prédios já existentes sem depósito registrado (dados de 1945) mantêm o piso 0.8;
-                // construir novos exige depósito (`estado_comporta_novo_nivel`) e a estimativa zera o lucro.
-                q * (0.8 + 0.4 * (lim as f64 / 120.0).clamp(0.0, 1.0))
+                if lim == 0 {
+                    0.40 * q
+                } else {
+                    q * (0.8 + 0.4 * (lim as f64 / 120.0).clamp(0.0, 1.0))
+                }
+            }
+            _ if def.usa_terra_aravel && !self.culturas_permitidas.is_empty() => {
+                if !self.cultura_permitida(&def.id) {
+                    0.25 * q
+                } else {
+                    q
+                }
             }
             _ => q,
         }

@@ -43,6 +43,19 @@ pub use motor::consumo::calcular_fatias_substituicao;
 pub use motor::demografia::taxa_crescimento_anual_pop;
 pub use motor::mercado::{atualizar_precos_mercado_isolado, calcular_preco_alvo};
 pub use motor::producao::atualizar_infraestrutura_estados;
+pub use motor::ciclos_demanda::{
+    ChoqueEventoAtivo, ChoqueEventoDemanda, CurvaDemandaBem, EstadoCiclosDemanda,
+    GatilhoTecnologiaDemanda, PontoEraDemanda, TabelaCiclosDemanda,
+};
+pub use motor::distribuicao::CUSTO_MANUTENCAO_FECHADO_POR_NIVEL;
+pub use motor::gestao_predios::{
+    CUSTO_MINIMO_REABRIR_POR_NIVEL, DIAS_FECHADO_DEMOLIR_IA, DIAS_FECHADO_REABRIR_IA,
+    DIAS_PREJUIZO_FECHAR_IA, FRACAO_CUSTO_REABRIR, FRACAO_REEMBOLSO_DEMOLIR,
+    HISTERESE_MUDANCA_PREDIO_DIAS, REEMBOLSO_MINIMO_DEMOLIR_POR_NIVEL, ResultadoAcaoPredio,
+    calcular_custo_reabertura_por_precos, calcular_reembolso_demolicao_por_precos,
+    estimar_margem_operacional_predio, predio_elegivel_gestao_automatica,
+    valor_materiais_construcao_niveis,
+};
 pub use motor::global::{ConfigMercadoGlobal, MercadoGlobal};
 pub mod estimativa;
 pub use estimativa::{calcular_com_perfil, precos_por_indice, PerfilPredio, calcular_lucratividade_esperada, ContextoLucratividade, EstimativaLucratividade};

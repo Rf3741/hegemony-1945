@@ -57,6 +57,7 @@ pub fn calcular_fatias_substituicao(
         precos_mercado,
         ofertas_mercado,
         aliquotas_consumo_bem,
+        None,
         elasticidade,
         &mut saida,
     );
@@ -69,6 +70,7 @@ fn preencher_fatias_substituicao(
     precos_mercado: &[f64],
     ofertas_mercado: &[f64],
     aliquotas_consumo_bem: &[f64],
+    pesos_era_bem: Option<&[f64]>,
     elasticidade: f64,
     saida: &mut Vec<(usize, f64)>,
 ) {
@@ -115,7 +117,11 @@ fn preencher_fatias_substituicao(
             1.0
         };
 
-        let util = c.peso * fator_oferta * razao_preco.powf(-eta);
+        let mult_era = pesos_era_bem
+            .and_then(|v| v.get(g).copied())
+            .unwrap_or(1.0)
+            .max(0.05);
+        let util = c.peso * mult_era * fator_oferta * razao_preco.powf(-eta);
         saida.push((g, util));
         soma_util += util;
     }
@@ -139,13 +145,18 @@ fn preencher_fatias_substituicao(
             let mut fixado = 0.0;
             let mut livre_soma = 0.0;
             for (i, c) in candidatos.iter().enumerate() {
+                let mult_era_min = pesos_era_bem
+                    .and_then(|v| v.get(c.bem_idx).copied())
+                    .unwrap_or(1.0)
+                    .clamp(0.05, 1.0);
+                let f_min = c.fracao_minima * mult_era_min;
                 let v = saida[i].1;
                 if v > c.fracao_maxima {
                     saida[i].1 = c.fracao_maxima;
                     fixado += c.fracao_maxima;
-                } else if v < c.fracao_minima {
-                    saida[i].1 = c.fracao_minima;
-                    fixado += c.fracao_minima;
+                } else if v < f_min {
+                    saida[i].1 = f_min;
+                    fixado += f_min;
                 } else {
                     livre_soma += v;
                 }
@@ -154,9 +165,14 @@ fn preencher_fatias_substituicao(
             if livre_soma > 1e-9 {
                 let escala = restante / livre_soma;
                 for (i, c) in candidatos.iter().enumerate() {
+                    let mult_era_min = pesos_era_bem
+                        .and_then(|v| v.get(c.bem_idx).copied())
+                        .unwrap_or(1.0)
+                        .clamp(0.05, 1.0);
+                    let f_min = c.fracao_minima * mult_era_min;
                     let v = saida[i].1;
-                    if v > c.fracao_minima && v < c.fracao_maxima {
-                        saida[i].1 = (v * escala).clamp(c.fracao_minima, c.fracao_maxima);
+                    if v > f_min && v < c.fracao_maxima {
+                        saida[i].1 = (v * escala).clamp(f_min, c.fracao_maxima);
                     }
                 }
             }
@@ -191,6 +207,7 @@ pub(crate) fn executar_consumo_tributos_e_bem_estar(
     pop_ari_pais: &[f64],
     cestas_pais: &mut [[CestaNecessidadeCompilada; NUM_NECESSIDADES]],
     demanda_necessidade_pais: &mut [[f64; NUM_NECESSIDADES]],
+    pesos_era_bem: &[f64],
     _empregados_tipo_scratch: &mut [f64],
     _pop_total_tipo_scratch: &mut [f64],
     proxima_demanda: &mut [f64],
@@ -226,6 +243,7 @@ pub(crate) fn executar_consumo_tributos_e_bem_estar(
                     &mercado.precos_idx,
                     &mercado.oferta_idx,
                     &pais.aliquota_consumo_por_bem,
+                    Some(pesos_era_bem),
                     config.elasticidade_substituicao,
                     &mut cesta.fatias_despesa,
                 );

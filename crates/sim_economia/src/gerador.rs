@@ -419,6 +419,13 @@ pub fn gerar_cenario_escala_mundial(
                 folha_salarial_ultimo_tick: 0.0,
                 lucro_ultimo_tick: 0.0,
                 dividendos_ultimo_tick: 0.0,
+                fechado: false,
+                dias_retomada: 0,
+                dias_prejuizo: 0,
+                dias_fechado: 0,
+                lucro_ema: 0.0,
+                tendencia_lucro: 0.0,
+                dia_ultima_mudanca_estado: 0,
                 cache: PredioCompilado::default(),
             });
         };

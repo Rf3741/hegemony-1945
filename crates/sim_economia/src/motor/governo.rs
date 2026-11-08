@@ -138,34 +138,13 @@ pub(crate) fn compilar_cache_predio(
     Some(())
 }
 
-/// Verifica se uma `Provincia` possui capacidade física (terra arável ou recurso natural)
-/// para receber `+1` nível de `tipo_predio_idx`.
+/// Verifica se uma `Provincia` comporta a construção de `tipo_predio_idx`.
+/// Construções são liberadas em qualquer província (recurso local não bloqueia, só muda o quanto rende).
 pub fn provincia_comporta_novo_nivel(
-    catalogo: &CatalogoEconomia,
-    prov: &Provincia,
-    tipo_predio_idx: usize,
+    _catalogo: &CatalogoEconomia,
+    _prov: &Provincia,
+    _tipo_predio_idx: usize,
 ) -> bool {
-    let def = &catalogo.tipos_predio[tipo_predio_idx];
-    if def.usa_terra_aravel && prov.terra_aravel_livre() == 0 {
-        return false;
-    }
-    if let Some(recurso) = &def.recurso_natural_requerido {
-        let limite = prov.limites_recursos.get(recurso).copied().unwrap_or(0);
-        let ocupado: u32 = prov
-            .predios
-            .iter()
-            .filter(|b| {
-                catalogo.tipos_predio[b.cache.tipo_idx]
-                    .recurso_natural_requerido
-                    .as_deref()
-                    == Some(recurso.as_str())
-            })
-            .map(|b| b.nivel)
-            .sum();
-        if ocupado >= limite {
-            return false;
-        }
-    }
     true
 }
 
@@ -230,95 +209,18 @@ pub fn estado_niveis_recurso(
     total
 }
 
-/// Verifica se um `Estado` e uma `Provincia` possuem aptidão e capacidade física (recursos naturais,
-/// terra arável e culturas permitidas) para receber `+1` nível de `tipo_predio_idx`.
+/// Verifica se um `Estado` e uma `Provincia` comportam a construção de `tipo_predio_idx`.
+/// Construções são liberadas em qualquer província (recurso local não bloqueia, só muda o quanto rende).
+/// Portos marítimos exigem estado costeiro.
 pub fn estado_comporta_novo_nivel(
     catalogo: &CatalogoEconomia,
     estado: &Estado,
-    prov: &Provincia,
+    _prov: &Provincia,
     tipo_predio_idx: usize,
 ) -> bool {
     let def = &catalogo.tipos_predio[tipo_predio_idx];
 
-    // 1. Agricultura (usa terra arável)
-    if def.usa_terra_aravel {
-        // Cultura deve ser permitida no clima/solo do estado
-        if !estado.cultura_permitida(&def.id) {
-            return false;
-        }
-        if prov.terra_aravel_livre() == 0 {
-            return false;
-        }
-        if estado.terra_aravel > 0 && estado.terra_aravel_livre() == 0 {
-            return false;
-        }
-        return true;
-    }
-
-    // 2. Extração / Recursos Naturais
-    if let Some(recurso) = &def.recurso_natural_requerido {
-        // Se o estado definir limites de recursos (cenário real 1945)
-        if !estado.limites_recursos.is_empty() {
-            let lim_est = estado.limite_recurso(recurso);
-            if lim_est == 0 {
-                return false;
-            }
-            let ocupado_prov: u32 = prov
-                .predios
-                .iter()
-                .filter(|b| {
-                    catalogo.tipos_predio[b.cache.tipo_idx]
-                        .recurso_natural_requerido
-                        .as_deref()
-                        .map_or(false, |r| recursos_compativeis(r, recurso))
-                })
-                .map(|b| b.nivel)
-                .sum();
-            if ocupado_prov >= lim_est {
-                return false;
-            }
-        } else {
-            // Se o estado não define limites (ex.: fixtures de teste legadas), exige jazida na província
-            let Some(lim_prov) = limite_recurso_provincia(prov, recurso) else {
-                return false;
-            };
-            let ocupado_prov: u32 = prov
-                .predios
-                .iter()
-                .filter(|b| {
-                    catalogo.tipos_predio[b.cache.tipo_idx]
-                        .recurso_natural_requerido
-                        .as_deref()
-                        .map_or(false, |r| recursos_compativeis(r, recurso))
-                })
-                .map(|b| b.nivel)
-                .sum();
-            if ocupado_prov >= lim_prov {
-                return false;
-            }
-        }
-
-        // Se a província também tiver limite explícito menor
-        if let Some(lim_prov) = limite_recurso_provincia(prov, recurso) {
-            let ocupado_prov: u32 = prov
-                .predios
-                .iter()
-                .filter(|b| {
-                    catalogo.tipos_predio[b.cache.tipo_idx]
-                        .recurso_natural_requerido
-                        .as_deref()
-                        .map_or(false, |r| recursos_compativeis(r, recurso))
-                })
-                .map(|b| b.nivel)
-                .sum();
-            if ocupado_prov >= lim_prov {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // 3. Portos marítimos exigem estado costeiro
+    // Portos marítimos exigem estado costeiro
     if def.id == "porto_comercial" || def.id == "porto_pesca" {
         if !estado.eh_costeiro && estado.limite_recurso("pesca") == 0 {
             return false;
@@ -462,6 +364,20 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
             .ceil()
             .clamp(1.0, 60.0) as usize;
         let obras_priv_ativas = pais.fila_construcao.iter().filter(|i| i.privado).count();
+
+        if config.habilitar_investimento_privado_automatico
+            && (dias_decorridos + c_idx as u64).is_multiple_of(30)
+            && !pais.exige_propriedade_estatal_lei
+        {
+            crate::motor::gestao_predios::gerir_predios_setor_privado_pais(
+                catalogo,
+                &mercados[pais.mercado_idx],
+                estados,
+                pais,
+                provincias,
+                dias_decorridos,
+            );
+        }
 
         if config.habilitar_investimento_privado_automatico
             && (dias_decorridos + c_idx as u64).is_multiple_of(7)
@@ -822,6 +738,13 @@ fn materializar_nivel_predio(
             folha_salarial_ultimo_tick: 0.0,
             lucro_ultimo_tick: 0.0,
             dividendos_ultimo_tick: 0.0,
+            fechado: false,
+            dias_retomada: 0,
+            dias_prejuizo: 0,
+            dias_fechado: 0,
+            lucro_ema: 0.0,
+            tendencia_lucro: 0.0,
+            dia_ultima_mudanca_estado: 0,
             cache: PredioCompilado::default(),
         };
         let _ = compilar_cache_predio(catalogo, &mut novo);
@@ -935,6 +858,15 @@ fn tentar_enfileirar_obra_privada(
                 continue;
             }
 
+            // Não expandir um prédio que está atualmente fechado nesta província (reabrir primeiro)
+            if prov
+                .predios
+                .iter()
+                .any(|b| b.cache.tipo_idx == tp_idx && b.fechado)
+            {
+                continue;
+            }
+
             // Não duplicar a mesma obra na mesma província enquanto pendente
             if pais
                 .fila_construcao
@@ -968,7 +900,8 @@ fn tentar_enfileirar_obra_privada(
             let vagas_abertas: f64 = prov
                 .predios
                 .iter()
-                .map(|b| (b.total_vagas() - b.total_empregados()).max(0.0))
+                .filter(|b| !b.fechado)
+                .map(|b| (b.total_vagas() * b.fator_retomada() - b.total_empregados()).max(0.0))
                 .sum();
             let mao_de_obra_liquida = desempregados + camponeses * 0.25 - vagas_abertas;
             if mao_de_obra_liquida < 250.0 {

@@ -12,7 +12,7 @@ use super::economy::RecursoMundo;
 use super::time::EventoTickDiario;
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, TaskPool, block_on, futures_lite::future};
-use sim_politica::{CatalogoPolitica, InstanciaPartido, LiderPolitico, PapelGrupoInteresse, CenarioPolitica, DataJogo, MundoPolitico, PaisPolitica, TipoCrisePolitica};
+use sim_politica::{CatalogoPolitica, Estrato, InstanciaPartido, LiderPolitico, ModificadorTemporario, PapelGrupoInteresse, CenarioPolitica, DataJogo, MundoPolitico, PaisPolitica, TipoCrisePolitica};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -41,6 +41,8 @@ pub enum ComandoPol {
     /// Troca o chefe de Estado (`estado`) ou de Governo de um país e aplica o ajuste de legitimidade.
     /// Aplicado ao país `tag` (não ao do jogador), por isso carrega a própria tag.
     Lider { tag: String, estado: bool, lider: LiderPolitico, delta_legitimidade: f64 },
+    /// Queda de aprovação e legitimidade por demissão em massa ao fechar/demolir grande empregador.
+    QuedaAprovacaoDesemprego { demitidos: f64, fracao_provincia: f64, motivo: String },
 }
 
 /// Instantâneo do país do jogador para a interface.
@@ -63,6 +65,7 @@ pub struct NucleoPol {
     /// IA dos países (propõe leis para todos os países que não são do jogador).
     ia: ia_paises::IaPolitica,
     extras_partidos: BTreeMap<String, Vec<PartidoExtra>>,
+    pub jogador_eh_ia: bool,
 }
 
 /// O que define o regime de um país para os nomes dinâmicos.
@@ -133,7 +136,7 @@ impl NucleoPol {
                 acc.entry(p.pais.clone()).or_default().push(p);
                 acc
             });
-        Ok((Self { mundo, base_eco: BTreeMap::new(), base_pops, assinatura_inicial, ia: ia_paises::IaPolitica::novo(), extras_partidos }, cat))
+        Ok((Self { mundo, base_eco: BTreeMap::new(), base_pops, assinatura_inicial, ia: ia_paises::IaPolitica::novo(), extras_partidos, jogador_eh_ia: false }, cat))
     }
 
     /// Escala o padrão de vida das pops conforme a evolução do padrão de vida econômico (tag -> padrão).
@@ -178,6 +181,31 @@ impl NucleoPol {
                 p.lei_em_tramitacao = None;
                 Ok("Proposta de lei retirada.".into())
             }
+            ComandoPol::QuedaAprovacaoDesemprego { demitidos, fracao_provincia, motivo } => {
+                let penalidade = (1.5 + (demitidos / 1000.0).min(3.5) + (fracao_provincia * 18.0).min(3.0)).clamp(1.5, 6.0);
+                for gi in p.grupos_interesse.values_mut() {
+                    let mult = if gi.id.contains("sindicato") || gi.id.contains("trabalha") || gi.id.contains("rural") || gi.id.contains("populis") {
+                        1.0
+                    } else {
+                        0.45
+                    };
+                    let delta = -penalidade * mult;
+                    gi.aprovacao = (gi.aprovacao + delta).clamp(-20.0, 20.0);
+                    gi.modificadores_temporarios.push(ModificadorTemporario {
+                        id: "fechamento_grande_empregador".into(),
+                        valor: delta,
+                        dias_restantes: 180,
+                    });
+                }
+                p.legitimidade = (p.legitimidade - penalidade * 1.1).clamp(0.0, 100.0);
+                for pop in &mut p.pops {
+                    if matches!(pop.estrato, Estrato::Baixo | Estrato::Medio) {
+                        let novos_rad = (demitidos * 0.15).min(pop.neutros() * 0.08).max(0.0);
+                        pop.radicais = (pop.radicais + novos_rad).min(pop.populacao);
+                    }
+                }
+                Ok(format!("Queda de aprovação popular (-{penalidade:.1}): {motivo}"))
+            }
             ComandoPol::Lider { .. } => Ok(String::new()), // tratado no início da função
         }
     }
@@ -191,7 +219,11 @@ impl NucleoPol {
             let antes = id.as_deref().and_then(|i| self.mundo.pais(i)).map(|p| (p.leis_ativas.clone(), p.ultima_eleicao.as_ref().map(|e| e.data), crises_graves(p)));
             let data = self.mundo.data_atual();
             self.mundo.executar_tick_diario();
-            let ignorar: Vec<String> = id.iter().cloned().collect();
+            let ignorar: Vec<String> = if self.jogador_eh_ia {
+                Vec::new()
+            } else {
+                id.iter().cloned().collect()
+            };
             self.ia.passo_diario(&mut self.mundo, &ignorar);
             for s in self.mundo.drenar_eventos_guerra_civil() {
                 let nome = self.mundo.pais(&s.pais_id).map_or(s.pais_tag.clone(), |p| p.nome.clone());
@@ -387,6 +419,7 @@ pub struct PoliticaSim {
     pub bandeiras: Vec<super::bandeiras_ui::EntradaBandeira>,
     pub versao_bandeiras: u64,
     pv_eco: BTreeMap<String, f64>,
+    pub jogador_eh_ia: bool,
 }
 
 /// Estado político salvo: mundo + referências de padrão de vida.
@@ -482,6 +515,7 @@ fn aguardar_carga(mut commands: Commands, carga: Option<ResMut<CargaPolitica>>) 
             bandeiras: Vec::new(),
             versao_bandeiras: 0,
             pv_eco: BTreeMap::new(),
+            jogador_eh_ia: false,
         }),
         Err(e) => error!("falha ao carregar a política: {e}"),
     }
@@ -578,7 +612,12 @@ pub fn fator_imposto(lei: &str) -> f64 {
     }
 }
 
-fn recolher(mut pol: ResMut<PoliticaSim>, mut legado: Option<ResMut<RecursoMundo>>) {
+fn recolher(
+    mut pol: ResMut<PoliticaSim>,
+    mut legado: Option<ResMut<RecursoMundo>>,
+    mut ev: Option<ResMut<super::eventos_ui::EstadoEv>>,
+    relogio: Option<Res<super::time::RecursoRelogio>>,
+) {
     if let Some(t) = pol.tarefa.as_mut()
         && let Some((n, s)) = block_on(future::poll_once(t))
     {
@@ -587,7 +626,32 @@ fn recolher(mut pol: ResMut<PoliticaSim>, mut legado: Option<ResMut<RecursoMundo
         pol.vista = s.vista;
         pol.bandeiras = s.bandeiras;
         pol.versao_bandeiras += 1;
+        if let Some(ev) = ev.as_deref_mut() {
+            let hoje = relogio
+                .as_ref()
+                .map_or((1945, 1, 1), |r| (r.data.ano, r.data.mes, r.data.dia));
+            for m in &s.mensagens {
+                if m.starts_with("Lei aprovada:")
+                    || m.starts_with("Eleição realizada")
+                    || m.starts_with("GUERRA CIVIL")
+                    || m.starts_with("GOLPE")
+                    || m.starts_with("REVOLUÇÃO")
+                {
+                    ev.estado.jornal.push(eventos::Noticia {
+                        data: hoje,
+                        texto: m.clone(),
+                    });
+                    if ev.estado.jornal.len() > 200 {
+                        ev.estado.jornal.remove(0);
+                    }
+                }
+            }
+        }
         pol.mensagens.extend(s.mensagens);
+        if pol.mensagens.len() > 200 {
+            let excesso = pol.mensagens.len() - 200;
+            pol.mensagens.drain(..excesso);
+        }
         pol.leis_trocadas.extend(s.leis_trocadas);
         pol.ms_por_dia = if pol.ms_por_dia == 0.0 { s.ms } else { 0.8 * pol.ms_por_dia + 0.2 * s.ms };
         // Espelha a legitimidade no legado, para o HUD antigo.
@@ -599,7 +663,10 @@ fn recolher(mut pol: ResMut<PoliticaSim>, mut legado: Option<ResMut<RecursoMundo
     }
 }
 
-fn despachar(mut pol: ResMut<PoliticaSim>) {
+fn despachar(mut pol: ResMut<PoliticaSim>, op: Option<Res<super::smoke::OpcoesCli>>) {
+    if let Some(op) = op {
+        pol.jogador_eh_ia = op.espectador_ativo();
+    }
     let Some(tag) = pol.tag.clone() else { return };
     let precisa_vista = pol.vista.tag != tag;
     if pol.nucleo.is_none() || (pol.pendentes == 0 && pol.comandos.is_empty() && !precisa_vista) {
@@ -610,7 +677,9 @@ fn despachar(mut pol: ResMut<PoliticaSim>) {
     let cmds = std::mem::take(&mut pol.comandos);
     let pv = pol.pv_eco.clone();
     let mut n = pol.nucleo.take().expect("núcleo");
+    let jogador_eh_ia = pol.jogador_eh_ia;
     pol.tarefa = Some(AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move {
+        n.jogador_eh_ia = jogador_eh_ia;
         let s = executar_lote(&mut n, &tag, cmds, dias, &pv);
         (n, s)
     }));

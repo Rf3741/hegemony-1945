@@ -88,10 +88,11 @@ pub fn atualizar_lod_sistema(
     mut estado_lod: ResMut<EstadoLod>,
     limites: Option<Res<LimitesZoomVisual>>,
     camada_visivel: Option<Res<crate::config::CamadaConstrucoesVisivel>>,
-    camera: Query<&Projection, With<Camera2d>>,
+    camera: Query<(&Projection, Option<&Transform>), With<Camera2d>>,
+    janela: Query<&Window, With<bevy::window::PrimaryWindow>>,
     cidades: Query<&crate::cidade::CidadeVisual>,
     mut marcadores: Query<(Entity, &mut Visibility, Option<&ChildOf>), (With<MarcadorLod>, Without<DetalheLod>)>,
-    mut detalhes: Query<&mut Visibility, (With<DetalheLod>, Without<MarcadorLod>)>,
+    mut detalhes: Query<(&mut Visibility, Option<&Transform>), (With<DetalheLod>, Without<MarcadorLod>)>,
     mut rotulos: Query<(&mut Visibility, &ChildOf), (With<crate::cidade::RotuloNomeCidade>, Without<MarcadorLod>, Without<DetalheLod>)>,
     agregados: Query<Entity, With<crate::predio::AgregadoEstadoVisual>>,
     mut commands: Commands,
@@ -101,7 +102,7 @@ pub fn atualizar_lod_sistema(
     let lim_padrao = LimitesZoomVisual::default();
     let lim = limites.as_deref().unwrap_or(&lim_padrao);
 
-    let escala = camera.single().ok().map(|proj| match proj {
+    let escala = camera.single().ok().map(|(proj, _)| match proj {
         Projection::Orthographic(o) => o.scale,
         _ => 1.0,
     }).unwrap_or(1.0);
@@ -112,16 +113,36 @@ pub fn atualizar_lod_sistema(
     let novo = EstadoLod::calcular_nivel_com_limites(escala, lim);
     estado_lod.nivel_atual = novo;
 
+    let tela_culling = camera.single().ok().and_then(|(proj, tf_opt)| {
+        let tf = tf_opt?;
+        let s = match proj {
+            Projection::Orthographic(o) => o.scale,
+            _ => 1.0,
+        };
+        let (w, h) = janela
+            .single()
+            .map(|win| (win.width(), win.height()))
+            .unwrap_or((1600.0, 900.0));
+        let meia = Vec2::new(w, h) * 0.5 * s + Vec2::splat(60.0);
+        Some((tf.translation.truncate(), meia))
+    });
+
     // Se a camada estiver desligada (tecla V): oculta absolutamente tudo
     if !visivel {
         for (_, mut v, _) in &mut marcadores {
-            *v = Visibility::Hidden;
+            if *v != Visibility::Hidden {
+                *v = Visibility::Hidden;
+            }
         }
-        for mut v in &mut detalhes {
-            *v = Visibility::Hidden;
+        for (mut v, _) in &mut detalhes {
+            if *v != Visibility::Hidden {
+                *v = Visibility::Hidden;
+            }
         }
         for (mut v, _) in &mut rotulos {
-            *v = Visibility::Hidden;
+            if *v != Visibility::Hidden {
+                *v = Visibility::Hidden;
+            }
         }
         for e in &particulas_fumaca {
             commands.entity(e).despawn();
@@ -137,30 +158,55 @@ pub fn atualizar_lod_sistema(
     }
 
     // 1. Atualizar Detalhes (sprites de atlas, prédios agregados por estado, ferrovias):
-    // Visíveis SOMENTE em zoom de perto (Local)
-    let vis_detalhes = if novo == NivelLod::Local {
-        Visibility::Inherited
+    // Visíveis SOMENTE em zoom de perto (Local) e dentro do frustum da tela
+    if novo == NivelLod::Local {
+        if let Some((centro, meia)) = tela_culling {
+            for (mut v, tf_opt) in &mut detalhes {
+                let vis = tf_opt.is_none_or(|tr| {
+                    let pos = tr.translation.truncate();
+                    if (pos.y - centro.y).abs() > meia.y {
+                        return false;
+                    }
+                    let dx = (pos.x - centro.x).abs();
+                    let dx_wrap = dx.min((pos.x + 5632.0 - centro.x).abs()).min((pos.x - 5632.0 - centro.x).abs());
+                    dx_wrap <= meia.x
+                });
+                let alvo = if vis { Visibility::Inherited } else { Visibility::Hidden };
+                if *v != alvo {
+                    *v = alvo;
+                }
+            }
+        } else {
+            for (mut v, _) in &mut detalhes {
+                if *v != Visibility::Inherited {
+                    *v = Visibility::Inherited;
+                }
+            }
+        }
     } else {
-        Visibility::Hidden
-    };
-    for mut v in &mut detalhes {
-        *v = vis_detalhes;
+        for (mut v, _) in &mut detalhes {
+            if *v != Visibility::Hidden {
+                *v = Visibility::Hidden;
+            }
+        }
     }
 
     // 2. Atualizar Marcadores Simples de Cidades:
     // - Global (Longe): apenas cidades grandes (nível >= 6 ou capitais)
-    // - Regional (Médio): todas as cidades (pequenos aglomerados)
+    // - Regional (Médio): apenas cidades dentro do frustum da tela
     // - Local (Perto): ocultos (substituídos pelos sprites detalhados)
     for (ent, mut v, child_of) in &mut marcadores {
         // Badges legados de estado nunca devem poluir o mapa
         if agregados.contains(ent) || child_of.is_some_and(|c| agregados.contains(c.parent())) {
-            *v = Visibility::Hidden;
+            if *v != Visibility::Hidden {
+                *v = Visibility::Hidden;
+            }
             continue;
         }
 
-        if let Some(child) = child_of {
+        let novo_v = if let Some(child) = child_of {
             if let Ok(cidade) = cidades.get(child.parent()) {
-                *v = match novo {
+                match novo {
                     NivelLod::Global => {
                         if cidade.nivel_atual_inteiro >= lim.nivel_min_cidade_longe || cidade.eh_capital {
                             Visibility::Inherited
@@ -168,16 +214,42 @@ pub fn atualizar_lod_sistema(
                             Visibility::Hidden
                         }
                     }
-                    NivelLod::Regional => Visibility::Inherited,
+                    NivelLod::Regional => {
+                        if let Some((centro, meia)) = tela_culling {
+                            let pos = cidade.posicao_mundo;
+                            if (pos.y - centro.y).abs() <= meia.y {
+                                let dx = (pos.x - centro.x).abs();
+                                let dx_wrap = dx.min((pos.x + 5632.0 - centro.x).abs()).min((pos.x - 5632.0 - centro.x).abs());
+                                if dx_wrap <= meia.x {
+                                    Visibility::Inherited
+                                } else {
+                                    Visibility::Hidden
+                                }
+                            } else {
+                                Visibility::Hidden
+                            }
+                        } else {
+                            Visibility::Inherited
+                        }
+                    }
                     NivelLod::Local => Visibility::Hidden,
-                };
-                continue;
+                }
+            } else {
+                match novo {
+                    NivelLod::Global | NivelLod::Regional => Visibility::Inherited,
+                    NivelLod::Local => Visibility::Hidden,
+                }
             }
-        }
-        *v = match novo {
-            NivelLod::Global | NivelLod::Regional => Visibility::Inherited,
-            NivelLod::Local => Visibility::Hidden,
+        } else {
+            match novo {
+                NivelLod::Global | NivelLod::Regional => Visibility::Inherited,
+                NivelLod::Local => Visibility::Hidden,
+            }
         };
+
+        if *v != novo_v {
+            *v = novo_v;
+        }
     }
 
     // 3. Rótulos: posicionamento, tamanho e colisão ficam em `cidade_v3::layout_rotulos_sistema`.

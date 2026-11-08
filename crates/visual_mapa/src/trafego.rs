@@ -40,6 +40,7 @@ use crate::rotas_maritimas::{MASCARA_PADRAO, Rota, Roteador};
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use serde::Deserialize;
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -790,14 +791,6 @@ fn spawnar_navios(commands: &mut Commands, plano: &[RotaNavios], rec: &RecursosT
                         Sprite::from_color(cor, Vec2::new(0.05, larg_faixa)),
                         Transform::from_xyz(-0.48, 0.0, 0.3),
                     ));
-                    // esteira sutil: duas linhas curtas semitransparentes atrás do navio
-                    for (x, comp, a) in [(-0.85, 0.6, 0.22), (-1.35, 0.5, 0.10)] {
-                        c.spawn((
-                            Sprite::from_color(Color::srgba(1.0, 1.0, 1.0, a), Vec2::new(comp, 0.07)),
-                            Transform::from_xyz(x, 0.0, -0.1),
-                            Esteira,
-                        ));
-                    }
                 });
             idx += 1;
         }
@@ -808,7 +801,7 @@ fn spawnar_navios(commands: &mut Commands, plano: &[RotaNavios], rec: &RecursosT
 fn lod_trafego(lod: &EstadoLod) -> (u32, f32) {
     let esc = lod.escala_camera.max(0.8).min(2.4);
     match lod.nivel_atual {
-        NivelLod::Global => (4, esc),
+        NivelLod::Global => (0, esc),
         NivelLod::Regional => (2, esc),
         NivelLod::Local => (1, esc),
     }
@@ -819,12 +812,32 @@ fn mover_navios_sistema(
     cfg: Res<ConfigTrafego>,
     camada: Res<CamadaConstrucoesVisivel>,
     lod: Res<EstadoLod>,
+    camera: Query<(&Transform, &Projection), (With<Camera2d>, Without<NavioVisual>)>,
+    janela: Query<&Window, With<PrimaryWindow>>,
     mut rel: ResMut<RelatorioCanais>,
-    mut q: Query<(&mut NavioVisual, &mut Transform, &mut Visibility)>,
+    mut q: Query<(&mut NavioVisual, &mut Transform, &mut Visibility), Without<Camera2d>>,
 ) {
     let dt = time.delta_secs().min(0.1);
     let (passo, _) = lod_trafego(&lod);
     let esc = lod.escala_camera;
+    let ver_base = cfg.ativo && camada.0 && lod.nivel_atual != NivelLod::Global && passo > 0;
+    let tela_rect = if ver_base {
+        camera.single().ok().and_then(|(ctf, proj)| {
+            let s = match proj {
+                Projection::Orthographic(o) => o.scale,
+                _ => 1.0,
+            };
+            let (w, h) = janela
+                .single()
+                .map(|win| (win.width(), win.height()))
+                .unwrap_or((1600.0, 900.0));
+            let meia = Vec2::new(w, h) * 0.5 * s + Vec2::splat(50.0);
+            Some((ctf.translation.truncate(), meia))
+        })
+    } else {
+        None
+    };
+
     for (mut n, mut tr, mut vis) in &mut q {
         let comp_rota = n.rota.comprimento();
         if n.espera > 0.0 {
@@ -846,6 +859,28 @@ fn mover_navios_sistema(
             }
         }
         let (pos, dir) = n.rota.amostrar(n.dist);
+        let mut visivel = false;
+        if ver_base && n.idx % passo == 0 {
+            if let Some((c, meia)) = tela_rect {
+                if (pos.y - c.y).abs() <= meia.y {
+                    let dx = (pos.x - c.x).abs();
+                    let dx_wrap = dx.min((pos.x + 5632.0 - c.x).abs()).min((pos.x - 5632.0 - c.x).abs());
+                    if dx_wrap <= meia.x {
+                        visivel = true;
+                    }
+                }
+            } else {
+                visivel = true;
+            }
+        }
+        let novo = if visivel { Visibility::Inherited } else { Visibility::Hidden };
+        if *vis != novo {
+            *vis = novo;
+        }
+        if !visivel {
+            continue;
+        }
+
         let dir = dir * n.sentido;
         let normal = Vec2::new(-dir.y, dir.x);
         let alvo = dir.y.atan2(dir.x);
@@ -866,11 +901,6 @@ fn mover_navios_sistema(
         };
         let l = px_para_mundo(navio_px(esc) * mult * cfg.escala_icones, esc);
         tr.scale = Vec3::new(l, l, 1.0);
-        let ver = cfg.ativo && camada.0 && n.idx % passo == 0;
-        let novo = if ver { Visibility::Inherited } else { Visibility::Hidden };
-        if *vis != novo {
-            *vis = novo;
-        }
     }
 }
 
@@ -935,10 +965,12 @@ fn mover_avioes_sistema(
     ano: Res<AnoVisual>,
     camada: Res<CamadaConstrucoesVisivel>,
     lod: Res<EstadoLod>,
+    camera: Query<(&Transform, &Projection), (With<Camera2d>, Without<AviaoVisual>, Without<Sombra>)>,
+    janela: Query<&Window, With<PrimaryWindow>>,
     cidades: Res<CidadesTrafego>,
     rec: Option<Res<RecursosTrafego>>,
-    mut q: Query<(&mut AviaoVisual, &mut Transform, &mut Visibility, &mut Mesh2d, &mut MeshMaterial2d<ColorMaterial>, &Children)>,
-    mut sombras: Query<(&mut Transform, &mut Mesh2d), (With<Sombra>, Without<AviaoVisual>)>,
+    mut q: Query<(&mut AviaoVisual, &mut Transform, &mut Visibility, &mut Mesh2d, &mut MeshMaterial2d<ColorMaterial>, &Children), (Without<Camera2d>, Without<Sombra>)>,
+    mut sombras: Query<(&mut Transform, &mut Mesh2d), (With<Sombra>, Without<AviaoVisual>, Without<Camera2d>)>,
 ) {
     let Some(rec) = rec else { return };
     let dt = time.delta_secs().min(0.1);
@@ -946,17 +978,65 @@ fn mover_avioes_sistema(
     let jato_frac = fracao_jato_no_ano(ano.0);
     let aero: Vec<Vec2> = cidades.cidades.iter().take(cfg.cidades_aeroporto).map(|c| c.mundo).collect();
     let esc = lod.escala_camera;
+    let tela_rect = if cfg.ativo && camada.0 && lod.nivel_atual != NivelLod::Global {
+        camera.single().ok().and_then(|(ctf, proj)| {
+            let s = match proj {
+                Projection::Orthographic(o) => o.scale,
+                _ => 1.0,
+            };
+            let (w, h) = janela
+                .single()
+                .map(|win| (win.width(), win.height()))
+                .unwrap_or((1600.0, 900.0));
+            let meia = Vec2::new(w, h) * 0.5 * s + Vec2::splat(60.0);
+            Some((ctf.translation.truncate(), meia))
+        })
+    } else {
+        None
+    };
+
     for (mut a, mut tr, mut vis, mut mesh, mut mat, filhos) in &mut q {
+        let comp = a.origem.distance(a.destino).max(1.0);
+        let v = if a.jato { cfg.velocidade_jato } else { cfg.velocidade_helice } * a.vel;
+        // acelera na decolagem e freia no pouso
+        let fator = (0.3 + 5.0 * a.t.min(1.0 - a.t).max(0.0)).min(1.0);
+        a.t += v * fator * dt / comp;
+        if a.t >= 1.0 {
+            let (o, d) = (a.destino, if aero.is_empty() { a.origem } else { escolher_destino(a.destino, &aero, &mut a.seed) });
+            a.origem = o;
+            a.destino = d;
+            a.t = 0.0;
+        }
+
         let ativo = cfg.ativo && camada.0 && (a.ordem as usize) < ativos
             && match lod.nivel_atual {
                 NivelLod::Global => false,
                 NivelLod::Regional => a.ordem % 2 == 0,
                 NivelLod::Local => true,
             };
-        let novo = if ativo { Visibility::Inherited } else { Visibility::Hidden };
+        let pos = a.origem.lerp(a.destino, a.t);
+        let mut visivel = false;
+        if ativo {
+            if let Some((c, meia)) = tela_rect {
+                if (pos.y - c.y).abs() <= meia.y {
+                    let dx = (pos.x - c.x).abs();
+                    let dx_wrap = dx.min((pos.x + 5632.0 - c.x).abs()).min((pos.x - 5632.0 - c.x).abs());
+                    if dx_wrap <= meia.x {
+                        visivel = true;
+                    }
+                }
+            } else {
+                visivel = true;
+            }
+        }
+        let novo = if visivel { Visibility::Inherited } else { Visibility::Hidden };
         if *vis != novo {
             *vis = novo;
         }
+        if !visivel {
+            continue;
+        }
+
         // tipo (hélice/jato) estável por avião: o i-ésimo mais "à esquerda" vira jato conforme o ano
         let u = ((a.ordem.wrapping_mul(2654435761)) >> 8) as f32 / (1u32 << 24) as f32;
         let jato = u < jato_frac;
@@ -970,18 +1050,7 @@ fn mover_avioes_sistema(
                 }
             }
         }
-        let comp = a.origem.distance(a.destino).max(1.0);
-        let v = if a.jato { cfg.velocidade_jato } else { cfg.velocidade_helice } * a.vel;
-        // acelera na decolagem e freia no pouso
-        let fator = (0.3 + 5.0 * a.t.min(1.0 - a.t).max(0.0)).min(1.0);
-        a.t += v * fator * dt / comp;
-        if a.t >= 1.0 {
-            let (o, d) = (a.destino, if aero.is_empty() { a.origem } else { escolher_destino(a.destino, &aero, &mut a.seed) });
-            a.origem = o;
-            a.destino = d;
-            a.t = 0.0;
-        }
-        let pos = a.origem.lerp(a.destino, a.t);
+
         let alvo = (a.destino - a.origem).to_angle();
         let mut dif = alvo - a.angulo;
         while dif > std::f32::consts::PI {

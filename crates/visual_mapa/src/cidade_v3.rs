@@ -551,10 +551,15 @@ pub fn ajustar_marcadores_sistema(
     camera: Query<(&Transform, &Projection), With<Camera2d>>,
     cidades: Query<&CidadeVisual>,
     mut marcadores: Query<(&ChildOf, &mut Transform), (With<MarcadorLod>, Without<Camera2d>)>,
+    mut ultima_escala: Local<f32>,
 ) {
     let Some((_, escala)) = escala_da_camera(&camera) else {
         return;
     };
+    if (*ultima_escala - escala).abs() < 1e-4 {
+        return;
+    }
+    *ultima_escala = escala;
     let raio_mesh = 2.5 * cfg.escala_sprites;
     for (pai, mut tr) in &mut marcadores {
         let Ok(c) = cidades.get(pai.parent()) else {
@@ -572,6 +577,7 @@ pub fn ajustar_marcadores_sistema(
 pub fn layout_rotulos_sistema(
     time: Res<Time>,
     mut acumulado: Local<f32>,
+    mut ultimo_estado: Local<(Vec2, f32)>,
     camada: Option<Res<CamadaConstrucoesVisivel>>,
     lod: Res<EstadoLod>,
     estilo: Res<crate::estilo::EstiloMapa>,
@@ -584,13 +590,18 @@ pub fn layout_rotulos_sistema(
     >,
 ) {
     *acumulado += time.delta_secs();
-    if *acumulado < 0.12 {
+    if *acumulado < 0.15 {
         return;
     }
-    *acumulado = 0.0;
     let Some((centro, escala)) = escala_da_camera(&camera) else {
         return;
     };
+    let camera_parada = (centro - ultimo_estado.0).length() < 0.5 && (escala - ultimo_estado.1).abs() < 1e-4;
+    if camera_parada && *acumulado < 0.35 {
+        return;
+    }
+    *acumulado = 0.0;
+    *ultimo_estado = (centro, escala);
     let visivel = camada.map_or(true, |c| c.0) && escala < estilo.cidades_escala_max;
     let (largura, altura) = janela
         .single()
@@ -870,6 +881,12 @@ pub fn materializar_detalhes_sistema(
     cidades: Query<(Entity, &CidadeVisual, Option<&DetalhesGerados>)>,
 ) {
     if lod.nivel_atual != NivelLod::Local {
+        for (ent, _, ger) in &cidades {
+            if let Some(g) = ger {
+                commands.entity(g.raiz).despawn();
+                commands.entity(ent).remove::<DetalhesGerados>();
+            }
+        }
         return;
     }
     let Some((centro, escala)) = escala_da_camera(&camera) else {
@@ -882,7 +899,12 @@ pub fn materializar_detalhes_sistema(
     let meia = Vec2::new(w, h) * 0.5 * escala + Vec2::splat(40.0);
     let mut feitos = 0;
     for (ent, c, ger) in &cidades {
-        if !c.existe || (c.posicao_mundo - centro).abs().cmpgt(meia).any() {
+        let fora_da_tela = !c.existe || (c.posicao_mundo - centro).abs().cmpgt(meia).any();
+        if fora_da_tela {
+            if let Some(g) = ger {
+                commands.entity(g.raiz).despawn();
+                commands.entity(ent).remove::<DetalhesGerados>();
+            }
             continue;
         }
         let escala_detalhe = escala_detalhe_cidade(c.nivel_atual_inteiro, escala, &estilo);
@@ -954,7 +976,7 @@ pub fn materializar_detalhes_sistema(
                                     MeshMaterial2d(t.mat_base.clone()),
                                     Transform::from_xyz(0.0, 0.0, 0.05)
                                         .with_scale(base_escala(nivel)),
-                                ))
+                                 ))
                                 .id();
                         }
                         spawn_estradas_e_trafego(rp, &id, (nivel + 2).min(8), era);
@@ -985,8 +1007,12 @@ fn base_escala(nivel: u8) -> Vec3 {
 /// Brotar dos prédios novos.
 pub fn animar_predios_urbanos_sistema(
     time: Res<Time>,
+    lod: Res<EstadoLod>,
     mut q: Query<(&mut PredioUrbano, &mut Transform)>,
 ) {
+    if lod.nivel_atual != NivelLod::Local {
+        return;
+    }
     let dt = time.delta_secs();
     for (mut p, mut tr) in &mut q {
         if (p.crescimento - p.alvo).abs() > 0.002 {
@@ -1043,6 +1069,7 @@ pub fn atualizar_noite_sistema(
 pub fn emitir_fumaca_urbana_sistema(
     mut commands: Commands,
     time: Res<Time>,
+    mut acumulado: Local<f32>,
     lod: Res<EstadoLod>,
     objetos: Res<crate::config::ConfiguracaoObjetos>,
     eras: Res<GerenciadorEras>,
@@ -1054,6 +1081,12 @@ pub fn emitir_fumaca_urbana_sistema(
     if lod.nivel_atual != NivelLod::Local || !objetos.qualidade.tem_animacao() {
         return;
     }
+    *acumulado += time.delta_secs();
+    if *acumulado < 0.05 {
+        return;
+    }
+    let dt = *acumulado;
+    *acumulado = 0.0;
     let Some((centro, escala)) = escala_da_camera(&camera) else {
         return;
     };
@@ -1063,7 +1096,6 @@ pub fn emitir_fumaca_urbana_sistema(
         .unwrap_or((1600.0, 900.0));
     let meia = Vec2::new(w, h) * 0.5 * escala + Vec2::splat(30.0);
     let mut total = existentes.iter().count();
-    let dt = time.delta_secs();
     let cor = if eras.modo_noturno {
         Color::srgba(0.55, 0.57, 0.66, 0.30)
     } else {
@@ -1101,11 +1133,17 @@ pub fn emitir_fumaca_urbana_sistema(
 pub fn atualizar_fumaca_urbana_sistema(
     mut commands: Commands,
     time: Res<Time>,
+    mut acumulado: Local<f32>,
     lod: Res<EstadoLod>,
     mut q: Query<(Entity, &mut FumacaUrbana, &mut Transform, &mut Sprite)>,
 ) {
-    let dt = time.delta_secs();
     let fora = lod.nivel_atual != NivelLod::Local;
+    *acumulado += time.delta_secs();
+    if !fora && *acumulado < 0.033 {
+        return;
+    }
+    let dt = *acumulado;
+    *acumulado = 0.0;
     for (e, mut f, mut tr, mut s) in &mut q {
         f.idade += dt;
         if fora || f.idade >= f.vida {
@@ -1126,6 +1164,7 @@ pub fn atualizar_fumaca_urbana_sistema(
 /// Anima guindastes (giro visto de lado + carga que sobe e desce) e o tráfego.
 pub fn animar_porto_e_trafego_sistema(
     time: Res<Time>,
+    mut acumulado: Local<f32>,
     lod: Res<EstadoLod>,
     mut jibs: Query<(&JibGuindaste, &mut Transform), (Without<CargaGuindaste>, Without<Veiculo>)>,
     mut cargas: Query<(&CargaGuindaste, &mut Transform), (Without<JibGuindaste>, Without<Veiculo>)>,
@@ -1137,6 +1176,11 @@ pub fn animar_porto_e_trafego_sistema(
     if lod.nivel_atual != NivelLod::Local {
         return;
     }
+    *acumulado += time.delta_secs();
+    if *acumulado < 0.033 {
+        return;
+    }
+    *acumulado = 0.0;
     let t = time.elapsed_secs();
     for (j, mut tr) in &mut jibs {
         tr.scale.x = (t * j.vel + j.fase).cos();

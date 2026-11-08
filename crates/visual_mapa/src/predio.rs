@@ -308,6 +308,7 @@ pub fn animar_predios_sistema(
     time: Res<Time>,
     cfg: Res<VisualMapaConfig>,
     camada: Option<Res<crate::config::CamadaConstrucoesVisivel>>,
+    lod: Option<Res<crate::lod::EstadoLod>>,
     ano: Res<AnoVisual>,
     atlas: Res<AtlasVisual>,
     catalogo: Res<CatalogoMapeamentoPredios>,
@@ -315,6 +316,9 @@ pub fn animar_predios_sistema(
     mut query: Query<(&mut PredioVisual, &mut Transform, Option<&mut Sprite>)>,
 ) {
     if !camada.map_or(true, |c| c.0) {
+        return;
+    }
+    if lod.as_ref().is_some_and(|l| l.nivel_atual != NivelLod::Local) {
         return;
     }
     let dt = time.delta_secs();
@@ -326,6 +330,11 @@ pub fn animar_predios_sistema(
     };
 
     for (mut p, mut tr, mut sprite) in &mut query {
+        let animando = p.escala_animada < 1.0 || p.timer_pop_nivel > 0.0 || p.era_idx != era_global;
+        if !animando && (tr.scale.x - 1.0).abs() < 1e-4 {
+            continue;
+        }
+
         if p.escala_animada < 1.0 {
             p.escala_animada = (p.escala_animada + dt * 3.5).min(1.0);
         }
@@ -339,9 +348,15 @@ pub fn animar_predios_sistema(
         let tam_base = tamanho_sprite_predio(p.nivel, cfg.escala_sprites);
         let escala_efetiva = p.escala_animada * fator_pop;
 
-        if let Some(ref mut s) = sprite {
-            s.custom_size = Some(Vec2::splat(tam_base));
+        if (tr.scale.x - escala_efetiva).abs() > 1e-4 {
             tr.scale = Vec3::splat(escala_efetiva);
+        }
+
+        if let Some(ref mut s) = sprite {
+            let tam_vec = Vec2::splat(tam_base);
+            if s.custom_size != Some(tam_vec) {
+                s.custom_size = Some(tam_vec);
+            }
             if s.color != tinta {
                 s.color = tinta;
             }
@@ -361,7 +376,10 @@ pub fn animar_predios_sistema(
             }
         } else {
             // Procedural quad
-            tr.scale = Vec3::new(tam_base * escala_efetiva, tam_base * escala_efetiva, 1.0);
+            let novo_s = Vec3::new(tam_base * escala_efetiva, tam_base * escala_efetiva, 1.0);
+            if (tr.scale.x - novo_s.x).abs() > 1e-4 {
+                tr.scale = novo_s;
+            }
         }
     }
 }

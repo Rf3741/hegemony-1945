@@ -200,11 +200,12 @@ fn main() {
                 let e = entradas.get(&tag).copied().unwrap_or_default();
                 tec.escolher_ia(&tag, ano, &e);
                 if let Some(feita) = tec.tick_pais(&tag, ano, &e) {
-                    // Tecnologia civil (produção/sociedade) eleva a produtividade do país (+0,6%), como na ponte do jogo.
-                    if tec.catalogo.obter(&feita).is_some_and(|x| matches!(x.ramo, sim_tecnologia::Ramo::Producao | sim_tecnologia::Ramo::Sociedade))
-                        && let Some(id) = id_por_tag.get(&tag)
-                    {
-                        eco.aplicar_ganho_produtividade(id, 0.006);
+                    if let Some(id) = id_por_tag.get(&tag) {
+                        eco.registrar_tecnologia_pesquisada(id, &feita);
+                        // Tecnologia civil (produção/sociedade) eleva a produtividade do país (+0,6%), como na ponte do jogo.
+                        if tec.catalogo.obter(&feita).is_some_and(|x| matches!(x.ramo, sim_tecnologia::Ramo::Producao | sim_tecnologia::Ramo::Sociedade)) {
+                            eco.aplicar_ganho_produtividade(id, 0.006);
+                        }
                     }
                 }
             }
@@ -213,7 +214,11 @@ fn main() {
 
         let i = Instant::now();
         guarda!("eventos", ds, {
+            let antes_ev = est.disparados.clone();
             avaliar_dia(&cate, &mut est, &mut legado, jogador);
+            for id_ev in est.disparados.keys().filter(|k| !antes_ev.contains_key(*k)) {
+                eco.registrar_evento_historico(id_ev);
+            }
             // O "jogador" também é IA nesta partida: resolve as decisões pendentes.
             for p in std::mem::take(&mut est.pendentes) {
                 if let Some(ev) = cate.por_id(&p.evento_id) {

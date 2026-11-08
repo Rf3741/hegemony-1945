@@ -4,7 +4,7 @@ use super::jogador::PaisJogador;
 use super::time::{EventoTickDiario, RecursoRelogio};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
-use eventos::{CatalogoEventos, EstadoEventos, aplicar_opcao, avaliar_dia, descrever_efeito};
+use eventos::{CatalogoEventos, EstadoEventos, aplicar_opcao, avaliar_dia, descrever_efeito, escolha_ia};
 
 #[derive(Resource)]
 pub struct CatalogoEv(pub CatalogoEventos);
@@ -51,10 +51,51 @@ fn tick_eventos(
     mut relogio: ResMut<RecursoRelogio>,
     cfg: Res<super::config::ConfigJogo>,
     tutorial: Option<Res<super::tutorial_guiado::TutorialGuiado>>,
+    opcoes: Option<Res<super::smoke::OpcoesCli>>,
+    mut eco: Option<ResMut<super::economia_sim::EconomiaSim>>,
 ) {
-    if leitor.read().count() > 0 {
-        let est = &mut ev.estado;
-        avaliar_dia(&cat.0, est, &mut mundo.0, &pais.0);
+    let eh_espectador = opcoes.as_ref().is_some_and(|o| o.espectador_ativo());
+    let data_salva = mundo.0.data;
+    let mut houve_tick = false;
+    for tick in leitor.read() {
+        houve_tick = true;
+        mundo.0.data = simulacao::tempo::DataSimulacao::nova(
+            tick.nova_data.ano,
+            tick.nova_data.mes,
+            tick.nova_data.dia,
+        );
+        let antes = ev.estado.disparados.clone();
+        avaliar_dia(&cat.0, &mut ev.estado, &mut mundo.0, &pais.0);
+        // Eventos históricos novos mudam os ciclos de demanda dos recursos.
+        if let Some(eco) = eco.as_mut() {
+            for id in ev.estado.disparados.keys().filter(|k| !antes.contains_key(*k)) {
+                eco.registrar_evento_historico(id);
+            }
+        }
+        if eh_espectador {
+            let pendentes = std::mem::take(&mut ev.estado.pendentes);
+            for p in pendentes {
+                if let Some(evento) = cat.0.por_id(&p.evento_id) {
+                    let h = (mundo.0.data.ano, mundo.0.data.mes, mundo.0.data.dia);
+                    let k = escolha_ia(evento, h);
+                    aplicar_opcao(&mut mundo.0, &mut ev.estado, evento, k, &p.pais);
+                }
+            }
+        }
+    }
+    if houve_tick {
+        mundo.0.data = data_salva;
+    }
+    if eh_espectador {
+        let pendentes = std::mem::take(&mut ev.estado.pendentes);
+        for p in pendentes {
+            if let Some(evento) = cat.0.por_id(&p.evento_id) {
+                let h = (mundo.0.data.ano, mundo.0.data.mes, mundo.0.data.dia);
+                let k = escolha_ia(evento, h);
+                aplicar_opcao(&mut mundo.0, &mut ev.estado, evento, k, &p.pais);
+            }
+        }
+        return;
     }
     if tutorial.as_ref().is_some_and(|t| t.ativo) {
         // No tutorial guiado, resolve automaticamente eventos urgentes na primeira opção
@@ -84,6 +125,7 @@ fn atalho_jornal(teclas: Res<ButtonInput<KeyCode>>, mut ev: ResMut<EstadoEv>) {
 }
 
 const PAPEL: egui::Color32 = ui_refinada::menu::PAPEL;
+const PAPEL_CLARO: egui::Color32 = ui_refinada::menu::PAPEL_CLARO;
 const TINTA: egui::Color32 = ui_refinada::menu::TINTA;
 const TINTA_SUAVE: egui::Color32 = ui_refinada::menu::TINTA_SUAVE;
 const CARIMBO: egui::Color32 = ui_refinada::menu::VERMELHO;
@@ -98,8 +140,9 @@ fn popup_evento(
     elenco: Option<Res<super::personagens_sim::ElencoRes>>,
     mut retratos: Option<ResMut<super::personagens_ui::Retratos>>,
     tutorial: Option<Res<super::tutorial_guiado::TutorialGuiado>>,
+    opcoes: Option<Res<super::smoke::OpcoesCli>>,
 ) -> Result {
-    if tutorial.as_ref().is_some_and(|t| t.ativo) {
+    if tutorial.as_ref().is_some_and(|t| t.ativo) || opcoes.as_ref().is_some_and(|o| o.espectador_ativo()) {
         return Ok(());
     }
     let Some(pend) = ev.estado.pendentes.first().cloned() else { return Ok(()) };
@@ -138,17 +181,29 @@ fn popup_evento(
         .frame(ui_refinada::moldura_janela_papel())
         .show(contextos.ctx_mut()?, |ui| {
             ui_refinada::decorar_janela(ui);
-            // Cabeçalho (faixa com a cor do país e carimbo).
-            egui::Frame::new().fill(cor_pais.gamma_multiply(0.55)).inner_margin(egui::Margin::symmetric(14, 10)).show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(nome_pais.to_uppercase()).color(egui::Color32::WHITE).strong());
-                    ui.label(egui::RichText::new(format!("• {data}")).color(egui::Color32::WHITE));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(egui::RichText::new("URGENTE • JOGO PAUSADO").color(CARIMBO).background_color(PAPEL).strong());
+            // Cabeçalho: faixa azul-marinho com a cor do país, data e carimbo de urgência.
+            egui::Frame::new()
+                .fill(ui_refinada::menu::AZUL_MARINHO)
+                .inner_margin(egui::Margin::symmetric(14, 8))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        let (rect, _) = ui.allocate_exact_size(egui::vec2(14.0, 14.0), egui::Sense::hover());
+                        ui.painter().rect_filled(rect, 1.0, cor_pais);
+                        ui.painter().rect_stroke(rect, 1.0, egui::Stroke::new(1.0, PAPEL), egui::StrokeKind::Inside);
+                        ui.label(
+                            egui::RichText::new(nome_pais.to_uppercase())
+                                .family(ui_refinada::familia_oswald(ui.ctx()))
+                                .size(16.0)
+                                .strong()
+                                .color(PAPEL),
+                        );
+                        ui.label(egui::RichText::new(data).color(PAPEL_CLARO));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(egui::RichText::new("URGENTE • JOGO PAUSADO").color(CARIMBO).background_color(PAPEL).strong());
+                        });
                     });
                 });
-            });
             egui::Frame::new().inner_margin(egui::Margin::symmetric(18, 12)).show(ui, |ui| {
                 if let (Some(el), Some(r)) = (elenco.as_deref(), retratos.as_deref_mut()) {
                     // Retrato do chefe de Estado do país afetado (tag do legado -> política).
@@ -167,15 +222,19 @@ fn popup_evento(
                     ui.label(egui::RichText::new(&evento.descricao).color(TINTA));
                 });
                 ui.add_space(10.0);
-                ui.separator();
+                ui_refinada::linha_decorativa(ui);
                 for (i, op) in evento.opcoes.iter().enumerate() {
                     let letra = (b'A' + (i as u8 % 26)) as char;
                     let r = ui.add_sized(
                         [ui.available_width(), 34.0],
-                        egui::Button::new(egui::RichText::new(format!("{letra}. {}", op.texto)).color(TINTA))
-                            .fill(ui_refinada::menu::PAPEL_CARD)
-                            .stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO))
-                            .wrap(),
+                        egui::Button::new(
+                            egui::RichText::new(format!("{letra}.  {}", op.texto))
+                                .color(TINTA)
+                                .size(14.0),
+                        )
+                        .fill(ui_refinada::menu::PAPEL_CARD)
+                        .stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO))
+                        .wrap(),
                     );
                     let r = r.on_hover_ui(|ui| {
                         ui.set_max_width(380.0);
@@ -224,20 +283,31 @@ fn jornal(
     let tela = ctx.viewport_rect();
     let livre = super::ui::area_livre_mapa(ctx);
     let dx = -(tela.max.x - livre.max.x).max(0.0) - 10.0;
-    ui_refinada::janela_estilo_menu("Jornal (J)")
+    ui_refinada::janela_dossie("Jornal (J)", None)
         .anchor(egui::Align2::RIGHT_BOTTOM, [dx, -58.0])
-        .default_width(340.0)
+        .default_width(360.0)
         .resizable(false)
         .show(ctx, |ui| {
-            ui_refinada::decorar_janela(ui);
-            ui_refinada::cabecalho_painel(ui, "JORNAL E TELEGRAMAS (J)");
+            ui_refinada::faixa_titulo(ui, "Jornal e Telegramas", Some("J"), None);
             if ev.estado.jornal.is_empty() {
                 ui.label(egui::RichText::new("Nenhum telegrama recente.").color(TINTA_SUAVE));
-            }
-            for n in ev.estado.jornal.iter().rev().take(6) {
-                ui.label(egui::RichText::new(format!("{:02}/{:02}/{}", n.data.2, n.data.1, n.data.0)).small().color(TINTA_SUAVE));
-                ui.label(egui::RichText::new(&n.texto).color(TINTA));
-                ui.separator();
+            } else {
+                egui::ScrollArea::vertical().id_salt("scroll_jornal").max_height(320.0).show(ui, |ui| {
+                    for n in ev.estado.jornal.iter().rev().take(12) {
+                        ui.horizontal(|ui| {
+                            ui_refinada::glifo_ui(ui, "jornal", 13.0, Some(CARIMBO));
+                            ui.label(
+                                egui::RichText::new(format!("{:02}/{:02}/{}", n.data.2, n.data.1, n.data.0))
+                                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                                    .size(13.0)
+                                    .strong()
+                                    .color(ui_refinada::menu::AZUL_MARINHO),
+                            );
+                        });
+                        ui.label(egui::RichText::new(&n.texto).color(TINTA));
+                        ui_refinada::linha_decorativa(ui);
+                    }
+                });
             }
         });
     Ok(())

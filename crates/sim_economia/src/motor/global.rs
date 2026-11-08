@@ -100,6 +100,8 @@ pub(crate) fn processar_comercio_mundial(
     mercados: &[crate::entidades::Mercado],
     paises: &mut [crate::entidades::Pais],
     abertura: &[f64],
+    fator_absorcao_excedente_bem: &[f64],
+    fator_oferta_importacao_bem: &[f64],
     proxima_oferta: &mut [f64],
     proxima_demanda: &mut [f64],
     importacoes_liquidas: &mut [f64],
@@ -142,12 +144,24 @@ pub(crate) fn processar_comercio_mundial(
                 }
             }
         }
-        // Resto do mundo: cobre parte do déficit que sobrou
+        // Resto do mundo: cobre parte do déficit que sobrou (sujeito a restrições de oferta em crises)
+        let mult_imp = fator_oferta_importacao_bem
+            .get(g)
+            .copied()
+            .unwrap_or(1.0)
+            .clamp(0.05, 1.5);
+        let mult_exp = fator_absorcao_excedente_bem
+            .get(g)
+            .copied()
+            .unwrap_or(1.0)
+            .clamp(0.0, 1.5);
         for m in 0..nm {
             let i = m * n + g;
             let falta = proxima_demanda[i] - proxima_oferta[i];
             if falta > 1e-9 {
-                let vol = falta * config.fracao_maxima_importacao_residual.clamp(0.0, 1.0) * abertura[m];
+                let vol = falta
+                    * (config.fracao_maxima_importacao_residual * mult_imp).clamp(0.0, 1.0)
+                    * abertura[m];
                 proxima_oferta[i] += vol;
                 importacoes_liquidas[i] += vol;
                 let lider = mercados[m].pais_lider_idx;
@@ -156,8 +170,10 @@ pub(crate) fn processar_comercio_mundial(
                     * paises[lider].politica_fiscal.tarifa_importacao_bem(&bem.id)
                     * paises[lider].eficiencia_arrecadacao;
             } else if falta < -1e-9 {
-                // Resto do mundo compra parte do excedente que sobrou (exportação residual a preço de mercado)
-                let vol = -falta * config.fracao_maxima_importacao_residual.clamp(0.0, 1.0) * abertura[m];
+                // Resto do mundo compra parte do excedente que sobrou (reduzida em superoferta estrutural global)
+                let vol = -falta
+                    * (config.fracao_maxima_importacao_residual * mult_exp).clamp(0.0, 1.0)
+                    * abertura[m];
                 proxima_demanda[i] += vol;
                 importacoes_liquidas[i] -= vol;
             }

@@ -111,7 +111,15 @@ fn barra_superior(
                 }
                 ui.separator();
                 if let Some(c) = camada_visivel {
-                    let texto = if c.0 { "🏛 Construções: [V] Ativas" } else { "🏛 Construções: [V] Ocultas" };
+                    let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
+                    ui_refinada::theme::icone::desenhar(
+                        ui.painter(),
+                        rect,
+                        "torre",
+                        ui_refinada::menu::TINTA,
+                        ui_refinada::menu::VERMELHO,
+                    );
+                    let texto = if c.0 { "Construções: [V] Ativas" } else { "Construções: [V] Ocultas" };
                     ui.label(egui::RichText::new(texto).color(ui_refinada::menu::TINTA));
                     ui.separator();
                 }
@@ -173,17 +181,20 @@ fn widget_relogio(ui: &mut egui::Ui, relogio: &mut RecursoRelogio) -> egui::Rect
     if b_pausa.clicked() {
         relogio.alternar_pausa();
     }
-    let r_data = dica(
-        ui.label(
-            egui::RichText::new(relogio.data.formatar_pt_br())
-                .family(ui_refinada::familia_oswald(ui.ctx()))
-                .size(20.0)
-                .strong()
-                .color(ui_refinada::menu::TINTA),
-        ),
-        "tooltip_topbar_data",
-    );
-    rect.union(r_data.rect)
+    let placa = egui::Frame::new().show(ui, |ui| {
+        ui_refinada::placa_data(ui, &relogio.data.formatar_pt_br());
+    });
+    let resp = dica(placa.response, "tooltip_topbar_data");
+    if relogio.pausado {
+        let r_placa = resp.rect;
+        ui.painter().rect_stroke(
+            r_placa.shrink(1.0),
+            0.0,
+            egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO_HOVER),
+            egui::StrokeKind::Inside,
+        );
+    }
+    rect.union(resp.rect)
 }
 
 fn barra_hud(

@@ -38,6 +38,10 @@ pub struct ConstrucaoUi {
     pub tutorial: Option<usize>,
     /// Pedidos de obra feitos pela interface: (província, tipo).
     pub pedidos: Vec<(String, String)>,
+    /// Ações diretas sobre prédios existentes (fechar, reabrir, demolir).
+    pub acoes_predios: Vec<Comando>,
+    /// Confirmação pendente de demolição: `(provincia_id, tipo_predio_id)`.
+    pub confirmar_demolicao: Option<(String, String)>,
     /// Última província do mapa processada (para sincronizar o estado destacado).
     ultima_selecao: u32,
 }
@@ -53,6 +57,8 @@ impl Default for ConstrucaoUi {
             modo_mapa: ModoMapa::Normal,
             tutorial: None,
             pedidos: Vec::new(),
+            acoes_predios: Vec::new(),
+            confirmar_demolicao: None,
             ultima_selecao: 0,
         }
     }
@@ -129,10 +135,14 @@ fn contexto_lucratividade(v: &VistaEconomia, prov: &Provincia, tipo_idx: usize, 
     let salario_base = prov.predios.iter().map(|p| p.salario_base).sum::<f64>() / prov.predios.len().max(1) as f64;
     let niveis = est.niveis_do_tipo(tipo_idx) as f64;
     let (potencial_livre, potencial_total) = if t.usa_terra_aravel {
-        (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+        if !est.cultura_permitida(&t.id) {
+            (Some(0.0), Some(0.0))
+        } else {
+            (Some(est.terra_aravel_livre() as f64), Some(est.terra_aravel.max(1) as f64))
+        }
     } else if let Some(rec) = &t.recurso_natural_requerido {
         let total = est.limite_recurso(rec) as f64;
-        (Some(total - niveis), Some(total))
+        (Some((total - niveis).max(0.0)), Some(total))
     } else {
         (None, None)
     };
@@ -149,6 +159,7 @@ fn contexto_lucratividade(v: &VistaEconomia, prov: &Provincia, tipo_idx: usize, 
         potencial_total,
         niveis_iguais: niveis,
         bonus_cadeia: est.bonus_cadeia(tipo_idx),
+        urbanizacao: est.urbanizacao,
     }
 }
 
@@ -198,9 +209,9 @@ fn detalhe_lucro(v: &VistaEconomia, prov: &Provincia, t: &TipoPredio, l: Estimat
         _ => "-".to_string(),
     };
     format!(
-        "Recurso local: {recurso}\nCadeia local: +{:.0}% ({cadeia})\nOutros fatores: salário x{:.2}; mão de obra x{:.2}; infra x{:.2}; acesso x{:.2}; concorrência x{:.2}",
+        "Recurso local: {recurso}\nCadeia local: +{:.0}% ({cadeia})\nOutros fatores: salário x{:.2}; mão de obra x{:.2}; infra x{:.2}; acesso x{:.2}; concorrência x{:.2}; mercado local x{:.2}",
         (l.fator_cadeia_local - 1.0).max(0.0) * 100.0,
-        l.fator_salario, l.fator_mao_de_obra, l.fator_infraestrutura, l.fator_acesso, l.fator_concorrencia
+        l.fator_salario, l.fator_mao_de_obra, l.fator_infraestrutura, l.fator_acesso, l.fator_concorrencia, l.fator_mercado_local
     )
 }
 
@@ -222,9 +233,9 @@ pub fn potencial_livre(v: &VistaEconomia, est: &Estado, t: &TipoPredio) -> Optio
 fn texto_potencial(v: &VistaEconomia, est: &Estado, t: &TipoPredio) -> String {
     match potencial_livre(v, est, t) {
         None => "Sem recurso regional (só precisa de espaço urbano)".into(),
-        Some(0) if t.usa_terra_aravel && !est.cultura_permitida(&t.id) => "Cultura não permitida neste estado".into(),
-        Some(0) if t.usa_terra_aravel => "Sem terra arável livre".into(),
-        Some(0) => format!("Sem jazida livre de {}", t.recurso_natural_requerido.as_deref().unwrap_or("recurso").replace('_', " ")),
+        Some(0) if t.usa_terra_aravel && !est.cultura_permitida(&t.id) => "Clima/solo desfavorável (rendimento reduzido)".into(),
+        Some(0) if t.usa_terra_aravel => "Sem terra arável livre (rendimento reduzido)".into(),
+        Some(0) => format!("Sem jazida de {} (rendimento reduzido)", t.recurso_natural_requerido.as_deref().unwrap_or("recurso").replace('_', " ")),
         Some(n) => {
             let q = est.fator_qualidade_predio(t);
             let b = if q > 1.0 { format!(", qualidade +{:.0}%", (q - 1.0) * 100.0) } else { String::new() };
@@ -255,7 +266,13 @@ pub fn opcoes_para_provincia(v: &VistaEconomia, prov: &Provincia) -> Vec<OpcaoCo
             let (potencial, motivo) = match est {
                 Some(e) => {
                     let p = texto_potencial(v, e, t);
-                    let m = if let Some(tec) = bloqueio_tec { format!("Requer tecnologia: {tec}") } else if comporta { String::new() } else { p.clone() };
+                    let m = if let Some(tec) = bloqueio_tec {
+                        format!("Requer tecnologia: {tec}")
+                    } else if !comporta {
+                        "Porto requer província costeira".into()
+                    } else {
+                        String::new()
+                    };
                     (p, m)
                 }
                 None => ("-".into(), String::new()),
@@ -266,7 +283,7 @@ pub fn opcoes_para_provincia(v: &VistaEconomia, prov: &Provincia) -> Vec<OpcaoCo
                 nome: t.nome.clone(),
                 categoria: t.categoria,
                 comporta,
-                motivo: if comporta || !motivo.is_empty() { motivo } else { "Capacidade esgotada".into() },
+                motivo,
                 pontos: t.custo_pontos_construcao,
                 dias: t.custo_pontos_construcao / pontos_dia,
                 custo_bens: mat.total_reais,
@@ -327,7 +344,7 @@ pub fn ranking_estados(v: &VistaEconomia, tipo_idx: usize) -> Vec<LinhaEstado> {
             let alvo = melhor.as_ref().map(|(_, p, _)| p.id.clone());
             let luc = melhor.map_or_else(EstimativaLucratividade::default, |(_, _, l)| l);
             let lucro = if t.financiado_pelo_governo { -(luc.custo_insumos + luc.custo_folha) } else { luc.lucro_liquido };
-            let pot = livre.map_or(1.0, |n| (1.0 + n as f64).ln());
+            let pot = livre.map_or(1.0, |n| if n > 0 { 1.0 + (n as f64).ln_1p() } else { 0.25 });
             let folga = (1.0 - e.penalidade_infraestrutura).clamp(0.05, 1.0);
             let vantagem = if alvo.is_some() { luc.fator_recurso * folga * pot * if lucro > 0.0 { 1.0 + lucro.max(0.0).ln_1p() } else { 0.5 } } else { 0.0 };
             LinhaEstado {
@@ -395,7 +412,7 @@ pub fn cores_por_adm1(v: &VistaEconomia, modo: ModoMapa, tipo_idx: usize) -> Has
 
 pub const PASSOS_TUTORIAL: [(&str, &str); 5] = [
     ("1/5  Como construir", "Aperte B (ou o botão \"Construir\" no topo) para abrir a tela de construção. Clique numa província do seu país e use a seção \"Construir aqui\" do painel da direita: escolha o prédio e aperte \"Construir\"."),
-    ("2/5  Recursos regionais", "Cada estado tem recursos próprios: terra arável, culturas permitidas e jazidas. Café só onde há cultura de café; ferro e carvão só onde há jazida. A lista só mostra o que cabe na província."),
+    ("2/5  Recursos regionais", "Qualquer prédio pode ser erguido em qualquer província, mas os recursos locais definem o rendimento: terras férteis e jazidas ricas rendem muito mais, enquanto regiões sem recursos rendem pouco e podem dar prejuízo."),
     ("3/5  Custo e lucro", "Cada obra gasta bens (aço, madeira, ferramentas...) e pontos de construção. O lucro esperado por dia ajuda a escolher. Prédios do governo dão serviço, não lucro."),
     ("4/5  Infraestrutura", "Prédios usam infraestrutura do estado (ferrovias, portos, urbanização). Passando da capacidade, a produção cai. Veja o modo de mapa \"Infraestrutura\" na tela de construção."),
     ("5/5  Setor privado e fila", "Capitalistas também investem sozinhos, conforme a lei econômica, usando o fundo privado. A fila de obras (na tela B) mostra o progresso de cada obra, estatal ou privada."),
@@ -407,37 +424,258 @@ pub const PASSOS_TUTORIAL: [(&str, &str); 5] = [
 // ---------------------------------------------------------------------------------------------
 
 fn cor_lucro(v: f64) -> egui::Color32 {
-    if v >= 0.0 { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED }
+    if v >= 0.0 { ui_refinada::menu::SUCESSO } else { ui_refinada::menu::PERIGO }
+}
+
+/// Calcula `(rotulo_tendencia, cor_tendencia, custo_reabrir, reembolso_demolir_1nv)` para um prédio existente.
+pub fn resumo_gestao_predio(
+    v: &VistaEconomia,
+    b: &sim_economia::Predio,
+) -> (String, egui::Color32, f64, f64) {
+    let Some(cat) = v.catalogo.as_ref() else {
+        return ("→ estável".into(), ui_refinada::menu::TINTA_SUAVE, 0.0, 0.0);
+    };
+    let Some(tipo) = cat.obter_tipo_predio(&b.tipo_predio_id) else {
+        return ("→ estável".into(), ui_refinada::menu::TINTA_SUAVE, 0.0, 0.0);
+    };
+    let preco_bem = |id: &str| {
+        v.bens
+            .iter()
+            .find(|x| x.id == id)
+            .map_or(20.0, |x| x.preco_nacional)
+    };
+    let custo_reabrir =
+        sim_economia::calcular_custo_reabertura_por_precos(cat, tipo, b.nivel, preco_bem);
+    let reembolso_demolir =
+        sim_economia::calcular_reembolso_demolicao_por_precos(cat, tipo, 1, preco_bem);
+
+    let var30 = b
+        .produtos_por_nivel()
+        .first()
+        .and_then(|&(idx, _)| v.bens.get(idx as usize))
+        .map_or(0.0, |bem| bem.var30_nacional);
+
+    let (seta, cor) = if b.tendencia_lucro > 3.0 || var30 > 0.04 {
+        ("↗ em alta", ui_refinada::menu::SUCESSO)
+    } else if b.tendencia_lucro < -3.0 || var30 < -0.04 || b.dias_prejuizo >= 15 {
+        ("↘ em queda", ui_refinada::menu::PERIGO)
+    } else {
+        ("→ estável", ui_refinada::menu::TINTA_SUAVE)
+    };
+    let rotulo = if var30.abs() >= 0.005 {
+        format!("{seta} ({:+.0}%/30d)", var30 * 100.0)
+    } else {
+        seta.to_string()
+    };
+    (rotulo, cor, custo_reabrir, reembolso_demolir)
+}
+
+/// Desenha os controles de Fechar / Reabrir e Demolir (com confirmação) para um prédio instalado.
+pub fn botoes_gestao_predio_inline(
+    ui: &mut egui::Ui,
+    v: &VistaEconomia,
+    provincia_id: &str,
+    b: &sim_economia::Predio,
+    confirmar_demolicao: &mut Option<(String, String)>,
+    acoes: &mut Vec<Comando>,
+) {
+    let (rotulo_tend, cor_tend, custo_reabrir, reembolso_demolir) = resumo_gestao_predio(v, b);
+    ui.colored_label(cor_tend, &rotulo_tend)
+        .on_hover_text("Tendência recente de rentabilidade do prédio e do preço de venda do produto");
+
+    if b.fechado {
+        let txt_reabrir = format!("Reabrir ({})", fmt_din(custo_reabrir));
+        if ui
+            .small_button(
+                egui::RichText::new(txt_reabrir)
+                    .color(ui_refinada::menu::SUCESSO)
+                    .strong(),
+            )
+            .on_hover_text(format!(
+                "Reabre o prédio pagando {} de remobilização. A produção retoma gradualmente em {} dias.",
+                fmt_din(custo_reabrir),
+                sim_economia::Predio::TEMPO_RETOMADA_DIAS
+            ))
+            .clicked()
+        {
+            acoes.push(Comando::ReabrirPredio {
+                provincia_id: provincia_id.to_string(),
+                tipo_id: b.tipo_predio_id.clone(),
+            });
+        }
+    } else if ui
+        .small_button(egui::RichText::new("Fechar").color(ui_refinada::menu::AVISO))
+        .on_hover_text(format!(
+            "Fecha temporariamente: cessa produção e consumo de insumos, dispensa {:.0} trabalhadores e mantém custo de conservação baixo (£{:.0}/dia).",
+            b.total_empregados(),
+            (b.nivel as f64) * sim_economia::CUSTO_MANUTENCAO_FECHADO_POR_NIVEL
+        ))
+        .clicked()
+    {
+        acoes.push(Comando::FecharPredio {
+            provincia_id: provincia_id.to_string(),
+            tipo_id: b.tipo_predio_id.clone(),
+        });
+    }
+
+    let chave = (provincia_id.to_string(), b.tipo_predio_id.clone());
+    if confirmar_demolicao.as_ref() == Some(&chave) {
+        ui.colored_label(ui_refinada::menu::PERIGO, "Confirmar?");
+        if ui
+            .small_button(
+                egui::RichText::new(format!("Demolir (+{})", fmt_din(reembolso_demolir)))
+                    .color(ui_refinada::menu::PERIGO)
+                    .strong(),
+            )
+            .on_hover_text(
+                "Confirma a demolição de 1 nível, liberando espaço regional e recuperando parte dos materiais.",
+            )
+            .clicked()
+        {
+            acoes.push(Comando::DemolirPredio {
+                provincia_id: provincia_id.to_string(),
+                tipo_id: b.tipo_predio_id.clone(),
+                niveis: 1,
+            });
+            *confirmar_demolicao = None;
+        }
+        if ui.small_button("Cancelar").clicked() {
+            *confirmar_demolicao = None;
+        }
+    } else if ui
+        .small_button(egui::RichText::new("Demolir (-1 nv)").color(ui_refinada::menu::PERIGO))
+        .on_hover_text(format!(
+            "Reduz 1 nível do prédio, libera capacidade regional e devolve {} em materiais recuperados.",
+            fmt_din(reembolso_demolir)
+        ))
+        .clicked()
+    {
+        *confirmar_demolicao = Some(chave);
+    }
 }
 
 /// Seção "Construir aqui" do painel de província/estado. `adm1` é o código da província clicada no mapa.
 pub fn secao_construir_aqui(ui: &mut egui::Ui, v: &VistaEconomia, adm1: &str, c: &mut ConstrucaoUi) {
-    ui.separator();
-    ui.heading("Construir aqui");
-    let Some(cat) = v.catalogo.as_ref() else {
+    ui.add_space(6.0);
+    ui_refinada::titulo_secao(ui, "Construir aqui");
+    if v.catalogo.is_none() {
         ui.label("A economia ainda está calculando...");
         return;
-    };
+    }
     let Some(prov) = provincia_por_adm1(v, adm1) else {
         ui.label("Esta província não é do seu país: só é possível construir no seu território.");
         return;
     };
     if let Some(e) = estado_de(v, prov) {
         ui.label(format!("Estado: {} | Província: {}", e.nome, prov.nome));
-        ui.label(format!(
-            "Terra arável livre: {} | Infraestrutura: {:.0}/{:.0}{}",
-            e.terra_aravel_livre(),
-            e.infraestrutura_uso,
-            e.infraestrutura_capacidade,
-            if e.penalidade_infraestrutura > 0.0 { format!(" (penalidade -{:.0}%)", e.penalidade_infraestrutura * 100.0) } else { String::new() }
-        ));
+        let pct = if e.infraestrutura_capacidade > 1e-6 {
+            (e.infraestrutura_uso / e.infraestrutura_capacidade).clamp(0.0, 1.0) as f32
+        } else {
+            0.0
+        };
+        let cor_infra = if e.penalidade_infraestrutura > 0.0 { ui_refinada::menu::PERIGO } else { ui_refinada::menu::SUCESSO };
+        ui_refinada::barra_status(
+            ui,
+            Some("Infraestrutura"),
+            pct,
+            1.0,
+            cor_infra,
+            170.0,
+            Some(&format!(
+                "{:.0}/{:.0}{}",
+                e.infraestrutura_uso,
+                e.infraestrutura_capacidade,
+                if e.penalidade_infraestrutura > 0.0 {
+                    format!(" · penalidade -{:.0}%", e.penalidade_infraestrutura * 100.0)
+                } else {
+                    String::new()
+                }
+            )),
+        );
+        ui.small(format!("Terra arável livre: {}", e.terra_aravel_livre()));
+    }
+
+    // Prédios já instalados nesta província: lucro atual, tendência, Fechar/Reabrir e Demolir com confirmação
+    if let Some(cat) = v.catalogo.as_ref()
+        && prov.predios.iter().any(|b| b.nivel > 0)
+    {
+        ui.add_space(4.0);
+        ui_refinada::titulo_secao(ui, "Prédios instalados nesta província");
+        egui::ScrollArea::vertical()
+            .id_salt("scroll_instalados_prov")
+            .max_height(190.0)
+            .show(ui, |ui| {
+                for b in prov.predios.iter().filter(|b| b.nivel > 0) {
+                    let nome_b = cat
+                        .obter_tipo_predio(&b.tipo_predio_id)
+                        .map_or(b.tipo_predio_id.as_str(), |t| t.nome.as_str());
+                    let eh_gov = cat
+                        .obter_tipo_predio(&b.tipo_predio_id)
+                        .is_some_and(|t| t.financiado_pelo_governo);
+                    ui_refinada::moldura_cartao().show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&b.tipo_predio_id), 14.0, None);
+                            ui.label(egui::RichText::new(format!("{nome_b} (Nv. {})", b.nivel)).strong());
+                            if b.fechado {
+                                ui.colored_label(
+                                    ui_refinada::menu::PERIGO,
+                                    format!("FECHADO ({}d)", b.dias_fechado),
+                                );
+                            } else if b.esta_em_retomada() {
+                                ui.colored_label(
+                                    ui_refinada::menu::AVISO,
+                                    format!(
+                                        "Retomando ({}d · {:.0}%)",
+                                        b.dias_retomada,
+                                        b.fator_retomada() * 100.0
+                                    ),
+                                );
+                            } else {
+                                ui.weak(format!(
+                                    "{:.0}/{:.0} trab.",
+                                    b.total_empregados(),
+                                    b.total_vagas()
+                                ));
+                            }
+                            if eh_gov {
+                                ui.colored_label(
+                                    ui_refinada::menu::INFO,
+                                    format!("Custo {}/d", fmt_din(b.folha_salarial_ultimo_tick + b.custo_insumos_ultimo_tick)),
+                                );
+                            } else {
+                                ui.colored_label(
+                                    cor_lucro(b.lucro_ultimo_tick),
+                                    format!("{}/d", fmt_din(b.lucro_ultimo_tick)),
+                                );
+                                if b.dias_prejuizo > 0 && !b.fechado {
+                                    ui.colored_label(
+                                        ui_refinada::menu::PERIGO,
+                                        format!("({}d prejuízo)", b.dias_prejuizo),
+                                    );
+                                }
+                            }
+                        });
+                        ui.horizontal_wrapped(|ui| {
+                            botoes_gestao_predio_inline(
+                                ui,
+                                v,
+                                &prov.id,
+                                b,
+                                &mut c.confirmar_demolicao,
+                                &mut c.acoes_predios,
+                            );
+                        });
+                    });
+                }
+            });
+        ui.add_space(4.0);
     }
     ui.horizontal_wrapped(|ui| {
-        if ui.selectable_label(c.filtro_cat.is_none(), "Todas").clicked() {
+        if ui_refinada::aba_glifo(ui, c.filtro_cat.is_none(), Some("lupa"), "Todas") {
             c.filtro_cat = None;
         }
         for cp in CATEGORIAS {
-            if ui.selectable_label(c.filtro_cat == Some(cp), nome_categoria(cp)).clicked() {
+            if ui_refinada::aba_glifo(ui, c.filtro_cat == Some(cp), Some(ui_refinada::chave_para(nome_categoria(cp).to_lowercase().as_str())), nome_categoria(cp)) {
                 c.filtro_cat = Some(cp);
             }
         }
@@ -452,42 +690,63 @@ pub fn secao_construir_aqui(ui: &mut egui::Ui, v: &VistaEconomia, adm1: &str, c:
                 continue;
             }
             mostradas += 1;
-            egui::Frame::new().stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(70))).inner_margin(6.0).corner_radius(4.0).show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.strong(&o.nome);
-                    ui.weak(nome_categoria(o.categoria));
-                    if o.na_fila > 0 {
-                        ui.colored_label(egui::Color32::YELLOW, format!("({} na fila)", o.na_fila));
+            ui_refinada::moldura_cartao()
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if o.comporta { ui_refinada::menu::PAPEL_BORDA } else { ui_refinada::menu::PERIGO },
+                ))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&o.tipo_id), 16.0, None);
+                        ui.label(
+                            egui::RichText::new(&o.nome)
+                                .family(ui_refinada::familia_oswald(ui.ctx()))
+                                .size(15.0)
+                                .strong()
+                                .color(ui_refinada::menu::AZUL_MARINHO),
+                        );
+                        ui.weak(nome_categoria(o.categoria));
+                        if o.na_fila > 0 {
+                            ui.colored_label(ui_refinada::menu::AVISO, format!("({} na fila)", o.na_fila));
+                        }
+                    });
+                    ui.horizontal_wrapped(|ui| {
+                        ui_refinada::chapa(ui, "picareta", "Pontos", &format!("{:.0}", o.pontos), None);
+                        ui_refinada::chapa(ui, "relogio", "Prazo", &format!("~{:.0} dias", o.dias), None);
+                        ui_refinada::chapa(ui, "caixa", "Custo em bens", &fmt_din(o.custo_bens), None);
+                        ui_refinada::chapa(ui, "grafico", "Potencial", &o.potencial.to_string(), None);
+                    });
+                    if !o.itens.is_empty() {
+                        let bens: Vec<String> = o.itens.iter().map(|(n, q)| format!("{q:.0}x {n}")).collect();
+                        ui.small(format!("Bens: {}", bens.join(", ")));
                     }
+                    ui.horizontal(|ui| {
+                        if o.governamental {
+                            ui.label(format!("Serviço público, custo ao tesouro: {}/dia", fmt_din(-o.lucro_dia)));
+                        } else {
+                            ui.label("Lucro esperado:");
+                            ui.colored_label(cor_lucro(o.lucro_dia), format!("{}/dia por nível", fmt_din(o.lucro_dia))).on_hover_text(&o.detalhe_lucro);
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        let btn = if o.comporta {
+                            ui_refinada::botao_estilo_menu(ui, "Construir")
+                        } else {
+                            ui.add_enabled(false, egui::Button::new("Não cabe"))
+                        };
+                        if btn.on_disabled_hover_text(&o.motivo).clicked() {
+                            c.pedidos.push((prov.id.clone(), o.tipo_id.clone()));
+                        }
+                        if !o.comporta {
+                            ui.colored_label(ui_refinada::menu::PERIGO, &o.motivo);
+                        }
+                    });
                 });
-                ui.label(format!("Potencial: {}", o.potencial));
-                ui.label(format!("Custo: {} em bens + {:.0} pts de construção (~{:.0} dias)", fmt_din(o.custo_bens), o.pontos, o.dias));
-                if !o.itens.is_empty() {
-                    let bens: Vec<String> = o.itens.iter().map(|(n, q)| format!("{q:.0}x {n}")).collect();
-                    ui.weak(format!("Bens: {}", bens.join(", ")));
-                }
-                ui.horizontal(|ui| {
-                    if o.governamental {
-                        ui.label(format!("Serviço público, custo ao tesouro: {}/dia", fmt_din(-o.lucro_dia)));
-                    } else {
-                        ui.label("Lucro esperado:");
-                        ui.colored_label(cor_lucro(o.lucro_dia), format!("{}/dia por nível", fmt_din(o.lucro_dia))).on_hover_text(&o.detalhe_lucro);
-                    }
-                    let b = ui.add_enabled(o.comporta, egui::Button::new("Construir"));
-                    if b.on_disabled_hover_text(&o.motivo).clicked() {
-                        c.pedidos.push((prov.id.clone(), o.tipo_id.clone()));
-                    }
-                });
-                if !o.comporta {
-                    ui.colored_label(egui::Color32::LIGHT_RED, format!("Não cabe: {}", o.motivo));
-                }
-            });
         }
         if mostradas == 0 {
             ui.label("Nenhum prédio dessa categoria cabe aqui. Veja o potencial regional na tela de construção (B).");
         }
     });
-    let _ = cat;
 }
 
 fn tela_construcao(mut contextos: EguiContexts, mut c: ResMut<ConstrucaoUi>, eco: Option<Res<EconomiaSim>>) -> Result {
@@ -497,12 +756,11 @@ fn tela_construcao(mut contextos: EguiContexts, mut c: ResMut<ConstrucaoUi>, eco
     let Some(eco) = eco else { return Ok(()) };
     let ctx = contextos.ctx_mut()?;
     let mut aberta = true;
-    ui_refinada::janela_estilo_menu("CONSTRUÇÃO (B)")
-        .open(&mut aberta)
-        .default_size([860.0, 640.0])
+    ui_refinada::janela_dossie("CONSTRUÇÃO (B)", None)
+        .default_pos([20.0, 96.0])
+        .default_size([980.0, 660.0])
         .show(ctx, |ui| {
-            ui_refinada::decorar_janela(ui);
-            ui_refinada::cabecalho_painel(ui, "CONSTRUÇÃO E EDIFICAÇÃO (B)");
+            ui_refinada::faixa_titulo(ui, "Construção e Edificação", Some("B"), Some(&mut aberta));
             corpo_tela_construcao(ui, &eco.vista, &mut c);
         });
     c.aberta = aberta;
@@ -519,13 +777,11 @@ pub fn corpo_tela_construcao(ui: &mut egui::Ui, v: &VistaEconomia, c: &mut Const
         c.tipo_idx = 0;
     }
     ui.horizontal_wrapped(|ui| {
-        ui.label(format!("Capacidade de construção: {:.0} pts/dia", v.pontos_construcao_dia));
-        ui.separator();
-        ui.label("Modo do mapa:");
-        if ui_refinada::aba_estilo_menu(ui, c.modo_mapa == ModoMapa::Normal, "Normal") { c.modo_mapa = ModoMapa::Normal; }
-        if ui_refinada::aba_estilo_menu(ui, c.modo_mapa == ModoMapa::Potencial, "Potencial") { c.modo_mapa = ModoMapa::Potencial; }
-        if ui_refinada::aba_estilo_menu(ui, c.modo_mapa == ModoMapa::Infraestrutura, "Infraestrutura") { c.modo_mapa = ModoMapa::Infraestrutura; }
-        ui.separator();
+        ui_refinada::chapa(ui, "picareta", "Capacidade", &format!("{:.0} pts/dia", v.pontos_construcao_dia), Some(ui_refinada::menu::OURO));
+        ui.label(egui::RichText::new("MODO DO MAPA:").size(12.0).strong().color(ui_refinada::menu::TINTA_SUAVE));
+        if ui_refinada::aba_glifo(ui, c.modo_mapa == ModoMapa::Normal, Some("caixa"), "Normal") { c.modo_mapa = ModoMapa::Normal; }
+        if ui_refinada::aba_glifo(ui, c.modo_mapa == ModoMapa::Potencial, Some("lupa"), "Potencial") { c.modo_mapa = ModoMapa::Potencial; }
+        if ui_refinada::aba_glifo(ui, c.modo_mapa == ModoMapa::Infraestrutura, Some("trem"), "Infraestrutura") { c.modo_mapa = ModoMapa::Infraestrutura; }
         if ui_refinada::botao_estilo_secundario(ui, "Ver tutorial").clicked() {
             c.tutorial = Some(0);
         }
@@ -539,17 +795,18 @@ pub fn corpo_tela_construcao(ui: &mut egui::Ui, v: &VistaEconomia, c: &mut Const
         }
         ModoMapa::Normal => {}
     }
-    ui.separator();
+    ui.add_space(4.0);
+    ui_refinada::linha_decorativa(ui);
     ui.columns(2, |cols| {
         // Coluna esquerda: categoria e tipo
         let ui = &mut cols[0];
-        ui.strong("1. Escolha o prédio");
+        ui_refinada::titulo_secao(ui, "1 · Escolha o prédio");
         ui.horizontal_wrapped(|ui| {
-            if ui.selectable_label(c.filtro_cat.is_none(), "Todas").clicked() {
+            if ui_refinada::aba_glifo(ui, c.filtro_cat.is_none(), Some("lupa"), "Todas") {
                 c.filtro_cat = None;
             }
             for cp in CATEGORIAS {
-                if ui.selectable_label(c.filtro_cat == Some(cp), nome_categoria(cp)).clicked() {
+                if ui_refinada::aba_glifo(ui, c.filtro_cat == Some(cp), Some(ui_refinada::chave_para(nome_categoria(cp).to_lowercase().as_str())), nome_categoria(cp)) {
                     c.filtro_cat = Some(cp);
                 }
             }
@@ -559,9 +816,12 @@ pub fn corpo_tela_construcao(ui: &mut egui::Ui, v: &VistaEconomia, c: &mut Const
                 if c.filtro_cat.is_some_and(|f| f != t.categoria) {
                     continue;
                 }
-                if ui.selectable_label(c.tipo_idx == i, &t.nome).clicked() {
-                    c.tipo_idx = i;
-                }
+                ui.horizontal(|ui| {
+                    ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&t.id), 14.0, None);
+                    if ui.selectable_label(c.tipo_idx == i, &t.nome).clicked() {
+                        c.tipo_idx = i;
+                    }
+                });
             }
         });
         let t = &cat.tipos_predio[c.tipo_idx];
@@ -569,29 +829,43 @@ pub fn corpo_tela_construcao(ui: &mut egui::Ui, v: &VistaEconomia, c: &mut Const
         let luc = v.provincias.iter()
             .find(|p| p.estado_id == c.estado_id && v.comporta(p, c.tipo_idx))
             .map_or_else(|| EstimativaLucratividade::default(), |p| estimar_lucro(v, p, t));
-        ui.separator();
-        ui.strong(&t.nome);
-        ui.label(format!("Custo: {} em bens + {:.0} pts de construção (~{:.0} dias)", fmt_din(mat.total_reais), t.custo_pontos_construcao, t.custo_pontos_construcao / v.pontos_construcao_dia.clamp(1.0, 25.0)));
-        if t.financiado_pelo_governo {
-            ui.label(format!("Serviço público: custa {}/dia ao tesouro", fmt_din(luc.custo_insumos + luc.custo_folha)));
-        } else {
+        ui.add_space(6.0);
+        ui_refinada::moldura_cartao().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label("Lucro esperado (por nível, base):");
-                ui.colored_label(cor_lucro(luc.lucro_liquido), format!("{}/dia", fmt_din(luc.lucro_liquido)));
+                ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&t.id), 18.0, None);
+                ui.label(
+                    egui::RichText::new(&t.nome)
+                        .family(ui_refinada::familia_oswald(ui.ctx()))
+                        .size(17.0)
+                        .strong()
+                        .color(ui_refinada::menu::AZUL_MARINHO),
+                );
             });
-        }
+            ui_refinada::linha_decorativa(ui);
+            ui.horizontal(|ui| {
+                ui_refinada::chapa(ui, "caixa", "Custo em bens", &fmt_din(mat.total_reais), None);
+                ui_refinada::chapa(ui, "picareta", "Pontos", &format!("{:.0}", t.custo_pontos_construcao), None);
+                ui_refinada::chapa(ui, "relogio", "Prazo", &format!("~{:.0} dias", t.custo_pontos_construcao / v.pontos_construcao_dia.clamp(1.0, 25.0)), None);
+            });
+            if t.financiado_pelo_governo {
+                ui.colored_label(ui_refinada::menu::INFO, format!("Serviço público: custa {}/dia ao tesouro", fmt_din(luc.custo_insumos + luc.custo_folha)));
+            } else {
+                ui.horizontal(|ui| {
+                    ui.label("Lucro esperado (por nível, base):");
+                    ui.colored_label(cor_lucro(luc.lucro_liquido), format!("{}/dia", fmt_din(luc.lucro_liquido)));
+                });
+            }
+        });
 
         // Coluna direita: ranking de estados
         let ui = &mut cols[1];
-        ui.strong("2. Estados com mais vantagem");
         let ranking = ranking_estados(v, c.tipo_idx);
+        ui_refinada::titulo_secao(ui, "2 · Estados com mais vantagem");
         egui::ScrollArea::vertical().id_salt("scroll_estados").max_height(300.0).show(ui, |ui| {
-            egui::Grid::new("grid_ranking_estados").striped(true).show(ui, |ui| {
-                ui.strong("Estado");
-                ui.strong("Potencial");
-                ui.strong("Infra");
-                ui.strong("Lucro/dia");
-                ui.strong("");
+            egui::Grid::new("grid_ranking_estados").striped(true).spacing([10.0, 3.0]).show(ui, |ui| {
+                for h in ["Estado", "Potencial", "Infra", "Infra %", "Lucro/dia", ""] {
+                    ui.label(egui::RichText::new(h.to_uppercase()).size(12.0).strong().color(ui_refinada::menu::TINTA_SUAVE));
+                }
                 ui.end_row();
                 for l in ranking.iter().take(60) {
                     let sel = c.estado_id == l.estado_id;
@@ -600,10 +874,11 @@ pub fn corpo_tela_construcao(ui: &mut egui::Ui, v: &VistaEconomia, c: &mut Const
                     }
                     match l.livre {
                         Some(n) => ui.label(format!("{n} livres (x{:.2})", l.qualidade)),
-                        None => ui.label("urbano"),
+                        None => ui.weak("urbano"),
                     };
                     let pct = if l.infra_cap > 1e-6 { l.infra_uso / l.infra_cap * 100.0 } else { 0.0 };
-                    let cor = if l.penalidade > 0.0 { egui::Color32::LIGHT_RED } else { egui::Color32::LIGHT_GREEN };
+                    let cor = if l.penalidade > 0.0 { ui_refinada::menu::PERIGO } else { ui_refinada::menu::SUCESSO };
+                    ui_refinada::barra_trilho(ui, (pct / 100.0) as f32, cor, 54.0, 9.0);
                     ui.colored_label(cor, format!("{pct:.0}%"));
                     ui.colored_label(cor_lucro(l.lucro_dia), fmt_din(l.lucro_dia));
                     let ok = l.provincia_alvo.is_some();
@@ -617,20 +892,25 @@ pub fn corpo_tela_construcao(ui: &mut egui::Ui, v: &VistaEconomia, c: &mut Const
             });
         });
     });
-    ui.separator();
-    ui.strong(format!("3. Fila de obras ({})", pais.fila_construcao.len()));
+    ui.add_space(6.0);
+    ui_refinada::titulo_secao(ui, &format!("3 · Fila de obras ({})", pais.fila_construcao.len()));
     egui::ScrollArea::vertical().id_salt("scroll_fila").max_height(180.0).show(ui, |ui| {
         if pais.fila_construcao.is_empty() {
-            ui.label("Nenhuma obra em andamento.");
+            ui.weak("Nenhuma obra em andamento.");
         }
         for it in &pais.fila_construcao {
             let nome_t = cat.tipos_predio.iter().find(|t| t.id == it.tipo_predio_id).map_or(it.tipo_predio_id.as_str(), |t| t.nome.as_str());
             let nome_p = v.provincias.iter().find(|p| p.id == it.provincia_id).map_or(it.provincia_id.as_str(), |p| p.nome.as_str());
             let frac = (it.progresso_pontos / it.custo_total_pontos.max(1.0)).clamp(0.0, 1.0) as f32;
-            ui.horizontal(|ui| {
-                ui.label(format!("{nome_t} em {nome_p} [{}]", if it.privado { "privada" } else { "estatal" }));
-                ui.add(egui::ProgressBar::new(frac).desired_width(160.0).text(format!("{:.0}/{:.0} pts", it.progresso_pontos, it.custo_total_pontos)));
-            });
+            ui_refinada::barra_status(
+                ui,
+                Some(if it.privado { "privada" } else { "estatal" }),
+                frac,
+                1.0,
+                ui_refinada::menu::AZUL_MARINHO,
+                160.0,
+                Some(&format!("{nome_t} em {nome_p} · {:.0}/{:.0} pts", it.progresso_pontos, it.custo_total_pontos)),
+            );
         }
     });
 }
@@ -681,11 +961,11 @@ fn tecla_b(teclas: Res<ButtonInput<KeyCode>>, mut c: ResMut<ConstrucaoUi>, mut e
 
 /// Converte os pedidos da interface em comandos para a economia.
 pub fn aplicar_pedidos(mut c: ResMut<ConstrucaoUi>, mut eco: ResMut<EconomiaSim>) {
-    if c.pedidos.is_empty() {
-        return;
-    }
     for (provincia_id, tipo_id) in std::mem::take(&mut c.pedidos) {
         eco.enviar(Comando::Construir { provincia_id, tipo_id });
+    }
+    for cmd in std::mem::take(&mut c.acoes_predios) {
+        eco.enviar(cmd);
     }
 }
 
@@ -883,21 +1163,162 @@ mod testes {
         assert!((3..=5).contains(&PASSOS_TUTORIAL.len()));
     }
 
-    /// Diagnóstico (temporário): lucro previsto do mesmo prédio em várias províncias dos EUA.
+    /// Diagnóstico e validação regional: lucro previsto do mesmo prédio em várias províncias dos EUA.
     #[test]
-    #[ignore]
     fn diag_lucro_por_provincia() {
         let app = app_headless();
         let v = &app.world().resource::<EconomiaSim>().vista;
         println!("DIAG pais={} provincias na vista: {} estados: {}", v.pais_id, v.provincias.len(), v.estados.len());
         let provs: Vec<&Provincia> = v.provincias.iter().step_by((v.provincias.len() / 10).max(1)).take(10).collect();
+
+        let buscar_tipo = |opcoes: &[OpcaoConstrucao], tipo: &str| -> Option<f64> {
+            match tipo {
+                "fazenda_trigo" => opcoes.iter().find(|o| o.tipo_id == "fazenda_graos").map(|o| o.lucro_dia),
+                "fabrica_moveis" => opcoes.iter().find(|o| o.tipo_id == "fabrica_moveis").map(|o| o.lucro_dia),
+                "siderurgica" => opcoes.iter().find(|o| o.tipo_id == "siderurgica").map(|o| o.lucro_dia),
+                "mina_carvao" => {
+                    opcoes
+                        .iter()
+                        .find(|o| o.tipo_id == "mina_carvao")
+                        .or_else(|| opcoes.iter().find(|o| o.tipo_id.starts_with("mina_")))
+                        .map(|o| o.lucro_dia)
+                }
+                outro => opcoes.iter().find(|o| o.tipo_id.contains(outro.split('_').next().unwrap())).map(|o| o.lucro_dia),
+            }
+        };
+
         for tipo in ["fabrica_moveis", "siderurgica", "mina_carvao", "fazenda_trigo"] {
             let linha: Vec<String> = provs.iter().map(|pr| {
-                opcoes_para_provincia(v, pr).iter().find(|o| o.tipo_id.contains(tipo.split('_').next().unwrap()) ).map_or("-".into(), |o| format!("{:.1}", o.lucro_dia))
+                let ops = opcoes_para_provincia(v, pr);
+                buscar_tipo(&ops, tipo).map_or("-".into(), |val| format!("{:.1}", val))
             }).collect();
             println!("DIAG {tipo}: {}", linha.join(" | "));
         }
-        for pr in &provs { println!("DIAG prov {} estado={}", pr.nome, pr.estado_id); }
+
+        let prov_samoa = provs.iter().find(|p| p.estado_id == "usa_american_samoa").copied().expect("samoa");
+        let prov_ohio = provs.iter().find(|p| p.estado_id == "usa_ohio").copied().expect("ohio");
+        let prov_iowa = provs.iter().find(|p| p.estado_id == "usa_iowa").copied().expect("iowa");
+
+        let ops_samoa = opcoes_para_provincia(v, prov_samoa);
+        let ops_ohio = opcoes_para_provincia(v, prov_ohio);
+        let ops_iowa = opcoes_para_provincia(v, prov_iowa);
+
+        let lucro_moveis_samoa = buscar_tipo(&ops_samoa, "fabrica_moveis").expect("lucro moveis samoa");
+        let lucro_moveis_ohio = buscar_tipo(&ops_ohio, "fabrica_moveis").expect("lucro moveis ohio");
+        let lucro_siderurgica_ohio = buscar_tipo(&ops_ohio, "siderurgica").expect("lucro siderurgica ohio");
+        let lucro_trigo_iowa = buscar_tipo(&ops_iowa, "fazenda_trigo").expect("lucro trigo iowa");
+
+        // 1. Fazenda de trigo em Iowa > 0
+        assert!(lucro_trigo_iowa > 0.0, "fazenda de trigo em Iowa deve ser > 0, deu {lucro_trigo_iowa:.1}");
+
+        // 2. Siderúrgica em Ohio > 0
+        assert!(lucro_siderurgica_ohio > 0.0, "siderurgica em Ohio deve ser > 0, deu {lucro_siderurgica_ohio:.1}");
+
+        // 3. Lucro previsto da mesma fábrica deve diferir pelo menos 20% entre Samoa Americana e Ohio
+        let dif_rel = (lucro_moveis_ohio - lucro_moveis_samoa).abs() / lucro_moveis_ohio.abs().max(lucro_moveis_samoa.abs()).max(1.0);
+        assert!(
+            dif_rel >= 0.20,
+            "lucro previsto de fábrica deve diferir pelo menos 20% entre Samoa ({lucro_moveis_samoa:.1}) e Ohio ({lucro_moveis_ohio:.1}), dif={:.1}%",
+            dif_rel * 100.0
+        );
+
+        for pr in &provs {
+            let est = estado_de(v, pr);
+            let desemp: f64 = pr.pops.iter().map(|p| p.desempregados()).sum();
+            println!(
+                "DIAG prov {} estado={} pop={:.0} desemp={:.0} urb={:?} infra={:?}/{:?} pen_infra={:?} acesso={:?} terra={:?}/{:?}",
+                pr.nome,
+                pr.estado_id,
+                pr.populacao_total(),
+                desemp,
+                est.map(|e| e.urbanizacao),
+                est.map(|e| e.infraestrutura_uso),
+                est.map(|e| e.infraestrutura_capacidade),
+                est.map(|e| e.penalidade_infraestrutura),
+                est.map(|e| e.acesso_mercado),
+                est.map(|e| e.terra_aravel_livre()),
+                est.map(|e| e.terra_aravel),
+            );
+        }
     }
 
+    /// Validação da regra do usuário: em Cuba o jogador tem dezenas de opções construíveis.
+    #[test]
+    fn cuba_tem_dezenas_de_opcoes_construiveis() {
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let nucleo = crate::plugins::economia_sim::Nucleo::carregar(&raiz.join("assets/data/economia"), 0).expect("nucleo");
+        let v = nucleo.vista("cub");
+        assert!(!v.provincias.is_empty(), "Cuba deve ter províncias");
+        for prov in &v.provincias {
+            let opcoes = opcoes_para_provincia(&v, prov);
+            let construiveis = opcoes.iter().filter(|o| o.comporta).count();
+            println!("Cuba prov {}: {} construíveis de {} opções totais", prov.nome, construiveis, opcoes.len());
+            assert!(
+                construiveis >= 20,
+                "em Cuba o jogador deve ter dezenas de opções construíveis (deu {construiveis})"
+            );
+        }
+    }
+
+    #[test]
+    fn fechar_reabrir_demolir_ui_e_consequencias() {
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut nucleo = crate::plugins::economia_sim::Nucleo::carregar(&raiz.join("assets/data/economia"), 5).expect("nucleo");
+        let usa = nucleo.id_pais("USA").unwrap();
+        let (prov_id, tipo_id, nivel_ini) = nucleo
+            .mundo
+            .provincias()
+            .iter()
+            .filter(|p| p.pais_id == usa)
+            .find_map(|p| {
+                p.predios
+                    .iter()
+                    .find(|b| b.nivel >= 2 && !b.fechado && b.total_empregados() >= 500.0)
+                    .map(|b| (p.id.clone(), b.tipo_predio_id.clone(), b.nivel))
+            })
+            .expect("prédio grande nos EUA");
+
+        // 1. Fechar via Comando::FecharPredio
+        let msg_fechar = nucleo
+            .aplicar(&usa, Comando::FecharPredio { provincia_id: prov_id.clone(), tipo_id: tipo_id.clone() })
+            .expect("fechar");
+        assert!(msg_fechar.contains("fechado"));
+        assert!(!nucleo.acoes_predio_recentes.is_empty());
+        assert!(nucleo.acoes_predio_recentes[0].trabalhadores_demitidos >= 500.0);
+
+        let v_fechado = nucleo.vista(&usa);
+        let b_fechado = v_fechado
+            .provincias
+            .iter()
+            .find(|p| p.id == prov_id)
+            .unwrap()
+            .predios
+            .iter()
+            .find(|b| b.tipo_predio_id == tipo_id)
+            .unwrap();
+        assert!(b_fechado.fechado);
+        let (rotulo_tend, _, custo_reabrir, reembolso_demolir) = resumo_gestao_predio(&v_fechado, b_fechado);
+        assert!(!rotulo_tend.is_empty() && custo_reabrir > 0.0 && reembolso_demolir > 0.0);
+
+        // 2. Reabrir via Comando::ReabrirPredio
+        let msg_reabrir = nucleo
+            .aplicar(&usa, Comando::ReabrirPredio { provincia_id: prov_id.clone(), tipo_id: tipo_id.clone() })
+            .expect("reabrir");
+        assert!(msg_reabrir.contains("reaberto"));
+
+        // 3. Demolir 1 nível via Comando::DemolirPredio
+        let msg_demolir = nucleo
+            .aplicar(&usa, Comando::DemolirPredio { provincia_id: prov_id.clone(), tipo_id: tipo_id.clone(), niveis: 1 })
+            .expect("demolir");
+        assert!(msg_demolir.contains("demolido"));
+        let b_demolido = nucleo
+            .mundo
+            .obter_provincia(&prov_id)
+            .unwrap()
+            .predios
+            .iter()
+            .find(|b| b.tipo_predio_id == tipo_id)
+            .unwrap();
+        assert_eq!(b_demolido.nivel, nivel_ini - 1);
+    }
 }
