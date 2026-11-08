@@ -179,6 +179,7 @@ fn avancar_tecnologia(
     mut t: ResMut<TecnologiaSim>,
     mut eco: ResMut<EconomiaSim>,
     jogador: Option<Res<PaisJogador>>,
+    op: Option<Res<super::smoke::OpcoesCli>>,
 ) {
     if let Some(j) = jogador {
         let tag = tag_economica(&j.0);
@@ -187,6 +188,7 @@ fn avancar_tecnologia(
             t.sujo = true;
         }
     }
+    let eh_espectador = op.as_ref().is_some_and(|o| o.espectador_ativo());
     let t = &mut *t;
     for ev in leitor.read() {
         if ev.total_ticks.abs_diff(t.ultimo_refresh) >= INTERVALO_ENTRADAS || t.ultimo_refresh == u64::MAX {
@@ -202,7 +204,7 @@ fn avancar_tecnologia(
         for tag in tags {
             let e = t.entrada(&tag);
             let eh_jogador = t.tag_jogador.as_deref() == Some(tag.as_str());
-            if !eh_jogador {
+            if !eh_jogador || eh_espectador {
                 t.mundo.escolher_ia(&tag, ano, &e);
             }
             if let Some(feita) = t.mundo.tick_pais(&tag, ano, &e) {

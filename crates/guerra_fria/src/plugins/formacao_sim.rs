@@ -187,7 +187,12 @@ fn aviso_formacao(
     mut form: ResMut<FormacaoSim>,
     mut relogio: ResMut<RecursoRelogio>,
     ev: Res<EstadoEv>,
+    op: Option<Res<super::smoke::OpcoesCli>>,
 ) -> Result {
+    if op.as_ref().is_some_and(|o| o.espectador_ativo()) {
+        form.avisos.clear();
+        return Ok(());
+    }
     // Eventos urgentes têm prioridade absoluta; este aviso permanece na fila.
     if !ev.estado.pendentes.is_empty() {
         return Ok(());

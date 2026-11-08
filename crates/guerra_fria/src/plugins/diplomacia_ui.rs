@@ -97,17 +97,119 @@ fn alternar(teclas: Res<ButtonInput<KeyCode>>, mut p: ResMut<PainelDiplomacia>) 
 fn tick_diplomacia(
     mut eventos: MessageReader<EventoTickDiario>,
     mut d: Option<ResMut<DiploSim>>,
+    mut eco: Option<ResMut<EconomiaSim>>,
+    mut ev: Option<ResMut<super::eventos_ui::EstadoEv>>,
     jogador: Res<PaisJogador>,
+    opcoes: Option<Res<super::smoke::OpcoesCli>>,
     mut painel: ResMut<PainelDiplomacia>,
 ) {
     let Some(d) = d.as_deref_mut() else { return };
     let jog = normalizar(&jogador.0);
+    let eh_espectador = opcoes.as_ref().is_some_and(|o| o.espectador_ativo());
+    let jog_arg = if eh_espectador { None } else { Some(jog.as_str()) };
     for e in eventos.read() {
-        d.0.tick_dia(e.nova_data.ano, e.nova_data.mes, e.nova_data.dia, Some(&jog));
+        let hoje = (e.nova_data.ano, e.nova_data.mes, e.nova_data.dia);
+        d.0.tick_dia(hoje.0, hoje.1, hoje.2, jog_arg);
+        if eh_espectador {
+            if hoje.2 == 1 {
+                let t = d.0.tesouro_ia.entry(jog.clone()).or_insert(500.0);
+                *t = (*t + 60.0).min(1500.0);
+            }
+            if hoje.2 == 15 {
+                ia_diplomatica_jogador(&mut d.0, &jog, hoje, eco.as_deref_mut(), ev.as_deref_mut());
+            }
+        }
         painel.dias_desde_pintura += 1;
+    }
+    if d.0.log.len() > 300 {
+        d.0.log.drain(..150);
     }
     if painel.mapa_esferas && painel.dias_desde_pintura >= 30 {
         painel.repintar = true;
+    }
+}
+
+pub(crate) fn ia_diplomatica_jogador(
+    d: &mut Diplomacia,
+    eu: &str,
+    hoje: (i32, u8, u8),
+    eco: Option<&mut EconomiaSim>,
+    ev: Option<&mut super::eventos_ui::EstadoEv>,
+) {
+    if d.pontos.get(eu).copied().unwrap_or(0.0) < 15.0 {
+        return;
+    }
+    let tes = d.tesouro_ia.get(eu).copied().unwrap_or(500.0);
+    let minha_esfera = d.esfera(eu);
+    let parceiros_prioritarios = ["USA", "ARG", "GBR", "FRA", "MEX", "CHL", "COL", "POR", "ITA", "FRG", "GER", "CAN", "VEN", "URY", "JAP", "SOV", "IND", "CHN"];
+    let mut candidatos: Vec<String> = d
+        .paises
+        .iter()
+        .map(|p| p.tag.clone())
+        .filter(|t| t != eu)
+        .collect();
+    if candidatos.is_empty() {
+        return;
+    }
+    let rotacao = ((hoje.0 as usize).wrapping_mul(12) + hoje.1 as usize) % candidatos.len();
+    candidatos.rotate_left(rotacao);
+    candidatos.sort_by_key(|alvo| {
+        let prio = if parceiros_prioritarios.contains(&alvo.as_str()) { 0 } else { 1 };
+        let mesma_esfera = if d.esfera(alvo) == minha_esfera { 0 } else { 1 };
+        (prio, mesma_esfera)
+    });
+    // Rotaciona entre os melhores parceiros a cada mês para diversificar tratados ao longo das décadas.
+    let topo = candidatos.len().min(12);
+    if topo > 1 {
+        let r = ((hoje.0 as usize).wrapping_mul(12) + hoje.1 as usize) % topo;
+        candidatos[..topo].rotate_left(r);
+    }
+
+    let seq = [
+        Acao::AcordoComercial,
+        Acao::PactoDefesa,
+        Acao::Alianca,
+        Acao::MelhorarRelacoes,
+        Acao::AjudaEconomica,
+    ];
+    for alvo in &candidatos {
+        for acao in seq {
+            if d.pode(eu, alvo, acao, tes).is_err() {
+                continue;
+            }
+            if d.aceitacao(eu, alvo, acao).is_some_and(|a| a < 0.0) {
+                continue;
+            }
+            if let Ok(r) = d.executar(eu, alvo, acao, tes) {
+                if r.custo_tesouro > 0.0 {
+                    *d.tesouro_ia.entry(eu.into()).or_insert(500.0) -= r.custo_tesouro;
+                }
+                d.log.push(format!(
+                    "Diplomacia {eu} -> {alvo}: {} ({})",
+                    acao.nome(),
+                    if r.aceita { "aceita" } else { "recusada" }
+                ));
+                if r.acordo_comercial
+                    && let Some(eco) = eco
+                    && let Some(id) = eco.id_pais(&tag_diplo_para_legado(alvo))
+                {
+                    eco.enviar(Comando::AssinarAcordo(id));
+                }
+                if r.aceita
+                    && matches!(acao, Acao::AcordoComercial | Acao::PactoDefesa | Acao::Alianca)
+                    && let Some(ev) = ev
+                {
+                    ev.estado.jornal.push(eventos::Noticia {
+                        data: hoje,
+                        texto: format!("Diplomacia: {eu} firma {} com {alvo}.", acao.nome()),
+                    });
+                    if ev.estado.jornal.len() > 200 {
+                        ev.estado.jornal.remove(0);
+                    }
+                }
+                return;
+            }
+        }
     }
 }
 
