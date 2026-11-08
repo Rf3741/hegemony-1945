@@ -240,11 +240,12 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
                 .color(ui_refinada::menu::TINTA),
         );
         ui.separator();
+        let val_txt = |t: String| egui::RichText::new(t).strong().color(ui_refinada::menu::TINTA);
         match (&eco.vista.pais, eco.vista.pais_id.is_empty()) {
             (Some(pe), false) => {
                 let o = &pe.orcamento;
                 ui.label(egui::RichText::new("Tesouro").small().color(suave));
-                dica_com(ui.strong(fmt_din(o.tesouro)), "tooltip_topbar_tesouro", |ui| {
+                dica_com(ui.label(val_txt(fmt_din(o.tesouro))), "tooltip_topbar_tesouro", |ui| {
                     ui.label(format!("Tesouro atual: {} | Dívida: {} | Saldo/dia: {}", fmt_din(o.tesouro), fmt_din(o.divida), fmt_din(o.saldo_diario)));
                 });
                 ui.label(egui::RichText::new("Saldo/dia").small().color(suave));
@@ -253,30 +254,30 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
                     ui.label(format!("Saldo diário atual: {} (por ano: {})", fmt_din(o.saldo_diario), fmt_din(o.saldo_diario * 365.0)));
                 });
                 ui.label(egui::RichText::new("Dívida").small().color(suave));
-                dica_conceito(ui.strong(fmt_din(o.divida)), "divida_publica");
+                dica_conceito(ui.label(val_txt(fmt_din(o.divida))), "divida_publica");
                 ui.separator();
                 ui.label(egui::RichText::new("PIB").small().color(suave));
-                dica_conceito(ui.strong(fmt_din(eco.vista.pib_anual)), "produtividade_do_trabalho");
+                dica_conceito(ui.label(val_txt(fmt_din(eco.vista.pib_anual))), "produtividade_do_trabalho");
                 ui.label(egui::RichText::new("Pop.").small().color(suave));
-                dica_conceito(ui.strong(fmt_pop(eco.vista.populacao as u64)), "pop");
+                dica_conceito(ui.label(val_txt(fmt_pop(eco.vista.populacao as u64))), "pop");
                 ui.label(egui::RichText::new("Padrão de vida").small().color(suave));
-                dica_conceito(ui.strong(format!("{:.1}", eco.vista.padrao_vida)), "padrao_de_vida");
+                dica_conceito(ui.label(val_txt(format!("{:.1}", eco.vista.padrao_vida))), "padrao_de_vida");
                 ui.label(egui::RichText::new("Desemprego").small().color(suave));
-                dica_conceito(ui.strong(format!("{:.1}%", eco.vista.desemprego * 100.0)), "estrato_social");
+                dica_conceito(ui.label(val_txt(format!("{:.1}%", eco.vista.desemprego * 100.0))), "estrato_social");
                 if o.em_calote {
                     ui.colored_label(ui_refinada::menu::PERIGO, egui::RichText::new("CALOTE").strong());
                 }
             }
             _ => {
                 ui.label(egui::RichText::new("PIB").small().color(suave));
-                ui.strong(fmt_din(p.pib_anual_estimado));
+                ui.label(val_txt(fmt_din(p.pib_anual_estimado)));
                 ui.label(egui::RichText::new("Pop.").small().color(suave));
-                ui.strong(fmt_pop(p.populacao_total()));
+                ui.label(val_txt(fmt_pop(p.populacao_total())));
                 ui.label(egui::RichText::new("(economia detalhada indisponível)").italics().color(suave));
             }
         }
         ui.label(egui::RichText::new("Legitimidade").small().color(suave));
-        dica_com(ui.strong(format!("{:.0}%", p.politica.legitimidade)), "tooltip_topbar_legitimidade", |ui| {
+        dica_com(ui.label(val_txt(format!("{:.0}%", p.politica.legitimidade))), "tooltip_topbar_legitimidade", |ui| {
             ui.label(format!("Legitimidade atual: {:.1}%", p.politica.legitimidade));
         });
         if eco.atraso_dias() > 10 || eco.dias_perdidos > 0 {
@@ -1268,7 +1269,7 @@ pub fn aba_construcao(
                                 if !item.justificativa.is_empty() {
                                     ui.label(&item.justificativa);
                                 } else if item.retorno_esperado > 0.0 {
-                                    ui.label(format!("+£{:.0}/dia", item.retorno_esperado));
+                                    ui.label(format!("+${:.0}/dia", item.retorno_esperado));
                                 } else {
                                     ui.label("Lucrativo");
                                 }

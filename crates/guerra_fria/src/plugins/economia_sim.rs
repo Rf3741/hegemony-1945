@@ -207,7 +207,7 @@ impl Nucleo {
             Comando::ReabrirPredio { provincia_id, tipo_id } => {
                 let res = self.mundo.reabrir_predio(pais_id, &provincia_id, &tipo_id, false).map_err(|e| e.to_string())?;
                 let msg = format!(
-                    "{} reaberto em {} (custo £{:.0}; retomada em {}d).",
+                    "{} reaberto em {} (custo ${:.0}; retomada em {}d).",
                     res.tipo_predio_nome,
                     res.provincia_nome,
                     res.valor_monetario,
@@ -220,7 +220,7 @@ impl Nucleo {
                 let res = self.mundo.demolir_predio(pais_id, &provincia_id, &tipo_id, niveis, false).map_err(|e| e.to_string())?;
                 let removidos = niveis.max(1);
                 let msg = format!(
-                    "{} demolido (-{removidos} nv) em {} (reembolso +£{:.0}).",
+                    "{} demolido (-{removidos} nv) em {} (reembolso +${:.0}).",
                     res.tipo_predio_nome, res.provincia_nome, res.valor_monetario
                 );
                 self.acoes_predio_recentes.push(res);
@@ -1025,7 +1025,7 @@ pub fn processar_consequencias_e_alertas_economia(
                 .map_or(b.tipo_predio_id.as_str(), |t| t.nome.as_str());
             let titulo = format!("Prejuízo persistente: {} em {}", nome_tipo, prov.nome);
             let texto = format!(
-                "{} (Nv. {}) em {} opera no vermelho há {} dias (saldo diário £{:.0}). Considere fechar temporariamente ou demolir níveis excedentes.",
+                "{} (Nv. {}) em {} opera no vermelho há {} dias (saldo diário ${:.0}). Considere fechar temporariamente ou demolir níveis excedentes.",
                 nome_tipo, b.nivel, prov.nome, b.dias_prejuizo, b.lucro_ultimo_tick
             );
             novos_alertas_jornal.push((titulo, texto));
@@ -1056,7 +1056,7 @@ pub fn processar_consequencias_e_alertas_economia(
                 bem.var30_nacional * 100.0
             );
             let texto = format!(
-                "A cotação de {} recuou {:+.1}% nos últimos 30 dias (preço atual £{:.1} vs base £{:.1}), pressionando a rentabilidade dos produtores.",
+                "A cotação de {} recuou {:+.1}% nos últimos 30 dias (preço atual ${:.1} vs base ${:.1}), pressionando a rentabilidade dos produtores.",
                 bem.nome,
                 bem.var30_nacional * 100.0,
                 bem.preco_nacional,

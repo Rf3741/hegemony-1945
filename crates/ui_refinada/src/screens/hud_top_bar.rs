@@ -164,7 +164,7 @@ pub fn render_top_bar(
         // ---------------------------------------------------------------------
         // 4. Legitimidade, Estabilidade & Tensão DEFCON
         // ---------------------------------------------------------------------
-        let legit_label = ui.label(format!("Legit: {:.0}%", vm.legitimidade_pct));
+        let legit_label = ui.label(RichText::new(format!("Legit: {:.0}%", vm.legitimidade_pct)).strong().color(texto::PRIMARIO));
         legit_label.on_hover_ui(|ui| {
             render_decomposicao_tooltip(
                 ui,
