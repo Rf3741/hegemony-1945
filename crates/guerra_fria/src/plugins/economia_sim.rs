@@ -56,6 +56,7 @@ pub struct Nucleo {
     /// IA dos países (impostos e obras) e id do país do jogador, que ela não toca.
     pub ia: ia_paises::IaEconomia,
     pub jogador: Option<String>,
+    pub jogador_eh_ia: bool,
 }
 
 /// Ação do jogador sobre a economia (aplicada pela thread antes do próximo lote).
@@ -123,7 +124,7 @@ impl Nucleo {
             .iter()
             .filter_map(|p| p.tag.clone().map(|t| (t, p.id.clone())))
             .collect();
-        Ok(Self { mundo, global, catalogo, tags, ia: ia_paises::IaEconomia::novo(), jogador: None })
+        Ok(Self { mundo, global, catalogo, tags, ia: ia_paises::IaEconomia::novo(), jogador: None, jogador_eh_ia: false })
     }
 
     /// Id econômico do país a partir da tag do legado.
@@ -143,7 +144,11 @@ impl Nucleo {
         for _ in 0..dias {
             let rel = self.mundo.executar_tick_diario();
             obras += rel.obras_concluidas;
-            let ignorar: Vec<String> = self.jogador.iter().cloned().collect();
+            let ignorar: Vec<String> = if self.jogador_eh_ia {
+                Vec::new()
+            } else {
+                self.jogador.iter().cloned().collect()
+            };
             self.ia.passo_diario(&mut self.mundo, &ignorar);
             self.mundo.atualizar_mercado_global(&mut self.global);
         }
@@ -637,6 +642,7 @@ pub struct EconomiaSim {
     tags: BTreeMap<String, String>,
     pub obras_novas_lote: usize,
     pub versao_construcao: u64,
+    pub jogador_eh_ia: bool,
 }
 
 impl EconomiaSim {
@@ -769,6 +775,7 @@ fn aguardar_economia(mut commands: Commands, carga: Option<ResMut<CargaEconomia>
                 tags,
                 obras_novas_lote: 0,
                 versao_construcao: 0,
+                jogador_eh_ia: false,
             });
         }
         Err(e) => error!("falha ao carregar a economia: {e}"),
@@ -824,7 +831,9 @@ fn despachar_interno(eco: &mut EconomiaSim) {
     let ganhos = std::mem::take(&mut eco.ganhos_tec);
     let pais = eco.pais_id.clone();
     let mut nucleo = eco.nucleo.take().expect("núcleo presente");
+    let jogador_eh_ia = eco.jogador_eh_ia;
     eco.tarefa = Some(AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move {
+        nucleo.jogador_eh_ia = jogador_eh_ia;
         for (id, g) in ganhos {
             nucleo.mundo.aplicar_ganho_produtividade(&id, g);
         }
@@ -837,7 +846,10 @@ pub fn conduzir_economia_recolher(mut eco: ResMut<EconomiaSim>) {
     recolher_interno(&mut *eco);
 }
 
-pub fn conduzir_economia_despachar(mut eco: ResMut<EconomiaSim>) {
+pub fn conduzir_economia_despachar(mut eco: ResMut<EconomiaSim>, op: Option<Res<super::smoke::OpcoesCli>>) {
+    if let Some(op) = op {
+        eco.jogador_eh_ia = op.espectador_ativo();
+    }
     despachar_interno(&mut *eco);
 }
 

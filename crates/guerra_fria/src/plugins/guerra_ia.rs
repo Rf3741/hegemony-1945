@@ -107,13 +107,22 @@ fn tick_ia_guerra(
     dados: Option<Res<DadosGuerra>>,
     mundo: Res<RecursoMundo>,
     jogador: Res<PaisJogador>,
+    op: Option<Res<super::smoke::OpcoesCli>>,
     mut ev: Option<ResMut<EstadoEv>>,
     mut notificacoes: Option<ResMut<Notificacoes>>,
 ) {
-    let n = leitor.read().count();
+    let mut houve_dia_1 = false;
+    let mut n = 0usize;
+    for tick in leitor.read() {
+        n += 1;
+        if tick.nova_data.dia == 1 {
+            houve_dia_1 = true;
+        }
+    }
     if n == 0 {
         return;
     }
+    let eh_espectador = op.as_ref().is_some_and(|o| o.espectador_ativo());
     let eu = normalizar_tag(&jogador.0);
     let data = (mundo.0.data.ano as i64, mundo.0.data.mes as i64, mundo.0.data.dia as i64);
     let mut avisos: Vec<String> = Vec::new();
@@ -159,7 +168,7 @@ fn tick_ia_guerra(
     ia.dias += n as u32;
 
     // 2. IA declara guerra: tensão alta e rivalidade entre blocos opostos (1o dia de cada mês).
-    if mundo.0.data.dia == 1 && diplo.0.tensao >= 55.0 {
+    if (mundo.0.data.dia == 1 || houve_dia_1) && diplo.0.tensao >= 55.0 {
         let ano_mes = (mundo.0.data.ano as u32).wrapping_mul(12) + mundo.0.data.mes as u32;
         let rivais: Vec<(String, String)> = diplo
             .0
@@ -167,7 +176,7 @@ fn tick_ia_guerra(
             .iter()
             .filter(|p| p.tipo == TipoPacto::Rivalidade)
             .map(|p| (normalizar_tag(&p.a), normalizar_tag(&p.b)))
-            .filter(|(a, b)| *a != eu && *b != eu && existe(&g, a) && existe(&g, b) && !em_guerra_com(&g, a, b))
+            .filter(|(a, b)| (eh_espectador || (*a != eu && *b != eu)) && existe(&g, a) && existe(&g, b) && !em_guerra_com(&g, a, b))
             .collect();
         if !rivais.is_empty() {
             let (a, b) = rivais[(ano_mes as usize * 7919) % rivais.len()].clone();
@@ -191,7 +200,7 @@ fn tick_ia_guerra(
             // Postura e alvo dos exércitos controlados pela IA.
             let regs: Vec<_> = g.0.regioes().iter().map(|r| (r.adm1_code.clone(), r.dono_tag.clone(), r.controlador_tag.clone(), r.pontos_vitoria)).collect();
             for e in g.0.exercitos_mut() {
-                if e.pais_tag == eu || !(w.eh_atacante(&e.pais_tag) || w.eh_defensor(&e.pais_tag)) {
+                if (!eh_espectador && e.pais_tag == eu) || !(w.eh_atacante(&e.pais_tag) || w.eh_defensor(&e.pais_tag)) {
                     continue;
                 }
                 let score = if w.eh_atacante(&e.pais_tag) { w.pontuacao_guerra } else { -w.pontuacao_guerra };
@@ -221,7 +230,7 @@ fn tick_ia_guerra(
             }
             let (vencedores, perdedores) = if def_perde { (&w.atacantes, &w.defensores) } else { (&w.defensores, &w.atacantes) };
             // A IA só decide quando o perdedor não é o jogador; se o vencedor é o jogador, a paz é dele.
-            if perdedores.contains(&eu) || vencedores.contains(&eu) {
+            if !eh_espectador && (perdedores.contains(&eu) || vencedores.contains(&eu)) {
                 continue;
             }
             let Some(prop) = vencedores.first().cloned() else { continue };

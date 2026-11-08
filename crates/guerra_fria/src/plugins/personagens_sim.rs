@@ -107,6 +107,7 @@ fn avancar(
     mut pol: ResMut<PoliticaSim>,
     jogador: Option<Res<PaisJogador>>,
     mut notas: ResMut<Notificacoes>,
+    mut ev_jornal: Option<ResMut<super::eventos_ui::EstadoEv>>,
     tempo: Res<Time<Real>>,
 ) {
     if !el.sincronizado {
@@ -129,6 +130,12 @@ fn avancar(
             if relevante && (meu.as_deref() == Some(pais.as_str()) || matches!(&ev, EventoPersonagem::Sucessao { papel: Papel::Estado, .. })) {
                 el.historico.push(format!("{:02}/{:02}/{}: {texto}", hoje.2, hoje.1, hoje.0));
                 if meu.as_deref() == Some(pais.as_str()) {
+                    if let Some(j) = ev_jornal.as_deref_mut() {
+                        j.estado.jornal.push(eventos::Noticia { data: hoje, texto: texto.clone() });
+                        if j.estado.jornal.len() > 200 {
+                            j.estado.jornal.remove(0);
+                        }
+                    }
                     notas.push(texto, tempo.elapsed_secs_f64());
                 }
             }

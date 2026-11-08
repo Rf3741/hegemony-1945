@@ -135,6 +135,38 @@ fn hash_texto(s: &str) -> u64 {
 const PRENOMES: [&str; 12] = ["Antonio", "Carlos", "Henri", "Johann", "Mikhail", "Ahmed", "Pedro", "Hans", "Giorgio", "Ivan", "Tomas", "Jorge"];
 const SOBRENOMES: [&str; 12] = ["Almeida", "Moreau", "Keller", "Petrov", "Haddad", "Rossi", "Santos", "Novak", "Larsen", "Duarte", "Ferreira", "Costa"];
 
+const PRENOMES_LUSO: [&str; 12] = ["Antônio", "Carlos", "João", "Paulo", "Roberto", "Fernando", "Marcos", "Eduardo", "Luís", "José", "Helena", "Marina"];
+const SOBRENOMES_LUSO: [&str; 12] = ["Almeida", "Santos", "Oliveira", "Pereira", "Lima", "Ferreira", "Costa", "Ribeiro", "Carvalho", "Gomes", "Barbosa", "Duarte"];
+
+const PRENOMES_HISP: [&str; 12] = ["Carlos", "Alejandro", "Javier", "Miguel", "Fernando", "Ricardo", "Jorge", "Rafael", "Martín", "Andrés", "Elena", "Sofía"];
+const SOBRENOMES_HISP: [&str; 12] = ["García", "Fernández", "López", "Martínez", "Rodríguez", "Gómez", "Sánchez", "Herrera", "Morales", "Vargas", "Castro", "Mendoza"];
+
+const PRENOMES_ANGLO: [&str; 12] = ["Arthur", "Edward", "Robert", "William", "Thomas", "Richard", "Charles", "Henry", "George", "James", "Margaret", "Elizabeth"];
+const SOBRENOMES_ANGLO: [&str; 12] = ["Carter", "Bennett", "Warren", "Morgan", "Campbell", "Stewart", "Fletcher", "Hamilton", "Wallace", "Russell", "Brooks", "Palmer"];
+
+const PRENOMES_ESLAVO: [&str; 12] = ["Mikhail", "Nikolai", "Viktor", "Sergei", "Andrei", "Pavel", "Boris", "Yuri", "Vladimir", "Aleksei", "Dmitri", "Ivan"];
+const SOBRENOMES_ESLAVO: [&str; 12] = ["Petrov", "Sokolov", "Morozov", "Volkov", "Novikov", "Kuznetsov", "Popov", "Lebedev", "Kozlov", "Orlov", "Kowalski", "Novak"];
+
+const PRENOMES_FRANCO: [&str; 12] = ["Henri", "Pierre", "Jean", "Jacques", "François", "Michel", "Philippe", "Laurent", "Claude", "René", "Claire", "Hélène"];
+const SOBRENOMES_FRANCO: [&str; 12] = ["Moreau", "Laurent", "Lefebvre", "Mercier", "Dupont", "Lambert", "Bonnet", "Rousseau", "Garnier", "Faure", "Blanc", "Chevalier"];
+
+const PRENOMES_GERM: [&str; 12] = ["Johann", "Hans", "Karl", "Friedrich", "Heinrich", "Werner", "Helmut", "Konrad", "Dieter", "Klaus", "Ursula", "Ingrid"];
+const SOBRENOMES_GERM: [&str; 12] = ["Keller", "Wagner", "Becker", "Hoffmann", "Schäfer", "Bauer", "Richter", "Klein", "Wolf", "Schröder", "Neumann", "Braun"];
+
+fn nomes_culturais(pais: &str) -> (&'static [&'static str], &'static [&'static str]) {
+    match pais {
+        "BRA" | "POR" | "PRT" | "AGO" | "MOZ" | "GNB" | "CPV" | "STP" => (&PRENOMES_LUSO, &SOBRENOMES_LUSO),
+        "ARG" | "MEX" | "CHL" | "COL" | "PER" | "VEN" | "URY" | "PRY" | "BOL" | "ECU" | "CUB" | "DOM" | "GTM" | "HND" | "SLV" | "NIC" | "CRI" | "PAN" | "ESP" => {
+            (&PRENOMES_HISP, &SOBRENOMES_HISP)
+        }
+        "USA" | "GBR" | "CAN" | "AST" | "AUS" | "NZL" | "IRE" | "ZAF" => (&PRENOMES_ANGLO, &SOBRENOMES_ANGLO),
+        "SOV" | "RUS" | "POL" | "CZE" | "YUG" | "BUL" | "BGR" | "ROM" | "UKR" | "BLR" => (&PRENOMES_ESLAVO, &SOBRENOMES_ESLAVO),
+        "FRA" | "BEL" | "CHE" | "LUX" => (&PRENOMES_FRANCO, &SOBRENOMES_FRANCO),
+        "GER" | "FRG" | "GDR" | "AUT" | "NLD" => (&PRENOMES_GERM, &SOBRENOMES_GERM),
+        _ => (&PRENOMES, &SOBRENOMES),
+    }
+}
+
 impl Elenco {
     /// Carrega `personagens.ron`, `stubs_lideres.ron`, `tracos.ron` e `transicoes.ron` de `dir`.
     pub fn carregar(dir: &Path, inicio: Data) -> Result<Self, ErroCarga> {
@@ -285,7 +317,10 @@ impl Elenco {
 
     fn morre_hoje(&self, p: &Personagem, hoje: Data) -> bool {
         if let Some(m) = p.morte.as_deref().and_then(parse_data) {
-            return m == hoje;
+            return hoje >= m;
+        }
+        if p.idade(hoje) >= 100 {
+            return true;
         }
         let h = mistura(self.semente ^ hash_texto(&p.id) ^ ((hoje.0 as u64) << 16 | (hoje.1 as u64) << 8 | hoje.2 as u64));
         ((h >> 11) as f64 / (1u64 << 53) as f64) < Self::risco_diario(p.idade(hoje))
@@ -309,7 +344,7 @@ impl Elenco {
             .values()
             .filter(|p| p.pais == pais && self.vivo(&p.id) && Some(p.id.as_str()) != excluir)
             .filter(|p| parse_data(&p.data_entrada).is_some_and(|d| d <= hoje))
-            .filter(|p| p.nascimento.as_str() < "1930" && p.idade(hoje) >= 30)
+            .filter(|p| (30..=85).contains(&p.idade(hoje)))
             .min_by_key(|p| (Self::afinidade(&p.cargo_inicial, papel), p.id.clone()))
             .map(|p| p.id.clone())
     }
@@ -317,7 +352,12 @@ impl Elenco {
     fn gerar_sucessor(&mut self, pais: &str, anterior: Option<&str>, hoje: Data) -> String {
         let id = format!("sucessor_{}_{}_{}", pais.to_lowercase(), hoje.0, self.pers.len());
         let h = mistura(hash_texto(&id));
-        let nome = format!("{} {}", PRENOMES[(h % 12) as usize], SOBRENOMES[((h >> 8) % 12) as usize]);
+        let (prenomes, sobrenomes) = nomes_culturais(pais);
+        let nome = format!(
+            "{} {}",
+            prenomes[(h as usize) % prenomes.len()],
+            sobrenomes[((h >> 8) as usize) % sobrenomes.len()]
+        );
         let ant = anterior.and_then(|a| self.pers.get(a)).cloned();
         let ids: Vec<&String> = self.tracos.keys().collect();
         let mut tracos: Vec<String> = Vec::new();
@@ -504,5 +544,46 @@ mod testes {
         let _ = e.efeitos_pais("USA");
         let a = e.ajuste_legitimidade("USA");
         assert!((-8.0..=8.0).contains(&a));
+    }
+
+    #[test]
+    fn simula_100_anos_ate_2045_nomes_e_idades_coerentes() {
+        let mut e = elenco();
+        let mut d = (1945, 1, 1);
+        while d < (2045, 1, 1) {
+            e.avancar_dia(d);
+            if d.1 == 1 && d.2 == 1 {
+                for p in e.paises() {
+                    for c in [Papel::Estado, Papel::Governo] {
+                        let l = e.lider(p, c).unwrap_or_else(|| panic!("{p} sem {c:?} em {d:?}"));
+                        assert!(e.vivo(&l.id), "{p} {c:?} morto {} em {d:?}", l.id);
+                        let idade = l.idade(d);
+                        assert!(
+                            (15..=106).contains(&idade),
+                            "{p} com líder {} de idade incoerente {idade} em {d:?}",
+                            l.nome
+                        );
+                    }
+                }
+            }
+            d = proximo(d);
+        }
+        let lider_bra = e.lider("BRA", Papel::Estado).expect("chefe do Brasil em 2045");
+        assert!(e.vivo(&lider_bra.id));
+        assert!((30..=105).contains(&lider_bra.idade((2045, 1, 1))));
+        let partes: Vec<&str> = lider_bra.nome.split_whitespace().collect();
+        assert_eq!(partes.len(), 2, "nome gerado esperado para BRA em 2045: {}", lider_bra.nome);
+        assert!(
+            PRENOMES_LUSO.contains(&partes[0]),
+            "prenome lusófono esperado para BRA em 2045, veio: {}",
+            lider_bra.nome
+        );
+        assert!(
+            SOBRENOMES_LUSO.contains(&partes[1]),
+            "sobrenome lusófono esperado para BRA em 2045, veio: {}",
+            lider_bra.nome
+        );
+        let aj = e.ajuste_legitimidade("BRA");
+        assert!(aj.is_finite() && (-8.0..=8.0).contains(&aj));
     }
 }

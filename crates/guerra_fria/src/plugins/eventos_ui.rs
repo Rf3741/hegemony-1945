@@ -4,7 +4,7 @@ use super::jogador::PaisJogador;
 use super::time::{EventoTickDiario, RecursoRelogio};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
-use eventos::{CatalogoEventos, EstadoEventos, aplicar_opcao, avaliar_dia, descrever_efeito};
+use eventos::{CatalogoEventos, EstadoEventos, aplicar_opcao, avaliar_dia, descrever_efeito, escolha_ia};
 
 #[derive(Resource)]
 pub struct CatalogoEv(pub CatalogoEventos);
@@ -50,10 +50,43 @@ fn tick_eventos(
     mut ev: ResMut<EstadoEv>,
     mut relogio: ResMut<RecursoRelogio>,
     cfg: Res<super::config::ConfigJogo>,
+    opcoes: Option<Res<super::smoke::OpcoesCli>>,
 ) {
-    if leitor.read().count() > 0 {
-        let est = &mut ev.estado;
-        avaliar_dia(&cat.0, est, &mut mundo.0, &pais.0);
+    let eh_espectador = opcoes.as_ref().is_some_and(|o| o.espectador_ativo());
+    let data_salva = mundo.0.data;
+    let mut houve_tick = false;
+    for tick in leitor.read() {
+        houve_tick = true;
+        mundo.0.data = simulacao::tempo::DataSimulacao::nova(
+            tick.nova_data.ano,
+            tick.nova_data.mes,
+            tick.nova_data.dia,
+        );
+        avaliar_dia(&cat.0, &mut ev.estado, &mut mundo.0, &pais.0);
+        if eh_espectador {
+            let pendentes = std::mem::take(&mut ev.estado.pendentes);
+            for p in pendentes {
+                if let Some(evento) = cat.0.por_id(&p.evento_id) {
+                    let h = (mundo.0.data.ano, mundo.0.data.mes, mundo.0.data.dia);
+                    let k = escolha_ia(evento, h);
+                    aplicar_opcao(&mut mundo.0, &mut ev.estado, evento, k, &p.pais);
+                }
+            }
+        }
+    }
+    if houve_tick {
+        mundo.0.data = data_salva;
+    }
+    if eh_espectador {
+        let pendentes = std::mem::take(&mut ev.estado.pendentes);
+        for p in pendentes {
+            if let Some(evento) = cat.0.por_id(&p.evento_id) {
+                let h = (mundo.0.data.ano, mundo.0.data.mes, mundo.0.data.dia);
+                let k = escolha_ia(evento, h);
+                aplicar_opcao(&mut mundo.0, &mut ev.estado, evento, k, &p.pais);
+            }
+        }
+        return;
     }
     // Enquanto houver decisão pendente o tempo fica parado.
     if !ev.estado.pendentes.is_empty() && cfg.partida.pausar_em_eventos {
@@ -85,7 +118,11 @@ fn popup_evento(
     cfg: Res<super::config::ConfigJogo>,
     elenco: Option<Res<super::personagens_sim::ElencoRes>>,
     mut retratos: Option<ResMut<super::personagens_ui::Retratos>>,
+    opcoes: Option<Res<super::smoke::OpcoesCli>>,
 ) -> Result {
+    if opcoes.as_ref().is_some_and(|o| o.espectador_ativo()) {
+        return Ok(());
+    }
     let Some(pend) = ev.estado.pendentes.first().cloned() else { return Ok(()) };
     let Some(evento) = cat.0.por_id(&pend.evento_id) else {
         ev.estado.pendentes.remove(0);
