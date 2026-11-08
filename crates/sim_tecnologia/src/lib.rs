@@ -208,7 +208,7 @@ impl Default for EntradaPais {
 impl EntradaPais {
     /// Substituto quando nao ha dados de predios: deriva niveis equivalentes do PIB per capita (US$/ano).
     pub fn por_pib_per_capita(pib_pc: f64, alfabetizacao: f64) -> Self {
-        let n = (pib_pc / 400.0).clamp(0.0, 12.0);
+        let n = (pib_pc / 300.0).clamp(0.0, 15.0);
         Self { niveis_universidade: n, alfabetizacao, ..Default::default() }
     }
 }
@@ -323,7 +323,12 @@ impl MundoTec {
     pub fn custo_efetivo(&self, pais: &str, tec: &Tecnologia, ano: i32, e: &EntradaPais) -> f64 {
         let ant = penalidade_antecedencia(ano, tec.ano_historico);
         let dif = self.bonus_difusao(pais, tec, e.acesso_mercado, e.alfabetizacao);
-        tec.custo * (1.0 + ant) * (1.0 - dif)
+        let escala_eco = if e.niveis_universidade > 10.0 {
+            1.0 + (e.niveis_universidade - 10.0) * 0.015
+        } else {
+            1.0
+        };
+        tec.custo * escala_eco * (1.0 + ant) * (1.0 - dif)
     }
 
     /// Define a pesquisa ativa (a anterior volta a fila de progresso parcial).
@@ -413,13 +418,14 @@ impl MundoTec {
         }
     }
 
-    /// IA: escolhe a proxima pesquisa por prioridade simples (mais barata, ramo preferido primeiro).
+    /// IA: escolhe a proxima pesquisa por prioridade balanceada, marcos historicos e corrida espacial.
     pub fn escolher_ia(&mut self, pais: &str, ano: i32, e: &EntradaPais) {
         if self.paises.get(pais).is_none_or(|x| x.ativa.is_some()) {
             return;
         }
         let cat = self.catalogo.clone();
         let militar = self.blocos.grandes_potencias.iter().any(|g| g == pais);
+        let eh_superpotencia = pais == "USA" || pais == "SOV";
         let mut melhor: Option<(f64, &str)> = None;
         for t in &cat.techs {
             if !self.pode_iniciar(pais, t, ano) {
@@ -428,13 +434,46 @@ impl MundoTec {
             let mut custo = self.custo_efetivo(pais, t, ano, e);
             let prog = self.paises[pais].progresso.get(&t.id).copied().unwrap_or(0.0);
             custo *= 1.0 - prog;
-            let peso = match t.ramo {
+
+            // Prioridade temporal: tecnologias historicas do ano certo tem prioridade sobre antecipadas
+            let diff = t.ano_historico - ano;
+            let mult_tempo = if diff > 0 {
+                1.0 + (diff as f64) * 0.75
+            } else {
+                (1.0 - (-diff as f64 * 0.025)).max(0.70)
+            };
+
+            let mut peso = match t.ramo {
                 Ramo::Producao => 0.85,
                 Ramo::Sociedade => 0.95,
                 Ramo::Militar => if militar { 0.9 } else { 1.15 },
                 Ramo::EspacialNuclear => if militar { 0.9 } else { 1.6 },
             };
-            let score = custo * peso;
+
+            // Corrida espacial e nuclear para superpotencias e grandes potencias
+            if (eh_superpotencia || militar) && t.ramo == Ramo::EspacialNuclear {
+                let eh_marco_espacial = matches!(
+                    t.id.as_str(),
+                    "primeiro_satelite_artificial_orbita"
+                        | "voo_espacial_humano_orbital_vostok"
+                        | "missil_balistico_alcance_intermediario_irbm"
+                        | "missil_balistico_intercontinental_icbm"
+                        | "pouso_tripulado_na_lua_apollo"
+                );
+                if eh_marco_espacial && diff <= 1 {
+                    peso *= 0.12;
+                } else if diff <= 0 {
+                    peso *= 0.60;
+                }
+            }
+
+            // Equilibrio de ramos: se um ramo tem menos tecnologias conhecidas no pais, recebe incentivo
+            let conhecidas_no_ramo = self.paises.get(pais).map_or(0, |ep| {
+                ep.conhecidas.iter().filter(|id| cat.obter(id).is_some_and(|k| k.ramo == t.ramo)).count()
+            });
+            let fator_equilibrio = 1.0 + (conhecidas_no_ramo as f64) * 0.04;
+
+            let score = custo * peso * mult_tempo * fator_equilibrio;
             if melhor.is_none_or(|(s, _)| score < s) {
                 melhor = Some((score, &t.id));
             }

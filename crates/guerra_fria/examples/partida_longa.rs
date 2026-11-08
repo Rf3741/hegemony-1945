@@ -317,7 +317,12 @@ fn main() {
                 }
                 for p in eco.paises() {
                     if let (Some(tag), Some((u, pa, pp))) = (&p.tag, por_pais.get(p.id.as_str())) {
-                        entradas.insert(tag.clone(), EntradaPais { niveis_universidade: *u, alfabetizacao: if *pp > 0.0 { pa / pp } else { 0.5 }, ..Default::default() });
+                        let alfa = if *pp > 0.0 { pa / pp } else { 0.5 };
+                        let pib = p.pib_diario * 365.0;
+                        let pib_pc = if *pp > 0.0 { pib / pp } else { 0.0 };
+                        let univ_eco = ((pib / 4.0e10).sqrt() * 2.2 + (pib_pc / 400.0).clamp(0.0, 6.0)) * (0.3 + 0.7 * alfa);
+                        let niveis_univ = (*u).max(univ_eco);
+                        entradas.insert(tag.clone(), EntradaPais { niveis_universidade: niveis_univ, alfabetizacao: alfa, ..Default::default() });
                     }
                 }
             }
