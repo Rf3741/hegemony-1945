@@ -104,6 +104,7 @@ pub enum Comando {
 
 impl Nucleo {
     pub fn aplicar_formacao(&mut self, e: &simulacao::formacao::EventoFormacao) -> Result<(), String> {
+        self.mundo.atualizar_nome_pais(&e.tag, &e.nome);
         if !e.pais_novo {
             return Ok(());
         }

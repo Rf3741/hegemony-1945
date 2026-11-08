@@ -131,7 +131,9 @@ impl MundoEconomico {
             let Some(codigo) = provincia.codigo_externo.as_deref() else { continue };
             let prefixo = codigo.split('-').next().unwrap_or_default();
             let dono_tag = self.paises.get(provincia.pais_idx).and_then(|p| p.tag.as_deref()).unwrap_or_default();
-            if origens.iter().any(|o| o == dono_tag) && adm1.iter().any(|a| a == prefixo) {
+            if origens.iter().any(|o| o == dono_tag)
+                && adm1.iter().any(|a| a == codigo || a == prefixo || codigo.starts_with(a) || a.starts_with(prefixo))
+            {
                 provincias_movidas.push(idx);
             }
         }
@@ -178,6 +180,13 @@ impl MundoEconomico {
         }
         self.reindexar_pos_formacao()?;
         Ok(())
+    }
+
+    /// Atualiza o nome oficial exibido do país (ex.: transição de regime ou independência).
+    pub fn atualizar_nome_pais(&mut self, tag: &str, novo_nome: &str) {
+        if let Some(p) = self.paises.iter_mut().find(|p| p.tag.as_deref() == Some(tag)) {
+            p.nome = novo_nome.to_string();
+        }
     }
 
     fn reindexar_pos_formacao(&mut self) -> ResultadoEconomia<()> {

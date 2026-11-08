@@ -132,6 +132,12 @@ pub const FLAGS_DATADAS: &[(&str, &str, (i32, u8, u8), (i32, u8, u8))] = &[
     // RAU: união Egito e Síria (1 fev 1958 a 28 set 1961)
     ("EGY", "uniao_arabe", (1958, 2, 1), (1961, 9, 28)),
     ("SYR", "uniao_arabe", (1958, 2, 1), (1961, 9, 28)),
+    // Japão: Constituição do Japão (3 mai 1947 em diante, abandono formal de "Império")
+    ("JAP", "jap_constituicao_1947", (1947, 5, 3), (9999, 1, 1)),
+    // Índia: Independência e República (15 ago 1947 em diante)
+    ("IND", "ind_republica", (1947, 8, 15), (9999, 1, 1)),
+    // União Soviética / Rússia: Dissolução da URSS (26 dez 1991 em diante)
+    ("SOV", "rus_federacao", (1991, 12, 26), (9999, 1, 1)),
     // França: Quarta República (27 out 1946 a 3 out 1958) e Quinta República (4 out 1958 em diante)
     ("FRA", "quarta_republica", (1946, 10, 27), (1958, 10, 3)),
     ("FRA", "quinta_republica", (1958, 10, 4), (9999, 1, 1)),
