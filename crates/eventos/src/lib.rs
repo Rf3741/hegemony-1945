@@ -16,7 +16,7 @@ pub use modificadores::{ModificadorAtivo, pertence_a_categoria};
 pub use politicos::{CondicoesEvento, EventoPolitico, OpcaoEventoPolitico};
 
 use serde::{Deserialize, Serialize};
-use simulacao::mundo::MundoJogo;
+use sim_politica::MundoPolitico;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -383,6 +383,36 @@ impl EstadoEventos {
                 },
                 None => self.avisar_uma_vez(&format!("variavel:{nome}")),
             },
+            Condicao::AberturaCortinaDeFerro => {
+                // Abertura da Cortina de Ferro: tensão mundial baixa OU flag de desgelo definida
+                mundo.tensao_mundial < 0.3 || self.tem_flag(alvo, "desgelo_cortina_ferro")
+            }
+            Condicao::AberturaSocialistaEmCurso => {
+                // Abertura socialista em curso: país do bloco soviético com flag de reforma
+                self.tem_flag(alvo, "reforma_socialista")
+                    || (mundo.paises.get(alvo).is_some_and(|p| chave_alinhamento(p.alinhamento_inicial) == "bloco_sovietico")
+                        && self.tem_flag(alvo, "desestalinizacao"))
+            }
+            Condicao::LiderAtivo(id_lider) => {
+                // Líder ativo: verifica flag específica ou assume true para líderes históricos conhecidos
+                self.tem_flag(alvo, &format!("lider_ativo:{id_lider}"))
+                    || matches!(
+                        id_lider.as_str(),
+                        // Líderes que começam ativos em 1945 ou são sucessões históricas certas
+                        "iosif_stalin" | "mao_zedong" | "harry_s_truman" | "clement_attlee" |
+                        "charles_de_gaulle" | "konrad_adenauer" | "shigeru_yoshida" |
+                        "winston_churchill" | "dwight_d_eisenhower" | "john_f_kennedy" |
+                        "nikita_khrushchev" | "leonid_brezhnev" | "fidel_castro" |
+                        "gamal_abdel_nasser" | "jomo_kenyatta" | "kwame_nkrumah" |
+                        "sukarno" | "jawaharlal_nehru" | "getulio_vargas" |
+                        "juan_domingo_peron" | "jacobo_arbenz" | "fulgencio_batista" |
+                        "syngman_rhee" | "kim_il_sung" | "ho_chi_minh" |
+                        "chiang_kai_shek" | "mohammad_mossadegh" | "mohammad_reza_pahlavi" |
+                        "ngo_dinh_diem" | "imre_nagy" | "wladyslaw_gomulka" |
+                        "carlos_castillo_armas" | "josip_broz_tito" | "zhou_enlai" |
+                        "vo_nguyen_giap" | "douglas_macarthur"
+                    )
+            }
             Condicao::Desconhecida(s) => self.avisar_uma_vez(&format!("condicao:{s}")),
         }
     }
@@ -499,7 +529,7 @@ pub fn avaliar_dia_com_contexto(
         if !ev.paises.is_empty() && !ev.paises.iter().any(|p| ctx.mundo.paises.contains_key(p)) {
             continue;
         }
-        if !ev.condicoes.iter().all(|c| est.avaliar(ctx.mundo, &alvo, c)) {
+        if !ev.condicoes.iter().all(|c| est.avaliar(ctx.mundo, ctx.politica.as_deref_mut(), &alvo, c)) {
             continue;
         }
         if ev.chance < 1.0 && rolar(&ev.id, hoje) > ev.chance {

@@ -29,6 +29,12 @@ pub enum Condicao {
     Alinhamento(String),
     /// Variável numérica comparada a um valor (`tensao_guerra_fria >= 40`).
     Compara(String, Op, f32),
+    /// Líder ativo no país (`lider_ativo:winston_churchill`).
+    LiderAtivo(String),
+    /// Abertura da Cortina de Ferro (desgelo nas relações Leste-Oeste).
+    AberturaCortinaDeFerro,
+    /// Abertura socialista em curso (reformas no bloco oriental).
+    AberturaSocialistaEmCurso,
     /// Sem dado no cliente para avaliar: assume verdadeira e avisa no log.
     Desconhecida(String),
 }
@@ -53,6 +59,9 @@ impl Condicao {
                 "legitimidade_min" | "legitimidade_minima" => {
                     v.parse::<f32>().map(Condicao::LegitimidadeMin).unwrap_or_else(|_| Condicao::Desconhecida(s.to_string()))
                 }
+                "abertura_cortina_de_ferro" => Condicao::AberturaCortinaDeFerro,
+                "abertura_socialista_em_curso" => Condicao::AberturaSocialistaEmCurso,
+                "lider_ativo" => Condicao::LiderAtivo(v.to_string()),
                 _ => {
                     if k.starts_with("relacao_min_") {
                         let tag = k.trim_start_matches("relacao_min_");
@@ -86,6 +95,12 @@ impl Condicao {
                 }
                 return Condicao::Compara(a.to_string(), op, n);
             }
+        }
+        if s == "abertura_cortina_de_ferro" {
+            return Condicao::AberturaCortinaDeFerro;
+        }
+        if s == "abertura_socialista_em_curso" {
+            return Condicao::AberturaSocialistaEmCurso;
         }
         Condicao::Desconhecida(s.to_string())
     }

@@ -18,7 +18,7 @@
         paises_alvo: ["USA", "SOV"],
         condicoes: [
             "ano >= 1950",
-            "pos_evento:primeiro_teste_atomico_sovietico_1949",
+            "pos_evento:primeiro_teste_nuclear_sovietico_1949",
             "corrida_armamentista_nuclear >= 0.5",
         ],
         opcoes: [
@@ -581,7 +581,7 @@
         condicoes: [
             "ano >= 1951",
             "lider_ativo:winston_churchill",
-            "tem_lei:republica_parlamentarista",
+            "tem_lei:monarquia_constitucional",
         ],
         opcoes: [
             OpcaoEvento(
@@ -834,10 +834,9 @@
         titulo: "A Insurreição Mau-Mau e a Declaração de Emergência no Quênia",
         descricao: "Após anos de expropriação violenta das férteis 'White Highlands' em benefício de colonos brancos britânicos, camponeses Kikuyu organizam o Exército de Terra e Liberdade (conhecido como Mau-Mau). Diante de juramentos secretos e ataques a fazendas coloniais, o governador britânico declara Estado de Emergência, prende o líder nacionalista Jomo Kenyatta e institui campos de concentração compulsórios.",
         data_gatilho: DataGatilho(ano: 1952, mes: 10, dia: 20),
-        paises_alvo: ["KEN", "GBR"],
+        paises_alvo: ["GBR"],
         condicoes: [
             "ano >= 1952",
-            "tem_lei:dominio_colonial_estrito",
         ],
         opcoes: [
             OpcaoEvento(
@@ -1456,10 +1455,9 @@
         titulo: "A Toussaint Rouge e o Início da Guerra de Independência da Argélia",
         descricao: "Na madrugada de 1º de novembro de 1954 (Dia de Todos os Santos), a recém-fundada Frente de Libertação Nacional (FLN) da Argélia deflagra dezenas de ataques simultâneos contra quartéis, delegacias e postos coloniais franceses nas montanhas de Aurès. Em Paris, o ministro do Interior François Mitterrand declara categoricamente: 'A Argélia é a França, e a única negociação possível é a guerra'.",
         data_gatilho: DataGatilho(ano: 1954, mes: 11, dia: 1),
-        paises_alvo: ["DZA", "FRA"],
+        paises_alvo: ["FRA"],
         condicoes: [
             "ano >= 1954",
-            "tem_lei:dominio_colonial_estrito",
         ],
         opcoes: [
             OpcaoEvento(
