@@ -334,7 +334,9 @@ impl Plugin for SmokePlugin {
             )
             .add_systems(
                 EguiPrimaryContextPass,
-                faixa_modo_espectador.run_if(in_state(AppState::Jogando)),
+                faixa_modo_espectador
+                    .after(crate::plugins::hud_mapas::barra_extra)
+                    .run_if(in_state(AppState::Jogando)),
             );
     }
 }
@@ -608,7 +610,7 @@ fn faixa_modo_espectador(
     egui::Area::new(egui::Id::new("faixa_modo_espectador"))
         .order(egui::Order::Foreground)
         .interactable(false)
-        .anchor(egui::Align2::RIGHT_TOP, [-10.0, 3.0])
+        .anchor(egui::Align2::CENTER_TOP, [0.0, 76.0])
         .show(ctx, |ui| {
             egui::Frame::new()
                 .fill(egui::Color32::from_black_alpha(205))
