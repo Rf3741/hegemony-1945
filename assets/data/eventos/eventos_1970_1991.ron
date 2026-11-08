@@ -725,7 +725,7 @@
         titulo: "O Golpe Cívico-Militar no Uruguai e a Dissolução das Câmaras",
         descricao: "Em 27 de junho de 1973, o presidente Juan María Bordaberry, com apoio das forças armadas uruguaias, dissolve o Senado e a Câmara de Representantes por decreto e institui um Conselho de Estado subserviente aos quartéis. O golpe encerra a tradicional democracia exemplar da 'Suíça da América', instaurando uma ditadura militar marcada por prisões em massa, tortura sistemática de opositores tupamaros e censura férrea.",
         data_gatilho: DataGatilho(ano: 1973, mes: 6, dia: 27),
-        paises_alvo: ["URU"],
+        paises_alvo: ["URY"],
         condicoes: ["tensao_autoritaria_cone_sul"],
         opcoes: [
             OpcaoEvento(
@@ -877,7 +877,7 @@
         titulo: "O Levante da Politécnica de Atenas e a Crise da Ditadura Grega",
         descricao: "Em novembro de 1973, estudantes da Universidade Politécnica de Atenas ocupam o campus em protesto contra a 'Ditadura dos Coronéis', transmitindo mensagens clandestinas de rádio com o slogan 'Pão, Educação, Liberdade!'. Na madrugada de 17 de novembro, um tanque blindado AMX-30 derruba os portões da universidade, e soldados e franco-atiradores massacram dezenas de estudantes, fraturando o regime militar que culmina na derrubada de Papadopoulos pelo brigadeiro Ioannidis.",
         data_gatilho: DataGatilho(ano: 1973, mes: 11, dia: 14),
-        paises_alvo: ["GRE"],
+        paises_alvo: ["GRC"],
         condicoes: ["regime_militar"],
         opcoes: [
             OpcaoEvento(
@@ -989,7 +989,7 @@
         titulo: "A Invasão Turca de Chipre e o Colapso da Ditadura dos Coronéis",
         descricao: "Em julho de 1974, a junta militar grega instiga um golpe de Estado em Chipre contra o Arcebispo Makarios com o objetivo de anexar a ilha à Grécia (Enosis). Em resposta, a Turquia lança a invasão anfíbia 'Operação Átila', ocupando o terço norte de Chipre para proteger a minoria turco-cipriota. O fracasso militar catastrófico e a iminência de guerra total entre dois membros da OTAN provocam o desmoronamento fulminante da junta em Atenas e o retorno do civil Konstantinos Karamanlis.",
         data_gatilho: DataGatilho(ano: 1974, mes: 7, dia: 20),
-        paises_alvo: ["TUR", "GRE", "CYP"],
+        paises_alvo: ["TUR", "GRC", "CYP"],
         condicoes: ["crise_otan_mediterraneo"],
         opcoes: [
             OpcaoEvento(
@@ -4744,7 +4744,7 @@
         titulo: "A Revolução Romena e a Queda de Nicolae Ceaușescu",
         descricao: "Em meados de dezembro de 1989, protestos na cidade de Timișoara em solidariedade ao pastor dissidente László Tőkés transformam-se em insurreição contra a ditadura de Nicolae Ceaușescu. Em 21 de dezembro, em Bucareste, Ceaușescu discursa da sacada do Comitê Central, mas a multidão o vaia e grita 'Abaixo o ditador!'. As Forças Armadas romenas confraternizam com os rebeldes civis e enfrentam os franco-atiradores da temida polícia secreta Securitate. Ceaușescu e sua esposa Elena fogem de helicóptero, são capturados e fuzilados após julgamento sumário no dia de Natal.",
         data_gatilho: DataGatilho(ano: 1989, mes: 12, dia: 25),
-        paises_alvo: ["ROM"],
+        paises_alvo: ["ROU"],
         condicoes: ["colapso_ditadura_ceausescu"],
         opcoes: [
             OpcaoEvento(
@@ -5041,7 +5041,7 @@
         titulo: "A Dissolução Oficial do Pacto de Varsóvia e do Comecon",
         descricao: "Em 1º de julho de 1991, no Palácio Černín em Praga, líderes dos seis Estados membros remanescentes (URSS, Polônia, Tchecoslováquia, Hungria, Romênia e Bulgária) assinam o protocolo que encerra formalmente o Tratado de Amizade, Cooperação e Assistência Mútua, conhecido como Pacto de Varsóvia, fundado em 1955. Dias antes, em Budapeste, o Conselho para Assistência Econômica Mútua (Comecon) fora igualmente dissolvido. O aparato militar e comercial do bloco comunista deixa de existir.",
         data_gatilho: DataGatilho(ano: 1991, mes: 7, dia: 1),
-        paises_alvo: ["SOV", "POL", "CZE", "HUN", "ROM", "BUL"],
+        paises_alvo: ["SOV", "POL", "CZE", "HUN", "ROU", "BGR"],
         condicoes: ["desmantelamento_bloco_leste"],
         opcoes: [
             OpcaoEvento(

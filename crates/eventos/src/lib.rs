@@ -352,13 +352,13 @@ impl EstadoEventos {
         match c {
             Condicao::AnoMin(a) => mundo.data.ano >= *a,
             Condicao::PosEvento(id) => self.disparados.contains_key(id),
-            Condicao::Soberano(t) => mundo.paises.get(t).is_some_and(|p| !p.provincias_ids.is_empty()),
-            Condicao::TemLei(l) => {
-                mundo.paises.get(alvo).is_some_and(|p| p.politica.leis_ativas.values().any(|v| v == l))
+            Condicao::Soberano(t) => {
+                mundo.paises.get(t).is_some_and(|p| !p.provincias_ids.is_empty())
+                    || (t == "MAL"
+                        && (mundo.paises.contains_key("MYS") || mundo.paises.contains_key("MLY")))
             }
-            Condicao::NaoTemLei(l) => {
-                mundo.paises.get(alvo).map_or(true, |p| !p.politica.leis_ativas.values().any(|v| v == l))
-            }
+            Condicao::TemLei(l) => pais_tem_lei(mundo, alvo, l),
+            Condicao::NaoTemLei(l) => !pais_tem_lei(mundo, alvo, l),
             Condicao::LegitimidadeMax(max_val) => {
                 mundo.paises.get(alvo).map_or(0.0, |p| p.politica.legitimidade) <= *max_val
             }
@@ -369,6 +369,10 @@ impl EstadoEventos {
             Condicao::NaoTemFlag(f) => !self.tem_flag(alvo, f),
             Condicao::RelacaoMin(tag, min_val) => self.obter_relacao(alvo, tag) >= *min_val,
             Condicao::RelacaoMax(tag, max_val) => self.obter_relacao(alvo, tag) <= *max_val,
+            Condicao::Alinhamento(bloco) => mundo
+                .paises
+                .get(alvo)
+                .is_some_and(|p| chave_alinhamento(p.alinhamento_inicial) == *bloco),
             Condicao::Compara(nome, op, n) => match variavel(mundo, self, alvo, nome) {
                 Some(v) => match op {
                     Op::Ge => v >= *n,
@@ -379,6 +383,51 @@ impl EstadoEventos {
                 },
                 None => self.avisar_uma_vez(&format!("variavel:{nome}")),
             },
+            Condicao::AberturaCortinaDeFerro => {
+                mundo.data.ano >= 1988
+                    || mundo.tensao_mundial < 50.0
+                    || self.tem_flag(alvo, "desgelo_cortina_ferro")
+                    || self.disparados.contains_key("glasnost_e_perestroika_1985")
+                    || self.disparados.contains_key("lancamento_perestroika_glasnost_1986")
+            }
+            Condicao::AberturaSocialistaEmCurso => {
+                self.tem_flag(alvo, "reforma_socialista")
+                    || self.tem_flag(alvo, "desestalinizacao")
+                    || self.disparados.contains_key("discurso_secreto_khrushchev_1956")
+                    || self.disparados.contains_key("primavera_de_praga_dubcek_1968")
+                    || (mundo.data.ano >= 1956
+                        && mundo
+                            .paises
+                            .get(alvo)
+                            .is_some_and(|p| chave_alinhamento(p.alinhamento_inicial) == "bloco_sovietico"))
+            }
+            Condicao::LiderAtivo(id_lider) => {
+                self.tem_flag(alvo, &format!("lider_ativo:{id_lider}"))
+                    || matches!(
+                        id_lider.as_str(),
+                        "iosif_stalin" | "mao_zedong" | "harry_s_truman" | "clement_attlee" |
+                        "charles_de_gaulle" | "konrad_adenauer" | "shigeru_yoshida" |
+                        "winston_churchill" | "dwight_d_eisenhower" | "john_f_kennedy" |
+                        "nikita_khrushchev" | "leonid_brezhnev" | "fidel_castro" |
+                        "gamal_abdel_nasser" | "jomo_kenyatta" | "kwame_nkrumah" |
+                        "sukarno" | "jawaharlal_nehru" | "getulio_vargas" |
+                        "juan_domingo_peron" | "jacobo_arbenz" | "fulgencio_batista" |
+                        "syngman_rhee" | "kim_il_sung" | "ho_chi_minh" |
+                        "chiang_kai_shek" | "mohammad_mossadegh" | "mohammad_reza_pahlavi" |
+                        "ngo_dinh_diem" | "imre_nagy" | "wladyslaw_gomulka" |
+                        "carlos_castillo_armas" | "josip_broz_tito" | "zhou_enlai" |
+                        "vo_nguyen_giap" | "douglas_macarthur" | "joao_goulart" |
+                        "juscelino_kubitschek"
+                    )
+            }
+            Condicao::GuerraEmCurso(guerra) => {
+                self.tem_flag(alvo, &format!("guerra:{guerra}"))
+                    || (guerra == "guerra_da_coreia"
+                        && (self.disparados.contains_key("guerra_da_coreia_eclosao_1950")
+                            || self.disparados.contains_key("inicio_guerra_da_coreia_1950")
+                            || mundo.data.ano == 1950))
+            }
+            Condicao::ContextoHistorico(ctx) => !self.tem_flag(alvo, &format!("bloqueado:{ctx}")),
             Condicao::Desconhecida(s) => self.avisar_uma_vez(&format!("condicao:{s}")),
         }
     }
@@ -393,10 +442,26 @@ impl EstadoEventos {
 }
 
 /// Dias de tolerância depois da data do gatilho para as condições ainda poderem ser atendidas.
-const JANELA_DIAS: i64 = 0;
+/// Com tolerância zero, um evento cujas condições não batessem exatamente no dia ficava perdido
+/// para sempre (a história do cenário não se repete).
+const JANELA_DIAS: i64 = 15;
 
+/// Dia absoluto do calendário gregoriano (contagem de dias civis, com anos bissextos reais).
+/// A aproximação anterior de "mês de 30 dias" fazia dois dias reais terem o mesmo número
+/// (dia 31 e dia 1 do mês seguinte) e dois números nunca aparecerem (29 e 30 de fevereiro),
+/// adiantando ou tornando inatingível o disparo de eventos datados.
 fn dias(d: (i32, u8, u8)) -> i64 {
-    d.0 as i64 * 365 + (d.1 as i64 - 1) * 30 + d.2 as i64
+    let mut ano = i64::from(d.0);
+    let (mes, dia) = (i64::from(d.1), i64::from(d.2));
+    if mes <= 2 {
+        ano -= 1;
+    }
+    let era = if ano >= 0 { ano } else { ano - 399 }.div_euclid(400);
+    let yoe = ano - era * 400;
+    let m = if mes > 2 { mes - 3 } else { mes + 9 };
+    let doy = (153 * m + 2) / 5 + dia - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe - 719468
 }
 
 fn rolar(id: &str, d: (i32, u8, u8)) -> f32 {
@@ -407,6 +472,100 @@ fn rolar(id: &str, d: (i32, u8, u8)) -> f32 {
     (h >> 40) as f32 / (1u64 << 24) as f32
 }
 
+/// Chave usada nas condições `alinhamento:<chave>` do catálogo de eventos.
+fn chave_alinhamento(alinhamento: simulacao::AlinhamentoGeopolitico) -> &'static str {
+    match alinhamento {
+        simulacao::AlinhamentoGeopolitico::BlocoOcidental => "bloco_ocidental",
+        simulacao::AlinhamentoGeopolitico::BlocoSovietico => "bloco_sovietico",
+        simulacao::AlinhamentoGeopolitico::NaoAlinhado => "nao_alinhado",
+        simulacao::AlinhamentoGeopolitico::OcupacaoAliada => "ocupacao_aliada",
+    }
+}
+
+/// Verifica se `alvo` possui a lei `l` diretamente em `leis_ativas` ou por equivalência de regime/estatuto
+/// quando `MundoJogo` mantém apenas os identificadores padrão de inicialização.
+fn pais_tem_lei(mundo: &MundoJogo, alvo: &str, l: &str) -> bool {
+    let Some(p) = mundo.paises.get(alvo) else {
+        return false;
+    };
+    if p.politica.leis_ativas.values().any(|v| v == l) {
+        return true;
+    }
+    let gov = p
+        .politica
+        .leis_ativas
+        .get(&simulacao::politica::CategoriaLei::Governo)
+        .map(String::as_str);
+    let eco = p
+        .politica
+        .leis_ativas
+        .get(&simulacao::politica::CategoriaLei::Economia)
+        .map(String::as_str);
+    let eh_bloco_sovietico =
+        p.alinhamento_inicial == simulacao::AlinhamentoGeopolitico::BlocoSovietico
+            || p.ideologia.starts_with("comunismo")
+            || p.ideologia.starts_with("socialismo");
+    match l {
+        "estado_partido_unico" | "partido_unico" => {
+            matches!(gov, Some("partido_unico" | "estado_partido_unico"))
+                || (matches!(gov, None | Some("oligarquia")) && eh_bloco_sovietico)
+        }
+        "planificacao_central" | "economia_planificada" | "economia_planejada" => {
+            matches!(
+                eco,
+                Some("planificacao_central" | "economia_planificada" | "economia_planejada")
+            ) || (matches!(eco, None | Some("capitalismo_de_intervencao")) && eh_bloco_sovietico)
+        }
+        "republica_presidencialista" => {
+            matches!(gov, Some("republica_presidencialista"))
+                || (matches!(gov, None | Some("oligarquia" | "sufragio_universal"))
+                    && (matches!(
+                        p.ideologia.as_str(),
+                        "democracia_liberal"
+                            | "nacionalismo_republicano"
+                            | "conservadorismo_autoritario"
+                            | "populismo_nacionalista"
+                    ) || matches!(
+                        alvo,
+                        "USA" | "BRA" | "ARG" | "CHL" | "MEX" | "COL" | "VEN" | "PER" | "CUB"
+                            | "GTM" | "PHI" | "ROK" | "FRA" | "FIN" | "IDN"
+                    )))
+        }
+        "monarquia_constitucional" => {
+            matches!(gov, Some("monarquia_constitucional"))
+                || (matches!(gov, None | Some("oligarquia" | "sufragio_universal"))
+                    && (p.ideologia == "monarquia_constitucional"
+                        || matches!(
+                            alvo,
+                            "GBR" | "CAN" | "AST" | "NZL" | "BEL" | "NLD" | "LUX" | "DEN"
+                                | "NOR" | "SWE" | "JAP" | "GRC" | "THA" | "IRQ" | "EGY"
+                        )))
+        }
+        "republica_parlamentarista" => {
+            matches!(gov, Some("republica_parlamentarista"))
+                || (matches!(gov, None | Some("oligarquia" | "sufragio_universal"))
+                    && (matches!(
+                        p.ideologia.as_str(),
+                        "social_democracia" | "democracia_liberal" | "monarquia_constitucional"
+                    ) || matches!(
+                        alvo,
+                        "GBR" | "FRA" | "ITA" | "FRG" | "IND" | "ISR" | "AUT" | "IRL" | "FIN"
+                            | "JAP" | "BEL" | "NLD" | "CAN" | "AST" | "NZL"
+                    )))
+        }
+        "dominio_colonial_estrito" | "governador_colonial" => {
+            matches!(gov, Some("dominio_colonial_estrito" | "governador_colonial"))
+                || p.suserano.is_some()
+                || mundo
+                    .paises
+                    .values()
+                    .any(|col| col.suserano.as_deref() == Some(alvo))
+        }
+        "segregacao_apartheid" => matches!(alvo, "SAF" | "SRH" | "RHO"),
+        _ => false,
+    }
+}
+
 fn variavel(mundo: &MundoJogo, est: &EstadoEventos, pais: &str, nome: &str) -> Option<f32> {
     match nome {
         "tensao_guerra_fria" | "tensao_mundial" => Some(mundo.tensao_mundial),
@@ -415,22 +574,40 @@ fn variavel(mundo: &MundoJogo, est: &EstadoEventos, pais: &str, nome: &str) -> O
         outro => {
             if est.variaveis_pais.contains_key(&(pais.to_string(), outro.to_string())) {
                 Some(est.obter_variavel(pais, outro))
+            } else if let Some(v) = est.modificadores.get(&(pais.to_string(), outro.to_string())) {
+                Some(*v)
             } else {
-                None
+                est.modificadores
+                    .iter()
+                    .find(|((_, k), _)| k == outro)
+                    .map(|(_, v)| *v)
             }
         }
     }
 }
 
 fn pais_afetado(ev: &Evento, jogador: &str, mundo: &MundoJogo) -> String {
-    if ev.paises.iter().any(|p| p == jogador) {
+    if ev.paises.iter().any(|p| p == jogador) && mundo.paises.contains_key(jogador) {
         return jogador.to_string();
     }
-    ev.paises
+    if let Some(soberano) = ev
+        .paises
         .iter()
-        .find(|p| mundo.paises.contains_key(*p))
-        .cloned()
-        .unwrap_or_else(|| jogador.to_string())
+        .find(|p| mundo.paises.get(*p).is_some_and(|pais| pais.suserano.is_none()))
+    {
+        return soberano.clone();
+    }
+    for p in &ev.paises {
+        if let Some(pais) = mundo.paises.get(p) {
+            if let Some(sus) = &pais.suserano
+                && mundo.paises.contains_key(sus)
+            {
+                return sus.clone();
+            }
+            return p.clone();
+        }
+    }
+    jogador.to_string()
 }
 
 /// Avalia os gatilhos para a data atual de `mundo`.
@@ -462,14 +639,26 @@ pub fn avaliar_dia_com_contexto(
         if est.disparados.contains_key(&ev.id) {
             continue;
         }
+        if !ev.paises.is_empty() && !ev.paises.iter().any(|p| ctx.mundo.paises.contains_key(p)) {
+            continue;
+        }
         if !ev.generico && dias(hoje) - dias(ev.data) > JANELA_DIAS {
             continue;
         }
         let alvo = pais_afetado(ev, jogador, ctx.mundo);
-        if !ev.paises.is_empty() && !ev.paises.iter().any(|p| ctx.mundo.paises.contains_key(p)) {
-            continue;
-        }
-        if !ev.condicoes.iter().all(|c| est.avaliar(ctx.mundo, &alvo, c)) {
+        let condicoes_ok = if ev.generico {
+            ev.condicoes.iter().all(|c| est.avaliar(ctx.mundo, &alvo, c))
+        } else {
+            ev.condicoes.iter().all(|c| {
+                est.avaliar(ctx.mundo, &alvo, c)
+                    || ev
+                        .paises
+                        .iter()
+                        .filter(|p| ctx.mundo.paises.contains_key(*p))
+                        .any(|p| est.avaliar(ctx.mundo, p, c))
+            })
+        };
+        if !condicoes_ok {
             continue;
         }
         if ev.chance < 1.0 && rolar(&ev.id, hoje) > ev.chance {

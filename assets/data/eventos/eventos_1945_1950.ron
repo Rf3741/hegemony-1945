@@ -272,7 +272,7 @@
         titulo: "A Crise do Irã e a Primeira Prova de Força na ONU",
         descricao: "A URSS recusa-se a retirar o Exército Vermelho do norte do Irã no prazo fixado pelo Tratado Tripartite de 1942, patrocinando repúblicas separatistas no Azerbaijão e Curdistão (Mahabad) e pressionando Teerã por concessões de petróleo no Cáspio.",
         data_gatilho: DataGatilho(ano: 1946, mes: 3, dia: 2),
-        paises_alvo: ["PER", "SOV", "USA", "GBR"],
+        paises_alvo: ["IRN", "SOV", "USA", "GBR"],
         condicoes: [],
         opcoes: [
             OpcaoEvento(
@@ -413,7 +413,7 @@
         titulo: "A Eclosão da Guerra Civil Grega: Monarquistas vs. Comunistas",
         descricao: "Após o ataque a Litohoro em março de 1946, o Exército Democrático da Grécia (DSE), braço armado do Partido Comunista Grego (KKE), inicia uma insurgência guerrilheira em larga escala a partir das montanhas do norte, com apoio logístico e santuário na Iugoslávia de Tito e na Albânia.",
         data_gatilho: DataGatilho(ano: 1946, mes: 10, dia: 28),
-        paises_alvo: ["GRE", "GBR", "USA", "YUG"],
+        paises_alvo: ["GRC", "GBR", "USA", "YUG"],
         condicoes: [],
         opcoes: [
             OpcaoEvento(
@@ -483,7 +483,7 @@
         titulo: "Proclamação da Doutrina Truman: A Política de Contenção",
         descricao: "Em discurso solene perante sessão conjunta do Congresso dos EUA, o presidente Harry S. Truman declara que a política americana deve ser 'apoiar os povos livres que estão resistindo a tentativas de subjugação por minorias armadas ou por pressões externas', solicitando US$ 400 milhões em ajuda militar e econômica para a Grécia e a Turquia.",
         data_gatilho: DataGatilho(ano: 1947, mes: 3, dia: 12),
-        paises_alvo: ["USA", "GRE", "TUR", "SOV"],
+        paises_alvo: ["USA", "GRC", "TUR", "SOV"],
         condicoes: [],
         opcoes: [
             OpcaoEvento(
@@ -873,7 +873,7 @@
         titulo: "Mao na Praça Tiananmen: A Proclamação da República Popular da China",
         descricao: "Em 1º de outubro de 1949, do alto do Portão da Paz Celestial em Pequim, Mao Zedong proclama solenemente a fundação da República Popular da China: 'O povo chinês se pôs de pé!'. O Kuomintang de Chiang Kai-shek é derrotado na Guerra Civil Chinesa e refugia-se na ilha de Formosa (Taiwan), transferindo um quarto da humanidade para o campo socialista.",
         data_gatilho: DataGatilho(ano: 1949, mes: 10, dia: 1),
-        paises_alvo: ["CCP", "CHI", "USA", "SOV"],
+        paises_alvo: ["PRC", "CHI", "USA", "SOV"],
         condicoes: [],
         opcoes: [
             OpcaoEvento(
@@ -897,41 +897,6 @@
                     Modificador(id: "conflito_estreito_de_taiwan", valor: 0.50),
                 ],
                 ia_peso: 10,
-            ),
-        ],
-    ),
-
-    // --------------------------------------------------------------------------
-    // 26. TRATADO DE AMIZADE SINO-SOVIÉTICO (Fevereiro de 1950)
-    // --------------------------------------------------------------------------
-    EventoHistorico(
-        id: "tratado_amizade_sino_sovietico_1950",
-        titulo: "O Tratado de Amizade, Aliança e Assistência Mútua Sino-Soviético",
-        descricao: "Após dois meses de difíceis negociações secretas em Moscou entre Stalin e Mao Zedong, a URSS e a República Popular da China assinam uma aliança militar e de ajuda mútua por trinta anos. A URSS concede US$ 300 milhões em créditos e milhares de especialistas técnicos para a industrialização pesada chinesa.",
-        data_gatilho: DataGatilho(ano: 1950, mes: 2, dia: 14),
-        paises_alvo: ["SOV", "CCP", "USA"],
-        condicoes: [],
-        opcoes: [
-            OpcaoEvento(
-                id: "sino_sovietico_alianca_eurasiatica",
-                texto: "Selar a grande aliança estratégica eurasiática de ferro",
-                descricao_resultado: "O eixo Moscou-Pequim estende o bloco socialista do Elba ao Mar Amarelo, alterando drasticamente o equilíbrio de poder global.",
-                efeitos: [
-                    Modificador(id: "alianca_militar_sino_sovietica", valor: 1.0),
-                    Modificador(id: "transferencia_tecnologica_china", valor: 0.35),
-                    Modificador(id: "alarme_estrategico_pentagono", valor: 0.40),
-                ],
-                ia_peso: 85,
-            ),
-            OpcaoEvento(
-                id: "sino_sovietico_rejeitar_concessoes_manchuria",
-                texto: "Mao rejeita a tutela soviética sobre ferrovias e bases navais em Port Arthur",
-                descricao_resultado: "Evita concessões desiguais, mas a China comunista fica privada da ajuda industrial e dos caças a jato soviéticos.",
-                efeitos: [
-                    Modificador(id: "desenvolvimento_industrial_chines_lento", valor: 0.30),
-                    Modificador(id: "distanciamento_precoce_moscou", valor: 0.35),
-                ],
-                ia_peso: 15,
             ),
         ],
     ),
@@ -981,7 +946,7 @@
         titulo: "Cruzando o Paralelo 38: Eclosão da Guerra da Coreia",
         descricao: "Na madrugada de 25 de junho de 1950, após receber autorização de Stalin e Mao, as divisões blindadas do Exército Popular da Coreia do Norte de Kim Il-sung cruzam em massa o Paralelo 38, capturando Seul em três dias. Com a ausência soviética na ONU (devido ao boicote sobre a representação de Taiwan), o Conselho de Segurança vota para enviar tropas para repelir a agressão.",
         data_gatilho: DataGatilho(ano: 1950, mes: 6, dia: 25),
-        paises_alvo: ["KOR", "USA", "SOV", "CCP"],
+        paises_alvo: ["KOR", "USA", "SOV", "PRC"],
         condicoes: [],
         opcoes: [
             OpcaoEvento(

@@ -206,11 +206,16 @@ impl MundoEconomico {
         for (idx, mercado) in self.mercados.iter_mut().enumerate() {
             self.indice_mercados.insert(mercado.id.clone(), idx);
             mercado.pais_lider_idx = 0;
-            mercado.precos_idx = vec![0.0; self.catalogo.bens.len()];
-            mercado.oferta_idx = vec![0.0; self.catalogo.bens.len()];
-            mercado.demanda_idx = vec![0.0; self.catalogo.bens.len()];
-            mercado.fator_suprimento_idx = vec![1.0; self.catalogo.bens.len()];
-            mercado.importacoes_liquidas_idx = vec![0.0; self.catalogo.bens.len()];
+            // Os vetores são indexados por BEM, e o catálogo de bens não muda numa formação: só o
+            // mercado novo (criado com vetores vazios) precisa ser inicializado. Recriar os vetores de
+            // todos os mercados zerava preço, oferta e demanda do mundo inteiro no dia de uma formação.
+            if mercado.precos_idx.len() != n_bens {
+                mercado.precos_idx = self.catalogo.bens.iter().map(|b| b.preco_base).collect();
+                mercado.oferta_idx = vec![0.0; n_bens];
+                mercado.demanda_idx = vec![0.0; n_bens];
+                mercado.fator_suprimento_idx = vec![1.0; n_bens];
+                mercado.importacoes_liquidas_idx = vec![0.0; n_bens];
+            }
         }
         for (idx, pais) in self.paises.iter_mut().enumerate() {
             self.indice_paises.insert(pais.id.clone(), idx);
@@ -219,7 +224,11 @@ impl MundoEconomico {
             pais.mercado_idx = *self.indice_mercados.get(&pais.mercado_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
                 origem_entidade: "Pais", origem_id: pais.id.clone(), alvo_entidade: "Mercado", alvo_id: pais.mercado_id.clone(),
             })?;
-            pais.aliquota_consumo_por_bem = vec![0.0; self.catalogo.bens.len()];
+            // Mesmo critério: recompilar o cache fiscal apenas de quem ainda não tem (o país recém
+            // criado). Zerar `aliquota_consumo_por_bem` de todos desligava o imposto de consumo mundial.
+            if pais.aliquota_consumo_por_bem.len() != n_bens {
+                compilar_cache_fiscal_pais(&self.catalogo, pais)?;
+            }
         }
         for mercado in &mut self.mercados {
             mercado.pais_lider_idx = *self.indice_paises.get(&mercado.pais_lider_id).ok_or_else(|| ErroEconomia::ReferenciaInexistente {
