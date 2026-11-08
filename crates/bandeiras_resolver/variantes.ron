@@ -84,6 +84,8 @@
             tag: "FRA",
             base: Variante(id: "base", arquivo: "svg/FRA.svg", nome: "Governo Provisório da República Francesa", cor: (45, 115, 215)),
             variantes: [
+                Variante(id: "fra_quarta_republica", arquivo: "svg/FRA.svg", nome: "Quarta República Francesa", cor: (45, 115, 215), condicao: (flags: ["quarta_republica"]), prioridade: 60, historica: true, descricao: "Constituição de 1946 (Quarta República)."),
+                Variante(id: "fra_quinta_republica", arquivo: "svg/FRA.svg", nome: "Quinta República Francesa", cor: (45, 115, 215), condicao: (flags: ["quinta_republica"]), prioridade: 65, historica: true, descricao: "Constituição gaullista de 1958 (Quinta República)."),
                 Variante(id: "fra_reino", arquivo: "svg/fra_reino.svg", nome: "Reino da França", cor: (240, 240, 235), condicao: (forma_governo: ["autocracia_monarquica", "monarquia_constitucional"]), prioridade: 25, historica: true, descricao: "Bandeira branca com flores-de-lis (Bourbon)."),
                 Variante(id: "comunista", arquivo: "svg/FRA_comunista.svg", nome: "República Popular da França", cor: (132, 64, 104), condicao: (categoria_ideologia: ["comunista"]), prioridade: 50, historica: false, descricao: "Regra genérica de ideologia."),
                 Variante(id: "socialista", arquivo: "svg/FRA_socialista.svg", nome: "República Social da França", cor: (115, 105, 173), condicao: (categoria_ideologia: ["socialista"]), prioridade: 25, historica: false, descricao: "Regra genérica de ideologia."),
@@ -492,6 +494,7 @@
             tag: "ITA",
             base: Variante(id: "base", arquivo: "svg/ITA.svg", nome: "Reino da Itália (Cobeligerante Aliado)", cor: (65, 150, 95)),
             variantes: [
+                Variante(id: "ita_republica_datada", arquivo: "svg/ita_republica.svg", nome: "República Italiana", cor: (0, 146, 70), condicao: (flags: ["ita_republica"]), prioridade: 60, historica: true, descricao: "Referendo institucional de 2 de junho de 1946: proclamação da República."),
                 Variante(id: "ita_republica", arquivo: "svg/ita_republica.svg", nome: "República Italiana", cor: (0, 146, 70), condicao: (forma_governo: ["republica_presidencialista", "republica_parlamentarista"]), prioridade: 25, historica: true, descricao: "Referendo de 2 jun 1946: tricolor sem o brasão de Saboia."),
                 Variante(id: "comunista", arquivo: "svg/ITA_comunista.svg", nome: "República Popular da Itália", cor: (140, 78, 56), condicao: (categoria_ideologia: ["comunista"]), prioridade: 50, historica: false, descricao: "Regra genérica de ideologia."),
                 Variante(id: "socialista", arquivo: "svg/ITA_socialista.svg", nome: "República Social da Itália", cor: (127, 126, 101), condicao: (categoria_ideologia: ["socialista"]), prioridade: 25, historica: false, descricao: "Regra genérica de ideologia."),
@@ -510,6 +513,7 @@
             tag: "ESP",
             base: Variante(id: "base", arquivo: "svg/ESP.svg", nome: "Estado Espanhol (Franquista)", cor: (205, 160, 45)),
             variantes: [
+                Variante(id: "esp_democratica", arquivo: "svg/esp_monarquia.svg", nome: "Reino da Espanha", cor: (205, 160, 45), condicao: (flags: ["esp_transicao"]), prioridade: 60, historica: true, descricao: "Transição democrática e restauração monárquica (1975-1978)."),
                 Variante(id: "esp_republica", arquivo: "svg/esp_republica.svg", nome: "República Espanhola", cor: (205, 160, 45), condicao: (forma_governo: ["republica_presidencialista", "republica_parlamentarista"]), prioridade: 25, historica: true, descricao: "Tricolor vermelho-amarelo-roxo de 1931."),
                 Variante(id: "esp_monarquia", arquivo: "svg/esp_monarquia.svg", nome: "Reino da Espanha", cor: (205, 160, 45), condicao: (forma_governo: ["autocracia_monarquica", "monarquia_constitucional"]), prioridade: 25, historica: true, descricao: "Rojigualda com o escudo real simplificado (restauração de 1975-78)."),
                 Variante(id: "comunista", arquivo: "svg/ESP_comunista.svg", nome: "República Popular da Espanha", cor: (196, 82, 36), condicao: (categoria_ideologia: ["comunista"]), prioridade: 50, historica: false, descricao: "Regra genérica de ideologia."),
@@ -529,6 +533,7 @@
             tag: "POR",
             base: Variante(id: "base", arquivo: "svg/POR.svg", nome: "República Portuguesa (Estado Novo)", cor: (45, 145, 95)),
             variantes: [
+                Variante(id: "por_democratica", arquivo: "svg/POR.svg", nome: "República Portuguesa", cor: (45, 145, 95), condicao: (flags: ["por_democratica"]), prioridade: 60, historica: true, descricao: "Revolução dos Cravos de 1974: fim do Estado Novo."),
                 Variante(id: "por_reino", arquivo: "svg/por_reino.svg", nome: "Reino de Portugal", cor: (45, 145, 95), condicao: (forma_governo: ["autocracia_monarquica", "monarquia_constitucional"]), prioridade: 25, historica: true, descricao: "Bandeira azul e branca da monarquia constitucional (1830-1910)."),
                 Variante(id: "comunista", arquivo: "svg/POR_comunista.svg", nome: "República Popular de Portugal", cor: (132, 76, 56), condicao: (categoria_ideologia: ["comunista"]), prioridade: 50, historica: false, descricao: "Regra genérica de ideologia."),
                 Variante(id: "socialista", arquivo: "svg/POR_socialista.svg", nome: "República Social de Portugal", cor: (115, 123, 101), condicao: (categoria_ideologia: ["socialista"]), prioridade: 25, historica: false, descricao: "Regra genérica de ideologia."),
@@ -548,6 +553,7 @@
             tag: "GRE",
             base: Variante(id: "base", arquivo: "svg/GRE.svg", nome: "Reino da Grécia", cor: (75, 145, 215)),
             variantes: [
+                Variante(id: "gre_republica_datada", arquivo: "svg/gre_republica.svg", nome: "República Helênica", cor: (75, 145, 215), condicao: (flags: ["gre_republica"]), prioridade: 60, historica: true, descricao: "Fim da monarquia e Terceira República Helênica (1974)."),
                 Variante(id: "gre_republica", arquivo: "svg/gre_republica.svg", nome: "República Helênica", cor: (75, 145, 215), condicao: (forma_governo: ["republica_presidencialista", "republica_parlamentarista"]), prioridade: 25, historica: true, descricao: "Galanolefki: nove listras e cruz no cantão (1822/1975)."),
                 Variante(id: "gre_junta", arquivo: "svg/gre_republica.svg", nome: "Regime dos Coronéis (Grécia)", cor: (75, 145, 215), condicao: (forma_governo: ["oligarquia_militar"]), prioridade: 35, historica: true, descricao: "A junta de 1967-74 manteve a bandeira de listras; só o nome muda."),
                 Variante(id: "comunista", arquivo: "svg/GRE_comunista.svg", nome: "República Popular da Grécia", cor: (144, 76, 104), condicao: (categoria_ideologia: ["comunista"]), prioridade: 50, historica: false, descricao: "Regra genérica de ideologia."),
@@ -821,6 +827,7 @@
             tag: "IRQ",
             base: Variante(id: "base", arquivo: "svg/IRQ.svg", nome: "Reino Haxemita do Iraque", cor: (140, 175, 95)),
             variantes: [
+                Variante(id: "irq_republica_datada", arquivo: "svg/irq_republica.svg", nome: "República do Iraque", cor: (150, 30, 40), condicao: (flags: ["republica_iraque"]), prioridade: 60, historica: true, descricao: "Revolução de 14 jul 1958 (Qasim)."),
                 Variante(id: "irq_republica", arquivo: "svg/irq_republica.svg", nome: "República do Iraque", cor: (150, 30, 40), condicao: (forma_governo: ["republica_presidencialista", "republica_parlamentarista"]), prioridade: 25, historica: true, descricao: "Revolução de 14 jul 1958 (Qasim): estrela vermelha de 8 pontas com sol amarelo."),
                 Variante(id: "irq_baath", arquivo: "svg/irq_baath.svg", nome: "República do Iraque (Baath)", cor: (120, 30, 40), condicao: (forma_governo: ["republica_presidencialista", "republica_parlamentarista"], categoria_ideologia: ["nacionalista_3m"]), prioridade: 45, historica: true, descricao: "Pan-árabe com três estrelas verdes (1963)."),
                 Variante(id: "comunista", arquivo: "svg/IRQ_comunista.svg", nome: "República Popular do Iraque", cor: (170, 88, 56), condicao: (categoria_ideologia: ["comunista"]), prioridade: 50, historica: false, descricao: "Regra genérica de ideologia."),
@@ -1374,6 +1381,7 @@
             tag: "BRA",
             base: Variante(id: "base", arquivo: "svg/BRA.svg", nome: "Estados Unidos do Brasil", cor: (35, 145, 65)),
             variantes: [
+                Variante(id: "bra_federativa", arquivo: "svg/BRA.svg", nome: "República Federativa do Brasil", cor: (35, 145, 65), condicao: (flags: ["bra_federativa"]), prioridade: 60, historica: true, descricao: "Constituição de 1967: República Federativa do Brasil."),
                 Variante(id: "bra_imperio", arquivo: "svg/bra_imperio.svg", nome: "Império do Brasil", cor: (0, 156, 59), condicao: (forma_governo: ["autocracia_monarquica", "monarquia_constitucional"]), prioridade: 25, historica: true, descricao: "Verde, losango amarelo e armas imperiais."),
                 Variante(id: "comunista", arquivo: "svg/BRA_comunista.svg", nome: "República Popular do Brasil", cor: (128, 76, 44), condicao: (categoria_ideologia: ["comunista"]), prioridade: 50, historica: false, descricao: "Regra genérica de ideologia."),
                 Variante(id: "socialista", arquivo: "svg/BRA_socialista.svg", nome: "República Social do Brasil", cor: (109, 123, 83), condicao: (categoria_ideologia: ["socialista"]), prioridade: 25, historica: false, descricao: "Regra genérica de ideologia."),
@@ -1867,6 +1875,7 @@
             tag: "EGY",
             base: Variante(id: "base", arquivo: "svg/EGY.svg", nome: "Reino do Egito", cor: (185, 175, 95)),
             variantes: [
+                Variante(id: "egy_republica_datada", arquivo: "svg/egy_republica.svg", nome: "República do Egito", cor: (190, 40, 40), condicao: (flags: ["republica_egito"]), prioridade: 60, historica: true, descricao: "Revolução de 1952 / República de 1953: pan-árabe com a águia de Saladino."),
                 Variante(id: "egy_republica", arquivo: "svg/egy_republica.svg", nome: "República do Egito", cor: (190, 40, 40), condicao: (forma_governo: ["republica_presidencialista", "republica_parlamentarista"]), prioridade: 25, historica: true, descricao: "Revolução de 1952/república de 1953: pan-árabe com a águia de Saladino."),
                 Variante(id: "egy_rau", arquivo: "svg/egy_rau.svg", nome: "República Árabe Unida", cor: (190, 40, 40), condicao: (flags: ["uniao_arabe"]), prioridade: 65, historica: true, descricao: "União com a Síria (1958): duas estrelas verdes."),
                 Variante(id: "comunista", arquivo: "svg/EGY_comunista.svg", nome: "República Popular do Egito", cor: (188, 88, 56), condicao: (categoria_ideologia: ["comunista"]), prioridade: 50, historica: false, descricao: "Regra genérica de ideologia."),

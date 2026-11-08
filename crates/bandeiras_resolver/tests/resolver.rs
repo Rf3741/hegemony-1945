@@ -180,6 +180,55 @@ fn alemanha_dividida_por_flags_e_tag_desconhecida() {
 }
 
 #[test]
+fn franca_muda_com_tempo_4a_e_5a_republica() {
+    let mut e = EstadoPais {
+        ano: 1945,
+        mes: 1,
+        forma_governo: "republica_parlamentarista".into(),
+        ideologia_dominante: "democracia_liberal".into(),
+        ..Default::default()
+    };
+    let r1945 = resolver_bandeira("FRA", &e);
+    assert_eq!(r1945.id, "base");
+    assert_eq!(r1945.nome, "Governo Provisório da República Francesa");
+
+    e.ano = 1950;
+    e.mes = 6;
+    let r1950 = resolver_bandeira("FRA", &e);
+    assert_eq!(r1950.id, "fra_quarta_republica");
+    assert_eq!(r1950.nome, "Quarta República Francesa");
+
+    e.ano = 1964;
+    e.mes = 1;
+    let r1964 = resolver_bandeira("FRA", &e);
+    assert_eq!(r1964.id, "fra_quinta_republica");
+    assert_eq!(r1964.nome, "Quinta República Francesa");
+}
+
+#[test]
+fn regimes_historicos_datados() {
+    // Brasil: 1945 Estados Unidos do Brasil -> 1970 República Federativa do Brasil
+    let mut bra = EstadoPais { ano: 1945, mes: 1, ..Default::default() };
+    assert_eq!(resolver_bandeira("BRA", &bra).nome, "Estados Unidos do Brasil");
+    bra.ano = 1970;
+    assert_eq!(resolver_bandeira("BRA", &bra).nome, "República Federativa do Brasil");
+
+    // Alemanha: 1950 RFA -> 1991 Reunificada
+    let mut ger = EstadoPais { ano: 1950, mes: 1, ..Default::default() };
+    assert_eq!(resolver_bandeira("GER", &ger).nome, "República Federal da Alemanha");
+    ger.ano = 1991;
+    assert_eq!(resolver_bandeira("GER", &ger).nome, "República Federal da Alemanha (reunificada)");
+
+    // Egito: 1945 Reino -> 1955 República -> 1959 RAU
+    let mut egy = EstadoPais { ano: 1945, mes: 1, ..Default::default() };
+    assert_eq!(resolver_bandeira("EGY", &egy).nome, "Reino do Egito");
+    egy.ano = 1955;
+    assert_eq!(resolver_bandeira("EGY", &egy).nome, "República do Egito");
+    egy.ano = 1959;
+    assert_eq!(resolver_bandeira("EGY", &egy).nome, "República Árabe Unida");
+}
+
+#[test]
 #[ignore = "exige svg/png de bandeiras_dinamicas (assets ainda nao integrados)"]
 fn todo_arquivo_do_catalogo_existe() {
     let raiz = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
