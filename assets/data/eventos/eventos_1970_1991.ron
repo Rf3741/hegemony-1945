@@ -5041,7 +5041,7 @@
         titulo: "A Dissolução Oficial do Pacto de Varsóvia e do Comecon",
         descricao: "Em 1º de julho de 1991, no Palácio Černín em Praga, líderes dos seis Estados membros remanescentes (URSS, Polônia, Tchecoslováquia, Hungria, Romênia e Bulgária) assinam o protocolo que encerra formalmente o Tratado de Amizade, Cooperação e Assistência Mútua, conhecido como Pacto de Varsóvia, fundado em 1955. Dias antes, em Budapeste, o Conselho para Assistência Econômica Mútua (Comecon) fora igualmente dissolvido. O aparato militar e comercial do bloco comunista deixa de existir.",
         data_gatilho: DataGatilho(ano: 1991, mes: 7, dia: 1),
-        paises_alvo: ["SOV", "POL", "CZE", "HUN", "ROU", "BUL"],
+        paises_alvo: ["SOV", "POL", "CZE", "HUN", "ROU", "BGR"],
         condicoes: ["desmantelamento_bloco_leste"],
         opcoes: [
             OpcaoEvento(
