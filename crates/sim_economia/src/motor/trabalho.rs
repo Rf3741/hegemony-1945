@@ -58,9 +58,10 @@ pub(crate) fn executar_contratacao_e_demissao(
         let mut houve_mudanca_emprego = false;
 
         for b in &mut prov.predios {
-            if b.nivel == 0 {
+            if b.nivel == 0 || b.fechado {
                 for slot in b.cache.vagas_mut() {
                     if slot.empregados > 0.0 {
+                        desemp_por_tipo[slot.tipo_pop_idx as usize] += slot.empregados;
                         slot.empregados = 0.0;
                         houve_mudanca_emprego = true;
                     }
@@ -101,7 +102,7 @@ pub(crate) fn executar_contratacao_e_demissao(
                 b.cache.financiado_pelo_governo || (b.subsidiado && !em_calote) || margem > 0.015;
 
             if quer_contratar {
-                let nivel_f = b.nivel as f64;
+                let nivel_f = (b.nivel as f64) * b.fator_retomada();
                 let mut precisa_contratar = false;
                 for slot in b.cache.vagas() {
                     let meta_vagas = (slot.vagas_por_nivel as f64) * nivel_f;
@@ -212,7 +213,7 @@ pub(crate) fn executar_contratacao_e_demissao(
                             (b.salario_base * (1.0 + 0.0015 * fator_dias)).clamp(1.2, 40.0);
                     }
                 }
-            } else if !b.cache.financiado_pelo_governo && !b.subsidiado && margem < -0.03 {
+            } else if !b.cache.financiado_pelo_governo && !b.subsidiado && b.dias_retomada == 0 && margem < -0.03 {
                 // Salário cede primeiro (proporcional ao prejuízo); só demite quando já está no piso.
                 let queda = ((0.01 + 0.05 * (-margem).min(1.0)) * fator_dias).min(0.5);
                 b.salario_base = (b.salario_base * (1.0 - queda)).clamp(1.2, 40.0);

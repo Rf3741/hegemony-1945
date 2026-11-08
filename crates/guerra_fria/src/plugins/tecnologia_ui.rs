@@ -233,6 +233,7 @@ fn avancar_tecnologia(
                 if t.mundo.catalogo.obter(&feita).is_some_and(|x| matches!(x.ramo, Ramo::Producao | Ramo::Sociedade)) {
                     eco.registrar_ganho_tecnologico(&tag, GANHO_PRODUTIVIDADE_TECNOLOGIA);
                 }
+                eco.registrar_tecnologia_pesquisada(&tag, &feita);
                 if eh_jogador {
                     let nome = t.mundo.catalogo.obter(&feita).map_or(feita.clone(), |x| x.nome.clone());
                     t.concluidas_jogador.push(nome.clone());

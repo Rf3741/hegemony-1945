@@ -1,0 +1,427 @@
+// Tabela histórica de ciclos estruturais de demanda, substituição tecnológica e choques
+// de oferta/demanda de recursos na Guerra Fria (1945–1991+).
+//
+// IMPORTANTE: Nenhum preço é fixado manualmente aqui. Todos os parâmetros atuam apenas
+// sobre:
+//   1. `fator_demanda`: intensidade de uso industrial/geral do bem no mercado;
+//   2. `fator_peso_pop`: preferência relativa das famílias dentro das cestas de substituição
+//      (`SubstituicaoNecessidade` em `bens.ron`), sem alterar a renda total nem a Lei de Engel;
+//   3. `fator_procura_estrategica`: encomendas estratégicas/governamentais de estocagem
+//      (ex.: programas de armas nucleares da AEC/URSS para `uranio`, aeroespacial para `aluminio`),
+//      escaladas pela capacidade física instalada de 1945;
+//   4. `fator_absorcao_excedente`: apetite do mercado externo residual por excedentes quando
+//      há escassez global (> 0.8) versus superoferta estrutural mundial (< 0.25);
+//   5. `multiplicador_oferta_importacao_residual` em choques históricos (ex.: embargos de 1973/1979).
+// Os preços reagem exclusivamente pela equação de fechamento de oferta e demanda do mercado.
+(
+    curvas: [
+        // =========================================================================
+        // 1. URÂNIO: corrida nuclear pós-1945 (Manhattan, RDS-1, bombas H, AEC)
+        //    seguida de saturação de estoques, centrífugas, TNP (1970), Three Mile
+        //    Island (1979), Chernobyl (1986), INF/START (1987) e excesso de oferta.
+        // =========================================================================
+        (
+            bem_id: "uranio",
+            referencia_historica: "Corrida de arsenais nucleares EUA/URSS e compras garantidas da AEC (1946–1959), seguida de saturação militar, TNP (1970), Three Mile Island (1979), Chernobyl (1986) e desarmamento INF/START.",
+            amplitude_desvio_anos: 2.2,
+            amplitude_variacao_partida: 0.16,
+            amplitude_ciclo_curto: 0.08,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 1.02, fator_absorcao_excedente: 0.80),
+                (ano: 1948.5, fator_demanda: 1.35, fator_peso_pop: 1.00, fator_procura_estrategica: 1.95, fator_absorcao_excedente: 0.98),
+                (ano: 1954.5, fator_demanda: 1.65, fator_peso_pop: 1.00, fator_procura_estrategica: 2.50, fator_absorcao_excedente: 1.00),
+                (ano: 1961.0, fator_demanda: 1.30, fator_peso_pop: 1.00, fator_procura_estrategica: 1.45, fator_absorcao_excedente: 0.65),
+                (ano: 1968.0, fator_demanda: 0.98, fator_peso_pop: 1.00, fator_procura_estrategica: 0.68, fator_absorcao_excedente: 0.32),
+                (ano: 1975.0, fator_demanda: 1.12, fator_peso_pop: 1.00, fator_procura_estrategica: 0.48, fator_absorcao_excedente: 0.26),
+                (ano: 1982.0, fator_demanda: 0.72, fator_peso_pop: 1.00, fator_procura_estrategica: 0.22, fator_absorcao_excedente: 0.10),
+                (ano: 1989.0, fator_demanda: 0.54, fator_peso_pop: 1.00, fator_procura_estrategica: 0.13, fator_absorcao_excedente: 0.05),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "bomba_atomica_fissao_implosao", delta_demanda: 0.08, delta_peso_pop: 0.0, delta_procura_estrategica: 0.22, delta_absorcao_excedente: 0.05),
+                (tecnologia_id: "bomba_termonuclear_fusao_hidrogenio", delta_demanda: 0.10, delta_peso_pop: 0.0, delta_procura_estrategica: 0.28, delta_absorcao_excedente: 0.05),
+                (tecnologia_id: "propulsao_nuclear_naval_nautilus", delta_demanda: 0.06, delta_peso_pop: 0.0, delta_procura_estrategica: 0.12, delta_absorcao_excedente: 0.02),
+                (tecnologia_id: "reator_nuclear_civil_eletricidade", delta_demanda: 0.12, delta_peso_pop: 0.0, delta_procura_estrategica: 0.05, delta_absorcao_excedente: 0.04),
+                (tecnologia_id: "reatores_agua_pressurizada_pwr_massa", delta_demanda: 0.16, delta_peso_pop: 0.0, delta_procura_estrategica: 0.04, delta_absorcao_excedente: 0.05),
+                (tecnologia_id: "separacao_isotopica_centrifuga_gasosa", delta_demanda: -0.18, delta_peso_pop: 0.0, delta_procura_estrategica: -0.16, delta_absorcao_excedente: -0.08),
+                (tecnologia_id: "tratados_desarmamento_inf_start_verificacao", delta_demanda: -0.15, delta_peso_pop: 0.0, delta_procura_estrategica: -0.22, delta_absorcao_excedente: -0.12),
+            ],
+            choques_eventos: [
+                (
+                    evento_id: "tratado_nao_proliferacao_tnp_1970",
+                    ano_referencia: 1970.2,
+                    duracao_dias: 1800,
+                    multiplicador_demanda: 0.84,
+                    multiplicador_procura_estrategica: 0.72,
+                    multiplicador_absorcao_excedente: 0.65,
+                    multiplicador_oferta_importacao_residual: 1.0,
+                ),
+                (
+                    evento_id: "cupula_vladivostok_salt_ii_1974",
+                    ano_referencia: 1974.9,
+                    duracao_dias: 1460,
+                    multiplicador_demanda: 0.92,
+                    multiplicador_procura_estrategica: 0.82,
+                    multiplicador_absorcao_excedente: 0.80,
+                    multiplicador_oferta_importacao_residual: 1.0,
+                ),
+                (
+                    evento_id: "acidente_nuclear_three_mile_island_1979",
+                    ano_referencia: 1979.25,
+                    duracao_dias: 2190,
+                    multiplicador_demanda: 0.76,
+                    multiplicador_procura_estrategica: 0.78,
+                    multiplicador_absorcao_excedente: 0.55,
+                    multiplicador_oferta_importacao_residual: 1.0,
+                ),
+                (
+                    evento_id: "desastre_nuclear_chernobyl_1986",
+                    ano_referencia: 1986.32,
+                    duracao_dias: 2555,
+                    multiplicador_demanda: 0.65,
+                    multiplicador_procura_estrategica: 0.68,
+                    multiplicador_absorcao_excedente: 0.42,
+                    multiplicador_oferta_importacao_residual: 1.0,
+                ),
+                (
+                    evento_id: "tratado_inf_desarmamento_1987",
+                    ano_referencia: 1987.93,
+                    duracao_dias: 2555,
+                    multiplicador_demanda: 0.82,
+                    multiplicador_procura_estrategica: 0.62,
+                    multiplicador_absorcao_excedente: 0.45,
+                    multiplicador_oferta_importacao_residual: 1.0,
+                ),
+            ],
+        ),
+
+        // =========================================================================
+        // 2. PETRÓLEO BRUTO: expansão motorizada dos anos 50–70, choques da OPEP
+        //    de 1973 e Revolução Iraniana de 1979, e contra-choque de 1986.
+        // =========================================================================
+        (
+            bem_id: "petroleo",
+            referencia_historica: "Motorização dos Trinta Gloriosos (1950–1972), embargo árabe da OPEP (1973), choque iraniano (1979) e contra-choque de eficiência/Mar do Norte (1986).",
+            amplitude_desvio_anos: 1.8,
+            amplitude_variacao_partida: 0.14,
+            amplitude_ciclo_curto: 0.07,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.85),
+                (ano: 1953.0, fator_demanda: 1.20, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.95),
+                (ano: 1962.0, fator_demanda: 1.46, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+                (ano: 1972.0, fator_demanda: 1.76, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+                (ano: 1980.0, fator_demanda: 1.84, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+                (ano: 1986.5, fator_demanda: 1.44, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.65),
+                (ano: 1991.0, fator_demanda: 1.54, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.80),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "refino_craqueamento_catalitico", delta_demanda: 0.08, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.04),
+                (tecnologia_id: "urbanismo_rodoviario_suburbano", delta_demanda: 0.14, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.05),
+                (tecnologia_id: "energia_eolica_solar_experimental", delta_demanda: -0.06, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: -0.04),
+            ],
+            choques_eventos: [
+                (
+                    evento_id: "crise_de_suez",
+                    ano_referencia: 1956.84,
+                    duracao_dias: 240,
+                    multiplicador_demanda: 1.18,
+                    multiplicador_procura_estrategica: 1.0,
+                    multiplicador_absorcao_excedente: 1.0,
+                    multiplicador_oferta_importacao_residual: 0.50,
+                ),
+                (
+                    evento_id: "primeiro_choque_petroleo_opep_1973",
+                    ano_referencia: 1973.79,
+                    duracao_dias: 760,
+                    multiplicador_demanda: 1.40,
+                    multiplicador_procura_estrategica: 1.0,
+                    multiplicador_absorcao_excedente: 1.0,
+                    multiplicador_oferta_importacao_residual: 0.18,
+                ),
+                (
+                    evento_id: "segundo_choque_petroleo_1979",
+                    ano_referencia: 1979.37,
+                    duracao_dias: 850,
+                    multiplicador_demanda: 1.44,
+                    multiplicador_procura_estrategica: 1.0,
+                    multiplicador_absorcao_excedente: 1.0,
+                    multiplicador_oferta_importacao_residual: 0.16,
+                ),
+                (
+                    evento_id: "eclosao_guerra_ira_iraque_1980",
+                    ano_referencia: 1980.73,
+                    duracao_dias: 540,
+                    multiplicador_demanda: 1.18,
+                    multiplicador_procura_estrategica: 1.0,
+                    multiplicador_absorcao_excedente: 1.0,
+                    multiplicador_oferta_importacao_residual: 0.42,
+                ),
+            ],
+        ),
+
+        // =========================================================================
+        // 3. COMBUSTÍVEIS REFINADOS: gasolina, diesel e querosene de aviação.
+        // =========================================================================
+        (
+            bem_id: "combustiveis_refinados",
+            referencia_historica: "Dieselização ferroviária/marítima, aviação comercial a jato e frota rodoviária pós-guerra, com repasse dos choques de 1973 e 1979.",
+            amplitude_desvio_anos: 1.8,
+            amplitude_variacao_partida: 0.12,
+            amplitude_ciclo_curto: 0.05,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.85),
+                (ano: 1955.0, fator_demanda: 1.22, fator_peso_pop: 1.28, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.95),
+                (ano: 1968.0, fator_demanda: 1.52, fator_peso_pop: 1.60, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+                (ano: 1979.0, fator_demanda: 1.66, fator_peso_pop: 1.65, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+                (ano: 1988.0, fator_demanda: 1.46, fator_peso_pop: 1.45, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.80),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "urbanismo_rodoviario_suburbano", delta_demanda: 0.12, delta_peso_pop: 0.20, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.04),
+            ],
+            choques_eventos: [
+                (
+                    evento_id: "primeiro_choque_petroleo_opep_1973",
+                    ano_referencia: 1973.79,
+                    duracao_dias: 700,
+                    multiplicador_demanda: 1.30,
+                    multiplicador_procura_estrategica: 1.0,
+                    multiplicador_absorcao_excedente: 1.0,
+                    multiplicador_oferta_importacao_residual: 0.25,
+                ),
+                (
+                    evento_id: "segundo_choque_petroleo_1979",
+                    ano_referencia: 1979.37,
+                    duracao_dias: 780,
+                    multiplicador_demanda: 1.34,
+                    multiplicador_procura_estrategica: 1.0,
+                    multiplicador_absorcao_excedente: 1.0,
+                    multiplicador_oferta_importacao_residual: 0.22,
+                ),
+            ],
+        ),
+
+        // =========================================================================
+        // 4. CARVÃO MINERAL: perde espaço estrutural para o petróleo, diesel e gás
+        //    no transporte e na calefação doméstica ao longo de 1950–1990.
+        // =========================================================================
+        (
+            bem_id: "carvao",
+            referencia_historica: "Declínio secular da hulha frente ao óleo diesel, óleo combustível e gás natural (fim das locomotivas a vapor, Lei do Ar Limpo e fechamento de minas europeias).",
+            amplitude_desvio_anos: 2.0,
+            amplitude_variacao_partida: 0.12,
+            amplitude_ciclo_curto: 0.05,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.78),
+                (ano: 1954.0, fator_demanda: 0.88, fator_peso_pop: 0.76, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.55),
+                (ano: 1964.0, fator_demanda: 0.72, fator_peso_pop: 0.48, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.32),
+                (ano: 1972.0, fator_demanda: 0.62, fator_peso_pop: 0.32, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.20),
+                (ano: 1980.0, fator_demanda: 0.68, fator_peso_pop: 0.28, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.26),
+                (ano: 1990.0, fator_demanda: 0.55, fator_peso_pop: 0.18, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.15),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "urbanismo_rodoviario_suburbano", delta_demanda: -0.06, delta_peso_pop: -0.10, delta_procura_estrategica: 0.0, delta_absorcao_excedente: -0.04),
+                (tecnologia_id: "gasodutos_oleodutos_transcontinentais", delta_demanda: -0.08, delta_peso_pop: -0.14, delta_procura_estrategica: 0.0, delta_absorcao_excedente: -0.05),
+                (tecnologia_id: "termoeletrica_ciclo_combinado", delta_demanda: -0.10, delta_peso_pop: -0.08, delta_procura_estrategica: 0.0, delta_absorcao_excedente: -0.05),
+            ],
+            choques_eventos: [],
+        ),
+
+        // =========================================================================
+        // 5. GÁS NATURAL: expansão por gasodutos continentais e calefação limpa.
+        // =========================================================================
+        (
+            bem_id: "gas_natural",
+            referencia_historica: "Expansão de gasodutos transcontinentais na América do Norte, Europa e URSS (Urengoy–Pomary–Uzhgorod) e geração térmica em ciclo combinado.",
+            amplitude_desvio_anos: 2.0,
+            amplitude_variacao_partida: 0.12,
+            amplitude_ciclo_curto: 0.05,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.75),
+                (ano: 1960.0, fator_demanda: 1.24, fator_peso_pop: 1.28, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.88),
+                (ano: 1975.0, fator_demanda: 1.50, fator_peso_pop: 1.52, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.95),
+                (ano: 1990.0, fator_demanda: 1.76, fator_peso_pop: 1.72, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "gasodutos_oleodutos_transcontinentais", delta_demanda: 0.14, delta_peso_pop: 0.18, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.05),
+                (tecnologia_id: "termoeletrica_ciclo_combinado", delta_demanda: 0.15, delta_peso_pop: 0.08, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.05),
+            ],
+            choques_eventos: [],
+        ),
+
+        // =========================================================================
+        // 6. BORRACHA NATURAL: breve boom na Guerra da Coreia (1950–52) seguido
+        //    de queda estrutural com o avanço da borracha sintética petroquímica.
+        // =========================================================================
+        (
+            bem_id: "borracha_natural",
+            referencia_historica: "Pico da Guerra da Coreia (1951) seguido de substituição irreversível por elastômeros sintéticos SBR/polibutadieno em pneus e vedação industrial.",
+            amplitude_desvio_anos: 2.0,
+            amplitude_variacao_partida: 0.15,
+            amplitude_ciclo_curto: 0.07,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.80),
+                (ano: 1951.0, fator_demanda: 1.16, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.90),
+                (ano: 1960.0, fator_demanda: 0.78, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.36),
+                (ano: 1972.0, fator_demanda: 0.56, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.18),
+                (ano: 1988.0, fator_demanda: 0.44, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.10),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "borracha_sintetica_elastomeros", delta_demanda: -0.20, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: -0.18),
+                (tecnologia_id: "polimeros_plasticos_moldados", delta_demanda: -0.08, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: -0.06),
+                (tecnologia_id: "fibras_sinteticas_poliester_kevlar", delta_demanda: -0.08, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: -0.06),
+            ],
+            choques_eventos: [],
+        ),
+
+        // =========================================================================
+        // 7. PLÁSTICOS SINTÉTICOS: expansão contínua substituindo madeira, vidro,
+        //    borracha natural e metais pesados.
+        // =========================================================================
+        (
+            bem_id: "plasticos_sinteticos",
+            referencia_historica: "Revolução petroquímica dos termoplásticos, fibras sintéticas e embalagens industriais (1950–1990).",
+            amplitude_desvio_anos: 1.8,
+            amplitude_variacao_partida: 0.12,
+            amplitude_ciclo_curto: 0.05,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.80),
+                (ano: 1958.0, fator_demanda: 1.34, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.92),
+                (ano: 1972.0, fator_demanda: 1.68, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+                (ano: 1988.0, fator_demanda: 1.94, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "polimeros_plasticos_moldados", delta_demanda: 0.14, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.05),
+                (tecnologia_id: "borracha_sintetica_elastomeros", delta_demanda: 0.12, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.04),
+                (tecnologia_id: "fibras_sinteticas_poliester_kevlar", delta_demanda: 0.12, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.04),
+            ],
+            choques_eventos: [],
+        ),
+
+        // =========================================================================
+        // 8. AÇO E MINÉRIO DE FERRO: auge na reconstrução pós-guerra (1948–1970) e
+        //    retração relativa na crise siderúrgica / Rust Belt dos anos 75–88.
+        // =========================================================================
+        (
+            bem_id: "aco",
+            referencia_historica: "Boom da reconstrução europeia/japonesa e infraestrutura nos anos 50–60, seguido de excesso de capacidade siderúrgica mundial (Rust Belt) e substituição por alumínio e polímeros nos anos 75–88.",
+            amplitude_desvio_anos: 2.0,
+            amplitude_variacao_partida: 0.12,
+            amplitude_ciclo_curto: 0.06,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.82),
+                (ano: 1956.0, fator_demanda: 1.30, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.95),
+                (ano: 1969.0, fator_demanda: 1.44, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.96),
+                (ano: 1979.0, fator_demanda: 1.04, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.48),
+                (ano: 1989.0, fator_demanda: 0.82, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.30),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "siderurgia_oxigenio_basico_ld", delta_demanda: 0.06, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.02),
+                (tecnologia_id: "materiais_compostos_fibra_carbono", delta_demanda: -0.10, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: -0.06),
+            ],
+            choques_eventos: [],
+        ),
+        (
+            bem_id: "minerio_ferro",
+            referencia_historica: "Acompanha o ciclo siderúrgico do pós-guerra, perdendo intensidade nos anos 80 com miniusinas de arco elétrico e reciclagem de sucata.",
+            amplitude_desvio_anos: 2.0,
+            amplitude_variacao_partida: 0.12,
+            amplitude_ciclo_curto: 0.06,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.80),
+                (ano: 1958.0, fator_demanda: 1.28, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.94),
+                (ano: 1970.0, fator_demanda: 1.38, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.92),
+                (ano: 1982.0, fator_demanda: 0.92, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.40),
+                (ano: 1990.0, fator_demanda: 0.76, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.26),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "reciclagem_industrial_gestao_residuos", delta_demanda: -0.10, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: -0.06),
+            ],
+            choques_eventos: [],
+        ),
+
+        // =========================================================================
+        // 9. ALUMÍNIO E BAUXITA: era do jato, eletrificação em alta tensão, corrida
+        //    espacial e alívio de peso automotivo pós-1973.
+        // =========================================================================
+        (
+            bem_id: "aluminio",
+            referencia_historica: "Transição da aviação militar da 2ª Guerra para jatos comerciais, cabos de transmissão de alta tensão, corrida espacial e embalagens leves.",
+            amplitude_desvio_anos: 1.8,
+            amplitude_variacao_partida: 0.13,
+            amplitude_ciclo_curto: 0.06,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.80),
+                (ano: 1948.0, fator_demanda: 0.94, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.72),
+                (ano: 1957.0, fator_demanda: 1.32, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.94),
+                (ano: 1969.0, fator_demanda: 1.64, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+                (ano: 1982.0, fator_demanda: 1.80, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.96),
+                (ano: 1990.0, fator_demanda: 1.88, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.96),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "metalurgia_aluminio_ligas_leves", delta_demanda: 0.15, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.05),
+                (tecnologia_id: "metalurgia_titanio_e_superligas", delta_demanda: 0.08, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.03),
+            ],
+            choques_eventos: [],
+        ),
+        (
+            bem_id: "bauxita",
+            referencia_historica: "Demanda primária impulsionada pela metalurgia do alumínio nos anos 50–70, moderada pela reciclagem industrial nos anos 80.",
+            amplitude_desvio_anos: 1.8,
+            amplitude_variacao_partida: 0.13,
+            amplitude_ciclo_curto: 0.06,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.80),
+                (ano: 1958.0, fator_demanda: 1.28, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.92),
+                (ano: 1972.0, fator_demanda: 1.56, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.96),
+                (ano: 1988.0, fator_demanda: 1.42, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.80),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "metalurgia_aluminio_ligas_leves", delta_demanda: 0.12, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.04),
+                (tecnologia_id: "reciclagem_industrial_gestao_residuos", delta_demanda: -0.14, delta_peso_pop: 0.0, delta_procura_estrategica: 0.0, delta_absorcao_excedente: -0.08),
+            ],
+            choques_eventos: [],
+        ),
+
+        // =========================================================================
+        // 10. ELETRÔNICOS E COBRE: do rádio valvulado à TV, transistores, circuitos
+        //     integrados, automação industrial e computadores pessoais nos anos 80.
+        // =========================================================================
+        (
+            bem_id: "eletronicos",
+            referencia_historica: "Ascensão secular da eletrônica: televisão (anos 50), circuitos integrados e mainframes (anos 60), microprocessadores e CLPs (anos 70) e PCs/redes digitais (anos 80).",
+            amplitude_desvio_anos: 1.6,
+            amplitude_variacao_partida: 0.14,
+            amplitude_ciclo_curto: 0.05,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.85),
+                (ano: 1955.0, fator_demanda: 1.32, fator_peso_pop: 1.38, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.95),
+                (ano: 1966.0, fator_demanda: 1.74, fator_peso_pop: 1.80, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+                (ano: 1978.0, fator_demanda: 2.28, fator_peso_pop: 2.35, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+                (ano: 1990.0, fator_demanda: 2.95, fator_peso_pop: 3.10, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 1.00),
+            ],
+            gatilhos_tecnologia: [
+                (tecnologia_id: "televisao_preto_e_branco_massa", delta_demanda: 0.10, delta_peso_pop: 0.18, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.02),
+                (tecnologia_id: "televisao_em_cores_difusao", delta_demanda: 0.12, delta_peso_pop: 0.22, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.02),
+                (tecnologia_id: "processamento_dados_mainframe_corporativo", delta_demanda: 0.14, delta_peso_pop: 0.06, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.03),
+                (tecnologia_id: "automacao_industrial_controladores_plc", delta_demanda: 0.16, delta_peso_pop: 0.05, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.03),
+                (tecnologia_id: "computadores_pessoais_escritorio", delta_demanda: 0.22, delta_peso_pop: 0.30, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.04),
+                (tecnologia_id: "redes_locais_ethernet_trabalho", delta_demanda: 0.16, delta_peso_pop: 0.15, delta_procura_estrategica: 0.0, delta_absorcao_excedente: 0.03),
+            ],
+            choques_eventos: [],
+        ),
+        (
+            bem_id: "cobre",
+            referencia_historica: "Expansão elétrica e telefônica de 1948–1973, moderada depois pela miniaturização eletrônica e cabos de alumínio/fibra.",
+            amplitude_desvio_anos: 2.0,
+            amplitude_variacao_partida: 0.13,
+            amplitude_ciclo_curto: 0.07,
+            pontos_era: [
+                (ano: 1945.0, fator_demanda: 1.00, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.82),
+                (ano: 1960.0, fator_demanda: 1.26, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.92),
+                (ano: 1972.0, fator_demanda: 1.36, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.92),
+                (ano: 1986.0, fator_demanda: 1.12, fator_peso_pop: 1.00, fator_procura_estrategica: 0.0, fator_absorcao_excedente: 0.68),
+            ],
+            gatilhos_tecnologia: [],
+            choques_eventos: [],
+        ),
+    ],
+)

@@ -211,12 +211,55 @@ pub struct Predio {
     pub lucro_ultimo_tick: f64,
     #[serde(default)]
     pub dividendos_ultimo_tick: f64,
+    /// Se `true`, o prédio está temporariamente fechado (inativo): para de produzir e consumir insumos,
+    /// demite os trabalhadores e mantém apenas custo baixo de conservação.
+    #[serde(default)]
+    pub fechado: bool,
+    /// Dias restantes de retomada gradual após reabrir (`0` = operando sem restrição de retomada).
+    #[serde(default)]
+    pub dias_retomada: u16,
+    /// Dias acumulados operando no prejuízo (usado para alertas no Jornal e histerese da IA).
+    #[serde(default)]
+    pub dias_prejuizo: u16,
+    /// Dias consecutivos desde que o prédio foi fechado.
+    #[serde(default)]
+    pub dias_fechado: u16,
+    /// Média móvel exponencial do lucro diário.
+    #[serde(default)]
+    pub lucro_ema: f64,
+    /// Tendência recente do lucro diário (`lucro_ultimo_tick - lucro_ema`).
+    #[serde(default)]
+    pub tendencia_lucro: f64,
+    /// Dia global (`dias_decorridos`) da última mudança de estado (fechar/reabrir/demolir).
+    #[serde(default)]
+    pub dia_ultima_mudanca_estado: u64,
 
     #[serde(skip)]
     pub(crate) cache: PredioCompilado,
 }
 
 impl Predio {
+    /// Duração padrão do período de retomada gradual ao reabrir um prédio fechado (em dias).
+    pub const TEMPO_RETOMADA_DIAS: u16 = 21;
+
+    /// Indica se o prédio está aberto porém ainda em fase de retomada gradual de capacidade.
+    #[inline]
+    pub fn esta_em_retomada(&self) -> bool {
+        !self.fechado && self.dias_retomada > 0
+    }
+
+    /// Fator multiplicador de capacidade ativa durante a retomada (`0.0` se fechado, `0.25..1.0` em retomada, `1.0` normal).
+    #[inline]
+    pub fn fator_retomada(&self) -> f64 {
+        if self.fechado {
+            0.0
+        } else if self.dias_retomada == 0 {
+            1.0
+        } else {
+            let frac = (self.dias_retomada as f64) / (Self::TEMPO_RETOMADA_DIAS as f64);
+            (1.0 - 0.75 * frac).clamp(0.25, 1.0)
+        }
+    }
     /// Escala efetiva de produção no último tick (níveis equivalentes, já com ocupação, insumos e acesso).
     #[inline]
     pub fn escala_efetiva(&self) -> f64 {

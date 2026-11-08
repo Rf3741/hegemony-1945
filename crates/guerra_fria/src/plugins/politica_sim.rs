@@ -12,7 +12,7 @@ use super::economy::RecursoMundo;
 use super::time::EventoTickDiario;
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, TaskPool, block_on, futures_lite::future};
-use sim_politica::{CatalogoPolitica, InstanciaPartido, LiderPolitico, PapelGrupoInteresse, CenarioPolitica, DataJogo, MundoPolitico, PaisPolitica, TipoCrisePolitica};
+use sim_politica::{CatalogoPolitica, Estrato, InstanciaPartido, LiderPolitico, ModificadorTemporario, PapelGrupoInteresse, CenarioPolitica, DataJogo, MundoPolitico, PaisPolitica, TipoCrisePolitica};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -41,6 +41,8 @@ pub enum ComandoPol {
     /// Troca o chefe de Estado (`estado`) ou de Governo de um país e aplica o ajuste de legitimidade.
     /// Aplicado ao país `tag` (não ao do jogador), por isso carrega a própria tag.
     Lider { tag: String, estado: bool, lider: LiderPolitico, delta_legitimidade: f64 },
+    /// Queda de aprovação e legitimidade por demissão em massa ao fechar/demolir grande empregador.
+    QuedaAprovacaoDesemprego { demitidos: f64, fracao_provincia: f64, motivo: String },
 }
 
 /// Instantâneo do país do jogador para a interface.
@@ -178,6 +180,31 @@ impl NucleoPol {
             ComandoPol::CancelarLei => {
                 p.lei_em_tramitacao = None;
                 Ok("Proposta de lei retirada.".into())
+            }
+            ComandoPol::QuedaAprovacaoDesemprego { demitidos, fracao_provincia, motivo } => {
+                let penalidade = (1.5 + (demitidos / 1000.0).min(3.5) + (fracao_provincia * 18.0).min(3.0)).clamp(1.5, 6.0);
+                for gi in p.grupos_interesse.values_mut() {
+                    let mult = if gi.id.contains("sindicato") || gi.id.contains("trabalha") || gi.id.contains("rural") || gi.id.contains("populis") {
+                        1.0
+                    } else {
+                        0.45
+                    };
+                    let delta = -penalidade * mult;
+                    gi.aprovacao = (gi.aprovacao + delta).clamp(-20.0, 20.0);
+                    gi.modificadores_temporarios.push(ModificadorTemporario {
+                        id: "fechamento_grande_empregador".into(),
+                        valor: delta,
+                        dias_restantes: 180,
+                    });
+                }
+                p.legitimidade = (p.legitimidade - penalidade * 1.1).clamp(0.0, 100.0);
+                for pop in &mut p.pops {
+                    if matches!(pop.estrato, Estrato::Baixo | Estrato::Medio) {
+                        let novos_rad = (demitidos * 0.15).min(pop.neutros() * 0.08).max(0.0);
+                        pop.radicais = (pop.radicais + novos_rad).min(pop.populacao);
+                    }
+                }
+                Ok(format!("Queda de aprovação popular (-{penalidade:.1}): {motivo}"))
             }
             ComandoPol::Lider { .. } => Ok(String::new()), // tratado no início da função
         }

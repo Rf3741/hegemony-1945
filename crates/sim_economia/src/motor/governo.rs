@@ -366,6 +366,20 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
         let obras_priv_ativas = pais.fila_construcao.iter().filter(|i| i.privado).count();
 
         if config.habilitar_investimento_privado_automatico
+            && (dias_decorridos + c_idx as u64).is_multiple_of(30)
+            && !pais.exige_propriedade_estatal_lei
+        {
+            crate::motor::gestao_predios::gerir_predios_setor_privado_pais(
+                catalogo,
+                &mercados[pais.mercado_idx],
+                estados,
+                pais,
+                provincias,
+                dias_decorridos,
+            );
+        }
+
+        if config.habilitar_investimento_privado_automatico
             && (dias_decorridos + c_idx as u64).is_multiple_of(7)
             && !pais.exige_propriedade_estatal_lei
             && cota_priv > 0.0
@@ -724,6 +738,13 @@ fn materializar_nivel_predio(
             folha_salarial_ultimo_tick: 0.0,
             lucro_ultimo_tick: 0.0,
             dividendos_ultimo_tick: 0.0,
+            fechado: false,
+            dias_retomada: 0,
+            dias_prejuizo: 0,
+            dias_fechado: 0,
+            lucro_ema: 0.0,
+            tendencia_lucro: 0.0,
+            dia_ultima_mudanca_estado: 0,
             cache: PredioCompilado::default(),
         };
         let _ = compilar_cache_predio(catalogo, &mut novo);
@@ -837,6 +858,15 @@ fn tentar_enfileirar_obra_privada(
                 continue;
             }
 
+            // Não expandir um prédio que está atualmente fechado nesta província (reabrir primeiro)
+            if prov
+                .predios
+                .iter()
+                .any(|b| b.cache.tipo_idx == tp_idx && b.fechado)
+            {
+                continue;
+            }
+
             // Não duplicar a mesma obra na mesma província enquanto pendente
             if pais
                 .fila_construcao
@@ -870,7 +900,8 @@ fn tentar_enfileirar_obra_privada(
             let vagas_abertas: f64 = prov
                 .predios
                 .iter()
-                .map(|b| (b.total_vagas() - b.total_empregados()).max(0.0))
+                .filter(|b| !b.fechado)
+                .map(|b| (b.total_vagas() * b.fator_retomada() - b.total_empregados()).max(0.0))
                 .sum();
             let mao_de_obra_liquida = desempregados + camponeses * 0.25 - vagas_abertas;
             if mao_de_obra_liquida < 250.0 {

@@ -51,6 +51,7 @@ fn tick_eventos(
     mut relogio: ResMut<RecursoRelogio>,
     cfg: Res<super::config::ConfigJogo>,
     opcoes: Option<Res<super::smoke::OpcoesCli>>,
+    mut eco: Option<ResMut<super::economia_sim::EconomiaSim>>,
 ) {
     let eh_espectador = opcoes.as_ref().is_some_and(|o| o.espectador_ativo());
     let data_salva = mundo.0.data;
@@ -62,7 +63,14 @@ fn tick_eventos(
             tick.nova_data.mes,
             tick.nova_data.dia,
         );
+        let antes = ev.estado.disparados.clone();
         avaliar_dia(&cat.0, &mut ev.estado, &mut mundo.0, &pais.0);
+        // Eventos históricos novos mudam os ciclos de demanda dos recursos.
+        if let Some(eco) = eco.as_mut() {
+            for id in ev.estado.disparados.keys().filter(|k| !antes.contains_key(*k)) {
+                eco.registrar_evento_historico(id);
+            }
+        }
         if eh_espectador {
             let pendentes = std::mem::take(&mut ev.estado.pendentes);
             for p in pendentes {

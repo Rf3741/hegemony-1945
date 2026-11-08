@@ -81,6 +81,12 @@ pub struct IaEconomia {
     pub obras_enfileiradas: u64,
     /// Ajustes de imposto realizados (total).
     pub ajustes_fiscais: u64,
+    /// Predios fechados temporariamente pela IA por prejuizo persistente.
+    pub predios_fechados: u64,
+    /// Predios reabertos pela IA quando voltaram a compensar.
+    pub predios_reabertos: u64,
+    /// Niveis de predios demolidos pela IA apos longo fechamento sem retorno.
+    pub predios_demolidos: u64,
     /// Provincias por pais (indices em `provincias()`), montado sob demanda.
     indice_provincias: BTreeMap<String, Vec<usize>>,
     n_provincias: usize,
@@ -118,9 +124,18 @@ impl IaEconomia {
         }
     }
 
-    // ---------------------------------------------------------------- fiscal (mensal)
+    // ---------------------------------------------------------------- fiscal e gestao de predios (mensal)
+
+    /// Avalia e executa fechamento, reabertura ou demolicao de predios deficitarios de `id` com histerese.
+    pub fn gerir_predios_pais(&mut self, mundo: &mut MundoEconomico, id: &str) {
+        let (f, r, d) = mundo.gerir_predios_ia_pais(id);
+        self.predios_fechados += f as u64;
+        self.predios_reabertos += r as u64;
+        self.predios_demolidos += d as u64;
+    }
 
     fn passo_mensal(&mut self, mundo: &mut MundoEconomico, id: &str, dia: u64) {
+        self.gerir_predios_pais(mundo, id);
         let Some(p) = mundo.obter_pais(id) else { return };
         let postura = classificar(p);
         let est = self.estados.entry(id.to_string()).or_default();
@@ -303,6 +318,9 @@ impl IaEconomia {
         let mut niveis_construcao = 0.0;
         for &pi in &idx {
             for b in &mundo.provincias()[pi].predios {
+                if b.fechado {
+                    continue;
+                }
                 if let Some(ti) = cat.tipos_predio.iter().position(|t| t.id == b.tipo_predio_id) {
                     let e = retorno.entry(ti).or_default();
                     e.0 += b.lucro_ultimo_tick;
@@ -362,6 +380,9 @@ impl IaEconomia {
             let mut melhor: Option<(f64, usize)> = None;
             for &pi in &idx {
                 let pr = &mundo.provincias()[pi];
+                if pr.predios.iter().any(|b| b.fechado && b.tipo_predio_id == t.id) {
+                    continue;
+                }
                 let acesso = mundo.obter_estado(&pr.estado_id).map_or(1.0, |e| e.acesso_mercado);
                 let score = if t.categoria == CategoriaPredio::Infraestrutura {
                     if acesso >= 0.92 { continue }
