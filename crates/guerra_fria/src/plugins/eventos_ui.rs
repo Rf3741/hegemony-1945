@@ -50,6 +50,7 @@ fn tick_eventos(
     mut ev: ResMut<EstadoEv>,
     mut relogio: ResMut<RecursoRelogio>,
     cfg: Res<super::config::ConfigJogo>,
+    tutorial: Option<Res<super::tutorial_guiado::TutorialGuiado>>,
     opcoes: Option<Res<super::smoke::OpcoesCli>>,
     mut eco: Option<ResMut<super::economia_sim::EconomiaSim>>,
 ) {
@@ -96,6 +97,18 @@ fn tick_eventos(
         }
         return;
     }
+    if tutorial.as_ref().is_some_and(|t| t.ativo) {
+        // No tutorial guiado, resolve automaticamente eventos urgentes na primeira opção
+        // para alimentar o Jornal (J) sem pausar o relógio nem bloquear o mapa.
+        while let Some(pend) = ev.estado.pendentes.first().cloned() {
+            if let Some(evento) = cat.0.por_id(&pend.evento_id).cloned() {
+                aplicar_opcao(&mut mundo.0, &mut ev.estado, &evento, 0, &pend.pais);
+            } else {
+                ev.estado.pendentes.remove(0);
+            }
+        }
+        return;
+    }
     // Enquanto houver decisão pendente o tempo fica parado.
     if !ev.estado.pendentes.is_empty() && cfg.partida.pausar_em_eventos {
         if !relogio.pausado {
@@ -126,9 +139,10 @@ fn popup_evento(
     cfg: Res<super::config::ConfigJogo>,
     elenco: Option<Res<super::personagens_sim::ElencoRes>>,
     mut retratos: Option<ResMut<super::personagens_ui::Retratos>>,
+    tutorial: Option<Res<super::tutorial_guiado::TutorialGuiado>>,
     opcoes: Option<Res<super::smoke::OpcoesCli>>,
 ) -> Result {
-    if opcoes.as_ref().is_some_and(|o| o.espectador_ativo()) {
+    if tutorial.as_ref().is_some_and(|t| t.ativo) || opcoes.as_ref().is_some_and(|o| o.espectador_ativo()) {
         return Ok(());
     }
     let Some(pend) = ev.estado.pendentes.first().cloned() else { return Ok(()) };
@@ -256,32 +270,45 @@ fn popup_evento(
     Ok(())
 }
 
-fn jornal(mut contextos: EguiContexts, ev: Res<EstadoEv>) -> Result {
-    if !ev.jornal_aberto || ev.estado.jornal.is_empty() {
+fn jornal(
+    mut contextos: EguiContexts,
+    ev: Res<EstadoEv>,
+    tutorial: Option<Res<super::tutorial_guiado::TutorialGuiado>>,
+) -> Result {
+    let em_tutorial = tutorial.as_ref().is_some_and(|t| t.ativo);
+    if !ev.jornal_aberto || (ev.estado.jornal.is_empty() && !em_tutorial) {
         return Ok(());
     }
+    let ctx = contextos.ctx_mut()?;
+    let tela = ctx.viewport_rect();
+    let livre = super::ui::area_livre_mapa(ctx);
+    let dx = -(tela.max.x - livre.max.x).max(0.0) - 10.0;
     ui_refinada::janela_dossie("Jornal (J)", None)
-        .anchor(egui::Align2::RIGHT_BOTTOM, [-10.0, -10.0])
+        .anchor(egui::Align2::RIGHT_BOTTOM, [dx, -58.0])
         .default_width(360.0)
         .resizable(false)
-        .show(contextos.ctx_mut()?, |ui| {
+        .show(ctx, |ui| {
             ui_refinada::faixa_titulo(ui, "Jornal e Telegramas", Some("J"), None);
-            egui::ScrollArea::vertical().id_salt("scroll_jornal").max_height(320.0).show(ui, |ui| {
-                for n in ev.estado.jornal.iter().rev().take(12) {
-                    ui.horizontal(|ui| {
-                        ui_refinada::glifo_ui(ui, "jornal", 13.0, Some(CARIMBO));
-                        ui.label(
-                            egui::RichText::new(format!("{:02}/{:02}/{}", n.data.2, n.data.1, n.data.0))
-                                .family(ui_refinada::familia_oswald(ui.ctx()))
-                                .size(13.0)
-                                .strong()
-                                .color(ui_refinada::menu::AZUL_MARINHO),
-                        );
-                    });
-                    ui.label(egui::RichText::new(&n.texto).color(TINTA));
-                    ui_refinada::linha_decorativa(ui);
-                }
-            });
+            if ev.estado.jornal.is_empty() {
+                ui.label(egui::RichText::new("Nenhum telegrama recente.").color(TINTA_SUAVE));
+            } else {
+                egui::ScrollArea::vertical().id_salt("scroll_jornal").max_height(320.0).show(ui, |ui| {
+                    for n in ev.estado.jornal.iter().rev().take(12) {
+                        ui.horizontal(|ui| {
+                            ui_refinada::glifo_ui(ui, "jornal", 13.0, Some(CARIMBO));
+                            ui.label(
+                                egui::RichText::new(format!("{:02}/{:02}/{}", n.data.2, n.data.1, n.data.0))
+                                    .family(ui_refinada::familia_oswald(ui.ctx()))
+                                    .size(13.0)
+                                    .strong()
+                                    .color(ui_refinada::menu::AZUL_MARINHO),
+                            );
+                        });
+                        ui.label(egui::RichText::new(&n.texto).color(TINTA));
+                        ui_refinada::linha_decorativa(ui);
+                    }
+                });
+            }
         });
     Ok(())
 }

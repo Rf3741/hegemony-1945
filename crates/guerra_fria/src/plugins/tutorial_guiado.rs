@@ -161,7 +161,7 @@ pub static PASSOS: [Passo; 18] = [
     },
     Passo {
         titulo: "A tela e a fila de obras",
-        texto: "A tela de construção (tecla B ou botão verde) mostra todos os modos de mapa de potencial e a fila de obras, com o progresso de cada uma, estatal ou privada. Abra-a para ver a sua obra na fila.",
+        texto: "A tela de construção (tecla B ou botão no topo) mostra todos os modos de mapa de potencial e a fila de obras, com o progresso de cada uma, estatal ou privada. Abra-a para ver a sua obra na fila.",
         objetivo: "Abra a tela de construção (B).",
         alvo: Alvo::Widget("btn_construir"),
         teclas: &[KeyB],
@@ -201,7 +201,7 @@ pub static PASSOS: [Passo; 18] = [
     },
     Passo {
         titulo: "Tecnologia (5)",
-        texto: "Abra a Tecnologia, procure uma pesquisa disponível e clique em \"Pesquisar\" (ou \"+ Fila\"). Tecnologias liberam prédios e métodos de produção melhores.",
+        texto: "Abra a Tecnologia, escolha um ramo e clique num cartão disponível na árvore (ou Shift+clique para pôr na fila). Tecnologias liberam prédios e métodos de produção melhores.",
         objetivo: "Comece uma pesquisa.",
         alvo: Alvo::WidgetEJanelas("btn_tec"),
         teclas: &[Digit5, Numpad5],
@@ -363,6 +363,7 @@ pub struct TutorialGuiado {
     pub ativo: bool,
     /// Pedido do menu: configurar a partida ao entrar em Jogando.
     pub pendente: bool,
+    pub proximo_pendente: bool,
     maquina: Option<Maquina>,
     /// Passo cujas preparações (fechar painéis, centrar câmera) já foram aplicadas.
     aplicado: Option<usize>,
@@ -374,6 +375,18 @@ impl TutorialGuiado {
     /// Chamado pelo botão do menu.
     pub fn iniciar(&mut self) {
         *self = Self { ativo: true, pendente: true, ..Default::default() };
+    }
+
+    pub fn passo_atual(&self) -> Option<usize> {
+        self.maquina.as_ref().map(|m| m.passo)
+    }
+
+    pub fn estado(&self) -> Option<EstadoTut> {
+        self.maquina.as_ref().map(|m| m.estado)
+    }
+
+    pub fn pedir_proximo(&mut self) {
+        self.proximo_pendente = true;
     }
 }
 
@@ -394,12 +407,18 @@ impl Plugin for TutorialGuiadoPlugin {
                     .run_if(ativo)
                     .run_if(in_state(AppState::Jogando)),
             )
-            .add_systems(EguiPrimaryContextPass, desenhar.run_if(ativo).run_if(crate::estado::em_partida));
+            .add_systems(
+                EguiPrimaryContextPass,
+                desenhar
+                    .after(super::ui::painel_provincia)
+                    .run_if(ativo)
+                    .run_if(crate::estado::em_partida),
+            );
     }
 }
 
 #[derive(SystemParam)]
-struct Paineis<'w> {
+pub(crate) struct Paineis<'w> {
     pais: ResMut<'w, PainelPais>,
     mercado: ResMut<'w, PainelMercado>,
     comercio: ResMut<'w, PainelComercio>,
@@ -407,6 +426,7 @@ struct Paineis<'w> {
     diplo: Option<ResMut<'w, PainelDiplomacia>>,
     tec: Option<ResMut<'w, TecnologiaSim>>,
     eventos: Option<ResMut<'w, EstadoEv>>,
+    saves: Option<ResMut<'w, super::menu_saves::JanelaSaves>>,
 }
 
 impl Paineis<'_> {
@@ -424,11 +444,14 @@ impl Paineis<'_> {
         if let Some(e) = self.eventos.as_mut() {
             e.jornal_aberto = false;
         }
+        if let Some(s) = self.saves.as_mut() {
+            s.aberta = false;
+        }
     }
 }
 
 #[derive(SystemParam)]
-struct Entradas<'w, 's> {
+pub(crate) struct Entradas<'w, 's> {
     camera: Query<'w, 's, (&'static Camera, &'static GlobalTransform, &'static mut Transform, &'static mut Projection), With<Camera2d>>,
     selecionada: Res<'w, ProvinciaSelecionada>,
     mundo: Res<'w, RecursoMundo>,
@@ -466,7 +489,7 @@ fn coletar(e: &mut Entradas, p: &Paineis, t: &mut TutorialGuiado) -> Fatos {
     }
 }
 
-/// Primeiro quadro em Jogando: pausa o relógio e cria a máquina.
+/// Primeiro quadro em Jogando: pausa o relógio, centra a câmera nos EUA e cria a máquina.
 fn iniciar_partida(mut t: ResMut<TutorialGuiado>, mut e: Entradas, mut p: Paineis) {
     if !t.pendente {
         return;
@@ -474,17 +497,32 @@ fn iniciar_partida(mut t: ResMut<TutorialGuiado>, mut e: Entradas, mut p: Painei
     t.pendente = false;
     e.relogio.pausado = true; // via Entradas: pedir RecursoRelogio de novo aqui conflitava (B0002)
     p.fechar_todos();
+    if let Ok((_, _, mut tf, mut proj)) = e.camera.single_mut() {
+        let pos_eua = visual_mapa::projecao::geo_para_mundo(-96.0, 38.5);
+        tf.translation.x = pos_eua.x;
+        tf.translation.y = pos_eua.y;
+        if let Projection::Orthographic(o) = &mut *proj {
+            o.scale = 0.75;
+        }
+    }
     let f = coletar(&mut e, &p, &mut t);
     t.maquina = Some(Maquina::nova(&f));
     t.aplicado = None;
 }
 
-fn avancar_passos(mut t: ResMut<TutorialGuiado>, mut e: Entradas, mut p: Paineis) {
+pub(crate) fn avancar_passos(mut t: ResMut<TutorialGuiado>, mut e: Entradas, mut p: Paineis) {
     // Contabiliza pedidos de obra antes de `aplicar_pedidos` esvaziá-los.
     t.obras += p.constr.pedidos.len() as u32;
     let f = coletar(&mut e, &p, &mut t);
     let Some(mut m) = t.maquina.take() else { return };
-    if m.atualizar(&f) {
+    let mut mudou = m.atualizar(&f);
+    if t.proximo_pendente {
+        t.proximo_pendente = false;
+        if m.proximo(&f) {
+            mudou = true;
+        }
+    }
+    if mudou {
         p.fechar_todos();
     }
     t.maquina = Some(m);
@@ -503,20 +541,16 @@ fn bloquear_teclas(mut teclas: ResMut<ButtonInput<KeyCode>>, t: Res<TutorialGuia
 // Interface
 // ---------------------------------------------------------------------------------------------
 
-fn uniao(a: Option<egui::Rect>, b: egui::Rect) -> egui::Rect {
-    a.map_or(b, |a| a.union(b))
-}
-
-/// Retângulos das janelas abertas (áreas de ordem Middle, exceto elementos fixos do mapa).
-fn janelas_abertas(ctx: &egui::Context) -> Vec<egui::Rect> {
-    let ignorar = [egui::Id::new("seletor_modo_mapa"), egui::Id::new("legenda_mapa")];
-    ctx.memory(|mem| {
-        mem.layer_ids()
-            .filter(|l| l.order == egui::Order::Middle && !ignorar.contains(&l.id))
-            .filter_map(|l| mem.area_rect(l.id))
-            .filter(|r| r.width() > 120.0 && r.height() > 60.0)
-            .collect()
-    })
+/// Retângulo da janela aberta correspondente ao alvo do passo (se estiver aberta no momento).
+fn janela_do_alvo(ctx: &egui::Context, p: &Paineis, nome_alvo: &str) -> Option<egui::Rect> {
+    let chave = match nome_alvo {
+        "btn_pais" if p.pais.aberto => "janela_pais",
+        "btn_diplo" if p.diplo.as_ref().is_some_and(|d| d.aberto) => "janela_diplo",
+        "btn_tec" if p.tec.as_ref().is_some_and(|t| t.aberto) => "janela_tec",
+        "salvar" if p.saves.as_ref().is_some_and(|s| s.aberta) => "janela_saves",
+        _ => return None,
+    };
+    alvo_recente(ctx, chave)
 }
 
 fn posicao_provincia(estado: &str, cat: &RecursoCatalogo, mundo: &RecursoMundo, dados: &DadosMapa) -> Option<Vec2> {
@@ -525,7 +559,12 @@ fn posicao_provincia(estado: &str, cat: &RecursoCatalogo, mundo: &RecursoMundo, 
         .iter()
         .filter(|p| p.estado == estado && mundo.dono_por_provincia.get(&p.id).is_some_and(|d| d == "USA"))
         .max_by(|a, b| a.area.partial_cmp(&b.area).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|p| Vec2::new(p.centroide_px.0 as f32 - dados.largura as f32 / 2.0, dados.altura as f32 / 2.0 - p.centroide_px.1 as f32))
+        .map(|p| {
+            Vec2::new(
+                p.centroide_px.0 as f32 - dados.largura as f32 / 2.0,
+                (dados.altura as f32 / 2.0 - p.centroide_px.1 as f32) * gf_mapa::mapa::ESCALA_Y_MAPA,
+            )
+        })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -559,13 +598,15 @@ fn desenhar(
         None
     };
     if t.aplicado != Some(m.passo) {
-        t.aplicado = Some(m.passo);
         if let (Some(pp), Ok((_, _, mut tf, mut proj))) = (pos_prov, e.camera.single_mut()) {
             tf.translation.x = pp.x;
             tf.translation.y = pp.y;
             if let Projection::Orthographic(o) = &mut *proj {
                 o.scale = o.scale.clamp(0.3, 1.2);
             }
+            t.aplicado = Some(m.passo);
+        } else if !matches!(passo.alvo, Alvo::Provincia(_)) {
+            t.aplicado = Some(m.passo);
         }
     }
 
@@ -574,18 +615,12 @@ fn desenhar(
     let mut circulo = false;
     match passo.alvo {
         Alvo::Mapa => {
-            // Área do mapa: abaixo das barras do topo e à esquerda do painel da província.
-            let topo = alvo_recente(&ctx, "hud").map_or(130.0, |h| h.max.y + 70.0);
-            let direita = alvo_recente(&ctx, "painel_provincia").map_or(tela.max.x, |r| r.min.x);
-            buraco = Some(egui::Rect::from_min_max(egui::pos2(tela.min.x, topo), egui::pos2(direita, tela.max.y)));
+            buraco = Some(super::ui::area_livre_mapa(&ctx));
         }
         Alvo::Teclado => {}
         Alvo::Widget(n) => buraco = alvo_recente(&ctx, n),
         Alvo::WidgetEJanelas(n) => {
-            buraco = alvo_recente(&ctx, n);
-            for r in janelas_abertas(&ctx) {
-                buraco = Some(uniao(buraco, r));
-            }
+            buraco = janela_do_alvo(&ctx, &p, n).or_else(|| alvo_recente(&ctx, n));
         }
         Alvo::Provincia(_) => {
             if let (Some(pp), Ok((cam, gt, _, _))) = (pos_prov, e.camera.single())
@@ -597,7 +632,8 @@ fn desenhar(
         }
     }
     let confirmando = m.estado == EstadoTut::ConfirmandoSaida;
-    let buraco_efetivo = if confirmando { None } else { buraco.map(|b| b.expand(6.0).intersect(tela)) };
+    let margem_buraco = if matches!(passo.alvo, Alvo::Mapa) { 0.0 } else { 6.0 };
+    let buraco_efetivo = if confirmando { None } else { buraco.map(|b| b.expand(margem_buraco).intersect(tela)) };
 
     // Overlay: quatro faixas em volta do buraco (ou a tela toda). Elas consomem os cliques.
     let escuro = egui::Color32::from_black_alpha(165);
@@ -628,9 +664,11 @@ fn desenhar(
         } else if !matches!(passo.alvo, Alvo::Mapa) {
             pintor.rect_stroke(r, 4.0, egui::Stroke::new(3.5, cor), egui::StrokeKind::Outside);
         }
-        if !matches!(passo.alvo, Alvo::Mapa) {
+        if !matches!(passo.alvo, Alvo::Mapa) && (b.width() < 450.0 || b.height() < 260.0) {
             let salto = 6.0 * (tempo * 6.0).sin().abs();
-            let (ponta, dir) = if b.min.y - tela.min.y > 90.0 {
+            let (ponta, dir) = if b.max.x >= tela.max.x - 20.0 && b.height() > 180.0 {
+                (egui::pos2(b.min.x - 6.0 - salto, b.center().y), egui::vec2(1.0, 0.0))
+            } else if b.min.y - tela.min.y > 90.0 {
                 (egui::pos2(b.center().x, b.min.y - 6.0 - salto), egui::vec2(0.0, 1.0))
             } else if tela.max.y - b.max.y > 90.0 {
                 (egui::pos2(b.center().x, b.max.y + 6.0 + salto), egui::vec2(0.0, -1.0))
@@ -646,15 +684,20 @@ fn desenhar(
 
     // Caixa do tutorial (sempre interativa), fora do buraco.
     let larg = 390.0;
-    let alt = 230.0;
+    let alt = 270.0;
     let cands = [
-        egui::pos2(tela.min.x + 16.0, tela.max.y - alt - 16.0),
-        egui::pos2(tela.max.x - larg - 16.0, tela.max.y - alt - 16.0),
-        egui::pos2(tela.min.x + 16.0, tela.min.y + 120.0),
-        egui::pos2(tela.max.x - larg - 16.0, tela.min.y + 120.0),
+        egui::pos2(tela.min.x + 16.0, tela.max.y - alt - 56.0),
+        egui::pos2(tela.max.x - larg - 16.0, tela.max.y - alt - 56.0),
+        egui::pos2(tela.min.x + 16.0, tela.min.y + 124.0),
+        egui::pos2(tela.max.x - larg - 16.0, tela.min.y + 124.0),
     ];
-    let livre = |pos: &egui::Pos2| buraco_efetivo.is_none_or(|b| !b.expand(30.0).intersects(egui::Rect::from_min_size(*pos, egui::vec2(larg, alt))));
-    let pos_caixa = if confirmando { egui::pos2(tela.center().x - larg / 2.0, tela.center().y - 80.0) } else { cands.iter().copied().find(livre).unwrap_or(cands[0]) };
+    let livre = |pos: &egui::Pos2| buraco_efetivo.is_none_or(|b| !b.expand(24.0).intersects(egui::Rect::from_min_size(*pos, egui::vec2(larg, alt))));
+    let pos_caixa = if confirmando {
+        egui::pos2(tela.center().x - larg / 2.0, tela.center().y - 80.0)
+    } else {
+        let p = cands.iter().copied().find(livre).unwrap_or(cands[0]);
+        egui::pos2(p.x, p.y.clamp(tela.min.y + 10.0, (tela.max.y - alt - 16.0).max(tela.min.y + 10.0)))
+    };
 
     let moldura = ui_refinada::moldura_janela_papel();
     let mut acao_proximo = false;
@@ -665,9 +708,8 @@ fn desenhar(
     let mut acao_livre = false;
     let mut acao_menu = false;
     egui::Area::new(egui::Id::new("tut_caixa")).order(egui::Order::Tooltip).fixed_pos(pos_caixa).interactable(true).show(&ctx, |ui| {
-        moldura.show(ui, |ui| {
+        let resp = moldura.show(ui, |ui| {
             ui.set_width(larg);
-            ui_refinada::decorar_janela(ui);
             ui.style_mut().visuals.override_text_color = Some(TINTA);
             if confirmando {
                 ui.label(
@@ -725,6 +767,7 @@ fn desenhar(
                 });
             });
         });
+        ui_refinada::desenhar_moldura_dupla_com_cantos(ui.painter(), resp.response.rect);
     });
 
     let mut mudou = false;
@@ -878,5 +921,101 @@ mod testes {
         assert!(m.ultimo());
         assert!(!m.proximo(&f));
         assert_eq!(m.estado, EstadoTut::Concluido);
+    }
+
+    #[test]
+    fn tutorial_completo_passo_a_passo_ate_o_fim() {
+        let mut f = base();
+        let mut m = Maquina::nova(&f);
+        assert_eq!(m.passo, 0);
+
+        // Passo 0: Mover câmera
+        f.camera = (15, 0, 20);
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 1);
+
+        // Passo 1: Selecionar Califórnia (província USA)
+        f.prov_id = 101;
+        f.prov_usa = true;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 2);
+
+        // Passo 2: HUD (Manual -> Próximo)
+        assert!(m.proximo(&f));
+        assert_eq!(m.passo, 3);
+
+        // Passo 3: Relógio continuar
+        f.pausado = false;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 4);
+
+        // Passo 4: Velocidade
+        f.velocidade = 3;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 5);
+
+        // Passo 5: Pausar
+        f.pausado = true;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 6);
+
+        // Passo 6: Modo de mapa
+        f.modo_mapa = "Pib".into();
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 7);
+
+        // Passo 7: Escolher Texas (província USA diferente)
+        f.prov_id = 202;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 8);
+
+        // Passo 8: Construir um prédio
+        f.obras += 1;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 9);
+
+        // Passo 9: Abrir construção
+        f.construcao_aberta = true;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 10);
+
+        // Passo 10: Mercado (2)
+        f.mercado_aberto = true;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 11);
+
+        // Passo 11: Comércio (3)
+        f.comercio_aberto = true;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 12);
+
+        // Passo 12: Política (1) - propor lei
+        f.lei_em_tramitacao = true;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 13);
+
+        // Passo 13: Diplomacia (4) - relações GBR
+        f.relacao_gbr += 10.0;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 14);
+
+        // Passo 14: Tecnologia (5) - pesquisando
+        f.pesquisando = true;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 15);
+
+        // Passo 15: Jornal (J)
+        f.jornal_aberto = true;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 16);
+
+        // Passo 16: Salvar
+        f.salvos += 1;
+        assert!(m.atualizar(&f));
+        assert_eq!(m.passo, 17);
+
+        // Passo 17: Último passo (Manual)
+        assert!(m.ultimo());
+        assert_eq!(m.passo, PASSOS.len() - 1);
     }
 }

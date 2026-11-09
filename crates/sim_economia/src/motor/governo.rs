@@ -1021,7 +1021,7 @@ fn tentar_enfileirar_obra_privada(
             continue;
         }
         escolhidos.push((p_idx, tp_idx));
-        let just = format!("Retorno: £{lucro_est:.0}/dia");
+        let just = format!("Retorno: ${lucro_est:.0}/dia");
         pais.fila_construcao.push(ItemConstrucao {
             provincia_id: provincias[p_idx].id.clone(),
             tipo_predio_id: catalogo.tipos_predio[tp_idx].id.clone(),

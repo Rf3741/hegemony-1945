@@ -136,6 +136,7 @@ struct Anterior {
     negativo: bool,
     obras_na_fila: usize,
     calote: bool,
+    tecnologias_concluidas: usize,
 }
 
 pub struct JogadorPlugin;
@@ -235,14 +236,16 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
             egui::RichText::new(&p.nome)
                 .family(ui_refinada::familia_oswald(ui.ctx()))
                 .size(16.0)
-                .strong(),
+                .strong()
+                .color(ui_refinada::menu::TINTA),
         );
         ui.separator();
+        let val_txt = |t: String| egui::RichText::new(t).strong().color(ui_refinada::menu::TINTA);
         match (&eco.vista.pais, eco.vista.pais_id.is_empty()) {
             (Some(pe), false) => {
                 let o = &pe.orcamento;
                 ui.label(egui::RichText::new("Tesouro").small().color(suave));
-                dica_com(ui.strong(fmt_din(o.tesouro)), "tooltip_topbar_tesouro", |ui| {
+                dica_com(ui.label(val_txt(fmt_din(o.tesouro))), "tooltip_topbar_tesouro", |ui| {
                     ui.label(format!("Tesouro atual: {} | Dívida: {} | Saldo/dia: {}", fmt_din(o.tesouro), fmt_din(o.divida), fmt_din(o.saldo_diario)));
                 });
                 ui.label(egui::RichText::new("Saldo/dia").small().color(suave));
@@ -251,30 +254,30 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
                     ui.label(format!("Saldo diário atual: {} (por ano: {})", fmt_din(o.saldo_diario), fmt_din(o.saldo_diario * 365.0)));
                 });
                 ui.label(egui::RichText::new("Dívida").small().color(suave));
-                dica_conceito(ui.strong(fmt_din(o.divida)), "divida_publica");
+                dica_conceito(ui.label(val_txt(fmt_din(o.divida))), "divida_publica");
                 ui.separator();
                 ui.label(egui::RichText::new("PIB").small().color(suave));
-                dica_conceito(ui.strong(fmt_din(eco.vista.pib_anual)), "produtividade_do_trabalho");
+                dica_conceito(ui.label(val_txt(fmt_din(eco.vista.pib_anual))), "produtividade_do_trabalho");
                 ui.label(egui::RichText::new("Pop.").small().color(suave));
-                dica_conceito(ui.strong(fmt_pop(eco.vista.populacao as u64)), "pop");
+                dica_conceito(ui.label(val_txt(fmt_pop(eco.vista.populacao as u64))), "pop");
                 ui.label(egui::RichText::new("Padrão de vida").small().color(suave));
-                dica_conceito(ui.strong(format!("{:.1}", eco.vista.padrao_vida)), "padrao_de_vida");
+                dica_conceito(ui.label(val_txt(format!("{:.1}", eco.vista.padrao_vida))), "padrao_de_vida");
                 ui.label(egui::RichText::new("Desemprego").small().color(suave));
-                dica_conceito(ui.strong(format!("{:.1}%", eco.vista.desemprego * 100.0)), "estrato_social");
+                dica_conceito(ui.label(val_txt(format!("{:.1}%", eco.vista.desemprego * 100.0))), "estrato_social");
                 if o.em_calote {
                     ui.colored_label(ui_refinada::menu::PERIGO, egui::RichText::new("CALOTE").strong());
                 }
             }
             _ => {
                 ui.label(egui::RichText::new("PIB").small().color(suave));
-                ui.strong(fmt_din(p.pib_anual_estimado));
+                ui.label(val_txt(fmt_din(p.pib_anual_estimado)));
                 ui.label(egui::RichText::new("Pop.").small().color(suave));
-                ui.strong(fmt_pop(p.populacao_total()));
+                ui.label(val_txt(fmt_pop(p.populacao_total())));
                 ui.label(egui::RichText::new("(economia detalhada indisponível)").italics().color(suave));
             }
         }
         ui.label(egui::RichText::new("Legitimidade").small().color(suave));
-        dica_com(ui.strong(format!("{:.0}%", p.politica.legitimidade)), "tooltip_topbar_legitimidade", |ui| {
+        dica_com(ui.label(val_txt(format!("{:.0}%", p.politica.legitimidade))), "tooltip_topbar_legitimidade", |ui| {
             ui.label(format!("Legitimidade atual: {:.1}%", p.politica.legitimidade));
         });
         if eco.atraso_dias() > 10 || eco.dias_perdidos > 0 {
@@ -306,9 +309,6 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
         if b_com.clicked() {
             *comercio_aberto = !*comercio_aberto;
         }
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
-        ui_refinada::theme::icone::desenhar(ui.painter(), rect, "estrela", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
-        ui.label(egui::RichText::new("Tecnologia (5)").color(ui_refinada::menu::TINTA_SUAVE));
         let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
         ui_refinada::theme::icone::desenhar(ui.painter(), rect, "livro", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
         ui.label(egui::RichText::new("Enciclopédia (8)").color(ui_refinada::menu::TINTA_SUAVE));
@@ -343,6 +343,7 @@ fn detectar_eventos(
     mundo: Res<RecursoMundo>,
     mut eco: Option<ResMut<EconomiaSim>>,
     mut pol: Option<ResMut<PoliticaSim>>,
+    mut tec: Option<ResMut<super::tecnologia_ui::TecnologiaSim>>,
     tempo: Res<Time<Real>>,
     mut ant: ResMut<Anterior>,
     mut notas: ResMut<Notificacoes>,
@@ -369,6 +370,16 @@ fn detectar_eventos(
             }
         }
     }
+    if let Some(tec) = tec.as_mut() {
+        if ant.tag != jogador.0 {
+            ant.tecnologias_concluidas = tec.concluidas_jogador.len();
+        } else if tec.concluidas_jogador.len() > ant.tecnologias_concluidas {
+            for t in &tec.concluidas_jogador[ant.tecnologias_concluidas..] {
+                notas.push(format!("Pesquisa concluída: {t}"), agora);
+            }
+            ant.tecnologias_concluidas = tec.concluidas_jogador.len();
+        }
+    }
 
     ant.calote = calote;
     let negativo = calote;
@@ -383,14 +394,20 @@ fn detectar_eventos(
     ant.negativo = negativo;
 }
 
-fn toasts(mut contextos: EguiContexts, tempo: Res<Time<Real>>, mut notas: ResMut<Notificacoes>) -> Result {
+fn toasts(
+    mut contextos: EguiContexts,
+    tempo: Res<Time<Real>>,
+    mut notas: ResMut<Notificacoes>,
+    tutorial: Option<Res<super::tutorial_guiado::TutorialGuiado>>,
+) -> Result {
     let agora = tempo.elapsed_secs_f64();
     notas.0.retain(|(_, t, _)| agora - t < 6.0);
-    if notas.0.is_empty() {
+    if notas.0.is_empty() || tutorial.as_ref().is_some_and(|t| t.ativo) {
         return Ok(());
     }
     // Acima dos botões fixos "Rankings (7)" e "Configurações" (canto inferior esquerdo).
     egui::Area::new("toasts".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -64.0]).show(contextos.ctx_mut()?, |ui| {
+        ui.set_width(260.0);
         for (txt, _, repeticoes) in notas.0.iter().rev().take(3) {
             egui::Frame::NONE
                 .fill(ui_refinada::menu::PAPEL)
@@ -403,12 +420,21 @@ fn toasts(mut contextos: EguiContexts, tempo: Res<Time<Real>>, mut notas: ResMut
                     color: egui::Color32::from_black_alpha(70),
                 })
                 .show(ui, |ui| {
+                    ui.set_min_width(260.0);
                     let msg = if *repeticoes > 1 {
                         format!("{txt} ×{repeticoes}")
                     } else {
                         txt.clone()
                     };
-                    ui.label(egui::RichText::new(msg).color(ui_refinada::menu::TINTA).strong());
+                    let mut job = egui::text::LayoutJob::simple(
+                        msg,
+                        egui::FontId::proportional(12.5),
+                        ui_refinada::menu::TINTA,
+                        244.0,
+                    );
+                    job.wrap.max_rows = 2;
+                    job.wrap.break_anywhere = false;
+                    ui.label(job);
                 });
         }
     });
@@ -434,8 +460,8 @@ fn painel_pais(
     let ctx = contextos.ctx_mut()?;
     let (tag_p, nome_p) = pol.as_ref().and_then(|p| p.vista.pais.as_ref().map(|x| (x.tag.clone(), x.nome.clone()))).unwrap_or_default();
     let legado = if tag_p.is_empty() { String::new() } else { super::politica_sim::tag_legado_pub(&tag_p) };
-    ui_refinada::janela_dossie("Painel do país (1)", None)
-        .default_pos([20.0, 120.0])
+    let resp_janela = ui_refinada::janela_dossie("Painel do país (1)", None)
+        .default_pos([420.0, 118.0])
         .default_size([720.0, 600.0])
         .show(ctx, |ui| {
             ui_refinada::decorar_janela(ui);
@@ -540,11 +566,11 @@ fn painel_pais(
                 Aba::Construcao => aba_construcao(ui, &mut eco, &mut painel, &mut icones),
                 Aba::Politica => match pol.as_mut() {
                     Some(p) => {
+                        super::politica_ui::aba_politica(ui, p);
                         if let (Some(el), Some(r), Some(tag)) = (elenco.as_deref(), retratos.as_deref_mut(), p.tag.clone()) {
-                            super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
                             ui.separator();
+                            super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
                         }
-                        super::politica_ui::aba_politica(ui, p)
                     }
                     None => {
                         ui.label("Política ainda carregando...");
@@ -553,6 +579,9 @@ fn painel_pais(
                 Aba::Ranking => aba_ranking(ui, &eco.vista),
             });
         });
+    if let Some(r) = resp_janela {
+        super::tutorial_guiado::marcar(&r.response, "janela_pais");
+    }
     painel.aba = aba;
     if fechar_painel {
         painel.aberto = false;
@@ -1240,7 +1269,7 @@ pub fn aba_construcao(
                                 if !item.justificativa.is_empty() {
                                     ui.label(&item.justificativa);
                                 } else if item.retorno_esperado > 0.0 {
-                                    ui.label(format!("+£{:.0}/dia", item.retorno_esperado));
+                                    ui.label(format!("+${:.0}/dia", item.retorno_esperado));
                                 } else {
                                     ui.label("Lucrativo");
                                 }

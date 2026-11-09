@@ -8,7 +8,7 @@ use super::mapa_provincial::{Escala, Metrica, PesosProvincias};
 use super::politica_sim::PoliticaSim;
 use super::tecnologia_ui::TecnologiaSim;
 use super::time::{EventoTickDiario, RecursoRelogio};
-use super::ui::ui_raiz;
+use super::ui::{area_livre_mapa, consumir_topo, ui_raiz};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use simulacao::mundo::EstadoPais;
@@ -275,7 +275,6 @@ pub struct InsumosAlertas {
     pub lei_pronta: Option<String>,
     pub dias_eleicao: Option<u32>,
     pub em_campanha: bool,
-    pub pesquisa_concluida: Option<String>,
 }
 
 pub fn calcular_alertas(i: &InsumosAlertas) -> Vec<Alerta> {
@@ -302,9 +301,6 @@ pub fn calcular_alertas(i: &InsumosAlertas) -> Vec<Alerta> {
         && d <= 60
     {
         v.push(Alerta { icone: "urna", texto: format!("Eleição em {d} dias"), gravidade: 0 });
-    }
-    if let Some(t) = &i.pesquisa_concluida {
-        v.push(Alerta { icone: "estrela", texto: format!("Pesquisa concluída: {t}"), gravidade: 0 });
     }
     v
 }
@@ -351,12 +347,9 @@ pub fn barra_extra(
         alertas_in.dias_eleicao = Some(pp.dias_para_proxima_eleicao);
         alertas_in.em_campanha = pp.campanha_eleitoral.is_some();
     }
-    if let Some(t) = &tec {
-        alertas_in.pesquisa_concluida = t.concluidas_jogador.last().cloned();
-    }
     let alertas = calcular_alertas(&alertas_in);
     let _ = (&jogador, &relogio);
-    egui::Panel::top("barra_modulos")
+    let resp = egui::Panel::top("barra_modulos")
         .frame(egui::Frame::NONE.fill(ui_refinada::menu::PAPEL).stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO)).inner_margin(4.0))
         .show(&mut raiz, |ui| {
             ui.horizontal_wrapped(|ui| {
@@ -387,32 +380,45 @@ pub fn barra_extra(
                     }
                 }
             });
-            if !alertas.is_empty() {
+        });
+    if !alertas.is_empty() {
+        egui::Panel::top("barra_alertas")
+            .frame(
+                egui::Frame::NONE
+                    .fill(ui_refinada::menu::PAPEL)
+                    .stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO))
+                    .inner_margin(egui::Margin::symmetric(6, 2)),
+            )
+            .show(&mut raiz, |ui| {
                 ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing.x = 6.0;
                     for a in &alertas {
                         let cor = cor_gravidade(a.gravidade);
                         egui::Frame::new()
                             .fill(ui_refinada::menu::PAPEL_CARD)
                             .stroke(egui::Stroke::new(1.0, cor))
-                            .inner_margin(egui::Margin::symmetric(6, 2))
+                            .inner_margin(egui::Margin::symmetric(5, 2))
                             .show(ui, |ui| {
                                 ui.horizontal(|ui| {
-                                    ui.spacing_mut().item_spacing.x = 5.0;
-                                    ui_refinada::glifo_ui(ui, a.icone, 14.0, Some(cor));
-                                    ui.label(egui::RichText::new(&a.texto).size(12.0).strong().color(cor));
+                                    ui.spacing_mut().item_spacing.x = 4.0;
+                                    ui_refinada::glifo_ui(ui, a.icone, 13.0, Some(cor));
+                                    ui.label(egui::RichText::new(&a.texto).size(11.5).strong().color(cor));
                                 });
                             });
                     }
                 });
-            }
-        });
+            });
+    }
     Ok(())
 }
 
-/// Seletor de modo no canto do mapa (canto inferior direito).
+/// Seletor de modo no canto do mapa (canto inferior direito da área livre do mapa).
 fn seletor_canto(mut contextos: EguiContexts, mut modo: ResMut<ModoTematico>) -> Result {
     let ctx = contextos.ctx_mut()?;
-    egui::Area::new("seletor_modo_mapa".into()).anchor(egui::Align2::RIGHT_BOTTOM, [-10.0, -10.0]).show(ctx, |ui| {
+    let tela = ctx.viewport_rect();
+    let livre = area_livre_mapa(ctx);
+    let dx = -(tela.max.x - livre.max.x).max(0.0) - 10.0;
+    egui::Area::new("seletor_modo_mapa".into()).anchor(egui::Align2::RIGHT_BOTTOM, [dx, -10.0]).show(ctx, |ui| {
         let quadro = egui::Frame::popup(ui.style())
             .fill(ui_refinada::menu::PAPEL)
             .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
@@ -437,13 +443,20 @@ fn seletor_canto(mut contextos: EguiContexts, mut modo: ResMut<ModoTematico>) ->
     Ok(())
 }
 
-/// Legenda do modo ativo (canto inferior esquerdo).
-fn legenda(mut contextos: EguiContexts, modo: Res<ModoTematico>, escala: Res<EscalaAtiva>) -> Result {
+/// Legenda do modo ativo (canto inferior esquerdo; sobe durante o tutorial para não colidir com a caixa).
+fn legenda(
+    mut contextos: EguiContexts,
+    modo: Res<ModoTematico>,
+    escala: Res<EscalaAtiva>,
+    tutorial: Option<Res<super::tutorial_guiado::TutorialGuiado>>,
+) -> Result {
     if matches!(*modo, ModoTematico::Politico) {
         return Ok(());
     }
     let ctx = contextos.ctx_mut()?;
-    egui::Area::new("legenda_mapa".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -10.0]).show(ctx, |ui| {
+    let em_tutorial = tutorial.as_ref().is_some_and(|t| t.ativo);
+    let pos = if em_tutorial { [16.0, -340.0] } else { [10.0, -10.0] };
+    egui::Area::new("legenda_mapa".into()).anchor(egui::Align2::LEFT_BOTTOM, pos).show(ctx, |ui| {
         egui::Frame::popup(ui.style())
             .fill(ui_refinada::menu::PAPEL)
             .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
@@ -484,7 +497,7 @@ fn legenda(mut contextos: EguiContexts, modo: Res<ModoTematico>, escala: Res<Esc
                     let ativa = escala.modo == Some(*modo) && escala.metrica == Some(m);
                     for k in (0..=4).rev() {
                         let t = k as f32 / 4.0;
-                        let txt = if !ativa || !matches!(k, 0 | 2 | 4) {
+                        let txt = if !ativa {
                             String::new()
                         } else {
                             let e = escala.escala;
@@ -513,7 +526,12 @@ impl Plugin for HudMapasPlugin {
         app.init_resource::<ModoTematico>()
             .init_resource::<EscalaAtiva>()
             .add_systems(Update, (teclas_modos, repintar_tematico).chain().run_if(crate::estado::em_partida))
-            .add_systems(EguiPrimaryContextPass, (legenda, seletor_canto).run_if(crate::estado::em_partida));
+            .add_systems(
+                EguiPrimaryContextPass,
+                (legenda, seletor_canto)
+                    .after(super::ui::painel_provincia)
+                    .run_if(crate::estado::em_partida),
+            );
     }
 }
 

@@ -506,7 +506,7 @@ pub fn botoes_gestao_predio_inline(
     } else if ui
         .small_button(egui::RichText::new("Fechar").color(ui_refinada::menu::AVISO))
         .on_hover_text(format!(
-            "Fecha temporariamente: cessa produção e consumo de insumos, dispensa {:.0} trabalhadores e mantém custo de conservação baixo (£{:.0}/dia).",
+            "Fecha temporariamente: cessa produção e consumo de insumos, dispensa {:.0} trabalhadores e mantém custo de conservação baixo (${:.0}/dia).",
             b.total_empregados(),
             (b.nivel as f64) * sim_economia::CUSTO_MANUTENCAO_FECHADO_POR_NIVEL
         ))

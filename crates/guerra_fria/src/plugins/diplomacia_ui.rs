@@ -294,7 +294,7 @@ fn tela_diplomacia(
     let nomes: std::collections::HashMap<String, String> = mundo.0.paises.values().map(|p| (normalizar(&p.tag), p.nome.clone())).collect();
     let nome = |t: &str| nomes.get(t).cloned().unwrap_or_else(|| t.to_string());
 
-    ui_refinada::janela_dossie("DIPLOMACIA E RELAÇÕES EXTERIORES (4)", None)
+    let resp_janela = ui_refinada::janela_dossie("DIPLOMACIA E RELAÇÕES EXTERIORES (4)", None)
         .default_pos([20.0, 96.0])
         .default_size([980.0, 660.0])
         .show(ctx, |ui| {
@@ -575,6 +575,9 @@ fn tela_diplomacia(
             }
         });
     });
+    if let Some(r) = resp_janela {
+        super::tutorial_guiado::marcar(&r.response, "janela_diplo");
+    }
     if gasto > 0.0
         && let Some(p) = mundo.0.paises.get_mut(&tag_legado)
     {

@@ -8679,7 +8679,7 @@
     ),
     CidadeDados(
         id: "vila_velha",
-        nome: "Vila Velha",
+        nome: "Vila Velha do Cassiporé",
         pais_tag: "BRA",
         adm1_code: "BRA-9608",
         posicao: (-51.2167, 3.2167),
@@ -8990,8 +8990,8 @@
         eh_capital: false,
     ),
     CidadeDados(
-        id: "natal_1",
-        nome: "Natal",
+        id: "manicore",
+        nome: "Manicoré",
         pais_tag: "BRA",
         adm1_code: "BRA-1581",
         posicao: (-60.2699, -6.9838),
@@ -11343,7 +11343,7 @@
     ),
     CidadeDados(
         id: "mazatlan",
-        nome: "Mazatlán",
+        nome: "Mazatán",
         pais_tag: "MEX",
         adm1_code: "MEX-4323",
         posicao: (-110.1333, 29.0171),
@@ -17439,7 +17439,7 @@
     ),
     CidadeDados(
         id: "nakhodka",
-        nome: "Nakhodka",
+        nome: "Faktoriya Nakhodka",
         pais_tag: "SOV",
         adm1_code: "SOV-8949",
         posicao: (77.52, 67.7504),

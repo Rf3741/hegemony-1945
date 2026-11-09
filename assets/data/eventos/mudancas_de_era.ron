@@ -565,7 +565,7 @@
         gatilho_sistemico: GatilhoMarco(
             ano_minimo: 1968,
             ano_limite_historico: 1969,
-            paises_envolvidos: ["CZE", "SOV", "POL", "HUN", "ROM"],
+            paises_envolvidos: ["CZE", "SOV", "POL", "HUN", "ROU"],
             condicoes_sistemicas: [
                 "dubcek_lideranca_tcheca",
                 "abertura_socialista_em_curso",
@@ -931,7 +931,7 @@
         gatilho_sistemico: GatilhoMarco(
             ano_minimo: 1989,
             ano_limite_historico: 1990,
-            paises_envolvidos: ["GER", "SOV", "USA", "FRA", "GBR", "POL", "HUN", "CZE", "ROM", "BUL"],
+            paises_envolvidos: ["GER", "SOV", "USA", "FRA", "GBR", "POL", "HUN", "CZE", "ROU", "BGR"],
             condicoes_sistemicas: [
                 "doutrina_sinatra_renuncia_forca",
                 "protestos_em_massa_alemanha_oriental",

@@ -12,7 +12,10 @@ use super::jogador::PaisJogador;
 use super::map::{CoresMapa, RaizProjeto};
 use super::politica_sim::PoliticaSim;
 use super::rotulos_pais::{RotuloPais, RotulosPaisCriados};
-use bandeiras_resolver::{EstadoPais as EstadoBandeira, Sobreposicao, Status, VarianteBandeira, catalogo_embutido};
+use bandeiras_resolver::{
+    EstadoPais as EstadoBandeira, Sobreposicao, Status, VarianteBandeira, catalogo_embutido,
+    flags_do_pais,
+};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use eventos::Noticia;
@@ -114,31 +117,19 @@ impl Plugin for BandeirasPlugin {
             .map(|r| r.0.clone())
             .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."));
         app.insert_resource(Bandeiras::novo(&raiz))
-            .insert_resource(UltimaVersao(0))
+            .insert_resource(UltimaVersao(0, (0, 0, 0)))
             .add_systems(Update, atualizar_bandeiras.run_if(resource_exists::<PoliticaSim>).run_if(resource_exists::<PaisJogador>).run_if(crate::estado::em_partida))
             .add_systems(EguiPrimaryContextPass, publicar.run_if(crate::estado::em_partida_ou_menu));
     }
 }
 
 #[derive(Resource)]
-struct UltimaVersao(u64);
+struct UltimaVersao(u64, (i32, u8, u8));
 
 fn publicar(mut ctxs: EguiContexts, b: Res<Bandeiras>) -> Result {
     let ctx = ctxs.ctx_mut()?;
     ctx.data_mut(|d| d.insert_temp(egui::Id::new("bandeiras_jogo"), b.clone()));
     Ok(())
-}
-
-/// Flags de eventos por data (tag, flag, desde, até) para variantes que dependem da história.
-const FLAGS_DATADAS: [(&str, &str, (i32, u8, u8), (i32, u8, u8)); 4] = [
-    ("CAN", "bandeira_folha_de_bordo", (1965, 2, 15), (9999, 1, 1)),
-    ("LBY", "jamahiriya", (1977, 9, 2), (9999, 1, 1)),
-    ("EGY", "uniao_arabe", (1958, 2, 1), (1961, 9, 28)),
-    ("SYR", "uniao_arabe", (1958, 2, 1), (1961, 9, 28)),
-];
-
-pub fn flags_do_pais(tag: &str, d: (i32, u8, u8)) -> Vec<String> {
-    FLAGS_DATADAS.iter().filter(|(t, _, de, ate)| *t == tag && d >= *de && d <= *ate).map(|(_, f, _, _)| f.to_string()).collect()
 }
 
 /// Ocupações aliadas que dão nome ao país no cenário ("Alemanha Ocupada", "Japão Ocupado",
@@ -210,13 +201,14 @@ fn atualizar_bandeiras(
     mut commands: Commands,
     mut ultima: ResMut<UltimaVersao>,
 ) {
-    if pol.versao_bandeiras == ultima.0 {
+    let d = mundo.0.data;
+    let data = (d.ano, d.mes, d.dia);
+    if pol.versao_bandeiras == ultima.0 && ultima.1 == data {
         return;
     }
     ultima.0 = pol.versao_bandeiras;
+    ultima.1 = data;
     let cat = catalogo_embutido();
-    let d = mundo.0.data;
-    let data = (d.ano, d.mes, d.dia);
     let entradas = pol.bandeiras.clone();
     let mut mudou_nome = false;
     let mut repintar: Vec<(String, (u8, u8, u8))> = Vec::new();

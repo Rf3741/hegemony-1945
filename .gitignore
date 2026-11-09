@@ -2,6 +2,7 @@
 /target/
 **/target/
 **/*.rs.bk
+/saves/
 
 # Python / Ferramentas Auxiliares
 venv/

@@ -10,7 +10,7 @@ use super::jogador::Notificacoes;
 use super::time::EventoTickDiario;
 use bevy::prelude::*;
 use eventos::Noticia;
-use sim_diplomacia::{Diplomacia, TipoPacto};
+use sim_diplomacia::{Bloco, Diplomacia, TipoPacto};
 use sim_guerra::{Divisao, Exercito, PaisMilitar, PosturaOperacional};
 use std::collections::BTreeSet;
 
@@ -167,25 +167,51 @@ fn tick_ia_guerra(
 
     ia.dias += n as u32;
 
-    // 2. IA declara guerra: tensão alta e rivalidade entre blocos opostos (1o dia de cada mês).
-    if (mundo.0.data.dia == 1 || houve_dia_1) && diplo.0.tensao >= 55.0 {
+    // 2. IA declara guerra: tensão ativa e rivalidade entre blocos ou hostilidade severa (1o dia de cada mês).
+    if (mundo.0.data.dia == 1 || houve_dia_1) && diplo.0.tensao >= 20.0 {
         let ano_mes = (mundo.0.data.ano as u32).wrapping_mul(12) + mundo.0.data.mes as u32;
-        let rivais: Vec<(String, String)> = diplo
+        let mut rivais: Vec<(String, String)> = diplo
             .0
             .pactos
             .iter()
-            .filter(|p| p.tipo == TipoPacto::Rivalidade)
+            .filter(|p| p.tipo == TipoPacto::Rivalidade || p.tipo == TipoPacto::Embargo)
             .map(|p| (normalizar_tag(&p.a), normalizar_tag(&p.b)))
             .filter(|(a, b)| (eh_espectador || (*a != eu && *b != eu)) && existe(&g, a) && existe(&g, b) && !em_guerra_com(&g, a, b))
             .collect();
+
+        if rivais.is_empty() {
+            let tags: Vec<String> = diplo.0.paises.iter().map(|p| normalizar_tag(&p.tag)).collect();
+            for i in 0..tags.len() {
+                for j in (i + 1)..tags.len() {
+                    let a = &tags[i];
+                    let b = &tags[j];
+                    if (!eh_espectador && (*a == eu || *b == eu)) || !existe(&g, a) || !existe(&g, b) || em_guerra_com(&g, a, b) {
+                        continue;
+                    }
+                    let rel = diplo.0.relacao(a, b);
+                    let opostos = (diplo.0.bloco(a) == Bloco::Ocidental && diplo.0.bloco(b) == Bloco::Sovietico)
+                        || (diplo.0.bloco(a) == Bloco::Sovietico && diplo.0.bloco(b) == Bloco::Ocidental);
+                    if rel <= -35.0 || (opostos && rel <= -15.0) {
+                        rivais.push((a.clone(), b.clone()));
+                        if rivais.len() >= 12 {
+                            break;
+                        }
+                    }
+                }
+                if rivais.len() >= 12 {
+                    break;
+                }
+            }
+        }
+
         if !rivais.is_empty() {
             let (a, b) = rivais[(ano_mes as usize * 7919) % rivais.len()].clone();
-            // Probabilidade proporcional à tensão acima do limiar (determinística pela data).
-            let chance = ((diplo.0.tensao - 55.0) / 45.0 * 100.0) as u32;
-            if ano_mes.wrapping_mul(2654435761) % 100 < chance.max(5) {
+            // Probabilidade proporcional à tensão (mínimo 10%, determinística pela data).
+            let chance = ((diplo.0.tensao - 18.0) / 32.0 * 100.0).clamp(10.0, 75.0) as u32;
+            if ano_mes.wrapping_mul(2654435761) % 100 < chance {
                 let nome = format!("Guerra {} - {}", a, b);
                 if let Ok(_) = declarar_com_aliados(&mut g, &diplo.0, &a, &b, &nome, true) {
-                    diplo.0.tensao = (diplo.0.tensao + 5.0).min(100.0);
+                    diplo.0.tensao = (diplo.0.tensao + 6.0).min(100.0);
                     avisos.push(format!("GUERRA: {a} declara guerra a {b}; os respectivos blocos entram no conflito."));
                 }
             }
@@ -222,10 +248,12 @@ fn tick_ia_guerra(
                 }
             }
 
-            // Paz: o lado que está perdendo (comandado pela IA) aceita quando a pontuação é decisiva.
-            let atk_perde = w.pontuacao_guerra <= -35.0 || w.capitulou_atacantes;
-            let def_perde = w.pontuacao_guerra >= 35.0 || w.capitulou_defensores;
-            if !(atk_perde || def_perde) {
+            // Paz: pontuação decisiva ou impasse prolongado (>= 3 anos de guerra).
+            let anos_guerra = (mundo.0.data.ano - w.data_inicio.ano as i32).max(0);
+            let impasse = anos_guerra >= 3;
+            let atk_perde = w.pontuacao_guerra <= -25.0 || w.capitulou_atacantes || (impasse && w.pontuacao_guerra < 0.0);
+            let def_perde = w.pontuacao_guerra >= 25.0 || w.capitulou_defensores || (impasse && w.pontuacao_guerra >= 0.0);
+            if !(atk_perde || def_perde || impasse) {
                 continue;
             }
             let (vencedores, perdedores) = if def_perde { (&w.atacantes, &w.defensores) } else { (&w.defensores, &w.atacantes) };
@@ -234,9 +262,13 @@ fn tick_ia_guerra(
                 continue;
             }
             let Some(prop) = vencedores.first().cloned() else { continue };
-            if let Ok(t) = acao_propor_paz(&mut g, &w.id, &prop, true, true) {
+            if let Ok(t) = acao_propor_paz(&mut g, &w.id, &prop, true, !impasse) {
                 let _ = t;
-                avisos.push(format!("PAZ: {} termina; {} impõe os termos a {}.", w.nome_pt, prop, perdedores.join(", ")));
+                if impasse && !w.capitulou_atacantes && !w.capitulou_defensores {
+                    avisos.push(format!("ARMISTÍCIO: {} é encerrada por armistício após anos de combate.", w.nome_pt));
+                } else {
+                    avisos.push(format!("PAZ: {} termina; {} impõe os termos a {}.", w.nome_pt, prop, perdedores.join(", ")));
+                }
             }
         }
     }
@@ -260,16 +292,19 @@ fn criar_rebelde_chines(g: &mut GuerraSim) {
     if existe(g, "CCP") {
         return;
     }
-    let ids = ["1813", "1828", "1839", "1804", "1811", "1814", "1818"];
+    let ids = ["951", "956", "961", "2119", "2223", "2224", "3796", "1813", "1828", "1839", "1804", "1811", "1814", "1818"];
     let regioes: Vec<String> = g
         .0
         .cenario
         .regioes
         .iter()
-        .filter(|r| ids.iter().any(|id| r.adm1_code == format!("prov_{id}")))
+        .filter(|r| {
+            ids.iter().any(|id| r.adm1_code == format!("prov_{id}") || r.adm1_code == format!("CHN-{id}"))
+                || (r.dono_tag == "CHI" && (r.adm1_code == "prov_961" || r.adm1_code == "prov_956" || r.adm1_code == "prov_3796"))
+        })
         .map(|r| r.adm1_code.clone())
         .collect();
-    let Some(capital) = regioes.first().cloned() else { return };
+    let capital = regioes.first().cloned().unwrap_or_else(|| "prov_961".to_string());
     for r in &mut g.0.cenario.regioes {
         if regioes.contains(&r.adm1_code) {
             r.dono_tag = "CCP".into();
@@ -315,6 +350,7 @@ fn criar_rebelde_chines(g: &mut GuerraSim) {
         frente_id: None,
         regiao_objetivo_adm1: None,
     });
+    g.0.invalidar_cache_territorial();
 }
 
 #[cfg(test)]

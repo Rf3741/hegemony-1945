@@ -601,6 +601,7 @@ fn atualizar_rankings_sistema(
     eco: Option<Res<EconomiaSim>>,
     mundo_geo: Res<RecursoMundo>,
     diplo: Option<Res<super::diplomacia_ui::DiploSim>>,
+    bandeiras: Option<Res<super::bandeiras_ui::Bandeiras>>,
 ) {
     let Some(eco) = eco else { return };
     if eco.vista.ranking.is_empty() {
@@ -617,6 +618,9 @@ fn atualizar_rankings_sistema(
     let mut max_mil = 1.0_f64;
 
     for p in &eco.vista.ranking {
+        if p.populacao <= 0.0 && p.pib_anual <= 0.0 {
+            continue;
+        }
         if p.pib_anual > max_pib {
             max_pib = p.pib_anual;
         }
@@ -628,7 +632,15 @@ fn atualizar_rankings_sistema(
     let mut entradas: Vec<EntradaRankingPotencia> = Vec::new();
 
     for p in &eco.vista.ranking {
+        if p.populacao <= 0.0 && p.pib_anual <= 0.0 {
+            continue;
+        }
         let tag = if p.tag.is_empty() { p.id.to_uppercase() } else { p.tag.clone() };
+        let nome = bandeiras
+            .as_ref()
+            .and_then(|b| b.variante(&tag).map(|v| v.nome))
+            .or_else(|| mundo_geo.paises.get(&tag).map(|gp| gp.nome.clone()))
+            .unwrap_or_else(|| p.nome.clone());
         let cor_geo = mundo_geo
             .paises
             .get(&tag)
@@ -709,7 +721,7 @@ fn atualizar_rankings_sistema(
             grau: GrauPotencia::PotenciaMenor,
             id: p.id.clone(),
             tag,
-            nome: p.nome.clone(),
+            nome,
             cor: cor_geo,
             pontuacao_total: pont_total,
             pontuacao_eco: pont_eco,

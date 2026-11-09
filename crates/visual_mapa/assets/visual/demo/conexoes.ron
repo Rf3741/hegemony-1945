@@ -3614,7 +3614,7 @@
     ConexaoDados(
         id: "con_0362",
         origem_id: "manaus",
-        destino_id: "natal_1",
+        destino_id: "manicore",
         tipo: "rodovia",
         distancia_km: 433.1,
         nivel_1945: 2,
@@ -3864,7 +3864,7 @@
     ConexaoDados(
         id: "con_0387",
         origem_id: "crato",
-        destino_id: "natal_1",
+        destino_id: "manicore",
         tipo: "rodovia",
         distancia_km: 310.2,
         nivel_1945: 2,
@@ -4133,7 +4133,7 @@
     ),
     ConexaoDados(
         id: "con_0414",
-        origem_id: "natal_1",
+        origem_id: "manicore",
         destino_id: "porto_velho",
         tipo: "rodovia",
         distancia_km: 445.5,

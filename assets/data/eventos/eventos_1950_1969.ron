@@ -18,7 +18,7 @@
         paises_alvo: ["USA", "SOV"],
         condicoes: [
             "ano >= 1950",
-            "pos_evento:primeiro_teste_atomico_sovietico_1949",
+            "pos_evento:primeiro_teste_nuclear_sovietico_1949",
             "corrida_armamentista_nuclear >= 0.5",
         ],
         opcoes: [
@@ -581,7 +581,7 @@
         condicoes: [
             "ano >= 1951",
             "lider_ativo:winston_churchill",
-            "tem_lei:republica_parlamentarista",
+            "tem_lei:monarquia_constitucional",
         ],
         opcoes: [
             OpcaoEvento(
@@ -749,11 +749,11 @@
         titulo: "O Decreto 900 de Reforma Agrária na Guatemala",
         descricao: "O presidente eleito da Guatemala, coronel Jacobo Árbenz Guzmán, promulga o Decreto 900 de reforma agrária. A lei desapropria terras não cultivadas de grandes latifúndios, indenizando os donos com títulos públicos calculados sobre os valores declarados ao fisco. Cerca de 80 mil hectares da poderosa United Fruit Company são distribuídos a camponeses maias, provocando fúria nos acionistas de Boston e na CIA.",
         data_gatilho: DataGatilho(ano: 1952, mes: 6, dia: 17),
-        paises_alvo: ["GUA", "USA"],
+        paises_alvo: ["GTM", "USA"],
         condicoes: [
             "ano >= 1952",
             "lider_ativo:jacobo_arbenz",
-            "soberano:GUA",
+            "soberano:GTM",
         ],
         opcoes: [
             OpcaoEvento(
@@ -1284,12 +1284,12 @@
         titulo: "A Operação PBSUCCESS e a Queda de Jacobo Árbenz na Guatemala",
         descricao: "Sob a direção de Allen Dulles na CIA e com aprovação de Eisenhower, aviões P-47 não identificados bombardeiam a Cidade da Guatemala e depósitos de combustível. Paralelamente, uma estação de rádio clandestina 'Voz da Libertação' simula uma grande invasão liderada pelo coronel exilado Carlos Castillo Armas. Traído pela cúpula do próprio exército assustada com a ameaça de invasão naval dos fuzileiros dos EUA, Jacobo Árbenz renuncia e parte para o exílio amargo.",
         data_gatilho: DataGatilho(ano: 1954, mes: 6, dia: 27),
-        paises_alvo: ["GUA", "USA"],
+        paises_alvo: ["GTM", "USA"],
         condicoes: [
             "ano >= 1954",
             "lider_ativo:jacobo_arbenz",
             "lider_ativo:carlos_castillo_armas",
-            "soberano:GUA",
+            "soberano:GTM",
         ],
         opcoes: [
             OpcaoEvento(
@@ -1637,7 +1637,7 @@
         titulo: "A Criação do Pacto de Varsóvia em Resposta ao Rearmamento Alemão",
         descricao: "Nove dias após a entrada da República Federal da Alemanha na OTAN, a União Soviética e sete Estados satélites da Europa Oriental (Polônia, Tchecoslováquia, Alemanha Oriental, Hungria, Romênia, Bulgária e Albânia) assinam em Varsóvia o Tratado de Amizade, Cooperação e Assistência Mútua. O marechal Ivan Konev assume o comando unificado da aliança, legitimando a presença militar soviética permanente em todo o Leste Europeu.",
         data_gatilho: DataGatilho(ano: 1955, mes: 5, dia: 14),
-        paises_alvo: ["SOV", "POL", "CZE", "GDR", "HUN", "ROM", "BUL", "ALB"],
+        paises_alvo: ["SOV", "POL", "CZE", "GDR", "HUN", "ROU", "BGR", "ALB"],
         condicoes: [
             "ano >= 1955",
             "pos_evento:soberania_rfa_entrada_otan_1955",
@@ -4766,10 +4766,10 @@
         titulo: "O Golpe dos Coronéis em Atenas e a Ditadura Militar Grega",
         descricao: "A poucas semanas de eleições parlamentares que apontavam a vitória certa da União do Centro de George Papandreou e da esquerda moderada, uma conspiração de oficiais de extrema-direita liderada pelo coronel Stylianos Pattakos e Georgios Papadopoulos deflagra um golpe militar incruento em Atenas. Utilizando o plano de emergência Prometheus da OTAN para simular ameaça de invasão comunista, a junta militar suspende a Constituição, prende 10 mil cidadãos e instaura uma ditadura de tortura e terror.",
         data_gatilho: DataGatilho(ano: 1967, mes: 4, dia: 21),
-        paises_alvo: ["GRE", "USA"],
+        paises_alvo: ["GRC", "USA"],
         condicoes: [
             "ano >= 1967",
-            "soberano:GRE",
+            "soberano:GRC",
         ],
         opcoes: [
             OpcaoEvento(
@@ -5117,7 +5117,7 @@
         titulo: "A Operação Danúbio: A Invasão da Tchecoslováquia e a Doutrina Brezhnev",
         descricao: "Na noite de 20 para 21 de agosto de 1968, meio milhão de soldados e mais de 6.000 tanques de cinco países do Pacto de Varsóvia (URSS, Polônia, Alemanha Oriental, Hungria e Bulgária; a Romênia de Ceaușescu recusa-se categoricamente a participar) cruzam a fronteira e ocupam a Tchecoslováquia na 'Operação Danúbio'. Sob instruções de Dubček, a população recorre à resistência civil pacífica, alterando placas de ruas e confrontando tripulações de tanques com flores e argumentos ideológicos. Brezhnev formaliza a 'Doutrina da Soberania Limitada', proclamando o direito de intervir pela força em qualquer país socialista ameaçado de restauração capitalista.",
         data_gatilho: DataGatilho(ano: 1968, mes: 8, dia: 20),
-        paises_alvo: ["SOV", "CZE", "POL", "GDR", "HUN", "BUL"],
+        paises_alvo: ["SOV", "CZE", "POL", "GDR", "HUN", "BGR"],
         condicoes: [
             "ano >= 1968",
             "pos_evento:primavera_de_praga_dubcek_1968",
