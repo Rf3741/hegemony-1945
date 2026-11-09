@@ -147,8 +147,20 @@ impl Nucleo {
     /// Id econômico do país a partir da tag do legado.
     #[allow(dead_code)]
     pub fn id_pais(&self, tag_legado: &str) -> Option<String> {
-        let tag = ALIAS_TAGS.iter().find(|(l, _)| *l == tag_legado).map_or(tag_legado, |(_, e)| *e);
-        self.tags.get(tag).cloned()
+        let tag_upper = tag_legado.to_uppercase();
+        let tag = ALIAS_TAGS
+            .iter()
+            .find(|(l, _)| l.eq_ignore_ascii_case(tag_legado))
+            .map_or(tag_upper.as_str(), |(_, e)| *e);
+        if let Some(id) = self.tags.get(tag) {
+            return Some(id.clone());
+        }
+        for (t, id) in &self.tags {
+            if t.eq_ignore_ascii_case(tag_legado) || id.eq_ignore_ascii_case(tag_legado) {
+                return Some(id.clone());
+            }
+        }
+        None
     }
 
     /// Aplica uma lei aprovada pelo motor político ao país econômico correspondente.
@@ -702,6 +714,8 @@ pub struct EconomiaSim {
     pub obras_novas_lote: usize,
     pub versao_construcao: u64,
     pub jogador_eh_ia: bool,
+    /// Sinaliza necessidade de reconstruir a vista na thread econômica sem limpar a vista atual da interface.
+    pub precisa_vista: bool,
 }
 
 impl EconomiaSim {
@@ -743,8 +757,20 @@ impl EconomiaSim {
     }
     /// Id econômico para a tag do legado.
     pub fn id_pais(&self, tag_legado: &str) -> Option<String> {
-        let tag = ALIAS_TAGS.iter().find(|(l, _)| *l == tag_legado).map_or(tag_legado, |(_, e)| *e);
-        self.tags.get(tag).cloned()
+        let tag_upper = tag_legado.to_uppercase();
+        let tag = ALIAS_TAGS
+            .iter()
+            .find(|(l, _)| l.eq_ignore_ascii_case(tag_legado))
+            .map_or(tag_upper.as_str(), |(_, e)| *e);
+        if let Some(id) = self.tags.get(tag) {
+            return Some(id.clone());
+        }
+        for (t, id) in &self.tags {
+            if t.eq_ignore_ascii_case(tag_legado) || id.eq_ignore_ascii_case(tag_legado) {
+                return Some(id.clone());
+            }
+        }
+        None
     }
 }
 
@@ -760,7 +786,7 @@ impl EconomiaSim {
         let n = self.nucleo.as_mut().ok_or("economia ocupada")?;
         n.mundo = MundoEconomico::restaurar_estado(n.catalogo.as_ref().clone(), e).map_err(|e| e.to_string())?;
         n.global = g;
-        self.vista.pais_id.clear();
+        self.precisa_vista = true;
         self.pendentes = 0;
         self.versao_construcao = self.versao_construcao.wrapping_add(1);
         Ok(())
@@ -809,7 +835,7 @@ fn aplicar_formacoes_economia(form: Option<ResMut<super::formacao_sim::FormacaoS
     }
     eco.nucleo = Some(nucleo);
     if integrados > 0 {
-        eco.vista.pais_id.clear();
+        eco.precisa_vista = true;
         eco.versao_construcao = eco.versao_construcao.wrapping_add(integrados);
     }
 }
@@ -852,6 +878,7 @@ fn aguardar_economia(mut commands: Commands, carga: Option<ResMut<CargaEconomia>
                 obras_novas_lote: 0,
                 versao_construcao: 0,
                 jogador_eh_ia: false,
+                precisa_vista: false,
             });
         }
         Err(e) => error!("falha ao carregar a economia: {e}"),
@@ -875,8 +902,8 @@ fn definir_pais_economico(jogador: Option<Res<super::jogador::PaisJogador>>, mut
         && eco.pais_id.as_deref() != Some(id.as_str())
     {
         eco.pais_id = Some(id);
-        // Força um lote (mesmo com 0 dias) para montar a vista do novo país.
-        eco.vista.pais_id.clear();
+        // Força atualização da vista do novo país mantendo a anterior válida até a conclusão.
+        eco.precisa_vista = true;
     }
 }
 
@@ -900,7 +927,8 @@ fn recolher_interno(eco: &mut EconomiaSim) {
 }
 
 fn despachar_interno(eco: &mut EconomiaSim) {
-    let precisa_vista = eco.pais_id.is_some() && eco.vista.pais_id.as_str() != eco.pais_id.as_deref().unwrap_or("");
+    let precisa_vista = eco.precisa_vista
+        || (eco.pais_id.is_some() && eco.vista.pais_id.as_str() != eco.pais_id.as_deref().unwrap_or(""));
     if eco.nucleo.is_none()
         || (eco.pendentes == 0
             && eco.comandos.is_empty()
@@ -910,6 +938,7 @@ fn despachar_interno(eco: &mut EconomiaSim) {
     {
         return;
     }
+    eco.precisa_vista = false;
     let dias = eco.pendentes.min(DIAS_POR_LOTE);
     eco.pendentes -= dias;
     let cmds = std::mem::take(&mut eco.comandos);
@@ -917,6 +946,32 @@ fn despachar_interno(eco: &mut EconomiaSim) {
     let tecs = std::mem::take(&mut eco.tecs_pesquisadas);
     let evs = std::mem::take(&mut eco.eventos_historicos);
     let pais = eco.pais_id.clone();
+    if dias == 0 && eco.tarefa.is_none() {
+        let mut nucleo = eco.nucleo.take().expect("núcleo presente");
+        let jogador_eh_ia = eco.jogador_eh_ia;
+        nucleo.jogador_eh_ia = jogador_eh_ia;
+        for (id, g) in ganhos {
+            nucleo.mundo.aplicar_ganho_produtividade(&id, g);
+        }
+        for (id, tec) in tecs {
+            nucleo.mundo.registrar_tecnologia_pesquisada(&id, &tec);
+        }
+        for ev in evs {
+            nucleo.mundo.registrar_evento_historico(&ev);
+        }
+        let (vista, msgs, _ms, obras) = executar_lote(&mut nucleo, pais.as_deref(), cmds, 0);
+        let acoes = std::mem::take(&mut nucleo.acoes_predio_recentes);
+        let mudou_predios = !acoes.is_empty();
+        eco.acoes_predio_recentes.extend(acoes);
+        eco.nucleo = Some(nucleo);
+        eco.vista = vista;
+        eco.mensagens.extend(msgs);
+        if obras > 0 || mudou_predios {
+            eco.obras_novas_lote += obras;
+            eco.versao_construcao = eco.versao_construcao.wrapping_add(1);
+        }
+        return;
+    }
     let mut nucleo = eco.nucleo.take().expect("núcleo presente");
     let jogador_eh_ia = eco.jogador_eh_ia;
     eco.tarefa = Some(AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move {
@@ -1303,6 +1358,72 @@ mod testes_plugin {
         assert!(e.vista.pais.is_some() && !e.vista.bens.is_empty() && e.ms_por_dia > 0.0);
         assert!(e.mensagens.iter().any(|m| m.contains("Tarifa")), "{:?}", e.mensagens);
         eprintln!("45 dias em {:?}; {:.1} ms/dia", t.elapsed(), e.ms_por_dia);
+    }
+
+    /// Valida que a vista econômica do jogador (EUA) não fica vazia e inicia com PIB, população e desemprego históricos.
+    #[test]
+    fn vista_economica_jogador_eua_valida_no_inicio() {
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, StatesPlugin))
+            .init_state::<AppState>()
+            .add_message::<EventoTickDiario>()
+            .insert_resource(RaizProjeto(raiz))
+            .add_plugins(EconomiaSimPlugin);
+        app.update();
+        let t = Instant::now();
+        while app.world().get_resource::<EconomiaSim>().is_none() {
+            assert!(t.elapsed().as_secs() < 120, "carga demorou demais");
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            app.update();
+        }
+        app.world_mut().insert_resource(PaisJogador("USA".into()));
+        let t = Instant::now();
+        loop {
+            app.update();
+            let e = app.world().resource::<EconomiaSim>();
+            if e.vista.pais.is_some() && !e.vista.pais_id.is_empty() {
+                break;
+            }
+            assert!(t.elapsed().as_secs() < 30, "vista econômica inicial não montada");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let e = app.world().resource::<EconomiaSim>();
+        assert_eq!(e.pais_id.as_deref(), Some("usa"), "id do país do jogador deve ser 'usa'");
+        assert_eq!(e.vista.pais_id.as_str(), "usa", "id na vista deve ser 'usa'");
+        assert!(e.vista.pais.is_some(), "vista econômica do país do jogador não pode ser vazia");
+
+        let pib = e.vista.pib_anual;
+        assert!(
+            (200.0e9..=350.0e9).contains(&pib),
+            "PIB dos EUA no início deve estar entre 200 bi e 350 bi, obteve {:.2e}",
+            pib
+        );
+
+        let pop = e.vista.populacao;
+        assert!(
+            (130.0e6..=160.0e6).contains(&pop),
+            "População dos EUA no início deve ser próxima da real (~140-150 mi), obteve {:.2e}",
+            pop
+        );
+
+        let desemp = e.vista.desemprego;
+        assert!(
+            (0.04..=0.10).contains(&desemp),
+            "Desemprego dos EUA no início deve estar na faixa de 4-10%, obteve {:.1}%",
+            desemp * 100.0
+        );
+
+        let pe = e.vista.pais.as_ref().unwrap();
+        assert!(pe.orcamento.tesouro > 0.0, "Tesouro inicial dos EUA deve ser positivo");
+
+        // Verifica que mesmo se 'precisa_vista' for acionada (ex: desocupação/formação),
+        // a vista do país não é esvaziada enquanto um novo lote é aguardado.
+        app.world_mut().resource_mut::<EconomiaSim>().precisa_vista = true;
+        app.update();
+        let e = app.world().resource::<EconomiaSim>();
+        assert!(e.vista.pais.is_some(), "vista não deve ser limpa durante refresh");
+        assert_eq!(e.vista.pais_id.as_str(), "usa", "pais_id na vista deve persistir durante refresh");
     }
 
     /// Teste headless de carga inicial: carrega os arquivos de cenário de 1945 como no main() e valida que tudo carrega sem pânico.

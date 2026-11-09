@@ -331,7 +331,6 @@ pub fn barra_extra(
     let mut alertas_in = InsumosAlertas::default();
     if let Some(eco) = &eco
         && let Some(p) = &eco.vista.pais
-        && !eco.vista.pais_id.is_empty()
     {
         alertas_in.tesouro = Some(p.orcamento.tesouro);
         alertas_in.saldo_diario = p.orcamento.saldo_diario;

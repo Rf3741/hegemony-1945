@@ -241,8 +241,8 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
         );
         ui.separator();
         let val_txt = |t: String| egui::RichText::new(t).strong().color(ui_refinada::menu::TINTA);
-        match (&eco.vista.pais, eco.vista.pais_id.is_empty()) {
-            (Some(pe), false) => {
+        match &eco.vista.pais {
+            Some(pe) => {
                 let o = &pe.orcamento;
                 ui.label(egui::RichText::new("Tesouro").small().color(suave));
                 dica_com(ui.label(val_txt(fmt_din(o.tesouro))), "tooltip_topbar_tesouro", |ui| {
