@@ -295,6 +295,7 @@ pub fn gerar_cenario_sintetico(
             capitulou_atacantes: false,
             capitulou_defensores: false,
             ativa: true,
+            envolvimentos: Vec::new(),
         });
     }
 

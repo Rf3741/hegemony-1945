@@ -2,6 +2,8 @@
 
 use super::economia_sim::{Comando, EconomiaSim};
 use super::economy::RecursoMundo;
+use super::guerra_ia::{aliados_com_obrigacao_defesa, ocupantes_atuais, ocupantes_historicos, todos_os_ocupantes};
+use super::guerra_sim::{DadosGuerra, GuerraSim, acao_declarar_guerra, declarar_com_aliados, normalizar_tag};
 use super::jogador::PaisJogador;
 use super::map::{CoresMapa, DadosMapa, ImagemMapa, pintar_paleta};
 use super::time::EventoTickDiario;
@@ -524,13 +526,43 @@ fn tela_diplomacia(
                                 ui_refinada::chapa(ui, "jornal", "Infâmia", &format!("+{:.0}", cb_atual.penalidade_infamia), Some(ui_refinada::menu::PERIGO));
                             });
 
+                            // Calcula consequências da declaração de guerra
+                            let data_tuple = (mundo.0.data.ano as i32, mundo.0.data.mes, mundo.0.data.dia);
+                            let alvo_norm = normalizar_tag(&alvo);
+                            let ocupantes: Vec<String> = todos_os_ocupantes(g_sim, &alvo_norm, data_tuple);
+                            let aliados_def: Vec<String> = aliados_com_obrigacao_defesa(&d.0, &alvo_norm);
+                            let mut consequencias: Vec<String> = Vec::new();
+                            if !ocupantes.is_empty() {
+                                consequencias.push(format!("Ocupantes: {}", ocupantes.join(", ")));
+                            }
+                            if !aliados_def.is_empty() {
+                                consequencias.push(format!("Aliados de defesa: {}", aliados_def.join(", ")));
+                            }
+
+                            // Mostra aviso se houver consequências
+                            if !consequencias.is_empty() {
+                                ui.horizontal(|ui| {
+                                    ui_refinada::glifo_ui(ui, "alerta", 14.0, Some(ui_refinada::menu::PERIGO));
+                                    ui.colored_label(ui_refinada::menu::PERIGO, &format!("⚠ Isso também te põe em guerra com: {}", consequencias.join("; ")));
+                                });
+                                ui.add_space(4.0);
+                            }
+
                             let btn_decl = ui_refinada::botao_estilo_menu(ui, "Declarar Guerra");
                             if btn_decl.clicked() {
                                 let nome_guerra = format!("{} de {} contra {}", cb_atual.nome, nome(&eu), nome(&alvo));
-                                match super::guerra_sim::acao_declarar_guerra(g_sim, &eu, &alvo, &nome_guerra) {
-                                    Ok(g_id) => {
+                                let eu_norm = normalizar_tag(&eu);
+                                match declarar_com_aliados(g_sim, &d.0, &eu_norm, &alvo_norm, &nome_guerra, true, data_tuple) {
+                                    Ok((g_id, ocupantes_entraram, aliados_def_entraram)) => {
                                         d.0.tensao = (d.0.tensao + cb_atual.tensao_mundial_gerada).min(100.0);
-                                        painel.mensagem = format!("Guerra declarada contra {}! (ID: {})", nome(&alvo), g_id);
+                                        let mut msg = format!("Guerra declarada contra {}! (ID: {})", nome(&alvo), g_id);
+                                        if !ocupantes_entraram.is_empty() {
+                                            msg.push_str(&format!("; {} (potência ocupante) entra na guerra contra você", ocupantes_entraram.join(", ")));
+                                        }
+                                        if !aliados_def_entraram.is_empty() {
+                                            msg.push_str(&format!("; aliados de defesa {} entram na guerra contra você", aliados_def_entraram.join(", ")));
+                                        }
+                                        painel.mensagem = msg;
                                         if let Some(ref mut pg) = painel_guerra {
                                             pg.aberto = true;
                                             pg.repintar = true;

@@ -370,6 +370,7 @@ impl MundoGuerra {
             capitulou_atacantes: false,
             capitulou_defensores: false,
             ativa: true,
+            envolvimentos: Vec::new(),
         });
 
         Ok(guerra_id)

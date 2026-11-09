@@ -214,3 +214,97 @@ pub enum ClausulaPaz {
         duracao_dias: u32,
     },
 }
+
+/// Nível de envolvimento de um país num conflito alheio (guerra por procuração).
+/// 0 = Neutro, 1 = Apoio diplomático, 2 = Apoio material, 3 = Conselheiros/voluntários,
+/// 4 = Intervenção limitada, 5 = Guerra total.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum NivelEnvolvimento {
+    #[default]
+    Neutro = 0,
+    ApoioDiplomatico = 1,
+    ApoioMaterial = 2,
+    ConseleirosVoluntarios = 3,
+    IntervencaoLimitada = 4,
+    GuerraTotal = 5,
+}
+
+impl NivelEnvolvimento {
+    /// Retorna a descrição em português do nível de envolvimento.
+    pub fn descricao(self) -> &'static str {
+        match self {
+            Self::Neutro => "Neutro",
+            Self::ApoioDiplomatico => "Apoio diplomático (condenações, sanções)",
+            Self::ApoioMaterial => "Apoio material (armas, dinheiro, empréstimos)",
+            Self::ConseleirosVoluntarios => "Conselheiros/voluntários (tropas não oficiais)",
+            Self::IntervencaoLimitada => "Intervenção limitada (tropas oficiais sob mandato/coalizão)",
+            Self::GuerraTotal => "Guerra total (declaração formal)",
+        }
+    }
+
+    /// Custo diário em tesouro (milhões) para manter este nível de envolvimento.
+    pub fn custo_tesouro_diario(self) -> f64 {
+        match self {
+            Self::Neutro => 0.0,
+            Self::ApoioDiplomatico => 0.1,
+            Self::ApoioMaterial => 1.0,
+            Self::ConseleirosVoluntarios => 3.0,
+            Self::IntervencaoLimitada => 10.0,
+            Self::GuerraTotal => 50.0,
+        }
+    }
+
+    /// Bônus de força militar dado ao lado apoiado (multiplicador).
+    pub fn bonus_forca_aliado(self) -> f64 {
+        match self {
+            Self::Neutro => 0.0,
+            Self::ApoioDiplomatico => 0.0,
+            Self::ApoioMaterial => 0.15,
+            Self::ConseleirosVoluntarios => 0.30,
+            Self::IntervencaoLimitada => 0.50,
+            Self::GuerraTotal => 1.0,
+        }
+    }
+
+    /// Gera tensão mundial por dia neste nível.
+    pub fn tensao_diaria(self) -> f32 {
+        match self {
+            Self::Neutro => 0.0,
+            Self::ApoioDiplomatico => 0.01,
+            Self::ApoioMaterial => 0.02,
+            Self::ConseleirosVoluntarios => 0.05,
+            Self::IntervencaoLimitada => 0.10,
+            Self::GuerraTotal => 0.50,
+        }
+    }
+
+    /// Verifica se este nível constitui estado de guerra formal.
+    pub fn eh_guerra_formal(self) -> bool {
+        matches!(self, Self::GuerraTotal)
+    }
+
+    /// Verifica se este nível envolve tropas no chão.
+    pub fn tem_tropas_no_chao(self) -> bool {
+        matches!(self, Self::ConseleirosVoluntarios | Self::IntervencaoLimitada | Self::GuerraTotal)
+    }
+}
+
+/// Envolvimento de um país numa guerra (para guerras por procuração).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EnvolvimentoGuerra {
+    pub pais_tag: String,
+    pub guerra_id: String,
+    pub lado: LadoGuerra, // Atacante ou Defensor
+    pub nivel: NivelEnvolvimento,
+    pub data_inicio: DataJogo,
+    pub custo_acumulado: f64,
+}
+
+/// Lado da guerra em que o país está envolvido.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LadoGuerra {
+    Atacante,
+    Defensor,
+}

@@ -79,7 +79,7 @@ fn estado_apos_n_dias_igual_ao_gravado() {
     assert_eq!(em_paz, GRAVADO_EM_PAZ, "estado em paz divergiu");
 }
 
-const GRAVADO_COM_GUERRA: u64 = 0xb0c4fb405aa9fc05;
+const GRAVADO_COM_GUERRA: u64 = 0x3286eaa0dd064e37;
 const GRAVADO_EM_PAZ: u64 = 0x9ad5dad618d04e9e;
 
 #[test]
