@@ -24,6 +24,7 @@ pub mod entidades;
 pub mod erro;
 pub mod gerador;
 pub mod motor;
+pub mod redistribuicao;
 pub mod tipos;
 
 pub use catalogo::{
@@ -63,6 +64,7 @@ pub use motor::governo::{
     estado_comporta_novo_nivel, estado_niveis_recurso, materiais_por_ponto,
     provincia_comporta_novo_nivel,
 };
+pub use redistribuicao::redistribuir_provincias;
 pub use motor::{EstadoEconomiaSalvo, MundoEconomico, RelatorioTick, TemposFasesTick};
 pub use tipos::{
     CategoriaBem, CategoriaNecessidade, CategoriaPredio, DataJogo, Estrato, FormulaPreco,
