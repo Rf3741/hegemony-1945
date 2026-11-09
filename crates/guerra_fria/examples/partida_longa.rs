@@ -145,7 +145,7 @@ fn main() {
     let mut anuais: Vec<String> = Vec::new();
     let mut por_pais: Vec<String> = Vec::new();
     #[allow(unused_assignments)] // o último ano grava o PIB de referência sem que ninguém o leia
-    let mut pib_ant = 0.0f64;
+    let mut _pib_ant = 0.0f64;
     let mut max_estr = BTreeMap::<&str, usize>::new();
     let total_dias = anos as u64 * 365;
     let t_total = Instant::now();
@@ -199,8 +199,8 @@ fn main() {
             );
             eprintln!("{resumo}");
             anuais.push(resumo);
-            let cresc = if pib_ant > 0.0 { format!("{:+.1}%", (pib / pib_ant - 1.0) * 100.0) } else { "-".into() };
-            pib_ant = pib;
+            let cresc = if _pib_ant > 0.0 { format!("{:+.1}%", (pib / _pib_ant - 1.0) * 100.0) } else { "-".into() };
+            _pib_ant = pib;
             let mut linha = format!("| {ano} | {pib:.3e} | {cresc} |");
             for t in PAISES_TABELA {
                 let v = id_por_tag.get(t).and_then(|id| eco.obter_pais(id)).map_or(0.0, |p| p.pib_diario * 365.0);

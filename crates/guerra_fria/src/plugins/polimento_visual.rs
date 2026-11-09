@@ -72,7 +72,6 @@ fn moldura_vinheta(mut contextos: EguiContexts, estilo: Res<EstiloMapa>) -> Resu
 
 #[cfg(test)]
 mod testes {
-    use super::*;
     use ui_refinada::menu;
     use ui_refinada::paleta::razao_contraste;
 

@@ -17,6 +17,7 @@ use crate::rng::RngDeterministico;
 use crate::tipos::DataJogo;
 use combate::RelatorioBatalha;
 use paz::{AvaliacaoPaz, PropostaPaz, TratadoPazAssinado};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use suprimento::BuffersSuprimento;
 use territorio::CacheTerritorial;
@@ -32,6 +33,16 @@ pub struct RelatorioTickGuerra {
     pub baixas_totais_dia: u32,
     pub tratados_assinados: usize,
     pub detalhes_batalhas: Vec<RelatorioBatalha>,
+}
+
+/// Estado dinâmico da guerra para salvar/carregar (cenário + RNG + frentes ativas + tratados).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EstadoGuerraSalvo {
+    pub cenario: CenarioGuerra,
+    pub rng: RngDeterministico,
+    pub frentes_ativas: Vec<Frente>,
+    pub historico_tratados: Vec<TratadoPazAssinado>,
+    pub proximo_frente_id: u32,
 }
 
 /// Estado global dinâmico da simulação militar do mundo.
@@ -400,5 +411,27 @@ impl MundoGuerra {
 
     pub fn catalogo(&self) -> &CatalogoGuerra {
         &self.cenario.catalogo
+    }
+
+    /// Captura o estado dinâmico da guerra para salvar (cenário + RNG + frentes + tratados).
+    pub fn salvar_estado(&self) -> EstadoGuerraSalvo {
+        EstadoGuerraSalvo {
+            cenario: self.cenario.clone(),
+            rng: self.rng,
+            frentes_ativas: self.frentes_ativas.clone(),
+            historico_tratados: self.historico_tratados.clone(),
+            proximo_frente_id: self.proximo_frente_id,
+        }
+    }
+
+    /// Reconstrói o mundo de guerra a partir do estado salvo.
+    pub fn restaurar_estado(catalogo: CatalogoGuerra, e: EstadoGuerraSalvo) -> ResultadoGuerra<Self> {
+        let mut m = Self::novo(e.cenario)?;
+        m.rng = e.rng;
+        m.frentes_ativas = e.frentes_ativas;
+        m.historico_tratados = e.historico_tratados;
+        m.proximo_frente_id = e.proximo_frente_id;
+        m.invalidar_cache_territorial();
+        Ok(m)
     }
 }

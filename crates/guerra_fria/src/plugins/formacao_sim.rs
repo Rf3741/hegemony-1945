@@ -6,7 +6,6 @@
 
 use super::diplomacia_ui::{DiploSim, PainelDiplomacia};
 use super::economy::RecursoMundo;
-use super::enciclopedia;
 use super::eventos_ui::EstadoEv;
 use super::guerra_sim::{normalizar_tag, GuerraSim};
 use super::jogador::{Notificacoes, PaisJogador};

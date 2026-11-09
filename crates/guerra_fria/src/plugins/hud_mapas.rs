@@ -8,7 +8,7 @@ use super::mapa_provincial::{Escala, Metrica, PesosProvincias};
 use super::politica_sim::PoliticaSim;
 use super::tecnologia_ui::TecnologiaSim;
 use super::time::{EventoTickDiario, RecursoRelogio};
-use super::ui::{area_livre_mapa, consumir_topo, ui_raiz};
+use super::ui::{area_livre_mapa, ui_raiz};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use simulacao::mundo::EstadoPais;
@@ -348,7 +348,7 @@ pub fn barra_extra(
     }
     let alertas = calcular_alertas(&alertas_in);
     let _ = (&jogador, &relogio);
-    let resp = egui::Panel::top("barra_modulos")
+    let _resp = egui::Panel::top("barra_modulos")
         .frame(egui::Frame::NONE.fill(ui_refinada::menu::PAPEL).stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO)).inner_margin(4.0))
         .show(&mut raiz, |ui| {
             ui.horizontal_wrapped(|ui| {

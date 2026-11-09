@@ -20,7 +20,7 @@ use sim_guerra::{
     Divisao, Exercito, Guerra, MundoGuerra, PaisMilitar, PosturaOperacional,
     PropostaPaz, RegiaoMapa, TratadoPazAssinado,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Recurso ECS que encapsula o motor determinístico `sim_guerra`.
 #[derive(Resource)]

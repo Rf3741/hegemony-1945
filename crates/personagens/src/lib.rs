@@ -3,7 +3,7 @@
 //! Núcleo puro (sem Bevy): o cliente chama [`Elenco::avancar_dia`] a cada dia de jogo e reage
 //! aos [`EventoPersonagem`] devolvidos.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -20,7 +20,7 @@ pub fn parse_data(s: &str) -> Option<Data> {
 }
 
 /// Registro de um personagem histórico (formato de `personagens.ron`).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Personagem {
     pub id: String,
     pub nome: String,
@@ -54,7 +54,7 @@ impl Personagem {
 }
 
 /// Traço de personalidade com efeitos numéricos (formato de `tracos.ron`).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Traco {
     pub id: String,
     pub nome: String,
@@ -64,7 +64,7 @@ pub struct Traco {
     pub efeitos: BTreeMap<String, f64>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct Transicao {
     data: String,
     pais: String,
@@ -73,7 +73,7 @@ struct Transicao {
 }
 
 /// Cargo nacional ocupado por um líder.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Papel {
     Estado,
     Governo,
@@ -89,7 +89,7 @@ impl Papel {
 }
 
 /// O que aconteceu num dia.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum EventoPersonagem {
     Morte { id: String, nome: String, pais: String, idade: i32, data: Data },
     /// `antigo` é `None` se o cargo estava vago.
@@ -109,7 +109,7 @@ impl std::fmt::Display for ErroCarga {
 impl std::error::Error for ErroCarga {}
 
 /// Estado vivo dos personagens do mundo.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Elenco {
     pers: BTreeMap<String, Personagem>,
     tracos: BTreeMap<String, Traco>,

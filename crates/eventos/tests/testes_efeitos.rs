@@ -2,7 +2,7 @@ use eventos::condicoes::{Condicao, Op};
 use eventos::contexto::ContextoEfeitos;
 use eventos::politicos::{CondicoesEvento, EventoPolitico, OpcaoEventoPolitico};
 use eventos::{
-    CatalogoEventos, EstadoEventos, Evento, Modificador, OpcaoEvento, aplicar_opcao_com_contexto,
+    CatalogoEventos, EstadoEventos, Evento, Modificador, OpcaoEvento, Pendente, aplicar_opcao_com_contexto,
     avaliar_dia_com_contexto,
 };
 use sim_diplomacia::{Bloco, Diplomacia, InfoPais};
@@ -629,4 +629,341 @@ fn teste_condicoes_abertura_cortina_e_socialista() {
 
     est.definir_flag("CZE", "reforma_socialista");
     assert!(est.avaliar(&m, "CZE", &c_socialista));
+}
+
+#[test]
+fn teste_fila_eventos_limite_maximo_tres() {
+    let mut m = mundo_teste();
+    let mut est = EstadoEventos::default();
+
+    let cat = CatalogoEventos {
+        eventos: vec![
+            Evento {
+                id: "evt1".to_string(),
+                titulo: "Evento Um".to_string(),
+                descricao: "Desc".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Opção 1".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+            Evento {
+                id: "evt2".to_string(),
+                titulo: "Evento Dois".to_string(),
+                descricao: "Desc".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Opção 1".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+            Evento {
+                id: "evt3".to_string(),
+                titulo: "Evento Três".to_string(),
+                descricao: "Desc".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Opção 1".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+            Evento {
+                id: "evt4".to_string(),
+                titulo: "Evento Quatro".to_string(),
+                descricao: "Desc".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Opção 1".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+            Evento {
+                id: "evt5".to_string(),
+                titulo: "Evento Cinco".to_string(),
+                descricao: "Desc".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Opção 1".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+        ],
+    };
+
+    // Preenche a fila manualmente para testar o limitador
+    est.pendentes.push(Pendente { evento_id: "evt1".to_string(), pais: "USA".to_string() });
+    est.pendentes.push(Pendente { evento_id: "evt2".to_string(), pais: "USA".to_string() });
+    est.pendentes.push(Pendente { evento_id: "evt3".to_string(), pais: "USA".to_string() });
+    est.disparados.insert("evt1".to_string(), None);
+    est.disparados.insert("evt2".to_string(), None);
+    est.disparados.insert("evt3".to_string(), None);
+
+    let mut ctx = ContextoEfeitos::apenas_mundo(&mut m);
+
+    // Adiciona evt4 e evt5 - devem ser resolvidos automaticamente pois excedem o limite de 3
+    est.pendentes.push(Pendente { evento_id: "evt4".to_string(), pais: "USA".to_string() });
+    est.disparados.insert("evt4".to_string(), None);
+    est.resolver_excedentes_fila(&cat, &mut ctx, "USA");
+
+    est.pendentes.push(Pendente { evento_id: "evt5".to_string(), pais: "USA".to_string() });
+    est.disparados.insert("evt5".to_string(), None);
+    est.resolver_excedentes_fila(&cat, &mut ctx, "USA");
+
+    // A fila deve ter no máximo 3 eventos
+    assert_eq!(est.pendentes.len(), 3, "Fila deve ter no máximo 3 eventos");
+
+    // Os 3 primeiros devem estar na fila (evt1, evt2, evt3)
+    assert_eq!(est.pendentes[0].evento_id, "evt1");
+    assert_eq!(est.pendentes[1].evento_id, "evt2");
+    assert_eq!(est.pendentes[2].evento_id, "evt3");
+
+    // evt4 e evt5 devem ter sido resolvidos automaticamente
+    // Verifica no jornal as decisões automáticas
+    let decisoes_auto: Vec<_> = est
+        .jornal
+        .iter()
+        .filter(|n| n.texto.starts_with("Decisão automática:"))
+        .collect();
+    assert_eq!(decisoes_auto.len(), 2, "Duas decisões automáticas esperadas");
+    assert!(decisoes_auto.iter().any(|n| n.texto.contains("Evento Quatro")));
+    assert!(decisoes_auto.iter().any(|n| n.texto.contains("Evento Cinco")));
+    assert!(decisoes_auto.iter().all(|n| n.texto.contains("Opção 1")));
+}
+
+#[test]
+fn teste_fila_eventos_deduplicacao_por_titulo() {
+    let mut m = mundo_teste();
+    let mut est = EstadoEventos::default();
+
+    let cat = CatalogoEventos {
+        eventos: vec![
+            Evento {
+                id: "evt_a".to_string(),
+                titulo: "Mesmo Título".to_string(),
+                descricao: "Desc A".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Opção A".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+            Evento {
+                id: "evt_b".to_string(),
+                titulo: "Mesmo Título".to_string(), // Mesmo título!
+                descricao: "Desc B".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Opção B".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+            Evento {
+                id: "evt_c".to_string(),
+                titulo: "Título Diferente".to_string(),
+                descricao: "Desc C".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Opção C".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+        ],
+    };
+
+    let mut ctx = ContextoEfeitos::apenas_mundo(&mut m);
+
+    // Adiciona evt_a
+    est.pendentes.push(Pendente { evento_id: "evt_a".to_string(), pais: "USA".to_string() });
+    est.disparados.insert("evt_a".to_string(), None);
+
+    // Tenta adicionar evt_b (mesmo título) - deve ser rejeitado pela deduplicação
+    assert!(est.tem_pendente_com_titulo(&cat, "Mesmo Título"));
+    // Simula a lógica de avaliar_dia_com_contexto: não adiciona se já existe título
+    if !est.tem_pendente_com_titulo(&cat, "Mesmo Título") {
+        est.pendentes.push(Pendente { evento_id: "evt_b".to_string(), pais: "USA".to_string() });
+        est.disparados.insert("evt_b".to_string(), None);
+    }
+
+    // Adiciona evt_c (título diferente)
+    est.pendentes.push(Pendente { evento_id: "evt_c".to_string(), pais: "USA".to_string() });
+    est.disparados.insert("evt_c".to_string(), None);
+
+    // Apenas 2 eventos devem estar na fila (evt_a e evt_c; evt_b é duplicata por título)
+    assert_eq!(est.pendentes.len(), 2, "Fila deve ter 2 eventos (sem duplicatas por título)");
+    assert_eq!(est.pendentes[0].evento_id, "evt_a");
+    assert_eq!(est.pendentes[1].evento_id, "evt_c");
+
+    // evt_b não deve ter sido adicionado
+    assert!(!est.disparados.contains_key("evt_b"));
+}
+
+#[test]
+fn teste_fila_eventos_decisao_automatica_registra_no_jornal() {
+    let mut m = mundo_teste();
+    let mut est = EstadoEventos::default();
+
+    let cat = CatalogoEventos {
+        eventos: vec![
+            Evento {
+                id: "evt1".to_string(),
+                titulo: "Crise Política".to_string(),
+                descricao: "Desc".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![
+                    OpcaoEvento {
+                        id: "opt_a".to_string(),
+                        texto: "Negociar".to_string(),
+                        descricao_resultado: "".to_string(),
+                        efeitos: vec![],
+                        ia_peso: 100,
+                    },
+                    OpcaoEvento {
+                        id: "opt_b".to_string(),
+                        texto: "Reprimir".to_string(),
+                        descricao_resultado: "".to_string(),
+                        efeitos: vec![],
+                        ia_peso: 50,
+                    },
+                ],
+                chance: 1.0,
+                generico: true,
+            },
+            Evento {
+                id: "evt2".to_string(),
+                titulo: "Revolta Popular".to_string(),
+                descricao: "Desc".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Conceder Reformas".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+            Evento {
+                id: "evt3".to_string(),
+                titulo: "Greve Geral".to_string(),
+                descricao: "Desc".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Dialogar".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+            Evento {
+                id: "evt4".to_string(),
+                titulo: "Motim Militar".to_string(),
+                descricao: "Desc".to_string(),
+                data: (1945, 1, 1),
+                paises: vec!["USA".to_string()],
+                condicoes: vec![],
+                opcoes: vec![OpcaoEvento {
+                    id: "opt1".to_string(),
+                    texto: "Anistia".to_string(),
+                    descricao_resultado: "".to_string(),
+                    efeitos: vec![],
+                    ia_peso: 100,
+                }],
+                chance: 1.0,
+                generico: true,
+            },
+        ],
+    };
+
+    // Preenche a fila com 3 eventos
+    est.pendentes.push(Pendente { evento_id: "evt1".to_string(), pais: "USA".to_string() });
+    est.pendentes.push(Pendente { evento_id: "evt2".to_string(), pais: "USA".to_string() });
+    est.pendentes.push(Pendente { evento_id: "evt3".to_string(), pais: "USA".to_string() });
+    est.disparados.insert("evt1".to_string(), None);
+    est.disparados.insert("evt2".to_string(), None);
+    est.disparados.insert("evt3".to_string(), None);
+
+    let mut ctx = ContextoEfeitos::apenas_mundo(&mut m);
+
+    // Adiciona evt4 - deve ser resolvido automaticamente pois excede o limite de 3
+    est.pendentes.push(Pendente { evento_id: "evt4".to_string(), pais: "USA".to_string() });
+    est.disparados.insert("evt4".to_string(), None);
+    est.resolver_excedentes_fila(&cat, &mut ctx, "USA");
+
+    // evt4 deve ter sido resolvido automaticamente com a primeira opção
+    let decisoes_auto: Vec<_> = est
+        .jornal
+        .iter()
+        .filter(|n| n.texto.starts_with("Decisão automática:"))
+        .collect();
+    assert_eq!(decisoes_auto.len(), 1);
+    assert!(decisoes_auto[0].texto.contains("Motim Militar"));
+    assert!(decisoes_auto[0].texto.contains("Anistia")); // primeira opção
+    assert_eq!(decisoes_auto[0].texto, "Decisão automática: Motim Militar — Anistia");
 }

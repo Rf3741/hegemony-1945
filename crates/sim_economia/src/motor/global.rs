@@ -24,7 +24,7 @@ impl Default for ConfigMercadoGlobal {
 }
 
 /// Estado do mercado global (vetores indexados pela ordem de `catalogo().bens`).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct MercadoGlobal {
     pub config: ConfigMercadoGlobal,
     pub preco_mundial: Vec<f64>,
