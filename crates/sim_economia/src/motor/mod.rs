@@ -811,7 +811,22 @@ impl MundoEconomico {
             self.dias_decorridos,
         );
 
+        let proximo_dia_num = self.dias_decorridos + 1;
+        let rodar_estrutural = match self.config.modo_cadencia {
+            ModoCadencia::DiarioCompleto => Some(1u32),
+            ModoCadencia::DiarioComAjusteSemanal => {
+                if proximo_dia_num.is_multiple_of(7) {
+                    Some(7u32)
+                } else {
+                    None
+                }
+            }
+        };
+
         // (1) Produção dos prédios e subsistência
+        // Infraestrutura só precisa ser recalculada nos ticks estruturais (quando a construção completa).
+        // Nos ticks diários normais, o acesso_mercado já está correto do último tick estrutural.
+        let recalcular_infra = rodar_estrutural.is_some();
         producao::executar_producao_diaria(
             &self.catalogo,
             &self.config,
@@ -826,6 +841,7 @@ impl MundoEconomico {
             &mut self.buffers.infra_gerada_estado,
             &mut self.buffers.infra_usada_estado,
             &mut self.buffers.pop_incorporada_pais,
+            recalcular_infra,
         );
         self.ciclos_demanda.aplicar_demanda_industrial_era(
             &self.catalogo,
@@ -923,19 +939,14 @@ impl MundoEconomico {
             &self.buffers.importacoes_liquidas,
         );
 
-        let proximo_dia_num = self.dias_decorridos + 1;
-        let rodar_estrutural = match self.config.modo_cadencia {
-            ModoCadencia::DiarioCompleto => Some(1u32),
-            ModoCadencia::DiarioComAjusteSemanal => {
-                if proximo_dia_num.is_multiple_of(7) {
-                    Some(7u32)
-                } else {
-                    None
-                }
-            }
-        };
-
         if let Some(dias_passo) = rodar_estrutural {
+            // Recalcular infraestrutura APÓS a construção civil completar (governo),
+            // para que o próximo tick de produção use os valores atualizados.
+            // Mas precisamos dos valores ATUAIS para a produção DESTE tick, que já foram calculados
+            // no último tick estrutural. Então só recalculamos para o PRÓXIMO tick.
+            // Na verdade, a construção completa no governo DESTE tick, então a infra mudará para o próximo.
+            // O acesso_mercado usado na produção deste tick já está correto (do último tick estrutural).
+
             // (6) Crescimento vegetativo e migração interna
             demografia::executar_crescimento_e_migracao(
                 &self.catalogo,
@@ -979,6 +990,12 @@ impl MundoEconomico {
             &self.buffers.pontos_construcao_setores_pais,
             &self.buffers.reservas_predios_pais,
         );
+
+        // Recalcular infraestrutura se houve conclusão de obras (tick estrutural)
+        // Isso prepara o acesso_mercado para o PRÓXIMO tick de produção.
+        if rodar_estrutural.is_some() {
+            producao::atualizar_infraestrutura_estados(&self.catalogo, &mut self.estados, &self.provincias);
+        }
 
         self.dias_decorridos = proximo_dia_num;
         self.cobrar_pedagios_canais();
@@ -1063,6 +1080,10 @@ impl MundoEconomico {
         );
 
         let i0 = Instant::now();
+        let recalcular_infra = match self.config.modo_cadencia {
+            ModoCadencia::DiarioCompleto => true,
+            ModoCadencia::DiarioComAjusteSemanal => (self.dias_decorridos + 1).is_multiple_of(7),
+        };
         producao::executar_producao_diaria(
             &self.catalogo,
             &self.config,
@@ -1077,6 +1098,7 @@ impl MundoEconomico {
             &mut self.buffers.infra_gerada_estado,
             &mut self.buffers.infra_usada_estado,
             &mut self.buffers.pop_incorporada_pais,
+            recalcular_infra,
         );
         self.ciclos_demanda.aplicar_demanda_industrial_era(
             &self.catalogo,

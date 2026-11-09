@@ -22,6 +22,9 @@ struct TarefaPaisDistribuicao<'a> {
     div_cap_pais: &'a mut f64,
     div_ari_pais: &'a mut f64,
     reservas: &'a mut f64,
+    /// Parâmetros do sistema econômico cacheados por país (taxa_cap, taxa_ari).
+    taxa_cap_base: f64,
+    taxa_ari_base: f64,
     provs: Vec<ProvDistribuicao<'a>>,
 }
 
@@ -57,9 +60,7 @@ pub(crate) fn executar_distribuicao_rendas(
     pop_ari_pais.fill(0.0);
     reservas_predios_pais.fill(0.0);
 
-    // Paralelo por PAÍS: cada país só escreve em si mesmo e nas suas províncias (e nas fatias delas nos
-    // vetores auxiliares); a ordem das províncias dentro do país é a global, então as somas de ponto
-    // flutuante (PIB, fundo privado, dividendos) são idênticas às da versão sequencial.
+    // Paralelo por PAÍS: cada país só escreve em si mesmo e nas suas províncias.
     let mut tarefas: Vec<TarefaPaisDistribuicao> = paises
         .iter_mut()
         .zip(pop_cap_pais.iter_mut())
@@ -67,14 +68,21 @@ pub(crate) fn executar_distribuicao_rendas(
         .zip(dividendos_cap_pais.iter_mut())
         .zip(dividendos_ari_pais.iter_mut())
         .zip(reservas_predios_pais.iter_mut())
-        .map(|(((((pais, pop_cap), pop_ari), div_cap_pais), div_ari_pais), reservas)| TarefaPaisDistribuicao {
-            pais,
-            pop_cap,
-            pop_ari,
-            div_cap_pais,
-            div_ari_pais,
-            reservas,
-            provs: Vec::new(),
+        .map(|(((((pais, pop_cap), pop_ari), div_cap_pais), div_ari_pais), reservas)| {
+            // Cache parâmetros do sistema econômico por país (evita match de string no loop quente)
+            let (taxa_cap_base, taxa_ari_base, _) =
+                governo::parametros_sistema_economico(&pais.politica_fiscal.lei_sistema_economico_id);
+            TarefaPaisDistribuicao {
+                pais,
+                pop_cap,
+                pop_ari,
+                div_cap_pais,
+                div_ari_pais,
+                reservas,
+                taxa_cap_base,
+                taxa_ari_base,
+                provs: Vec::new(),
+            }
         })
         .collect();
     for (((prov, sal_tipo), div_cap), div_ari) in provincias
@@ -87,11 +95,12 @@ pub(crate) fn executar_distribuicao_rendas(
         tarefas[c].provs.push(ProvDistribuicao { prov, sal_tipo, div_cap, div_ari });
     }
     tarefas.into_par_iter().for_each(|t| {
-        let TarefaPaisDistribuicao { pais, pop_cap, pop_ari, div_cap_pais, div_ari_pais, reservas, provs } = t;
+        let TarefaPaisDistribuicao { pais, pop_cap, pop_ari, div_cap_pais, div_ari_pais, reservas, taxa_cap_base, taxa_ari_base, provs } = t;
         for ProvDistribuicao { prov, sal_tipo, div_cap: div_cap_prov, div_ari: div_ari_prov } in provs {
             let m_idx = prov.mercado_idx;
             let precos = &mercados[m_idx].precos_idx;
 
+            // Contar população capitalista/aristocrata de uma só vez
             let mut pop_cap_local = 0.0;
             let mut pop_ari_local = 0.0;
             for pop in &prov.pops {
@@ -365,10 +374,7 @@ pub(crate) fn executar_distribuicao_rendas(
                 reservas_prov += b.reservas_caixa;
                 b.dividendos_ultimo_tick = dividendos;
                 if dividendos > 0.0 {
-                    let (taxa_cap_base, taxa_ari_base, _) = governo::parametros_sistema_economico(
-                        &pais.politica_fiscal.lei_sistema_economico_id,
-                    );
-                    // Saturação suave baseada na escala do PIB anual do país (sem teto artificial de 250k)
+                    // Usar parâmetros cacheados em vez de match de string
                     let cap_escala = (pais.pib_diario * 365.0).max(500_000.0);
                     let saturacao = (pais.fundo_investimento_privado / (cap_escala * 2.0)).clamp(0.0, 1.0);
 

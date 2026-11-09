@@ -5,9 +5,9 @@ use crate::catalogo::CatalogoEconomia;
 use crate::entidades::{ConfigSimulacao, Estado, Mercado, Pais, Predio, PredioCompilado, Provincia};
 use crate::motor::governo::compilar_cache_predio;
 use crate::motor::trabalho::reconciliar_empregados_provincia;
-use std::collections::BTreeMap;
 use crate::tipos::{CategoriaBem, CategoriaPredio};
 use rayon::prelude::*;
+use std::collections::BTreeMap;
 
 /// Trabalho de um mercado na fase de produção (partes disjuntas do estado, seguras para threads).
 struct TarefaMercadoProducao<'a> {
@@ -16,6 +16,8 @@ struct TarefaMercadoProducao<'a> {
     demanda: &'a mut [f64],
     /// (índice do país, país, pop. incorporada, pontos de construção)
     paises: Vec<(usize, &'a mut Pais, &'a mut f64, &'a mut f64)>,
+    /// Mapa país_idx -> índice no vetor paises (para lookup O(1))
+    pais_idx_map: Vec<usize>,
 }
 
 /// Executa a produção física de todos os prédios e fazendas de subsistência em passagem única,
@@ -35,6 +37,7 @@ pub(crate) fn executar_producao_diaria(
     infra_gerada_estado: &mut [f64],
     infra_usada_estado: &mut [f64],
     pop_incorporada_pais: &mut [f64],
+    recalcular_infra: bool,
 ) {
     let num_bens = catalogo.bens.len();
     proxima_oferta.fill(0.0);
@@ -43,7 +46,10 @@ pub(crate) fn executar_producao_diaria(
     pop_incorporada_pais.fill(0.0);
 
     // 0. Recalcular a infraestrutura de todos os estados (Victoria 3)
-    atualizar_infraestrutura_estados(catalogo, estados, provincias);
+    // Só recalcula nos ticks estruturais (semanal); nos ticks diários usa valores cacheados.
+    if recalcular_infra {
+        atualizar_infraestrutura_estados(catalogo, estados, provincias);
+    }
 
     for (e_idx, est) in estados.iter().enumerate() {
         infra_gerada_estado[e_idx] = est.infraestrutura_capacidade;
@@ -95,15 +101,19 @@ pub(crate) fn executar_producao_diaria(
         };
     }
 
-    // 2. Passagem sobre as províncias, paralela por MERCADO. Cada mercado só escreve nas suas próprias
-    // células de oferta/demanda e nos acumuladores dos países que lhe pertencem; dentro do mercado a ordem
-    // das províncias é a global, então toda soma de ponto flutuante é idêntica à versão sequencial
-    // (resultado determinístico, independente do número de threads).
+    // 2. Passagem sobre as províncias, paralela por MERCADO.
     let num_alimentos = bens_alimento_basico.len();
+    let num_paises = paises.len();
     let mut tarefas: Vec<TarefaMercadoProducao> = proxima_oferta
         .chunks_mut(num_bens)
         .zip(proxima_demanda.chunks_mut(num_bens))
-        .map(|(oferta, demanda)| TarefaMercadoProducao { provs: Vec::new(), oferta, demanda, paises: Vec::new() })
+        .map(|(oferta, demanda)| TarefaMercadoProducao {
+            provs: Vec::new(),
+            oferta,
+            demanda,
+            paises: Vec::new(),
+            pais_idx_map: vec![usize::MAX; num_paises],
+        })
         .collect();
     for (c_idx, ((pais, pop_inc), pontos)) in paises
         .iter_mut()
@@ -111,17 +121,22 @@ pub(crate) fn executar_producao_diaria(
         .zip(pontos_construcao_setores_pais.iter_mut())
         .enumerate()
     {
-        tarefas[pais.mercado_idx].paises.push((c_idx, pais, pop_inc, pontos));
+        let m_idx = pais.mercado_idx;
+        let pos = tarefas[m_idx].paises.len();
+        tarefas[m_idx].paises.push((c_idx, pais, pop_inc, pontos));
+        tarefas[m_idx].pais_idx_map[c_idx] = pos;
     }
     for prov in provincias.iter_mut() {
         tarefas[prov.mercado_idx].provs.push(prov);
     }
+
     tarefas.into_par_iter().for_each(|mut t| {
         let provs = std::mem::take(&mut t.provs);
         for prov in provs {
             let m_idx = prov.mercado_idx;
             let c_idx = prov.pais_idx;
-            let ci = t.paises.iter().position(|x| x.0 == c_idx).expect("país do mercado");
+            let ci = t.pais_idx_map[c_idx];
+            debug_assert!(ci != usize::MAX, "país do mercado não encontrado");
             let e_idx = prov.estado_idx;
             let acesso = estados[e_idx].acesso_mercado;
             let est_inc = estados[e_idx].incorporado;
@@ -184,7 +199,8 @@ pub(crate) fn executar_producao_diaria(
 
                 let nivel_f = b.nivel as f64;
                 let escala_inst = nivel_f * r_emp;
-                let categoria = catalogo.tipos_predio[b.cache.tipo_idx].categoria;
+                let tp_idx = b.cache.tipo_idx;
+                let categoria = catalogo.tipos_predio[tp_idx].categoria;
 
                 let mut fator_insumos = 1.0_f64;
                 for &(g_in, _) in b.cache.insumos() {
@@ -198,14 +214,15 @@ pub(crate) fn executar_producao_diaria(
                 };
 
                 let econ_escala = 1.0 + 0.01 * (b.nivel.saturating_sub(1).min(25) as f64);
-                if b.cache.qualidade_local.is_nan() {
-                    b.cache.qualidade_local = estados[e_idx].rendimento_recurso(&catalogo.tipos_predio[b.cache.tipo_idx]);
-                }
-                let mult_qualidade = b.cache.qualidade_local;
-                // Cadeia local: processar onde o insumo é produzido (menos transporte, mais produtividade).
+                let mult_qualidade = if b.cache.qualidade_local.is_nan() {
+                    b.cache.qualidade_local = estados[e_idx].rendimento_recurso(&catalogo.tipos_predio[tp_idx]);
+                    b.cache.qualidade_local
+                } else {
+                    b.cache.qualidade_local
+                };
                 let mult_fabrica = if categoria == CategoriaPredio::Industrial {
                     let bonus_mercado = if acesso >= 0.90 { 0.03 } else { 0.0 };
-                    1.0 + bonus_mercado + estados[e_idx].bonus_cadeia(b.cache.tipo_idx)
+                    1.0 + bonus_mercado + estados[e_idx].bonus_cadeia(tp_idx)
                 } else {
                     1.0
                 };

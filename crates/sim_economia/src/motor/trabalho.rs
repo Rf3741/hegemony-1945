@@ -214,7 +214,6 @@ pub(crate) fn executar_contratacao_e_demissao(
                     }
                 }
             } else if !b.cache.financiado_pelo_governo && !b.subsidiado && b.dias_retomada == 0 && margem < -0.03 {
-                // Salário cede primeiro (proporcional ao prejuízo); só demite quando já está no piso.
                 let queda = ((0.01 + 0.05 * (-margem).min(1.0)) * fator_dias).min(0.5);
                 b.salario_base = (b.salario_base * (1.0 - queda)).clamp(1.2, 350.0);
 
@@ -243,7 +242,6 @@ pub(crate) fn executar_contratacao_e_demissao(
             reconciliar_empregados_provincia(prov, emp_alvo_por_tipo, pop_total_por_tipo);
         }
 
-        // Absorção do excedente desempregado na rede de subsistência/informalidade (camponeses)
         if let Some(camp_idx) = catalogo.tipo_pop_campones_idx {
             promocoes.clear();
             let mut demote_houve = false;
