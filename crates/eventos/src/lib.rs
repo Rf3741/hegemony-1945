@@ -339,6 +339,51 @@ impl EstadoEventos {
         self.modificadores_temporarios.retain(|m| !m.expirado());
     }
 
+    /// Verifica se já existe um evento pendente com o mesmo título.
+    pub fn tem_pendente_com_titulo(&self, cat: &CatalogoEventos, titulo: &str) -> bool {
+        self.pendentes.iter().any(|p| {
+            cat.por_id(&p.evento_id)
+                .is_some_and(|e| e.titulo == titulo)
+        })
+    }
+
+    /// Resolve automaticamente eventos excedentes da fila (além de 3), aplicando a primeira opção
+    /// e registrando no jornal. Remove do final da fila (eventos mais novos) para preservar
+    /// os mais antigos que o jogador ainda não viu.
+    pub fn resolver_excedentes_fila(
+        &mut self,
+        cat: &CatalogoEventos,
+        ctx: &mut ContextoEfeitos,
+        _alvo: &str,
+    ) {
+        const MAX_PENDENTES: usize = 3;
+        while self.pendentes.len() > MAX_PENDENTES {
+            if let Some(pend) = self.pendentes.pop() {
+                if let Some(evento) = cat.por_id(&pend.evento_id) {
+                    if let Some(op) = evento.opcoes.first() {
+                        aplicar_opcao_com_contexto(ctx, self, evento, 0, &pend.pais);
+                        let _nome_pais = ctx
+                            .mundo
+                            .paises
+                            .get(&pend.pais)
+                            .map(|p| p.nome.clone())
+                            .unwrap_or_else(|| pend.pais.clone());
+                        self.jornal.push(Noticia {
+                            data: (ctx.mundo.data.ano, ctx.mundo.data.mes, ctx.mundo.data.dia),
+                            texto: format!(
+                                "Decisão automática: {} — {}",
+                                evento.titulo, op.texto
+                            ),
+                        });
+                        if self.jornal.len() > 200 {
+                            self.jornal.remove(0);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Retorna o valor agregado de modificadores temporários para um país por ID ou categoria conceitual.
     pub fn modificador_total(&self, pais: &str, id_ou_cat: &str) -> f32 {
         self.modificadores_temporarios
@@ -670,10 +715,15 @@ pub fn avaliar_dia_com_contexto(
             let exibidos = est.popups_por_semana.get(&semana).copied().unwrap_or(0);
             let cooldown_liberado = est.ultimo_popup_por_pais.get(&alvo).copied() != Some(semana);
             if exibidos < 2 && cooldown_liberado {
-                est.disparados.insert(ev.id.clone(), None);
-                est.pendentes.push(Pendente { evento_id: ev.id.clone(), pais: alvo.clone() });
-                est.popups_por_semana.insert(semana, exibidos + 1);
-                est.ultimo_popup_por_pais.insert(alvo, semana);
+                // Evita duplicatas por título na fila de pendentes
+                if !est.tem_pendente_com_titulo(cat, &ev.titulo) {
+                    est.disparados.insert(ev.id.clone(), None);
+                    est.pendentes.push(Pendente { evento_id: ev.id.clone(), pais: alvo.clone() });
+                    est.popups_por_semana.insert(semana, exibidos + 1);
+                    est.ultimo_popup_por_pais.insert(alvo.clone(), semana);
+                    // Limita a fila a 3 eventos; excedentes (mais novos) são resolvidos automaticamente
+                    est.resolver_excedentes_fila(cat, ctx, &alvo);
+                }
             } else {
                 // Eventos excedentes continuam históricos, mas entram no Jornal sem interromper o jogo.
                 let i = escolha_ia(ev, hoje);
