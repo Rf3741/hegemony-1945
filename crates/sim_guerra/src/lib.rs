@@ -39,4 +39,4 @@ pub use grafo::{ArestaRegiao, GrafoCompilado, VizinhoCompilado};
 pub use motor::paz::{AvaliacaoPaz, PropostaPaz, TratadoPazAssinado};
 pub use motor::{EstadoGuerraSalvo, MundoGuerra, RelatorioTickGuerra};
 pub use rng::RngDeterministico;
-pub use tipos::{ClasseUnidade, ClausulaPaz, DataJogo, PosturaOperacional, TipoResultadoBatalha};
+pub use tipos::{ClasseUnidade, ClausulaPaz, DataJogo, EnvolvimentoGuerra, LadoGuerra, NivelEnvolvimento, PosturaOperacional, TipoResultadoBatalha};

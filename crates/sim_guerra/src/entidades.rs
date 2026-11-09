@@ -1,7 +1,7 @@
 //! Entidades de domínio militar serializáveis em RON:
 //! regiões do mapa, países militares, comandantes, divisões, exércitos, frentes, guerras e configuração.
 
-use crate::tipos::{DataJogo, PosturaOperacional};
+use crate::tipos::{DataJogo, EnvolvimentoGuerra, LadoGuerra, PosturaOperacional};
 use serde::{Deserialize, Serialize};
 
 const fn padrao_true() -> bool {
@@ -219,6 +219,10 @@ pub struct Guerra {
     pub capitulou_defensores: bool,
     #[serde(default = "padrao_true")]
     pub ativa: bool,
+    /// Envolvimentos de terceiros (guerra por procuração): países que não são beligerantes diretos
+    /// mas apoiam um dos lados em diferentes níveis (0 a 5).
+    #[serde(default)]
+    pub envolvimentos: Vec<EnvolvimentoGuerra>,
 }
 
 impl Guerra {

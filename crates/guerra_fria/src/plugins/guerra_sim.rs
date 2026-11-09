@@ -681,6 +681,9 @@ pub fn acao_propor_paz(
         .map_err(|e| format!("Erro ao assinar paz: {e}"))
 }
 
+/// Re-exporta `declarar_com_aliados` do módulo `guerra_ia` para uso externo (ex.: UI de diplomacia).
+pub use crate::plugins::guerra_ia::declarar_com_aliados;
+
 #[cfg(test)]
 mod testes {
     use super::*;
