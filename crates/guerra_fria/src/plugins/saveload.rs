@@ -1,10 +1,13 @@
 //! Salvar e carregar a partida (serde + RON + gzip), com slots, salvamento rápido e autosave anual.
 use super::diplomacia_ui::{DiploSim, PainelDiplomacia};
+use super::divergencia_sim::DivergenciaSim;
 use super::economia_sim::EconomiaSim;
 use super::economy::RecursoMundo;
 use super::eventos_ui::EstadoEv;
+use super::guerra_sim::GuerraSim;
 use super::jogador::PaisJogador;
 use super::map::RaizProjeto;
+use super::personagens_sim::ElencoRes;
 use super::politica_sim::{PoliticaSalva, PoliticaSim};
 use super::tecnologia_ui::TecnologiaSim;
 use super::time::{EventoTickDiario, RecursoRelogio};
@@ -14,9 +17,11 @@ use bevy_egui::egui;
 use eventos::EstadoEventos;
 use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use gf_mapa::tempo::RelogioSimulacao;
+use personagens::Elenco;
 use serde::{Deserialize, Serialize};
 use sim_diplomacia::DiplomaciaSalva;
 use sim_economia::{EstadoEconomiaSalvo, MercadoGlobal};
+use sim_guerra::EstadoGuerraSalvo;
 use simulacao::mundo::MundoJogo;
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
@@ -101,6 +106,12 @@ pub struct Partida {
     pub diplomacia: DiplomaciaSalva,
     pub tecnologia: BTreeMap<String, sim_tecnologia::EstadoPais>,
     pub eventos: EstadoEventos,
+    #[serde(default)]
+    pub divergencia: Option<simulacao::MotorDivergencia>,
+    #[serde(default)]
+    pub guerra: Option<EstadoGuerraSalvo>,
+    #[serde(default)]
+    pub personagens: Option<Elenco>,
 }
 
 impl Partida {
@@ -114,6 +125,9 @@ impl Partida {
         diplomacia: DiplomaciaSalva,
         tecnologia: BTreeMap<String, sim_tecnologia::EstadoPais>,
         eventos: EstadoEventos,
+        divergencia: Option<simulacao::MotorDivergencia>,
+        guerra: Option<EstadoGuerraSalvo>,
+        personagens: Option<Elenco>,
     ) -> Self {
         Self {
             versao: VERSAO,
@@ -126,6 +140,9 @@ impl Partida {
             diplomacia,
             tecnologia,
             eventos,
+            divergencia,
+            guerra,
+            personagens,
         }
     }
     pub fn mundo(self_: &Partida) -> MundoJogo {
@@ -338,6 +355,9 @@ type RecursosSalvar<'w> = (
     Option<Res<'w, DiploSim>>,
     Option<Res<'w, TecnologiaSim>>,
     Option<Res<'w, EstadoEv>>,
+    Option<Res<'w, DivergenciaSim>>,
+    Option<Res<'w, GuerraSim>>,
+    Option<Res<'w, ElencoRes>>,
 );
 
 fn executar_salvar(mut pedidos: MessageReader<PedirSalvar>, mut espera: Local<Vec<Slot>>, mut slots: ResMut<Slots>, rec: RecursosSalvar) {
@@ -345,7 +365,7 @@ fn executar_salvar(mut pedidos: MessageReader<PedirSalvar>, mut espera: Local<Ve
     if espera.is_empty() {
         return;
     }
-    let (raiz, mundo, relogio, jogador, eco, pol, diplo, tec, ev) = rec;
+    let (raiz, mundo, relogio, jogador, eco, pol, diplo, tec, ev, div, guerra_sim, elenco) = rec;
     let (Some(jogador), Some(mut eco), Some(mut pol), Some(diplo), Some(tec), Some(ev)) = (jogador, eco, pol, diplo, tec, ev) else {
         espera.clear();
         slots.mensagem = "Nada para salvar ainda.".into();
@@ -354,7 +374,10 @@ fn executar_salvar(mut pedidos: MessageReader<PedirSalvar>, mut espera: Local<Ve
     // Se a economia/política estão processando um lote, tenta de novo no próximo quadro.
     let Some(economia) = eco.estado_salvo() else { return };
     let Some(politica) = pol.estado_salvo() else { return };
-    let partida = Partida::montar(&jogador.0, &mundo.0, &relogio.0, economia, politica, diplo.0.salvar_estado(), tec.mundo.salvar_estado(), ev.estado.clone());
+    let divergencia = div.map(|d| d.0.clone());
+    let guerra = guerra_sim.and_then(|g| g.0.salvar_estado().into());
+    let personagens = elenco.map(|e| e.elenco.clone());
+    let partida = Partida::montar(&jogador.0, &mundo.0, &relogio.0, economia, politica, diplo.0.salvar_estado(), tec.mundo.salvar_estado(), ev.estado.clone(), divergencia, guerra, personagens);
     let bytes = match codificar(&partida) {
         Ok(b) => b,
         Err(e) => {
@@ -389,6 +412,9 @@ struct RecursosCarregar<'w> {
     diplo: Option<ResMut<'w, DiploSim>>,
     tec: Option<ResMut<'w, TecnologiaSim>>,
     ev: Option<ResMut<'w, EstadoEv>>,
+    div: Option<ResMut<'w, DivergenciaSim>>,
+    guerra_sim: Option<ResMut<'w, GuerraSim>>,
+    elenco: Option<ResMut<'w, ElencoRes>>,
     painel_diplo: Option<ResMut<'w, PainelDiplomacia>>,
     estado: Res<'w, State<AppState>>,
     prox: ResMut<'w, NextState<AppState>>,
@@ -416,7 +442,7 @@ fn executar_carregar(mut pedidos: MessageReader<PedirCarregar>, mut espera: Loca
             return;
         }
     };
-    let Partida { pais_jogador, relogio, economia, mercado_global, politica, diplomacia, tecnologia, eventos, .. } = {
+    let Partida { pais_jogador, relogio, economia, mercado_global, politica, diplomacia, tecnologia, eventos, divergencia, guerra, personagens, .. } = {
         let m = Partida::mundo(&partida);
         r.mundo.0 = m;
         partida
@@ -429,6 +455,26 @@ fn executar_carregar(mut pedidos: MessageReader<PedirCarregar>, mut espera: Loca
     tec.restaurar_estado(tecnologia);
     ev.estado = eventos;
     r.relogio.0 = relogio;
+    // Restaura divergência (MotorDivergencia)
+    if let Some(div) = r.div.as_mut()
+        && let Some(divergencia) = divergencia
+    {
+        div.0 = divergencia;
+    }
+    // Restaura guerra (MundoGuerra)
+    if let Some(guerra_sim) = r.guerra_sim.as_mut()
+        && let Some(guerra) = guerra
+    {
+        if let Ok(mut mundo_guerra) = sim_guerra::MundoGuerra::restaurar_estado(guerra_sim.0.cenario.catalogo.clone(), guerra) {
+            guerra_sim.0 = mundo_guerra;
+        }
+    }
+    // Restaura personagens (Elenco)
+    if let Some(elenco_res) = r.elenco.as_mut()
+        && let Some(personagens) = personagens
+    {
+        elenco_res.elenco = personagens;
+    }
     if let Some(p) = r.painel_diplo.as_mut() {
         p.repintar = true;
     }
@@ -483,7 +529,7 @@ mod testes {
         relogio.total_ticks = 123;
         let eco = (nucleo.mundo.salvar_estado(), nucleo.global.clone());
         let pol = PoliticaSalva { mundo: sim_politica::EstadoPoliticoSalvo { data: Default::default(), dias_decorridos: 9, paises: vec![], rng: Default::default(), eventos_guerra_civil: vec![] }, base_eco: BTreeMap::new(), base_pops: BTreeMap::new() };
-        let p1 = Partida::montar("USA", &mundo, &relogio, eco, pol, diplo.salvar_estado(), BTreeMap::new(), ev);
+        let p1 = Partida::montar("USA", &mundo, &relogio, eco, pol, diplo.salvar_estado(), BTreeMap::new(), ev, None, None, None);
         let c1 = checksum(&p1).unwrap();
         let bytes = codificar(&p1).unwrap();
         let p2 = decodificar(&bytes).unwrap();
@@ -522,5 +568,121 @@ mod testes {
         let n = ruim.len();
         ruim[n - 20] ^= 0xFF;
         assert!(decodificar(&ruim).is_err());
+    }
+
+    #[test]
+    fn salvar_carregar_divergencia_roundtrip() {
+        let mut motor = simulacao::MotorDivergencia::novo(19450815);
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let (_, mut mundo) = MundoJogo::carregar_de_arquivos(
+            raiz.join("assets/map/provinces.ron"),
+            raiz.join("data/scenario_1945/countries_1945.ron"),
+            raiz.join("data/scenario_1945/province_owners_1945.ron"),
+        )
+        .expect("cenário");
+        // Avança alguns anos para gerar estado
+        for ano in 1960..=1970 {
+            motor.avaliar_passo(&mut mundo, simulacao::tempo::DataSimulacao::nova(ano, 6, 1), 35.0, &[]);
+        }
+
+        let p1 = Partida::montar(
+            "USA", &mundo, &RelogioSimulacao::novo(),
+            (sim_economia::EstadoEconomiaSalvo { data: Default::default(), dias_decorridos: 0, config: Default::default(), mercados: vec![], paises: vec![], estados: vec![], provincias: vec![], rotas_comerciais: vec![], blocos_comerciais: vec![], ciclos_demanda: Default::default() }, sim_economia::MercadoGlobal::default()),
+            PoliticaSalva { mundo: sim_politica::EstadoPoliticoSalvo { data: Default::default(), dias_decorridos: 0, paises: vec![], rng: Default::default(), eventos_guerra_civil: vec![] }, base_eco: BTreeMap::new(), base_pops: BTreeMap::new() },
+            sim_diplomacia::Diplomacia::novo(vec![]).salvar_estado(),
+            BTreeMap::new(),
+            EstadoEventos::default(),
+            Some(motor),
+            None,
+            None,
+        );
+        let bytes = codificar(&p1).unwrap();
+        let p2 = decodificar(&bytes).unwrap();
+        let d1 = p1.divergencia.as_ref().unwrap();
+        let d2 = p2.divergencia.as_ref().unwrap();
+        assert_eq!(d2.semente, d1.semente);
+        assert_eq!(d2.rng, d1.rng);
+        assert_eq!(d2.desfecho, d1.desfecho);
+        assert_eq!(d2.revolucoes_feitas, d1.revolucoes_feitas);
+        assert_eq!(d2.golpes_feitos, d1.golpes_feitos);
+        assert_eq!(d2.noticias_pendentes, d1.noticias_pendentes);
+        assert_eq!(d2.guerras_extras_ativas, d1.guerras_extras_ativas);
+        assert_eq!(d2.baixas_civis_acumuladas, d1.baixas_civis_acumuladas);
+        assert_eq!(d2.baixas_militares_acumuladas, d1.baixas_militares_acumuladas);
+    }
+
+    #[test]
+    fn salvar_carregar_guerra_roundtrip() {
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let catalogo_mapa: gf_mapa::mapa::CatalogoProvincias = ron::from_str(&std::fs::read_to_string(raiz.join("assets/map/provinces.ron")).unwrap()).unwrap();
+        let mundo_base = MundoJogo::carregar_de_arquivos(
+            raiz.join("assets/map/provinces.ron"),
+            raiz.join("data/scenario_1945/countries_1945.ron"),
+            raiz.join("data/scenario_1945/province_owners_1945.ron"),
+        )
+        .expect("cenário")
+        .1;
+        let (mut mundo_guerra, _) = super::super::guerra_sim::construir_guerra_1945(&raiz, &catalogo_mapa, &mundo_base).expect("guerra 1945");
+        // Declara uma guerra de teste
+        let _ = mundo_guerra.declarar_guerra("USA", "SOV", "Guerra de Teste");
+        let guerras_antes = mundo_guerra.guerras().len();
+        let divisoes_antes = mundo_guerra.divisoes().len();
+        let rng_antes = mundo_guerra.rng;
+
+        let estado_guerra = mundo_guerra.salvar_estado();
+        let p1 = Partida::montar(
+            "USA", &mundo_base, &RelogioSimulacao::novo(),
+            (sim_economia::EstadoEconomiaSalvo { data: Default::default(), dias_decorridos: 0, config: Default::default(), mercados: vec![], paises: vec![], estados: vec![], provincias: vec![], rotas_comerciais: vec![], blocos_comerciais: vec![], ciclos_demanda: Default::default() }, sim_economia::MercadoGlobal::default()),
+            PoliticaSalva { mundo: sim_politica::EstadoPoliticoSalvo { data: Default::default(), dias_decorridos: 0, paises: vec![], rng: Default::default(), eventos_guerra_civil: vec![] }, base_eco: BTreeMap::new(), base_pops: BTreeMap::new() },
+            sim_diplomacia::Diplomacia::novo(vec![]).salvar_estado(),
+            BTreeMap::new(),
+            EstadoEventos::default(),
+            None,
+            Some(estado_guerra),
+            None,
+        );
+        let bytes = codificar(&p1).unwrap();
+        let p2 = decodificar(&bytes).unwrap();
+        let g1 = p1.guerra.as_ref().unwrap();
+        let g2 = p2.guerra.as_ref().unwrap();
+        assert_eq!(g2.cenario.guerras.len(), guerras_antes);
+        assert_eq!(g2.cenario.divisoes.len(), divisoes_antes);
+        assert_eq!(g2.rng, rng_antes);
+        assert_eq!(g2.frentes_ativas.len(), 0); // sem tick, sem frentes
+    }
+
+    #[test]
+    fn salvar_carregar_personagens_roundtrip() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/data/personagens");
+        let elenco = personagens::Elenco::carregar(&dir, super::super::personagens_sim::INICIO).expect("carregar elenco");
+        let lider_usa_original = elenco.lider("USA", personagens::Papel::Estado).unwrap().id.clone();
+        let lider_sov_original = elenco.lider("SOV", personagens::Papel::Estado).unwrap().id.clone();
+
+        let p1 = Partida::montar(
+            "USA", &MundoJogo::carregar_de_arquivos(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/map/provinces.ron"),
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/scenario_1945/countries_1945.ron"),
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/scenario_1945/province_owners_1945.ron"),
+            )
+            .expect("cenário")
+            .1,
+            &RelogioSimulacao::novo(),
+            (sim_economia::EstadoEconomiaSalvo { data: Default::default(), dias_decorridos: 0, config: Default::default(), mercados: vec![], paises: vec![], estados: vec![], provincias: vec![], rotas_comerciais: vec![], blocos_comerciais: vec![], ciclos_demanda: Default::default() }, sim_economia::MercadoGlobal::default()),
+            PoliticaSalva { mundo: sim_politica::EstadoPoliticoSalvo { data: Default::default(), dias_decorridos: 0, paises: vec![], rng: Default::default(), eventos_guerra_civil: vec![] }, base_eco: BTreeMap::new(), base_pops: BTreeMap::new() },
+            sim_diplomacia::Diplomacia::novo(vec![]).salvar_estado(),
+            BTreeMap::new(),
+            EstadoEventos::default(),
+            None,
+            None,
+            Some(elenco),
+        );
+        let bytes = codificar(&p1).unwrap();
+        let p2 = decodificar(&bytes).unwrap();
+        let e1 = p1.personagens.as_ref().unwrap();
+        let e2 = p2.personagens.as_ref().unwrap();
+        assert_eq!(e2.lider("USA", personagens::Papel::Estado).unwrap().id, lider_usa_original);
+        assert_eq!(e2.lider("SOV", personagens::Papel::Estado).unwrap().id, lider_sov_original);
+        // Compara serialização completa para garantir que tudo bate
+        assert_eq!(ron::to_string(e1).unwrap(), ron::to_string(e2).unwrap());
     }
 }

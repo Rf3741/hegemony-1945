@@ -37,6 +37,6 @@ pub use erro::{
 pub use gerador::{ParametrosCenarioSintetico, gerar_cenario_sintetico};
 pub use grafo::{ArestaRegiao, GrafoCompilado, VizinhoCompilado};
 pub use motor::paz::{AvaliacaoPaz, PropostaPaz, TratadoPazAssinado};
-pub use motor::{MundoGuerra, RelatorioTickGuerra};
+pub use motor::{EstadoGuerraSalvo, MundoGuerra, RelatorioTickGuerra};
 pub use rng::RngDeterministico;
 pub use tipos::{ClasseUnidade, ClausulaPaz, DataJogo, PosturaOperacional, TipoResultadoBatalha};
