@@ -31,36 +31,39 @@ pub fn taxa_crescimento_anual_pop_epoca(padrao_de_vida: f64, alfabetizacao: f64,
     }
 
     // 1. Curva por padrão de vida (estágios da transição demográfica):
-    // SoL 3 a 8: transição inicial e auge de fecundidade (1,4% a 3,0%)
-    // SoL 8 a 16: transição plena, urbanização e renda (3,0% cai para 1,4%)
-    // SoL 16 a 26: países de renda média-alta / industrializados (1,4% cai para 0,5%)
-    // SoL > 26: pós-transição / estabilização demográfica (0,5% cai para ~0,15%)
-    let base_sol = if sol <= 8.0 {
-        0.014 + 0.016 * ((sol - 3.0) / 5.0)
-    } else if sol <= 16.0 {
-        0.030 - 0.016 * ((sol - 8.0) / 8.0)
-    } else if sol <= 26.0 {
-        0.014 - 0.009 * ((sol - 16.0) / 10.0)
+    // SoL 3 a 7: transição inicial e auge de fecundidade (1,6% a 3,0%)
+    // SoL 7 a 14: auge populacional de países em desenvolvimento (3,0% a 3,3%, queda da mortalidade infantil)
+    // SoL 14 a 22: transição para renda média / industrialização (3,3% cai para 1,6%)
+    // SoL 22 a 32: países industrializados e de alta renda (1,6% cai para 0,5%)
+    // SoL > 32: pós-transição / estabilização demográfica (~0,2% a 0,5%)
+    let base_sol = if sol <= 7.0 {
+        0.016 + 0.014 * ((sol - 3.0) / 4.0)
+    } else if sol <= 14.0 {
+        0.030 + 0.003 * ((sol - 7.0) / 7.0)
+    } else if sol <= 22.0 {
+        0.033 - 0.017 * ((sol - 14.0) / 8.0)
+    } else if sol <= 32.0 {
+        0.016 - 0.011 * ((sol - 22.0) / 10.0)
     } else {
-        (0.005 - 0.00015 * (sol - 26.0)).max(0.0015)
+        (0.0050 - 0.0001 * (sol - 32.0)).max(0.0020)
     };
 
     // 2. Fator época (transição global da Guerra Fria até o século XXI):
-    // 1945 a 1975: ápice do pós-guerra e revolução sanitária global (0.88 a 1.04).
-    // 1975 a 2010: difusão de métodos contraceptivos e planejamento familiar (1.04 cai para 0.58).
-    // 2010 a 2045: estabilização do século XXI (0.58 cai para 0.32).
-    let fator_epoca = if ano <= 1975.0 {
-        0.88 + 0.16 * ((ano - 1945.0) / 30.0).clamp(0.0, 1.0)
-    } else if ano <= 2010.0 {
-        let progresso = ((ano - 1975.0) / 35.0).clamp(0.0, 1.0);
-        1.04 - 0.46 * progresso
+    // 1945 a 1970: ápice do pós-guerra, antibióticos e revolução sanitária global (0.94 a 1.05).
+    // 1970 a 2005: difusão de métodos contraceptivos e planejamento familiar (1.05 cai para 0.76).
+    // 2005 a 2045: envelhecimento demográfico e estabilização do século XXI (0.76 cai para 0.48).
+    let fator_epoca = if ano <= 1970.0 {
+        0.94 + 0.11 * ((ano - 1945.0) / 25.0).clamp(0.0, 1.0)
+    } else if ano <= 2005.0 {
+        let progresso = ((ano - 1970.0) / 35.0).clamp(0.0, 1.0);
+        1.05 - 0.29 * progresso
     } else {
-        let progresso = ((ano - 2010.0) / 35.0).clamp(0.0, 1.0);
-        0.58 - 0.26 * progresso
+        let progresso = ((ano - 2005.0) / 40.0).clamp(0.0, 1.0);
+        0.76 - 0.28 * progresso
     };
 
     // 3. Efeito da alfabetização e educação feminina (acelera a transição demográfica)
-    let peso_alfa = 0.0025 + 0.0065 * ((ano - 1965.0).max(0.0) / 60.0).min(1.0);
+    let peso_alfa = 0.0020 + 0.0055 * ((ano - 1970.0).max(0.0) / 55.0).min(1.0);
     (base_sol * fator_epoca - peso_alfa * alfa).clamp(0.001, 0.035)
 }
 

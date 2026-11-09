@@ -7882,13 +7882,16 @@
         terra_aravel: 50,
         culturas_permitidas: ["acucar", "frutas", "gado", "graos", "tabaco"],
         recursos: {
+            "carvao": 240,
             "cobre": 60,
             "madeira": 30,
             "ouro_prata": 60,
             "pesca": 30,
             "uranio": 140,
         },
-        qualidade_recursos: {},
+        qualidade_recursos: {
+            "carvao": 1.25,
+        },
     ),
     (
         estado_id: "usa_connecticut",
@@ -8174,11 +8177,15 @@
         terra_aravel: 50,
         culturas_permitidas: ["acucar", "frutas", "gado", "graos", "tabaco"],
         recursos: {
+            "carvao": 320,
             "cobre": 150,
             "madeira": 30,
             "ouro_prata": 50,
         },
-        qualidade_recursos: {},
+        qualidade_recursos: {
+            "carvao": 1.30,
+            "cobre": 1.20,
+        },
     ),
     (
         estado_id: "usa_navassa_island",
@@ -8268,10 +8275,15 @@
         terra_aravel: 50,
         culturas_permitidas: ["acucar", "frutas", "gado", "graos", "tabaco"],
         recursos: {
+            "carvao": 180,
+            "ferro": 120,
             "madeira": 30,
             "pesca": 30,
         },
-        qualidade_recursos: {},
+        qualidade_recursos: {
+            "carvao": 1.15,
+            "ferro": 1.15,
+        },
     ),
     (
         estado_id: "usa_oklahoma",

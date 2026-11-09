@@ -216,16 +216,21 @@ pub(crate) fn executar_distribuicao_rendas(
                     custo_insumos += escala * qtd * precos[g_in as usize];
                 }
 
+                let categoria = catalogo.tipos_predio[b.cache.tipo_idx].categoria;
                 let mut receita = 0.0;
-                let escala_prod = if b.cache.financiado_pelo_governo { escala } else { escala * pais.produtividade };
+                let escala_prod = if b.cache.financiado_pelo_governo {
+                    escala
+                } else if categoria == CategoriaPredio::Extrativo {
+                    escala * (1.0 + (pais.produtividade - 1.0) * 0.5)
+                } else {
+                    escala * pais.produtividade
+                };
                 for &(g_out, qtd) in b.cache.produtos() {
                     receita += escala_prod * qtd * precos[g_out as usize];
                 }
 
                 b.custo_insumos_ultimo_tick = custo_insumos;
                 b.receita_ultimo_tick = receita;
-
-                let categoria = catalogo.tipos_predio[b.cache.tipo_idx].categoria;
 
                 if b.cache.financiado_pelo_governo {
                     let mult_sal_setor = match categoria {
