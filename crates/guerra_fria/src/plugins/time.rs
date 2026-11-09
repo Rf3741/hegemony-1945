@@ -44,8 +44,12 @@ fn atualizar_tempo_sistema(
     time: Res<Time>,
     mut relogio: ResMut<RecursoRelogio>,
     mut escritor_eventos: MessageWriter<EventoTickDiario>,
+    op: Option<Res<super::smoke::OpcoesCli>>,
 ) {
-    let dt = time.delta_secs_f64();
+    let mut dt = time.delta_secs_f64();
+    if op.as_ref().is_some_and(|o| o.espectador_ativo()) {
+        dt *= 4.0;
+    }
     let disparados = relogio.atualizar(dt);
     for _ in 0..disparados {
         escritor_eventos.write(EventoTickDiario {

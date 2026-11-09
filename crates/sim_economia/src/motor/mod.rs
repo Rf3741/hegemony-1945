@@ -189,6 +189,32 @@ impl MundoEconomico {
         }
     }
 
+    /// Aplica baixas militares e perdas civis de guerras extras sobre as províncias do país.
+    pub fn aplicar_baixas_guerra_extra(&mut self, tag: &str, baixas_militares: f64, baixas_civis: f64) {
+        let Some(pais_idx) = self.paises.iter().position(|p| p.tag.as_deref() == Some(tag)) else { return };
+        let prov_indices = self.paises[pais_idx].provincias_indices.clone();
+        if prov_indices.is_empty() {
+            return;
+        }
+        let total_perdas = baixas_militares + baixas_civis;
+        if total_perdas <= 0.0 {
+            return;
+        }
+        let perdas_por_prov = total_perdas / prov_indices.len() as f64;
+        for &idx in &prov_indices {
+            let prov = &mut self.provincias[idx];
+            let pop_prov = prov.populacao_total();
+            if pop_prov <= 0.0 {
+                continue;
+            }
+            let frac = (perdas_por_prov / pop_prov).clamp(0.0, 0.5);
+            for pop in &mut prov.pops {
+                pop.populacao = (pop.populacao * (1.0 - frac)).max(10.0);
+                pop.empregados = pop.empregados.min(pop.populacao);
+            }
+        }
+    }
+
     fn reindexar_pos_formacao(&mut self) -> ResultadoEconomia<()> {
         let n_paises = self.paises.len();
         let n_bens = self.catalogo.bens.len();

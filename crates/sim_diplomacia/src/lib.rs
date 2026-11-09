@@ -282,6 +282,47 @@ impl Diplomacia {
         self.paises.iter().find(|p| p.tag == tag).map_or(Bloco::NaoAlinhado, |p| p.bloco)
     }
 
+    /// Altera o bloco diplomático de um país e ajusta a influência geopolítica de referência.
+    pub fn definir_bloco(&mut self, tag: &str, novo_bloco: Bloco) {
+        if let Some(p) = self.paises.iter_mut().find(|p| p.tag == tag) {
+            p.bloco = novo_bloco;
+        } else {
+            self.adicionar_pais(InfoPais {
+                tag: tag.to_string(),
+                bloco: novo_bloco,
+            });
+        }
+        let i = match novo_bloco {
+            Bloco::Ocidental => (65.0, 5.0),
+            Bloco::Sovietico => (5.0, 65.0),
+            Bloco::NaoAlinhado => (20.0, 20.0),
+        };
+        self.influencia.insert(tag.to_string(), i);
+    }
+
+    /// Dissolve uma organização multilateral (ex: "otan", "pacto_varsovia").
+    pub fn dissolver_organizacao(&mut self, org_id: &str) {
+        if let Some(org) = self.orgs.iter_mut().find(|o| o.id == org_id) {
+            org.formada = None;
+            org.membros.clear();
+        }
+    }
+
+    /// Remove alianças e pactos de defesa bilaterais com nações de um bloco oposto.
+    pub fn romper_pactos_com_bloco(&mut self, tag: &str, bloco: Bloco) {
+        let aliados_bloco: Vec<String> = self
+            .paises
+            .iter()
+            .filter(|p| p.bloco == bloco)
+            .map(|p| p.tag.clone())
+            .collect();
+        self.pactos.retain(|p| {
+            let toca = (p.a == tag && aliados_bloco.contains(&p.b))
+                || (p.b == tag && aliados_bloco.contains(&p.a));
+            !toca || matches!(p.tipo, TipoPacto::Embargo | TipoPacto::Rivalidade)
+        });
+    }
+
     /// Relação entre dois países; pares não listados usam a regra de blocos.
     pub fn relacao(&self, a: &str, b: &str) -> f32 {
         if a == b {

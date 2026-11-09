@@ -100,6 +100,12 @@ pub enum Comando {
     CancelarAcordo(String),
     /// Alterna a ativação da integração comercial COMECON no Bloco Soviético.
     AlternarComecon,
+    /// Deduz baixas militares e perdas civis de guerras extras.
+    BaixasGuerraExtra { tag: String, baixas_militares: f64, baixas_civis: f64 },
+    /// Firma acordo bilateral entre dois países quaisquer (via tag legado).
+    AcordoComercialBilateral { tag_a: String, tag_b: String },
+    /// Cancela acordo bilateral entre dois países quaisquer.
+    CancelarAcordoBilateral { tag_a: String, tag_b: String },
 }
 
 impl Nucleo {
@@ -325,6 +331,22 @@ impl Nucleo {
             Comando::AlternarComecon => {
                 let ativo = self.mundo.alternar_comecon().map_err(|e| e.to_string())?;
                 Ok(if ativo { "COMECON ativado: cooperação e livre comércio no bloco socialista." } else { "COMECON desativado." }.into())
+            }
+            Comando::BaixasGuerraExtra { tag, baixas_militares, baixas_civis } => {
+                self.mundo.aplicar_baixas_guerra_extra(&tag, baixas_militares, baixas_civis);
+                Ok("Baixas de guerra extra registradas.".into())
+            }
+            Comando::AcordoComercialBilateral { tag_a, tag_b } => {
+                let id_a = self.id_pais(&tag_a).unwrap_or_else(|| tag_a.to_lowercase());
+                let id_b = self.id_pais(&tag_b).unwrap_or_else(|| tag_b.to_lowercase());
+                let _ = self.mundo.assinar_acordo_comercial(&id_a, &id_b);
+                Ok("Acordo comercial bilateral firmado.".into())
+            }
+            Comando::CancelarAcordoBilateral { tag_a, tag_b } => {
+                let id_a = self.id_pais(&tag_a).unwrap_or_else(|| tag_a.to_lowercase());
+                let id_b = self.id_pais(&tag_b).unwrap_or_else(|| tag_b.to_lowercase());
+                let _ = self.mundo.cancelar_acordo_comercial(&id_a, &id_b);
+                Ok("Acordo comercial bilateral cancelado.".into())
             }
         }
     }

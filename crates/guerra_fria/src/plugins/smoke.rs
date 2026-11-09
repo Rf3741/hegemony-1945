@@ -66,6 +66,8 @@ pub struct OpcoesCli {
     pub anos: Option<u32>,
     /// Caminho do relatório Markdown periódico e final.
     pub relatorio: Option<PathBuf>,
+    /// Semente determinística da partida.
+    pub semente: Option<u64>,
 }
 
 impl OpcoesCli {
@@ -79,6 +81,10 @@ impl OpcoesCli {
 
     pub fn ativo(&self) -> bool {
         self.smoke_ativo() || self.espectador_ativo()
+    }
+
+    pub fn semente_efetiva(&self) -> u64 {
+        self.semente.unwrap_or(19450815)
     }
 
     pub fn pais_efetivo(&self) -> &str {
@@ -183,6 +189,14 @@ where
             "--tutorial" => {
                 op.tutorial = true;
                 i += 1;
+            }
+            "--semente" => {
+                let s: u64 = valor()?
+                    .trim()
+                    .parse()
+                    .map_err(|_| "--semente exige um número inteiro positivo".to_string())?;
+                op.semente = Some(s);
+                i += 2;
             }
             other if other.starts_with('-') => {
                 return Err(format!("bandeira desconhecida: {other}"));
@@ -341,6 +355,8 @@ pub struct SnapshotDecada {
     pub num_guerras: usize,
     pub guerras: Vec<String>,
     pub top10: Vec<EntradaTop10>,
+    pub vencedor_guerra_fria: String,
+    pub paises_socialistas: u32,
     pub fps_medio: f64,
     pub fps_min: f64,
     pub rss_mb: f64,
@@ -1070,6 +1086,7 @@ fn capturar_snapshot(
     ledger: Option<&RecursoLedger>,
     mundo: Option<&RecursoMundo>,
     bandeiras: Option<&Bandeiras>,
+    div: Option<&super::divergencia_sim::DivergenciaSim>,
 ) -> SnapshotDecada {
     let tag = op.pais_efetivo();
     let agora = tempo_real;
@@ -1251,6 +1268,13 @@ fn capturar_snapshot(
         }
     }
 
+    let vencedor_guerra_fria = div
+        .map(|d| d.0.desfecho.rotulo().to_string())
+        .unwrap_or_else(|| "Em andamento".to_string());
+    let paises_socialistas = div
+        .and_then(|d| mundo.map(|m| d.0.contar_paises_socialistas(&m.0) as u32))
+        .unwrap_or(0);
+
     SnapshotDecada {
         data_str,
         ano: d.ano,
@@ -1272,6 +1296,8 @@ fn capturar_snapshot(
         num_guerras,
         guerras,
         top10,
+        vencedor_guerra_fria,
+        paises_socialistas,
         fps_medio,
         fps_min,
         rss_mb,
@@ -1309,6 +1335,8 @@ fn formatar_relatorio_md(op: &OpcoesCli, snapshots: &[SnapshotDecada], concluido
         out.push_str("| :--- | :--- | :--- |\n");
         out.push_str(&format!("| **Nome Oficial** | {} | — |\n", u.nome_pais));
         out.push_str(&format!("| **Governo / Regime** | {} | — |\n", u.forma_governo));
+        out.push_str(&format!("| **Desfecho Guerra Fria** | {} | — |\n", u.vencedor_guerra_fria));
+        out.push_str(&format!("| **Países Socialistas** | {} | — |\n", u.paises_socialistas));
         out.push_str(&format!("| **População** | {} | {} |\n", fmt_pop(u.pop_pais.max(0.0) as u64), fmt_pop(u.pop_mundo.max(0.0) as u64)));
         out.push_str(&format!("| **PIB Anual** | {} | {} |\n", fmt_din(u.pib_pais), fmt_din(u.pib_mundo)));
         out.push_str(&format!("| **PIB per capita** | US$ {:.0} | US$ {:.0} |\n", u.pib_pc_pais, u.pib_pc_mundo));
@@ -1340,15 +1368,31 @@ fn formatar_relatorio_md(op: &OpcoesCli, snapshots: &[SnapshotDecada], concluido
     }
 
     out.push_str("## 5. Histórico Decenal da Simulação\n\n");
-    out.push_str("| Ano | Data | Pop Jogador | PIB Jogador | PIB pc | Desemp | Pop Mundo | PIB Mundo | Guerras | RSS (MB) | FPS Médio |\n");
-    out.push_str("| -: | :---: | -: | -: | -: | -: | -: | -: | -: | -: | -: |\n");
+    out.push_str("| Ano | Data | Pop Jogador | PIB Jogador | Pop Mundo | PIB Mundo | P. Socialistas | Guerra Fria | Guerras | RSS (MB) | FPS Médio |\n");
+    out.push_str("| -: | :---: | -: | -: | -: | -: | -: | :--- | -: | -: | -: |\n");
     for s in snapshots {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | US$ {:.0} | {:.1}% | {} | {} | {} | {:.1} | {:.1} |\n",
-            s.ano, s.data_str, fmt_pop(s.pop_pais.max(0.0) as u64), fmt_din(s.pib_pais), s.pib_pc_pais, s.desemp_pais,
-            fmt_pop(s.pop_mundo.max(0.0) as u64), fmt_din(s.pib_mundo), s.num_guerras, s.rss_mb, s.fps_medio
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {:.1} | {:.1} |\n",
+            s.ano, s.data_str, fmt_pop(s.pop_pais.max(0.0) as u64), fmt_din(s.pib_pais),
+            fmt_pop(s.pop_mundo.max(0.0) as u64), fmt_din(s.pib_mundo), s.paises_socialistas,
+            s.vencedor_guerra_fria, s.num_guerras, s.rss_mb, s.fps_medio
         ));
     }
+    out.push_str("\n");
+
+    out.push_str("## 6. Resumo da Divergência da Guerra Fria\n\n");
+    let soc_1970 = snapshots.iter().find(|s| s.ano >= 1970).map_or(0, |s| s.paises_socialistas);
+    let soc_1990 = snapshots.iter().find(|s| s.ano >= 1990).map_or(0, |s| s.paises_socialistas);
+    let soc_2020 = snapshots.iter().find(|s| s.ano >= 2020).map_or(0, |s| s.paises_socialistas);
+    let vencedor_final = ultimo.map_or("Em andamento", |u| u.vencedor_guerra_fria.as_str());
+
+    out.push_str("| Indicador Geopolítico | Resultado Observado |\n");
+    out.push_str("| :--- | :--- |\n");
+    out.push_str(&format!("| **Vencedor da Guerra Fria** | {} |\n", vencedor_final));
+    out.push_str(&format!("| **Países Socialistas em 1970** | {} |\n", soc_1970));
+    out.push_str(&format!("| **Países Socialistas em 1990** | {} |\n", soc_1990));
+    out.push_str(&format!("| **Países Socialistas em 2020** | {} |\n", soc_2020));
+    out.push_str(&format!("| **Semente da Partida** | {} |\n", op.semente_efetiva()));
     out.push_str("\n");
 
     out
@@ -1377,6 +1421,7 @@ fn vigiar_espectador(
     ledger: Option<Res<RecursoLedger>>,
     mundo: Option<Res<RecursoMundo>>,
     bandeiras: Option<Res<Bandeiras>>,
+    div: Option<Res<super::divergencia_sim::DivergenciaSim>>,
     mut saida: MessageWriter<AppExit>,
 ) {
     if !op.espectador_ativo() || espectador.encerrado {
@@ -1402,6 +1447,7 @@ fn vigiar_espectador(
             ledger.as_deref(),
             mundo.as_deref(),
             bandeiras.as_deref(),
+            div.as_deref(),
         );
         espectador.snapshots.push(snap);
         if !encerramento_pedido
@@ -1427,6 +1473,7 @@ fn vigiar_espectador(
             ledger.as_deref(),
             mundo.as_deref(),
             bandeiras.as_deref(),
+            div.as_deref(),
         );
         espectador.snapshots.push(snap);
         gravou_decada_neste_quadro = true;
@@ -1453,6 +1500,7 @@ fn vigiar_espectador(
                 ledger.as_deref(),
                 mundo.as_deref(),
                 bandeiras.as_deref(),
+                div.as_deref(),
             );
             espectador.snapshots.push(snap);
         }
@@ -1529,6 +1577,20 @@ mod testes {
     fn tutorial_smoke_valido() {
         let op = analisar_args(args(&["--smoke", "30", "--tutorial"])).unwrap();
         assert!(op.tutorial);
+    }
+
+    #[test]
+    fn semente_valida_e_invalida() {
+        let op = analisar_args(args(&["--espectador", "--semente", "42"])).unwrap();
+        assert_eq!(op.semente, Some(42));
+        assert_eq!(op.semente_efetiva(), 42);
+
+        let op_padrao = analisar_args(args(&["--espectador"])).unwrap();
+        assert_eq!(op_padrao.semente, None);
+        assert_eq!(op_padrao.semente_efetiva(), 19450815);
+
+        assert!(analisar_args(args(&["--semente", "abc"])).is_err());
+        assert!(analisar_args(args(&["--semente"])).is_err());
     }
 
     #[test]
@@ -1654,6 +1716,8 @@ mod testes {
             divida_mundo: 18_000_000_000_000.0,
             num_guerras: 0,
             guerras: vec![],
+            vencedor_guerra_fria: "Indefinido".into(),
+            paises_socialistas: 12,
             top10: vec![EntradaTop10 {
                 pos: 1,
                 nome: "Estados Unidos".into(),

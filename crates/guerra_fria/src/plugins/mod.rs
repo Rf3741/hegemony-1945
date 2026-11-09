@@ -6,6 +6,7 @@ pub mod comercio_ui;
 pub mod config;
 pub mod construcao_ui;
 pub mod diplomacia_ui;
+pub mod divergencia_sim;
 pub mod economia_sim;
 pub mod economy;
 pub mod enciclopedia;

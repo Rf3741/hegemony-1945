@@ -184,7 +184,13 @@ pub fn estado_de_aparencia(
         grupo_religioso_no_poder: e.grupo_religioso_no_poder,
         mudanca_regime: e.mudanca_regime,
         nome_cenario: nome_cenario.unwrap_or("").to_string(),
-        flags: flags_do_pais(tag, data),
+        flags: {
+            let mut f = flags_do_pais(tag, data);
+            if tag == "SOV" && (ideologia.contains("comunista") || ideologia.contains("socialista")) && !e.mudanca_regime {
+                f.retain(|flag| flag != "rus_federacao");
+            }
+            f
+        },
     }
 }
 

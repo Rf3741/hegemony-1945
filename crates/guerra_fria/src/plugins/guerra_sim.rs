@@ -30,6 +30,16 @@ pub struct GuerraSim(pub MundoGuerra);
 #[derive(Resource)]
 pub struct DadosGuerra(pub CatalogoDesignGuerra);
 
+/// IDs das guerras históricas pré-programadas do cenário.
+pub const GUERRAS_HISTORICAS_IDS: &[&str] = &[
+    "guerra_civil_chinesa",
+    "primeira_guerra_indochina",
+    "guerra_civil_grega",
+    "guerra_indo_paquistanesa_1947",
+    "guerra_arabe_israelense_1948",
+    "guerra_da_coreia",
+];
+
 /// Estado do painel e modo visual da guerra.
 #[derive(Resource, Default)]
 pub struct PainelGuerra {
@@ -374,6 +384,39 @@ fn tick_guerra(
         if mudou {
             painel.repintar = true;
         }
+
+        // Sincroniza baixas de guerras extras com o motor econômico
+        if let Some(eco_sim) = eco.as_mut() {
+            let wars_extras: Vec<&Guerra> = guerra
+                .0
+                .cenario
+                .guerras
+                .iter()
+                .filter(|w| w.ativa && !GUERRAS_HISTORICAS_IDS.contains(&w.id.as_str()))
+                .collect();
+            for w in wars_extras {
+                for atk in &w.atacantes {
+                    let b = (w.baixas_atacantes as f64 * 0.005).max(0.0);
+                    if b > 0.0 {
+                        eco_sim.enviar(super::economia_sim::Comando::BaixasGuerraExtra {
+                            tag: atk.clone(),
+                            baixas_militares: b,
+                            baixas_civis: b * 1.5,
+                        });
+                    }
+                }
+                for def in &w.defensores {
+                    let b = (w.baixas_defensores as f64 * 0.005).max(0.0);
+                    if b > 0.0 {
+                        eco_sim.enviar(super::economia_sim::Comando::BaixasGuerraExtra {
+                            tag: def.clone(),
+                            baixas_militares: b,
+                            baixas_civis: b * 1.5,
+                        });
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -390,6 +433,51 @@ pub fn aplicar_tick_guerra(
     ids_prov: &mut Vec<Option<u32>>,
 ) -> bool {
     let rel = guerra.executar_tick_diario();
+
+    // 1b. Impacto demográfico realista de guerras extras (fora das históricas)
+    let wars_extras: Vec<&Guerra> = guerra
+        .cenario
+        .guerras
+        .iter()
+        .filter(|w| w.ativa && !GUERRAS_HISTORICAS_IDS.contains(&w.id.as_str()))
+        .collect();
+
+    if !wars_extras.is_empty() {
+        for b in &rel.detalhes_batalhas {
+            let eh_extra = wars_extras.iter().any(|w| {
+                (w.eh_atacante(&b.atacante_tag) && w.eh_defensor(&b.defensor_tag))
+                    || (w.eh_atacante(&b.defensor_tag) && w.eh_defensor(&b.atacante_tag))
+            });
+            if eh_extra {
+                let baixas_atk = b.baixas_atacante as u64;
+                let baixas_def = b.baixas_defensor as u64;
+                let civis = ((baixas_atk + baixas_def) as f64 * 1.5) as u64;
+
+                if let Some(p) = mundo.paises.get_mut(&b.atacante_tag) {
+                    let total = p.populacao_total();
+                    let perda = (baixas_atk + civis / 2).min(total.saturating_sub(5_000));
+                    if total > 0 && perda > 0 {
+                        let frac = perda as f64 / total as f64;
+                        for pop in &mut p.pops {
+                            pop.ativos = (pop.ativos as f64 * (1.0 - frac)).round() as u64;
+                            pop.dependentes = (pop.dependentes as f64 * (1.0 - frac)).round() as u64;
+                        }
+                    }
+                }
+                if let Some(p) = mundo.paises.get_mut(&b.defensor_tag) {
+                    let total = p.populacao_total();
+                    let perda = (baixas_def + civis / 2).min(total.saturating_sub(5_000));
+                    if total > 0 && perda > 0 {
+                        let frac = perda as f64 / total as f64;
+                        for pop in &mut p.pops {
+                            pop.ativos = (pop.ativos as f64 * (1.0 - frac)).round() as u64;
+                            pop.dependentes = (pop.dependentes as f64 * (1.0 - frac)).round() as u64;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // 1. Consumo simples de bens militares e impacto no tesouro
     if com_economia {
@@ -631,6 +719,51 @@ mod testes {
         com_economia: bool,
     ) -> bool {
     let rel = guerra.executar_tick_diario();
+
+    // 1b. Impacto demográfico realista de guerras extras (fora das históricas)
+    let wars_extras: Vec<&Guerra> = guerra
+        .cenario
+        .guerras
+        .iter()
+        .filter(|w| w.ativa && !GUERRAS_HISTORICAS_IDS.contains(&w.id.as_str()))
+        .collect();
+
+    if !wars_extras.is_empty() {
+        for b in &rel.detalhes_batalhas {
+            let eh_extra = wars_extras.iter().any(|w| {
+                (w.eh_atacante(&b.atacante_tag) && w.eh_defensor(&b.defensor_tag))
+                    || (w.eh_atacante(&b.defensor_tag) && w.eh_defensor(&b.atacante_tag))
+            });
+            if eh_extra {
+                let baixas_atk = b.baixas_atacante as u64;
+                let baixas_def = b.baixas_defensor as u64;
+                let civis = ((baixas_atk + baixas_def) as f64 * 1.5) as u64;
+
+                if let Some(p) = mundo.paises.get_mut(&b.atacante_tag) {
+                    let total = p.populacao_total();
+                    let perda = (baixas_atk + civis / 2).min(total.saturating_sub(5_000));
+                    if total > 0 && perda > 0 {
+                        let frac = perda as f64 / total as f64;
+                        for pop in &mut p.pops {
+                            pop.ativos = (pop.ativos as f64 * (1.0 - frac)).round() as u64;
+                            pop.dependentes = (pop.dependentes as f64 * (1.0 - frac)).round() as u64;
+                        }
+                    }
+                }
+                if let Some(p) = mundo.paises.get_mut(&b.defensor_tag) {
+                    let total = p.populacao_total();
+                    let perda = (baixas_def + civis / 2).min(total.saturating_sub(5_000));
+                    if total > 0 && perda > 0 {
+                        let frac = perda as f64 / total as f64;
+                        for pop in &mut p.pops {
+                            pop.ativos = (pop.ativos as f64 * (1.0 - frac)).round() as u64;
+                            pop.dependentes = (pop.dependentes as f64 * (1.0 - frac)).round() as u64;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // 1. Consumo simples de bens militares e impacto no tesouro
     if com_economia {

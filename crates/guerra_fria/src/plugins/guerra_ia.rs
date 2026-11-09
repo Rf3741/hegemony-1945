@@ -148,14 +148,32 @@ fn tick_ia_guerra(
             if lado_a.is_empty() || lado_b.is_empty() || em_guerra_com(&g, &lado_a[0], &lado_b[0]) {
                 continue;
             }
+            // Consequência em cadeia: se ambos os beligerantes principais compartilham o mesmo bloco ideológico,
+            // o conflito por procuração bipolar é evitado pacificamente.
+            let bloco_a = diplo.0.bloco(&lado_a[0]);
+            let bloco_b = diplo.0.bloco(&lado_b[0]);
+            if bloco_a == bloco_b && bloco_a != Bloco::NaoAlinhado {
+                ia.disparadas.insert(h.id.clone());
+                avisos.push(format!("CONFLITO EVITADO: {} não eclode pois ambos os lados compartilham alinhamento geopolítico.", h.nome));
+                continue;
+            }
             ia.disparadas.insert(h.id.clone());
             // Lado B é o agressor nos conflitos de invasão (ex.: Coreia do Norte); quando o gatilho é de
             // insurgência ou guerra civil, o lado A é o governo. Usamos o lado B como atacante.
             match acao_declarar_guerra(&mut g, &lado_b[0], &lado_a[0], &h.nome) {
                 Ok(id) => {
                     if let Some(w) = g.0.cenario.guerras.iter_mut().find(|w| w.id == id) {
-                        w.atacantes.extend(lado_b.iter().skip(1).cloned());
-                        w.defensores.extend(lado_a.iter().skip(1).cloned());
+                        // Aliados só ingressam se forem coerentes com o alinhamento real do momento
+                        for b_aliado in lado_b.iter().skip(1) {
+                            if diplo.0.bloco(b_aliado) != bloco_a || diplo.0.bloco(b_aliado) == Bloco::NaoAlinhado {
+                                w.atacantes.push(b_aliado.clone());
+                            }
+                        }
+                        for a_aliado in lado_a.iter().skip(1) {
+                            if diplo.0.bloco(a_aliado) != bloco_b || diplo.0.bloco(a_aliado) == Bloco::NaoAlinhado {
+                                w.defensores.push(a_aliado.clone());
+                            }
+                        }
                     }
                     diplo.0.tensao = (diplo.0.tensao + h.impacto_tensao_mundial_vitoria.abs().min(10.0)).min(100.0);
                     avisos.push(format!("GUERRA: {} eclode. {}", h.nome, h.gatilho_disparo.descricao));

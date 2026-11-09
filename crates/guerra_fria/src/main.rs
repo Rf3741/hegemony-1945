@@ -118,6 +118,7 @@ fn main() -> AppExit {
     .add_plugins(plugins::abertura::AberturaPlugin)
     .add_plugins(AtmosferaPlugin)
     .add_plugins(EventosPlugin)
+    .add_plugins(plugins::divergencia_sim::DivergenciaPlugin)
     .add_plugins(plugins::formacao_sim::FormacaoSimPlugin)
     .add_plugins(plugins::bandeiras_ui::BandeirasPlugin)
     .add_plugins(DiplomaciaUiPlugin)

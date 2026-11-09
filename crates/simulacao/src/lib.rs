@@ -9,6 +9,7 @@
 //! - Concordância de artigo com o nome dos países das mensagens (`artigo`).
 
 pub mod artigo;
+pub mod divergencia;
 pub mod economia;
 pub mod erro;
 pub mod formacao;
@@ -16,6 +17,8 @@ pub mod mapa;
 pub mod mundo;
 pub mod politica;
 pub mod tempo;
+
+pub use divergencia::{DesfechoGuerraFria, EventoDivergencia, MotorDivergencia, RngDeterministico};
 
 pub use economia::{
     BemId, Estrato, Mercado, NivelImposto, OrcamentoNacional, Pop, Predio, Profissao, TipoPredio,

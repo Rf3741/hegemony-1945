@@ -127,6 +127,8 @@ pub struct Formacoes {
     transicoes_feitas: BTreeSet<String>,
     /// id da província -> (código adm1 completo, centroide)
     indice: HashMap<u32, (String, (f32, f32))>,
+    pub dissolucao_urss_autorizada: bool,
+    pub reunificacao_alema_autorizada: bool,
 }
 
 impl Formacoes {
@@ -194,6 +196,8 @@ impl Formacoes {
             feitos: BTreeSet::new(),
             transicoes_feitas: BTreeSet::new(),
             indice,
+            dissolucao_urss_autorizada: false,
+            reunificacao_alema_autorizada: false,
         }
     }
 
@@ -227,6 +231,15 @@ impl Formacoes {
                 && d <= hoje
                 && !self.feitos.contains(&f.tag)
             {
+                let eh_dissolucao_urss = f.formacao.origem_tags.iter().any(|o| o == "SOV")
+                    && (f.formacao.tipo == "dissolucao" || d.ano >= 1990);
+                if eh_dissolucao_urss && !self.dissolucao_urss_autorizada {
+                    continue;
+                }
+                let eh_reunificacao_alema = f.tag == "DEU" && f.formacao.tipo == "unificacao";
+                if eh_reunificacao_alema && !self.reunificacao_alema_autorizada {
+                    continue;
+                }
                 itens.push((d, false, i));
             }
         }
