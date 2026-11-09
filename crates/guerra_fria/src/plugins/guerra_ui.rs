@@ -254,7 +254,7 @@ fn tela_guerra(
                     ui.separator();
 
                     egui::ScrollArea::vertical().id_salt("scroll_exercitos").show(ui, |ui| {
-                        for (e_idx, exe) in exercitos.iter().enumerate() {
+                        for (_e_idx, exe) in exercitos.iter().enumerate() {
                             ui_refinada::moldura_cartao().show(ui, |ui| {
                                 ui.horizontal(|ui| {
                                     ui_refinada::glifo_ui(ui, "pessoa", 16.0, Some(ui_refinada::menu::AZUL_MARINHO));

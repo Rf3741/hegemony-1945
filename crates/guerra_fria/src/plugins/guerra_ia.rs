@@ -109,7 +109,7 @@ fn tick_ia_guerra(
     jogador: Res<PaisJogador>,
     op: Option<Res<super::smoke::OpcoesCli>>,
     mut ev: Option<ResMut<EstadoEv>>,
-    mut notificacoes: Option<ResMut<Notificacoes>>,
+    notificacoes: Option<ResMut<Notificacoes>>,
 ) {
     let mut houve_dia_1 = false;
     let mut n = 0usize;

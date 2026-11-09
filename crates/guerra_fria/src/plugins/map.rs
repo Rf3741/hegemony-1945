@@ -303,7 +303,7 @@ pub fn preparar_ids_gpu(ids: &[u32], w: u32, h: u32) -> Vec<u8> {
     let (wu, hu) = (w as usize, h as usize);
     // Pixels de fronteira: algum vizinho (x com wrap, y sem) tem outro id.
     let mut perto = vec![false; wu * hu];
-    let mut fronteira;
+    let mut fronteira = vec![false; wu * hu];
     for y in 0..hu {
         for x in 0..wu {
             let i = y * wu + x;
@@ -645,7 +645,7 @@ fn aguardar_carga(
     mut materiais: ResMut<Assets<TerrainMaterial>>,
     asset_server: Res<AssetServer>,
     economia: Option<Res<super::economia_sim::EconomiaSim>>,
-    cfg: Option<Res<super::config::ConfigJogo>>,
+    _cfg: Option<Res<super::config::ConfigJogo>>,
     mut abertura: ResMut<super::abertura::CarregamentoPronto>,
     cores: Option<Res<CoresMapa>>,
     raiz: Option<Res<RaizProjeto>>,

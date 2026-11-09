@@ -11,7 +11,7 @@ use super::jogador::PaisJogador;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
 pub const RON_TUTORIAL: &str = include_str!("../../../../assets/data/enciclopedia/tutorial.ron");
