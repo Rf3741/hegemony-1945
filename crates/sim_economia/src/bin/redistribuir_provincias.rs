@@ -3,7 +3,7 @@
 //! Uso:
 //!   cargo run -p sim_economia --bin redistribuir_provincias -- [--input <dir>] [--output <dir>] [--dry-run]
 
-use sim_economia::{CenarioEconomia, redistribuir_provincias};
+use sim_economia::{CenarioEconomia, redistribuir_provincias, cenario::escrever_provincias_compacto};
 use std::path::PathBuf;
 
 fn main() {
@@ -45,8 +45,10 @@ fn main() {
     redistribuir_provincias(&mut cen);
 
     if !dry_run {
-        cen.salvar_diretorio(&output_dir).expect("falha ao salvar cenário");
-        println!("\n✅ Cenário salvo em {}", output_dir.display());
+        // Salvar APENAS provincias.ron no formato compacto
+        escrever_provincias_compacto(&output_dir.join("provincias.ron"), &cen.provincias)
+            .expect("falha ao salvar provincias.ron");
+        println!("\n✅ provincias.ron salvo em {}", output_dir.display());
     } else {
         println!("\n🔍 Dry-run: cenário NÃO salvo.");
     }
@@ -69,32 +71,13 @@ fn imprimir_relatorio_verificacao(cen: &CenarioEconomia) {
 
         // Exemplos específicos para EUA
         if pais_id == "usa" {
+            let mut pop_total_usa = 0.0;
             for prov in &provincias {
                 let pop_total: f64 = prov.pops.iter().map(|p| p.populacao).sum();
-                match prov.nome.as_str() {
-                    "Guam" => {
-                        let tem_mina_ferro = prov.predios.iter().any(|b| b.tipo_predio_id == "mina_ferro");
-                        println!("  Guam: pop={:.0} mina_ferro={}", pop_total, tem_mina_ferro);
-                    }
-                    "Minnesota" => {
-                        let n_ferro: u32 = prov.predios.iter().filter(|b| b.tipo_predio_id == "mina_ferro").map(|b| b.nivel).sum();
-                        println!("  Minnesota: mina_ferro={}", n_ferro);
-                    }
-                    "Iowa" => {
-                        let n_ferro: u32 = prov.predios.iter().filter(|b| b.tipo_predio_id == "mina_ferro").map(|b| b.nivel).sum();
-                        println!("  Iowa: mina_ferro={}", n_ferro);
-                    }
-                    "Texas" => {
-                        let n_petroleo: u32 = prov.predios.iter().filter(|b| b.tipo_predio_id == "poco_petroleo").map(|b| b.nivel).sum();
-                        println!("  Texas: poco_petroleo={}", n_petroleo);
-                    }
-                    "Nova Iorque" => {
-                        let n_petroleo: u32 = prov.predios.iter().filter(|b| b.tipo_predio_id == "poco_petroleo").map(|b| b.nivel).sum();
-                        println!("  Nova Iorque: poco_petroleo={}", n_petroleo);
-                    }
-                    _ => {}
-                }
+                pop_total_usa += pop_total;
+                println!("  {}: pop={:.0}", prov.nome, pop_total);
             }
+            println!("  TOTAL USA: pop={:.0} ({:.1}M)", pop_total_usa, pop_total_usa / 1e6);
         }
     }
 }

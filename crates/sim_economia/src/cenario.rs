@@ -43,6 +43,56 @@ fn escrever_arquivo_ron<T: Serialize>(caminho: &Path, valor: &T) -> ResultadoEco
     })
 }
 
+/// Escreve `provincias.ron` no formato compacto original: uma província por linha,
+/// sem espaços extras, compatível com o formato do branch `jogavel`.
+pub fn escrever_provincias_compacto(caminho: &Path, provincias: &[Provincia]) -> ResultadoEconomia<()> {
+    use ron::ser::PrettyConfig;
+
+    // Configuração para formato compacto (sem unwrap_newtypes para evitar #![enable(...)])
+    let pretty = PrettyConfig::new()
+        .depth_limit(10)
+        .separate_tuple_members(false)
+        .enumerate_arrays(false)
+        .new_line("\n    ")
+        .indentor("    ");
+
+    let mut texto = String::with_capacity(provincias.len() * 2000);
+    texto.push_str("[\n");
+    
+    for (i, prov) in provincias.iter().enumerate() {
+        let prov_str = to_string_pretty(prov, pretty.clone())
+            .map_err(|origem| ErroEconomia::SerializacaoRon {
+                contexto: "provincia".into(),
+                origem: Box::new(origem),
+            })?;
+        // Compactar: remover quebras de linha internas, manter apenas uma linha por província
+        // Também remover espaços após dois-pontos e vírgulas finais
+        let compact = prov_str
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<_>>()
+            .join("")
+            .replace(": ", ":")
+            .replace(",}", "}")
+            .replace(",]", "]")
+            .replace("{,", "{")
+            .replace("[,", "[");
+        texto.push_str("    ");
+        texto.push_str(&compact);
+        if i < provincias.len() - 1 {
+            texto.push_str(",");
+        }
+        texto.push_str("\n");
+    }
+    texto.push_str("]\n");
+    
+    fs::write(caminho, texto).map_err(|origem| ErroEconomia::Io {
+        caminho: caminho.to_path_buf(),
+        origem,
+    })
+}
+
 impl CenarioEconomia {
     /// Carrega um cenário modular completo a partir de uma pasta contendo os arquivos `.ron`:
     /// - Obrigatórios: `bens.ron`, `tipos_pop.ron`, `leis_economicas.ron`, `metodos_producao.ron`,
@@ -133,7 +183,7 @@ impl CenarioEconomia {
             })
             .collect();
         escrever_arquivo_ron(&dir.join("potenciais.ron"), &potenciais)?;
-        escrever_arquivo_ron(&dir.join("provincias.ron"), &self.provincias)?;
+        escrever_provincias_compacto(&dir.join("provincias.ron"), &self.provincias)?;
         escrever_arquivo_ron(&dir.join("rotas_comerciais.ron"), &self.rotas_comerciais)?;
         escrever_arquivo_ron(&dir.join("config_simulacao.ron"), &self.config)?;
         Ok(())
