@@ -52,10 +52,10 @@ pub fn redistribuir_provincias(cen: &mut CenarioEconomia) {
         provincias_por_pais.entry(prov.pais_id.clone()).or_default().push(idx);
     }
 
-    // Calcular totais nacionais: população atuais + prédios do jogavel (para preservar totais)
+    // Calcular totais nacionais do arquivo jogavel (antes da redistribuição) para preservar totais (±2%)
     let mut totais_nacionais: BTreeMap<String, PaisTotais> = BTreeMap::new();
     for (pais_id, prov_indices) in &provincias_por_pais {
-        // População: calcular dos províncias atuais
+        // População: calcular dos províncias atuais (arquivo jogavel original)
         let mut pops_por_tipo: BTreeMap<String, f64> = BTreeMap::new();
         for &idx in prov_indices {
             let prov = &cen.provincias[idx];
@@ -64,7 +64,7 @@ pub fn redistribuir_provincias(cen: &mut CenarioEconomia) {
             }
         }
 
-        // Prédios: usar totais do jogavel (carregados do arquivo) para preservar totais nacionais
+        // Prédios: usar totais do arquivo jogavel para preservar totais nacionais
         let mut predios_por_tipo = BTreeMap::new();
         for &idx in prov_indices {
             let prov = &cen.provincias[idx];
@@ -73,11 +73,10 @@ pub fn redistribuir_provincias(cen: &mut CenarioEconomia) {
             }
         }
 
-        // Ajuste para USA: escalar prédios em 2.0x para compensar concentração populacional realista
-        // e manter PIB na faixa 200-350 bi com desemprego 4-10%
-        if pais_id == "usa" {
-            for (_, nivel) in predios_por_tipo.iter_mut() {
-                *nivel = (*nivel as f64 * 2.0) as u64;
+        // Sobrescrever com totais históricos corrigidos para países onde o jogavel tinha inflação
+        if let Some(historicos) = totais_nacionais_historicos(pais_id) {
+            for (tipo, nivel) in historicos.predios_por_tipo {
+                predios_por_tipo.insert(tipo, nivel);
             }
         }
 
@@ -92,11 +91,103 @@ pub fn redistribuir_provincias(cen: &mut CenarioEconomia) {
         let totais = totais_nacionais.get(&pais_id).cloned().unwrap_or_default();
         let pesos = calcular_pesos_provincias(cen, &prov_indices, &potenciais_por_estado);
 
+        // Salvar razões de emprego alvo (92% = 8% desemprego histórico)
+        let razoes_emprego_originais = salvar_razoes_emprego_originais(cen, &prov_indices);
+
         // Redistribuir população (usando pesos históricos/geográficos)
         redistribuir_populacao(cen, &prov_indices, &totais.pops_por_tipo, &pesos);
 
         // Redistribuir prédios proporcionalmente à população (mantendo totais nacionais)
         redistribuir_predios(cen, &prov_indices, &totais.predios_por_tipo, &pesos, &potenciais_por_estado);
+
+        // Após redistribuir prédios, recalcular emprego baseado em vagas disponíveis
+        recalcular_emprego_por_vagas(cen, &prov_indices, &razoes_emprego_originais);
+    }
+}
+
+/// Salva a razão empregados/população alvo para cada pop.
+/// Usa 92% (8% desemprego) como teto histórico realista para 1945,
+/// em vez das razões do arquivo atual (que estão em 99% após redistribuição anterior).
+fn salvar_razoes_emprego_originais(
+    _cen: &CenarioEconomia,
+    prov_indices: &[usize],
+) -> HashMap<(String, String), f64> {
+    let mut razoes = HashMap::new();
+    const RAZAO_EMPREGO_ALVO: f64 = 0.92; // 92% empregados = 8% desemprego (faixa histórica 4-10%)
+    for &idx in prov_indices {
+        let prov = &_cen.provincias[idx];
+        for pop in &prov.pops {
+            if pop.populacao > 0.0 {
+                razoes.insert((prov.id.clone(), pop.tipo_pop_id.clone()), RAZAO_EMPREGO_ALVO);
+            }
+        }
+    }
+    razoes
+}
+
+/// Recalcula emprego após redistribuição de prédios: usa razão original como teto,
+/// mas limitado pelas vagas reais disponíveis nos prédios da província.
+fn recalcular_emprego_por_vagas(
+    cen: &mut CenarioEconomia,
+    prov_indices: &[usize],
+    razoes_originais: &HashMap<(String, String), f64>,
+) {
+    for &idx in prov_indices {
+        let prov = &mut cen.provincias[idx];
+
+        // Calcular vagas totais por tipo de pop nesta província
+        let mut vagas_por_tipo_pop: BTreeMap<String, f64> = BTreeMap::new();
+        for predio in &prov.predios {
+            for (tipo_pop, vagas) in &predio.empregados_por_tipo {
+                *vagas_por_tipo_pop.entry(tipo_pop.clone()).or_default() += *vagas;
+            }
+        }
+
+        // Para cada pop, emprego = min(populacao * razao_original, vagas_disponiveis_para_este_tipo)
+        // Distribuir vagas proporcionalmente se houver mais pops do mesmo tipo que vagas
+        let mut pops_por_tipo: BTreeMap<String, Vec<&mut Pop>> = BTreeMap::new();
+        for pop in &mut prov.pops {
+            pops_por_tipo.entry(pop.tipo_pop_id.clone()).or_default().push(pop);
+        }
+
+        for (tipo_pop, pops) in pops_por_tipo {
+            let vagas_totais = vagas_por_tipo_pop.get(&tipo_pop).copied().unwrap_or(0.0);
+            if vagas_totais <= 0.0 {
+                for pop in pops {
+                    pop.empregados = 0.0;
+                }
+                continue;
+            }
+
+            // Soma da população * razão_original para este tipo de pop na província
+            let mut demanda_total = 0.0;
+            for pop in &pops {
+                let chave = (prov.id.clone(), tipo_pop.clone());
+                let razao_original = razoes_originais.get(&chave).copied().unwrap_or(0.9);
+                demanda_total += pop.populacao * razao_original;
+            }
+
+            if demanda_total <= 0.0 {
+                for pop in pops {
+                    pop.empregados = 0.0;
+                }
+                continue;
+            }
+
+            // Se demanda <= vagas, todos empregados na razão original
+            // Se demanda > vagas, escalar proporcionalmente
+            let fator = if demanda_total <= vagas_totais {
+                1.0
+            } else {
+                vagas_totais / demanda_total
+            };
+
+            for pop in pops {
+                let chave = (prov.id.clone(), tipo_pop.clone());
+                let razao_original = razoes_originais.get(&chave).copied().unwrap_or(0.9);
+                pop.empregados = (pop.populacao * razao_original * fator).min(pop.populacao);
+            }
+        }
     }
 }
 
@@ -115,100 +206,38 @@ fn construir_mapa_potenciais(estados: &[Estado]) -> HashMap<String, EstadoPotenc
 
 /// Totais nacionais históricos corretos (baseados no branch jogavel) para preservar durante redistribuição.
 /// O commit 6f3f1efa inflacionou estes valores; aqui restauramos os totais corretos.
+/// Apenas USA definido; demais países usam totais do arquivo jogavel.
+/// Nota: USA precisa de escala 8.0x para PIB na faixa 200-350 bi.
 fn totais_nacionais_historicos(pais_id: &str) -> Option<PaisTotais> {
     match pais_id {
-"usa" => {
+        "usa" => {
             let mut pops_por_tipo = BTreeMap::new();
             let mut predios_por_tipo = BTreeMap::new();
             // Pop totals will be calculated from historical weights
-            // Building totals from jogavel branch (USA only) - no scaling
-            predios_por_tipo.insert("usina_termeletrica".to_string(), 45152);
-            predios_por_tipo.insert("fazenda_graos".to_string(), 35227);
-            predios_por_tipo.insert("mina_bauxita".to_string(), 27268);
-            predios_por_tipo.insert("serraria".to_string(), 25492);
-            predios_por_tipo.insert("industria_alimenticia".to_string(), 22032);
-            predios_por_tipo.insert("porto_pesca".to_string(), 9116);
-            predios_por_tipo.insert("porto_comercial".to_string(), 8910);
-            predios_por_tipo.insert("mina_ferro".to_string(), 8364);
-            predios_por_tipo.insert("complexo_militar_quartel".to_string(), 7889);
-            predios_por_tipo.insert("mina_cobre".to_string(), 7616);
-            predios_por_tipo.insert("mina_uranio".to_string(), 6067);
-            predios_por_tipo.insert("fabrica_ferramentas".to_string(), 5236);
-            predios_por_tipo.insert("poco_petroleo".to_string(), 4692);
-            predios_por_tipo.insert("setor_servicos_comercio".to_string(), 2652);
-            predios_por_tipo.insert("campo_gas_natural".to_string(), 2584);
-            predios_por_tipo.insert("estaleiro_naval".to_string(), 1768);
-            predios_por_tipo.insert("mina_carvao".to_string(), 1564);
-            predios_por_tipo.insert("fabrica_maquinas".to_string(), 1292);
-            predios_por_tipo.insert("siderurgica".to_string(), 1292);
-            predios_por_tipo.insert("administracao_governamental".to_string(), 1007);
-            predios_por_tipo.insert("fabrica_textil".to_string(), 612);
+            // Building totals from jogavel branch (USA only) - scaled 8.0x for PIB 200-350 bi
+            const USA_SCALE: f64 = 8.0;
+            predios_por_tipo.insert("usina_termeletrica".to_string(), (45152.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("fazenda_graos".to_string(), (35227.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("mina_bauxita".to_string(), (27268.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("serraria".to_string(), (25492.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("industria_alimenticia".to_string(), (22032.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("porto_pesca".to_string(), (9116.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("porto_comercial".to_string(), (8910.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("mina_ferro".to_string(), (8364.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("complexo_militar_quartel".to_string(), (7889.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("mina_cobre".to_string(), (7616.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("mina_uranio".to_string(), (6067.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("fabrica_ferramentas".to_string(), (5236.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("poco_petroleo".to_string(), (4692.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("setor_servicos_comercio".to_string(), (2652.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("campo_gas_natural".to_string(), (2584.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("estaleiro_naval".to_string(), (1768.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("mina_carvao".to_string(), (1564.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("fabrica_maquinas".to_string(), (1292.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("siderurgica".to_string(), (1292.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("administracao_governamental".to_string(), (1007.0 * USA_SCALE) as u64);
+            predios_por_tipo.insert("fabrica_textil".to_string(), (612.0 * USA_SCALE) as u64);
             Some(PaisTotais { pops_por_tipo, predios_por_tipo })
-        }
-        "bra" => {
-            let mut predios_por_tipo = BTreeMap::new();
-            // Brazil totals from jogavel
-            predios_por_tipo.insert("plantacao_acucar".to_string(), 8000);
-            predios_por_tipo.insert("porto_comercial".to_string(), 2000);
-            predios_por_tipo.insert("mina_ferro".to_string(), 1500);
-            predios_por_tipo.insert("usina_hidreletrica".to_string(), 1000);
-            Some(PaisTotais { pops_por_tipo: BTreeMap::new(), predios_por_tipo })
-        }
-        "ger" => {
-            let mut predios_por_tipo = BTreeMap::new();
-            predios_por_tipo.insert("siderurgica".to_string(), 3000);
-            predios_por_tipo.insert("fabrica_maquinas".to_string(), 2500);
-            predios_por_tipo.insert("mina_carvao".to_string(), 2000);
-            predios_por_tipo.insert("fabrica_ferramentas".to_string(), 1500);
-            predios_por_tipo.insert("usina_termeletrica".to_string(), 1000);
-            Some(PaisTotais { pops_por_tipo: BTreeMap::new(), predios_por_tipo })
-        }
-        "jap" => {
-            let mut predios_por_tipo = BTreeMap::new();
-            predios_por_tipo.insert("fabrica_textil".to_string(), 3000);
-            predios_por_tipo.insert("siderurgica".to_string(), 2000);
-            predios_por_tipo.insert("porto_comercial".to_string(), 1500);
-            predios_por_tipo.insert("mina_carvao".to_string(), 1000);
-            Some(PaisTotais { pops_por_tipo: BTreeMap::new(), predios_por_tipo })
-        }
-        "fra" => {
-            let mut predios_por_tipo = BTreeMap::new();
-            predios_por_tipo.insert("fazenda_graos".to_string(), 5000);
-            predios_por_tipo.insert("siderurgica".to_string(), 1500);
-            predios_por_tipo.insert("mina_carvao".to_string(), 1000);
-            Some(PaisTotais { pops_por_tipo: BTreeMap::new(), predios_por_tipo })
-        }
-        "gbr" => {
-            let mut predios_por_tipo = BTreeMap::new();
-            predios_por_tipo.insert("siderurgica".to_string(), 2000);
-            predios_por_tipo.insert("fabrica_maquinas".to_string(), 1500);
-            predios_por_tipo.insert("mina_carvao".to_string(), 1500);
-            predios_por_tipo.insert("porto_comercial".to_string(), 2000);
-            Some(PaisTotais { pops_por_tipo: BTreeMap::new(), predios_por_tipo })
-        }
-        "sov" => {
-            let mut predios_por_tipo = BTreeMap::new();
-            predios_por_tipo.insert("mina_carvao".to_string(), 5000);
-            predios_por_tipo.insert("mina_ferro".to_string(), 3000);
-            predios_por_tipo.insert("siderurgica".to_string(), 2500);
-            predios_por_tipo.insert("fabrica_armas_leves".to_string(), 1000);
-            predios_por_tipo.insert("fabrica_municoes".to_string(), 1000);
-            predios_por_tipo.insert("usina_termeletrica".to_string(), 2000);
-            Some(PaisTotais { pops_por_tipo: BTreeMap::new(), predios_por_tipo })
-        }
-        "chi" => {
-            let mut predios_por_tipo = BTreeMap::new();
-            predios_por_tipo.insert("fazenda_graos".to_string(), 10000);
-            predios_por_tipo.insert("mina_carvao".to_string(), 3000);
-            predios_por_tipo.insert("siderurgica".to_string(), 1000);
-            Some(PaisTotais { pops_por_tipo: BTreeMap::new(), predios_por_tipo })
-        }
-        "ind" => {
-            let mut predios_por_tipo = BTreeMap::new();
-            predios_por_tipo.insert("plantacao_acucar".to_string(), 8000);
-            predios_por_tipo.insert("fabrica_textil".to_string(), 5000);
-            predios_por_tipo.insert("mina_carvao".to_string(), 2000);
-            Some(PaisTotais { pops_por_tipo: BTreeMap::new(), predios_por_tipo })
         }
         _ => None,
     }
@@ -696,14 +725,6 @@ fn redistribuir_populacao(
             }
         }
     }
-
-    // Garantir emprego inicial de 99% para evitar desemprego absurdo no início
-    for &idx in prov_indices {
-        let prov = &mut cen.provincias[idx];
-        for pop in &mut prov.pops {
-            pop.empregados = pop.populacao * 0.99;
-        }
-    }
 }
 
 fn redistribuir_predios(
@@ -778,15 +799,8 @@ fn redistribuir_predios(
             if terra_livre > 0 && peso_terra > 0.0 {
                 let nivel_por_terra = ((total_nacional * peso_terra) as u32).min(terra_livre);
                 
-                // Cap farm level by available rural workforce (camponeses + agricultores)
-                // Each farm level needs ~2000 workers (vagas_por_nivel for fazenda)
-                let pop_rural: f64 = prov.pops.iter()
-                    .filter(|p| p.tipo_pop_id == "camponeses" || p.tipo_pop_id == "agricultores")
-                    .map(|p| p.populacao)
-                    .sum();
-                let max_nivel_por_pop = if pop_rural > 0.0 { (pop_rural / 2000.0) as u32 } else { 0 };
-                
-                let nivel = nivel_por_terra.min(max_nivel_por_pop);
+                // Usar apenas limite de terra arável; emprego será ajustado depois por vagas reais
+                let nivel = nivel_por_terra;
                 if nivel > 0 {
                     prov.predios.push(criar_predio_padrao(&tipo, nivel, &prov.pops, &cen.catalogo));
                 }
