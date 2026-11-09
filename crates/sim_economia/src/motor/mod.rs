@@ -988,11 +988,11 @@ impl MundoEconomico {
             let a = if pop[i] > 0.0 { alfa[i] / pop[i] } else { 0.3 };
             let pc = if pop[i] > 0.0 { pais.pib_diario / pop[i] } else { 0.0 };
             let convergencia = if pc > 0.0 && fronteira > 0.0 {
-                (fronteira / pc).ln().clamp(0.0, 3.0) * 0.007
+                (fronteira / pc).ln().clamp(0.0, 3.5) * 0.008
             } else {
                 0.0
             };
-            let g_ano = 0.014 + 0.012 * a.clamp(0.0, 1.0) + convergencia;
+            let g_ano = 0.012 + 0.008 * a.clamp(0.0, 1.0) + convergencia;
             pais.produtividade *= 1.0 + g_ano * 30.0 / 365.0;
         }
     }

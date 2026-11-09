@@ -217,7 +217,13 @@ pub(crate) fn executar_producao_diaria(
                 for &(g_in, qtd) in b.cache.insumos() {
                     t.demanda[offset_mercado + (g_in as usize)] += escala * qtd;
                 }
-                let escala_prod = if b.cache.financiado_pelo_governo { escala } else { escala * tfp };
+                let escala_prod = if b.cache.financiado_pelo_governo {
+                    escala
+                } else if categoria == CategoriaPredio::Extrativo {
+                    escala * (1.0 + (tfp - 1.0) * 0.5)
+                } else {
+                    escala * tfp
+                };
                 for &(g_out, qtd) in b.cache.produtos() {
                     t.oferta[offset_mercado + (g_out as usize)] += escala_prod * qtd;
                 }

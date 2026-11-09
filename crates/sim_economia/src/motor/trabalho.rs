@@ -242,6 +242,51 @@ pub(crate) fn executar_contratacao_e_demissao(
         if houve_mudanca_emprego {
             reconciliar_empregados_provincia(prov, emp_alvo_por_tipo, pop_total_por_tipo);
         }
+
+        // Absorção do excedente desempregado na rede de subsistência/informalidade (camponeses)
+        if let Some(camp_idx) = catalogo.tipo_pop_campones_idx {
+            promocoes.clear();
+            let mut demote_houve = false;
+            for pop in &mut prov.pops {
+                if pop.populacao <= 50.0 || catalogo.tipos_pop[pop.tipo_idx].subsistencia {
+                    continue;
+                }
+                let desemp = pop.desempregados();
+                if desemp <= 1.0 {
+                    continue;
+                }
+                let taxa = desemp / pop.populacao;
+                if taxa > 0.10 {
+                    let excesso = (desemp - pop.populacao * 0.085).max(0.0);
+                    if excesso < 1.0 {
+                        continue;
+                    }
+                    let taxa_democao = (0.040 * fator_dias).clamp(0.02, 0.40);
+                    let demotados = (excesso * taxa_democao).min(desemp).min(pop.populacao - pop.empregados);
+                    if demotados < 1.0 {
+                        continue;
+                    }
+                    let fracao = (demotados / pop.populacao).clamp(0.0, 1.0);
+                    let riq_transf = pop.riqueza_reservas * fracao;
+                    pop.populacao = (pop.populacao - demotados).max(pop.empregados);
+                    pop.riqueza_reservas = (pop.riqueza_reservas - riq_transf).max(0.0);
+                    registrar_lote_promocao(
+                        promocoes,
+                        camp_idx,
+                        pop,
+                        demotados,
+                        riq_transf,
+                    );
+                    demote_houve = true;
+                }
+            }
+            if demote_houve && !promocoes.is_empty() {
+                for &lote in promocoes.iter() {
+                    aplicar_lote_democao(catalogo, nomes_culturas, nomes_religioes, prov, lote);
+                }
+                reconciliar_empregados_provincia(prov, emp_alvo_por_tipo, pop_total_por_tipo);
+            }
+        }
     }
 }
 
@@ -335,6 +380,75 @@ fn aplicar_lote_promocao(
             .unwrap_or_default(),
         populacao: lote.quantidade,
         empregados: lote.quantidade,
+        riqueza_reservas: lote.riqueza,
+        padrao_de_vida: lote.padrao_de_vida,
+        alfabetizacao: lote.alfabetizacao,
+        renda_ultimo_tick: 0.0,
+        gasto_consumo_ultimo_tick: 0.0,
+        tipo_idx: lote.novo_tipo_idx,
+        cultura_idx: lote.cultura_idx,
+        religiao_idx: lote.religiao_idx,
+    });
+}
+
+fn aplicar_lote_democao(
+    catalogo: &CatalogoEconomia,
+    nomes_culturas: &[String],
+    nomes_religioes: &[String],
+    prov: &mut Provincia,
+    lote: LotePromocao,
+) {
+    if let Some(alvo) = prov.pops.iter_mut().find(|p| {
+        p.tipo_idx == lote.novo_tipo_idx
+            && p.cultura_idx == lote.cultura_idx
+            && p.religiao_idx == lote.religiao_idx
+    }) {
+        let total = alvo.populacao + lote.quantidade;
+        if total > 0.0 {
+            alvo.padrao_de_vida = (alvo.padrao_de_vida * alvo.populacao
+                + lote.padrao_de_vida * lote.quantidade)
+                / total;
+            alvo.alfabetizacao = (alvo.alfabetizacao * alvo.populacao
+                + lote.alfabetizacao * lote.quantidade)
+                / total;
+        }
+        alvo.populacao = total;
+        alvo.riqueza_reservas += lote.riqueza;
+        return;
+    }
+
+    if prov.pops.len() >= 24
+        && let Some(alvo_tipo) = prov
+            .pops
+            .iter_mut()
+            .find(|p| p.tipo_idx == lote.novo_tipo_idx)
+    {
+        let total = alvo_tipo.populacao + lote.quantidade;
+        if total > 0.0 {
+            alvo_tipo.padrao_de_vida = (alvo_tipo.padrao_de_vida * alvo_tipo.populacao
+                + lote.padrao_de_vida * lote.quantidade)
+                / total;
+            alvo_tipo.alfabetizacao = (alvo_tipo.alfabetizacao * alvo_tipo.populacao
+                + lote.alfabetizacao * lote.quantidade)
+                / total;
+        }
+        alvo_tipo.populacao = total;
+        alvo_tipo.riqueza_reservas += lote.riqueza;
+        return;
+    }
+
+    prov.pops.push(Pop {
+        tipo_pop_id: catalogo.tipos_pop[lote.novo_tipo_idx].id.clone(),
+        cultura: nomes_culturas
+            .get(lote.cultura_idx as usize)
+            .cloned()
+            .unwrap_or_default(),
+        religiao: nomes_religioes
+            .get(lote.religiao_idx as usize)
+            .cloned()
+            .unwrap_or_default(),
+        populacao: lote.quantidade,
+        empregados: 0.0,
         riqueza_reservas: lote.riqueza,
         padrao_de_vida: lote.padrao_de_vida,
         alfabetizacao: lote.alfabetizacao,

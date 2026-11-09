@@ -25,31 +25,43 @@ pub(crate) struct LoteMigrante {
 pub fn taxa_crescimento_anual_pop_epoca(padrao_de_vida: f64, alfabetizacao: f64, ano: f64) -> f64 {
     let sol = padrao_de_vida.clamp(1.0, 99.0);
     let alfa = alfabetizacao.clamp(0.0, 1.0);
-    if sol < 5.0 {
-        return -0.015 * ((5.0 - sol) / 4.0).clamp(0.0, 1.0);
+    // Mortalidade severa apenas em extrema fome/miséria (< 3.0)
+    if sol < 3.0 {
+        return -0.012 * ((3.0 - sol) / 2.0).clamp(0.0, 1.0);
     }
-    // 1. Curva por padrão de vida (renda): pico em SoL baixo-médio (8 a 13)
-    let base_sol = if sol <= 11.0 {
-        0.014 + 0.012 * (sol - 5.0) / 6.0
-    } else if sol <= 22.0 {
-        0.026 - 0.014 * (sol - 11.0) / 11.0
+
+    // 1. Curva por padrão de vida (estágios da transição demográfica):
+    // SoL 3 a 8: transição inicial e auge de fecundidade (1,4% a 3,0%)
+    // SoL 8 a 16: transição plena, urbanização e renda (3,0% cai para 1,4%)
+    // SoL 16 a 26: países de renda média-alta / industrializados (1,4% cai para 0,5%)
+    // SoL > 26: pós-transição / estabilização demográfica (0,5% cai para ~0,15%)
+    let base_sol = if sol <= 8.0 {
+        0.014 + 0.016 * ((sol - 3.0) / 5.0)
+    } else if sol <= 16.0 {
+        0.030 - 0.016 * ((sol - 8.0) / 8.0)
+    } else if sol <= 26.0 {
+        0.014 - 0.009 * ((sol - 16.0) / 10.0)
     } else {
-        (0.012 - 0.0003 * (sol - 22.0)).max(0.004)
+        (0.005 - 0.00015 * (sol - 26.0)).max(0.0015)
     };
 
-    // 2. Fator época (transição demográfica global da Guerra Fria até o século XXI):
-    // 1945 a 1970: ápice da explosão demográfica nos países em desenvolvimento (fator ~1.0 a 1.12).
-    // A partir de 1975: queda contínua da natalidade mundial (fator cai para ~0.45 em 2045).
-    let fator_epoca = if ano <= 1970.0 {
-        1.0 + 0.12 * ((ano - 1945.0) / 25.0).clamp(0.0, 1.0)
+    // 2. Fator época (transição global da Guerra Fria até o século XXI):
+    // 1945 a 1975: ápice do pós-guerra e revolução sanitária global (0.88 a 1.04).
+    // 1975 a 2010: difusão de métodos contraceptivos e planejamento familiar (1.04 cai para 0.58).
+    // 2010 a 2045: estabilização do século XXI (0.58 cai para 0.32).
+    let fator_epoca = if ano <= 1975.0 {
+        0.88 + 0.16 * ((ano - 1945.0) / 30.0).clamp(0.0, 1.0)
+    } else if ano <= 2010.0 {
+        let progresso = ((ano - 1975.0) / 35.0).clamp(0.0, 1.0);
+        1.04 - 0.46 * progresso
     } else {
-        let progresso = ((ano - 1970.0) / 75.0).clamp(0.0, 1.0);
-        1.12 - 0.67 * progresso
+        let progresso = ((ano - 2010.0) / 35.0).clamp(0.0, 1.0);
+        0.58 - 0.26 * progresso
     };
 
-    // 3. Efeito da alfabetização e educação feminina (acelera a queda da natalidade)
-    let peso_alfa = 0.006 + 0.006 * ((ano - 1960.0).max(0.0) / 70.0).min(1.0);
-    (base_sol * fator_epoca - peso_alfa * alfa).clamp(0.002, 0.030)
+    // 3. Efeito da alfabetização e educação feminina (acelera a transição demográfica)
+    let peso_alfa = 0.0025 + 0.0065 * ((ano - 1965.0).max(0.0) / 60.0).min(1.0);
+    (base_sol * fator_epoca - peso_alfa * alfa).clamp(0.001, 0.035)
 }
 
 /// Taxa líquida anual de crescimento populacional (compatibilidade: época padrão 1950).
