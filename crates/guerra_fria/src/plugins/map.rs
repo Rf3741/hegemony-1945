@@ -906,11 +906,26 @@ fn legenda_zonas_ocupacao(
     Ok(())
 }
 
+/// Verdadeiro se o ponteiro está sobre qualquer UI egui: janelas/áreas flutuantes, widget em uso
+/// ou painéis da cadeia raiz (barras do topo e painel lateral), que ficam na camada de fundo e por
+/// isso não contam em `is_pointer_over_area`.
+fn ponteiro_sobre_ui(egui: &EguiWantsInput, contextos: &mut EguiContexts, janela: &Window) -> bool {
+    if egui.wants_pointer_input() || egui.is_pointer_over_area() {
+        return true;
+    }
+    let Some(cursor) = janela.cursor_position() else { return false };
+    let Ok(ctx) = contextos.ctx_mut() else { return false };
+    let ppp = ctx.pixels_per_point().max(0.01);
+    let pos = egui::pos2(cursor.x * janela.scale_factor() / ppp, cursor.y * janela.scale_factor() / ppp);
+    !super::ui::area_livre_mapa(ctx).contains(pos)
+}
+
 fn mover_camera(
     teclas: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     scroll: Res<AccumulatedMouseScroll>,
     egui: Res<EguiWantsInput>,
+    mut contextos: EguiContexts,
     mut camera: Query<(&mut Transform, &mut Projection), With<Camera2d>>,
     janela: Query<&Window, With<PrimaryWindow>>,
     botoes: Res<ButtonInput<MouseButton>>,
@@ -920,7 +935,7 @@ fn mover_camera(
 ) {
     let Ok((mut tf, mut proj)) = camera.single_mut() else { return };
     let Projection::Orthographic(ortho) = &mut *proj else { return };
-    let sobre_ui = egui.wants_pointer_input() || egui.is_pointer_over_area();
+    let sobre_ui = janela.single().is_ok_and(|j| ponteiro_sobre_ui(&egui, &mut contextos, j));
 
     let mut dir = Vec2::ZERO;
     if teclas.pressed(KeyCode::KeyW) || teclas.pressed(KeyCode::ArrowUp) { dir.y += 1.0; }
@@ -981,11 +996,12 @@ fn selecionar_provincia(
     mut imagens: ResMut<Assets<Image>>,
     mut realces: Query<(&Realce, &mut Sprite, &mut Transform, &mut Visibility)>,
     egui: Res<EguiWantsInput>,
+    mut contextos: EguiContexts,
 ) {
     if !botoes.just_released(MouseButton::Left) || arrasto.moveu > 4.0 || !arrasto.ativo {
         return;
     }
-    if egui.is_pointer_over_area() || egui.wants_pointer_input() {
+    if janela.single().is_ok_and(|j| ponteiro_sobre_ui(&egui, &mut contextos, j)) {
         return;
     }
     let Some(caixas) = caixas else { return };
