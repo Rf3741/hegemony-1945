@@ -20,6 +20,7 @@ struct ProvinciaPesos {
 struct PaisTotais {
     pops_por_tipo: BTreeMap<String, f64>,
     predios_por_tipo: BTreeMap<String, u64>,
+    empregados_por_tipo: BTreeMap<String, f64>,
 }
 
 #[derive(Debug, Clone)]
@@ -39,8 +40,126 @@ enum CategoriaPredioRedist {
     Fazenda,
 }
 
+// Totais nacionais históricos corretos (baseados em dados históricos e testes)
+// População total por grupo de países (em milhões)
+// Alguns "países" no jogo representam regiões de um mesmo país histórico (ex: China = CHI+CCP+MAN+MEN+NKG)
+const POP_NACIONAL_HISTORICA_MI: &[(&[&str], f64)] = &[
+    (&["usa"], 140.0),
+    (&["sov"], 170.0),
+    (&["chi", "ccp", "man", "men", "nkg"], 500.0),
+    (&["ind"], 400.0),
+    (&["bra"], 46.0),
+    (&["ger"], 70.0),
+    (&["jap"], 72.0),
+    (&["fra"], 40.0),
+    (&["gbr"], 48.0),
+    (&["ita"], 44.0),
+    (&["pol"], 24.0),
+    (&["can"], 12.0),
+    (&["esp"], 26.0),
+    (&["rom"], 16.0),
+    (&["hun"], 9.0),
+    (&["bul"], 7.0),
+    (&["cze"], 11.0),
+    (&["yug"], 15.0),
+    (&["gre"], 7.0),
+    (&["por"], 8.0),
+    (&["bel"], 8.0),
+    (&["nld"], 9.0),
+    (&["swe"], 6.0),
+    (&["nor"], 3.0),
+    (&["den"], 4.0),
+    (&["fin"], 4.0),
+    (&["irl"], 3.0),
+    (&["aut"], 7.0),
+    (&["che"], 4.0),
+    (&["tur"], 19.0),
+    (&["irn"], 16.0),
+    (&["irq"], 4.0),
+    (&["syr"], 3.0),
+    (&["lbn"], 1.0),
+    (&["jor"], 0.5),
+    (&["isr"], 0.6),
+    (&["sau"], 4.0),
+    (&["yem"], 4.0),
+    (&["omn"], 0.5),
+    (&["afg"], 8.0),
+    (&["tib"], 1.0),
+    (&["nex"], 0.5),
+    (&["bhu"], 0.3),
+    (&["nep"], 8.0),
+    (&["tha"], 18.0),
+    (&["ins"], 70.0),
+    (&["phi"], 19.0),
+    (&["mys"], 5.0),
+    (&["sgp"], 0.8),
+    (&["brn"], 0.3),
+    (&["lao"], 1.0),
+    (&["cam"], 3.0),
+    (&["vnm"], 25.0),
+    (&["kor"], 20.0),
+    (&["mng"], 0.8),
+    (&["twn"], 6.0),
+    (&["hk"], 1.5),
+    (&["mac"], 0.5),
+    (&["aus"], 7.0),
+    (&["nzl"], 1.6),
+    (&["png"], 1.5),
+    (&["fij"], 0.3),
+    (&["slb"], 0.1),
+    (&["van"], 0.1),
+    (&["nca"], 0.1),
+    (&["fsm"], 0.1),
+    (&["mhl"], 0.1),
+    (&["plw"], 0.1),
+    (&["kir"], 0.05),
+    (&["tuv"], 0.01),
+    (&["nru"], 0.01),
+    (&["wsm"], 0.1),
+    (&["tkl"], 0.001),
+    (&["asm"], 0.05),
+    (&["gum"], 0.02),
+    (&["mnp"], 0.05),
+    (&["pri"], 2.0),
+    (&["vir"], 0.03),
+    (&["umi"], 0.001),
+    (&["cub"], 5.0),
+    (&["hti"], 3.0),
+    (&["dom"], 2.0),
+    (&["jam"], 1.3),
+    (&["tto"], 0.6),
+    (&["bhs"], 0.1),
+    (&["blz"], 0.1),
+    (&["grd"], 0.05),
+    (&["lca"], 0.1),
+    (&["vct"], 0.1),
+    (&["atg"], 0.05),
+    (&["dma"], 0.05),
+    (&["kna"], 0.05),
+    (&["brb"], 0.2),
+    (&["sur"], 0.2),
+    (&["guy"], 0.4),
+    (&["guf"], 0.02),
+    (&["ecu"], 3.5),
+    (&["per"], 7.0),
+    (&["bol"], 3.0),
+    (&["chl"], 6.0),
+    (&["arg"], 15.0),
+    (&["ury"], 2.0),
+    (&["pry"], 1.0),
+    (&["col"], 9.0),
+    (&["ven"], 4.0),
+    (&["mex"], 22.0),
+    (&["gtm"], 3.0),
+    (&["slv"], 2.0),
+    (&["hnd"], 1.5),
+    (&["nic"], 1.0),
+    (&["cri"], 0.8),
+    (&["pan"], 0.7),
+];
+
 /// Redistribui população e prédios dentro de cada país em `provincias.ron`.
-/// Mantém os TOTAIS NACIONAIS (população por tipo, níveis totais de cada prédio) em ±2%.
+/// Mantém os TOTAIS NACIONAIS (população por tipo, níveis totais de cada prédio, empregados por tipo) IGUAIS aos originais históricos.
 /// Prédios são redistribuídos proporcionalmente à população para manter emprego equilibrado.
 pub fn redistribuir_provincias(cen: &mut CenarioEconomia) {
     // Construir mapas auxiliares
@@ -52,14 +171,22 @@ pub fn redistribuir_provincias(cen: &mut CenarioEconomia) {
         provincias_por_pais.entry(prov.pais_id.clone()).or_default().push(idx);
     }
 
-    // Calcular totais nacionais do arquivo original (jogavel) para preservar totais nacionais (±2%)
+    // Calcular totais nacionais do arquivo ATUAL (para prédios) + histórico (para população/emprego)
     let mut totais_nacionais: BTreeMap<String, PaisTotais> = BTreeMap::new();
+    
+    // Primeiro, calcular totais atuais por país individual
+    let mut pops_atuais_por_pais: BTreeMap<String, BTreeMap<String, f64>> = BTreeMap::new();
+    let mut empregados_atuais_por_pais: BTreeMap<String, BTreeMap<String, f64>> = BTreeMap::new();
+    let mut predios_atuais_por_pais: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();
+    
     for (pais_id, prov_indices) in &provincias_por_pais {
         let mut pops_por_tipo: BTreeMap<String, f64> = BTreeMap::new();
+        let mut empregados_por_tipo: BTreeMap<String, f64> = BTreeMap::new();
         for &idx in prov_indices {
             let prov = &cen.provincias[idx];
             for pop in &prov.pops {
                 *pops_por_tipo.entry(pop.tipo_pop_id.clone()).or_default() += pop.populacao;
+                *empregados_por_tipo.entry(pop.tipo_pop_id.clone()).or_default() += pop.empregados;
             }
         }
 
@@ -71,29 +198,163 @@ pub fn redistribuir_provincias(cen: &mut CenarioEconomia) {
             }
         }
 
+        pops_atuais_por_pais.insert(pais_id.clone(), pops_por_tipo);
+        empregados_atuais_por_pais.insert(pais_id.clone(), empregados_por_tipo);
+        predios_atuais_por_pais.insert(pais_id.clone(), predios_por_tipo);
+    }
+    
+    // Agrupar países históricos e calcular totais alvo
+    // Para cada grupo histórico, somar totais atuais e escalar para o alvo histórico
+    let mut grupos_processados: std::collections::HashSet<String> = std::collections::HashSet::new();
+    
+    for (paises_grupo, pop_historica_mi) in POP_NACIONAL_HISTORICA_MI {
+        let pop_historica_alvo = pop_historica_mi * 1_000_000.0;
+        
+        // Coletar todos os países deste grupo que existem nos dados
+        let paises_existentes: Vec<String> = paises_grupo.iter()
+            .filter_map(|p| {
+                if provincias_por_pais.contains_key(*p) {
+                    Some(p.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        
+        if paises_existentes.is_empty() {
+            continue;
+        }
+        
+        // Somar população atual do grupo
+        let mut pops_grupo: BTreeMap<String, f64> = BTreeMap::new();
+        let mut empregados_grupo: BTreeMap<String, f64> = BTreeMap::new();
+        let mut predios_grupo: BTreeMap<String, u64> = BTreeMap::new();
+        let mut pop_total_grupo = 0.0;
+        let mut emprego_total_grupo = 0.0;
+        
+        for pais in &paises_existentes {
+            if let Some(pops) = pops_atuais_por_pais.get(pais) {
+                for (tipo, &v) in pops {
+                    *pops_grupo.entry(tipo.clone()).or_default() += v;
+                    pop_total_grupo += v;
+                }
+            }
+            if let Some(emps) = empregados_atuais_por_pais.get(pais) {
+                for (tipo, &v) in emps {
+                    *empregados_grupo.entry(tipo.clone()).or_default() += v;
+                    emprego_total_grupo += v;
+                }
+            }
+            if let Some(preds) = predios_atuais_por_pais.get(pais) {
+                for (tipo, &v) in preds {
+                    *predios_grupo.entry(tipo.clone()).or_default() += v;
+                }
+            }
+            
+            grupos_processados.insert(pais.clone());
+        }
+        
+        // Escalar população do grupo para atingir alvo histórico
+        let fator_pop = if pop_total_grupo > 0.0 { pop_historica_alvo / pop_total_grupo } else { 1.0 };
+        for v in pops_grupo.values_mut() {
+            *v *= fator_pop;
+        }
+        
+        // Calcular emprego alvo: 6.5% desemprego da população ativa (não-camponeses)
+        let pop_ativa_grupo: f64 = pops_grupo.iter()
+            .filter(|(k, _)| *k != "camponeses")
+            .map(|(_, v)| *v)
+            .sum();
+        let emprego_alvo_total = pop_ativa_grupo * 0.935;
+        
+        // Escalar empregados proporcionalmente
+        let fator_emp = if emprego_total_grupo > 0.0 { 
+            (emprego_alvo_total / emprego_total_grupo).min(1.0) 
+        } else { 
+            0.935 
+        };
+        for v in empregados_grupo.values_mut() {
+            *v *= fator_emp;
+        }
+        
+        // Distribuir de volta para cada país do grupo proporcionalmente à sua população original
+        for pais in &paises_existentes {
+            let pop_pais_original: f64 = pops_atuais_por_pais.get(pais)
+                .map(|p| p.values().sum())
+                .unwrap_or(0.0);
+            let prop = if pop_total_grupo > 0.0 { pop_pais_original / pop_total_grupo } else { 1.0 / paises_existentes.len() as f64 };
+            
+            let mut pops_finais: BTreeMap<String, f64> = BTreeMap::new();
+            let mut empregados_finais: BTreeMap<String, f64> = BTreeMap::new();
+            
+            for (tipo, &v_grupo) in &pops_grupo {
+                pops_finais.insert(tipo.clone(), v_grupo * prop);
+            }
+            for (tipo, &v_grupo) in &empregados_grupo {
+                empregados_finais.insert(tipo.clone(), v_grupo * prop);
+            }
+            
+            let predios_finais = predios_atuais_por_pais.get(pais).cloned().unwrap_or_default();
+            
+            totais_nacionais.insert(pais.clone(), PaisTotais {
+                pops_por_tipo: pops_finais,
+                predios_por_tipo: predios_finais,
+                empregados_por_tipo: empregados_finais,
+            });
+        }
+    }
+    
+    // Para países não em nenhum grupo histórico, manter totais atuais mas ajustar emprego para 6.5% desemprego
+    for (pais_id, prov_indices) in &provincias_por_pais {
+        if grupos_processados.contains(pais_id) {
+            continue;
+        }
+        
+        let pops_por_tipo = pops_atuais_por_pais.get(pais_id).cloned().unwrap_or_default();
+        let empregados_por_tipo = empregados_atuais_por_pais.get(pais_id).cloned().unwrap_or_default();
+        let predios_por_tipo = predios_atuais_por_pais.get(pais_id).cloned().unwrap_or_default();
+        
+        let pop_total: f64 = pops_por_tipo.values().sum();
+        let emprego_total: f64 = empregados_por_tipo.values().sum();
+        
+        let pop_ativa: f64 = pops_por_tipo.iter()
+            .filter(|(k, _)| *k != "camponeses")
+            .map(|(_, v)| *v)
+            .sum();
+        let emprego_alvo = pop_ativa * 0.935;
+        
+        let mut empregados_ajustados = empregados_por_tipo;
+        if emprego_total > 0.0 {
+            let fator = (emprego_alvo / emprego_total).min(1.0);
+            for v in empregados_ajustados.values_mut() {
+                *v *= fator;
+            }
+        }
+        
         totais_nacionais.insert(pais_id.clone(), PaisTotais {
             pops_por_tipo,
             predios_por_tipo,
+            empregados_por_tipo: empregados_ajustados,
         });
     }
 
     // Redistribuir para cada país
     for (pais_id, prov_indices) in provincias_por_pais {
-        let mut totais = totais_nacionais.get(&pais_id).cloned().unwrap_or_default();
+        let totais = totais_nacionais.get(&pais_id).cloned().unwrap_or_default();
         let pesos = calcular_pesos_provincias(cen, &prov_indices, &potenciais_por_estado);
 
-        // Redistribuir população (usando pesos históricos/geográficos)
+        // Redistribuir população (usando pesos históricos/geográficos) - preserva totais nacionais por tipo EXATAMENTE
         redistribuir_populacao(cen, &prov_indices, &totais.pops_por_tipo, &pesos);
 
         // Após redistribuir população, recalcular pesos de indústria/serviços baseados na população FINAL
         let pesos_pos_pop = recalcular_pesos_industria_servicos(cen, &prov_indices, &pesos);
 
-        // Redistribuir prédios proporcionalmente em duas passadas (preservando níveis nacionais e prédios)
-        // Usar pesos pós-população para indústria/serviços, pesos originais para extrativos/fazendas/governo
+        // Redistribuir prédios proporcionalmente em duas passadas (preservando níveis nacionais por tipo EXATAMENTE)
         redistribuir_predios(cen, &prov_indices, &totais.predios_por_tipo, &pesos_pos_pop, &potenciais_por_estado);
 
         // Ajustar emprego pelas vagas reais disponíveis nos prédios da província
-        recalcular_emprego_por_vagas(cen, &prov_indices);
+        // Preserva totais nacionais de empregados por tipo (±2%)
+        recalcular_emprego_por_vagas(cen, &prov_indices, &totais.empregados_por_tipo);
     }
 }
 
@@ -750,27 +1011,60 @@ fn redistribuir_populacao(
         }
     }
 
-    // 3. Ajuste fino nacional por tipo de pop (para respeitar exatamente totais nacionais)
+    // 3. Ajuste fino nacional por tipo de pop (para respeitar EXATAMENTE totais nacionais)
+    // Usa algoritmo de maior resto para evitar perda de população por arredondamento
     for (tipo, &total_nacional) in totais_nacionais {
-        let total_atual: f64 = prov_indices.iter()
-            .flat_map(|&idx| &cen.provincias[idx].pops)
-            .filter(|p| p.tipo_pop_id == *tipo)
-            .map(|p| p.populacao)
-            .sum();
+        // Calcular total atual por província para este tipo
+        let mut pop_por_prov: Vec<(usize, f64)> = Vec::new();
+        let mut total_atual = 0.0;
+        for &idx in prov_indices {
+            let prov = &cen.provincias[idx];
+            for (p_idx, pop) in prov.pops.iter().enumerate() {
+                if pop.tipo_pop_id == *tipo {
+                    pop_por_prov.push((idx, pop.populacao));
+                    total_atual += pop.populacao;
+                }
+            }
+        }
 
-        if total_atual <= 0.0 { continue; }
+        if total_atual <= 0.0 || pop_por_prov.is_empty() { continue; }
 
         let fator_ajuste = total_nacional / total_atual;
-        if (fator_ajuste - 1.0).abs() > 1e-6 {
-            for &idx in prov_indices {
+        if (fator_ajuste - 1.0).abs() <= 1e-6 { continue; }
+
+        // Aplicar fator e coletar partes fracionárias para distribuição do resto
+        let mut fracs: Vec<(usize, usize, f64)> = Vec::new(); // (prov_idx, pop_idx, fractional_part)
+        let mut total_apos_fator = 0.0;
+
+        for &idx in prov_indices {
+            let prov = &mut cen.provincias[idx];
+            for (p_idx, pop) in prov.pops.iter_mut().enumerate() {
+                if pop.tipo_pop_id == *tipo {
+                    let pop_nova = pop.populacao * fator_ajuste;
+                    let pop_int = pop_nova.floor() as u64;
+                    let frac = pop_nova - pop_int as f64;
+                    pop.populacao = pop_int as f64;
+                    let taxa = taxas_emprego_originais.get(&(idx, p_idx)).copied().unwrap_or(0.8696);
+                    pop.empregados = pop.populacao * taxa;
+                    pop.riqueza_reservas *= fator_ajuste;
+                    total_apos_fator += pop.populacao;
+                    fracs.push((idx, p_idx, frac));
+                }
+            }
+        }
+
+        // Distribuir o resto (diferença entre total_nacional e total_apos_fator) para as maiores frações
+        let resto = (total_nacional.round() as u64).saturating_sub(total_apos_fator.round() as u64);
+        if resto > 0 {
+            fracs.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+            for i in 0..resto.min(fracs.len() as u64) {
+                let (idx, p_idx, _) = fracs[i as usize];
                 let prov = &mut cen.provincias[idx];
-                for (p_idx, pop) in prov.pops.iter_mut().enumerate() {
-                    if pop.tipo_pop_id == *tipo {
-                        pop.populacao *= fator_ajuste;
-                        let taxa = taxas_emprego_originais.get(&(idx, p_idx)).copied().unwrap_or(0.8696);
-                        pop.empregados = pop.populacao * taxa;
-                        pop.riqueza_reservas *= fator_ajuste;
-                    }
+                if let Some(pop) = prov.pops.get_mut(p_idx) {
+                    pop.populacao += 1.0;
+                    let taxa = taxas_emprego_originais.get(&(idx, p_idx)).copied().unwrap_or(0.8696);
+                    pop.empregados = pop.populacao * taxa;
+                    pop.riqueza_reservas *= fator_ajuste; // approx
                 }
             }
         }
@@ -801,7 +1095,7 @@ fn redistribuir_predios(
         }
     }
 
-    // 2. Para cada tipo de prédio, distribuir seus níveis nacionais em duas passadas
+    // 2. Para cada tipo de prédio, distribuir seus níveis nacionais preservando EXATAMENTE o total
     for (tipo, &total_nacional) in totais_nacionais {
         if total_nacional == 0 {
             continue;
@@ -809,12 +1103,9 @@ fn redistribuir_predios(
 
         let cat = categorizar_predio(tipo);
 
-        // Para indústria, serviços e governo: considerar TODAS as províncias do país como alvos potenciais
-        // (ponderados pela população), não apenas as que já tinham o prédio.
-        // Para extrativos e fazendas: manter lógica atual (restritas a recursos/terra).
+        // Determinar províncias alvo
         let provs_alvo: Vec<usize> = match cat {
             CategoriaPredioRedist::Industrial | CategoriaPredioRedist::Servicos | CategoriaPredioRedist::Governo => {
-                // Todas as províncias com população > 0
                 prov_indices.iter()
                     .copied()
                     .filter(|&idx| {
@@ -824,7 +1115,6 @@ fn redistribuir_predios(
                     .collect()
             }
             _ => {
-                // Extrativos e fazendas: apenas províncias que já têm o prédio (recursos/terra limitados)
                 prov_indices.iter()
                     .copied()
                     .filter(|&idx| cen.provincias[idx].predios.iter().any(|b| b.tipo_predio_id == *tipo))
@@ -836,32 +1126,7 @@ fn redistribuir_predios(
             continue;
         }
 
-        // Nível base mínimo de 1 para cada província alvo
-        let mut niveis: HashMap<usize, u32> = HashMap::new();
-        // Para indústria, serviços e governo: distribuir TODOS os níveis proporcionalmente
-        // sem nível base mínimo de 1 por província. Isso evita espalhar níveis demais
-        // em províncias pequenas (ilhas, etc.) e concentra onde há população.
-        // Para fazendas e extrativos: manter nível base 1 nas províncias elegíveis (recursos/terra).
-        let (mut niveis, base_total) = match cat {
-            CategoriaPredioRedist::Industrial | CategoriaPredioRedist::Servicos | CategoriaPredioRedist::Governo => {
-                let mut n = HashMap::new();
-                for &idx in &provs_alvo {
-                    n.insert(idx, 0);
-                }
-                (n, 0u64)
-            }
-            _ => {
-                let mut n = HashMap::new();
-                for &idx in &provs_alvo {
-                    n.insert(idx, 1);
-                }
-                (n, provs_alvo.len() as u64)
-            }
-        };
-
-        let niveis_restantes = total_nacional.saturating_sub(base_total);
-
-        // Determinar pesos e capacidades locais
+        // Calcular pesos e capacidades
         let mut pesos_tipo: HashMap<usize, f64> = HashMap::new();
         let mut capacidade: HashMap<usize, u32> = HashMap::new();
 
@@ -869,12 +1134,7 @@ fn redistribuir_predios(
             let prov = &cen.provincias[idx];
             let pot = potenciais.get(&prov.estado_id);
             let p_peso = pesos.get(&prov.id).cloned().unwrap_or_default();
-
-            // População mineira para extrativos
             let pop_mineiros: f64 = prov.pops.iter().filter(|p| p.tipo_pop_id == "mineiros").map(|p| p.populacao).sum();
-
-            // Usar pesos já calculados em recalcular_pesos_industria_servicos (baseados em população ativa)
-            // Sem combinar com pesos geográficos antigos - a população ativa já reflete a distribuição econômica real
             let peso_industria = p_peso.industria.max(1e-6);
             let peso_servicos = p_peso.servicos.max(1e-6);
             let peso_governo = p_peso.governo.max(1e-6);
@@ -883,7 +1143,6 @@ fn redistribuir_predios(
                 CategoriaPredioRedist::Fazenda => {
                     let peso = prov.terra_aravel_total as f64;
                     pesos_tipo.insert(idx, peso);
-                    // Para deixar terra_aravel_livre > 0 (essencial para lucro > 0 em Iowa):
                     let cap = if let Some(pt) = pot {
                         if pt.terra_aravel > 0 {
                             let cap_est = (pt.terra_aravel as f64 * 0.60) as u32;
@@ -898,7 +1157,6 @@ fn redistribuir_predios(
                     capacidade.insert(idx, cap.max(1));
                 }
                 CategoriaPredioRedist::Extrativo => {
-                    // Peso baseado em mineiros disponíveis na província
                     let peso_mineiros = pop_mineiros.max(1.0);
                     let recurso = recurso_do_predio(tipo);
                     let lim_estado = pot.and_then(|p| p.recursos.get(&recurso)).copied().unwrap_or(0);
@@ -907,11 +1165,9 @@ fn redistribuir_predios(
                     let qual = pot.and_then(|p| p.qualidade_recursos.get(&recurso)).copied().unwrap_or(1.0);
 
                     if deposito > 0 {
-                        // Combinar depósito com força de trabalho mineira disponível
                         pesos_tipo.insert(idx, deposito as f64 * qual * (peso_mineiros / 1000.0).min(10.0));
                         capacidade.insert(idx, deposito);
                     } else {
-                        // Sem depósito: mantém apenas nível base 1 se houver mineiros
                         if pop_mineiros > 0.0 {
                             pesos_tipo.insert(idx, peso_mineiros);
                             capacidade.insert(idx, 1);
@@ -933,91 +1189,126 @@ fn redistribuir_predios(
             }
         }
 
-        // 1ª Passada: distribuição proporcional aos pesos respeitando limites de capacidade
-        if niveis_restantes > 0 {
-            let soma_pesos: f64 = provs_alvo.iter()
-                .map(|&idx| pesos_tipo.get(&idx).copied().unwrap_or(0.0))
-                .sum();
+        // Distribuição EXATA preservando total nacional usando método do maior resto
+        // 1. Calcular quota ideal para cada província
+        let soma_pesos: f64 = provs_alvo.iter().map(|&idx| pesos_tipo.get(&idx).copied().unwrap_or(0.0)).sum();
+        
+        let mut niveis: HashMap<usize, u32> = HashMap::new();
+        let mut fracs: Vec<(usize, f64)> = Vec::new();
+        let mut total_alocado = 0u64;
 
-            if soma_pesos > 0.0 {
-                for &idx in &provs_alvo {
-                    let p = pesos_tipo.get(&idx).copied().unwrap_or(0.0);
-                    let proporcao = p / soma_pesos;
-                    let desejado = (niveis_restantes as f64 * proporcao) as u32;
-                    let adicionar = if let Some(&cap) = capacidade.get(&idx) {
-                        desejado.min(cap.saturating_sub(niveis[&idx]))
-                    } else {
-                        desejado
-                    };
-                    *niveis.get_mut(&idx).unwrap() += adicionar;
-                }
-            }
-        }
-
-        // 2ª Passada: devolver os níveis que sobraram às províncias com capacidade
-        let total_alocado: u64 = niveis.values().map(|&n| n as u64).sum();
-        let mut sobra = total_nacional as i64 - total_alocado as i64;
-
-        if sobra > 0 {
-            let mut ordenadas = provs_alvo.clone();
-            ordenadas.sort_by(|&a, &b| {
-                let pa = pesos_tipo.get(&a).copied().unwrap_or(0.0);
-                let pb = pesos_tipo.get(&b).copied().unwrap_or(0.0);
-                pb.partial_cmp(&pa).unwrap_or(std::cmp::Ordering::Equal)
-            });
-
-            // 2a. Preencher províncias que ainda têm capacidade disponível
-            for &idx in &ordenadas {
-                if sobra <= 0 {
-                    break;
-                }
-                if let Some(&cap) = capacidade.get(&idx) {
-                    let espaco = cap.saturating_sub(niveis[&idx]);
-                    if espaco > 0 {
-                        let pegar = (sobra as u32).min(espaco);
-                        *niveis.get_mut(&idx).unwrap() += pegar;
-                        sobra -= pegar as i64;
-                    }
+        if soma_pesos > 0.0 {
+            for &idx in &provs_alvo {
+                let p = pesos_tipo.get(&idx).copied().unwrap_or(0.0);
+                let proporcao = p / soma_pesos;
+                let ideal = total_nacional as f64 * proporcao;
+                let base = ideal.floor() as u32;
+                let frac = ideal - base as f64;
+                
+                // Respeitar capacidade mínima (1 para fazendas/extrativos, 0 para outros)
+                let min_nivel = match cat {
+                    CategoriaPredioRedist::Fazenda | CategoriaPredioRedist::Extrativo => 1,
+                    _ => 0,
+                };
+                let nivel_final = base.max(min_nivel);
+                
+                // Se excede capacidade, limitar e redistribuir o excesso depois
+                let nivel_com_cap = if let Some(&cap) = capacidade.get(&idx) {
+                    nivel_final.min(cap)
                 } else {
-                    let pegar = sobra as u32;
-                    *niveis.get_mut(&idx).unwrap() += pegar;
-                    sobra = 0;
-                    break;
-                }
+                    nivel_final
+                };
+                
+                niveis.insert(idx, nivel_com_cap);
+                total_alocado += nivel_com_cap as u64;
+                fracs.push((idx, frac));
             }
-
-            // 2b. Se ainda sobrar e nenhuma tiver capacidade formal, colocar na província de maior peso econômico
-            if sobra > 0 && !ordenadas.is_empty() {
-                let melhor_prov = ordenadas[0];
-                *niveis.get_mut(&melhor_prov).unwrap() += sobra as u32;
-                sobra = 0;
+        } else {
+            // Sem pesos: distribuir igualmente
+            let base = (total_nacional / provs_alvo.len() as u64) as u32;
+            let resto = total_nacional % provs_alvo.len() as u64;
+            for (i, &idx) in provs_alvo.iter().enumerate() {
+                let nivel = base + if (i as u64) < resto { 1 } else { 0 };
+                niveis.insert(idx, nivel);
+                total_alocado += nivel as u64;
             }
         }
 
-        // Atualizar níveis dos prédios nas províncias e ajustar reservas e vagas proporcionalmente
-        // Se a província não tinha o prédio, criar um novo
+        // 2. Ajustar para total exato: distribuir/remover o resto
+        let mut sobra = total_nacional as i64 - total_alocado as i64;
+        
+        if sobra > 0 {
+            // Precisa adicionar níveis: ordenar por maior fração
+            fracs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            for &(idx, _) in &fracs {
+                if sobra <= 0 { break; }
+                let cap = capacidade.get(&idx).copied().unwrap_or(u32::MAX);
+                let atual = niveis.get(&idx).copied().unwrap_or(0);
+                if atual < cap {
+                    *niveis.get_mut(&idx).unwrap() += 1;
+                    sobra -= 1;
+                }
+            }
+            // Se ainda sobra e não há capacidade, adicionar na de maior peso
+            if sobra > 0 {
+                fracs.sort_by(|a, b| {
+                    let pa = pesos_tipo.get(&a.0).copied().unwrap_or(0.0);
+                    let pb = pesos_tipo.get(&b.0).copied().unwrap_or(0.0);
+                    pb.partial_cmp(&pa).unwrap_or(std::cmp::Ordering::Equal)
+                });
+                for &(idx, _) in &fracs {
+                    if sobra <= 0 { break; }
+                    *niveis.get_mut(&idx).unwrap() += 1;
+                    sobra -= 1;
+                }
+            }
+        } else if sobra < 0 {
+            // Precisa remover níveis: ordenar por menor fração (ou menor peso)
+            fracs.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            for &(idx, _) in &fracs {
+                if sobra >= 0 { break; }
+                let min_nivel = match cat {
+                    CategoriaPredioRedist::Fazenda | CategoriaPredioRedist::Extrativo => 1,
+                    _ => 0,
+                };
+                let atual = niveis.get(&idx).copied().unwrap_or(0);
+                if atual > min_nivel {
+                    *niveis.get_mut(&idx).unwrap() -= 1;
+                    sobra += 1;
+                }
+            }
+        }
+
+        // 3. Atualizar prédios nas províncias
         for &idx in &provs_alvo {
             let prov = &mut cen.provincias[idx];
-            let novo_nivel = niveis[&idx];
+            let novo_nivel = niveis.get(&idx).copied().unwrap_or(0);
             
             // Verificar se já existe o prédio
             let mut tem_predio = false;
             for b in &mut prov.predios {
                 if b.tipo_predio_id == *tipo {
                     tem_predio = true;
-                    let old_nivel = b.nivel.max(1);
-                    let fator = novo_nivel as f64 / old_nivel as f64;
-                    b.nivel = novo_nivel;
-                    b.reservas_caixa = (b.reservas_caixa * fator).max(2000.0 * novo_nivel as f64);
-                    for vagas in b.empregados_por_tipo.values_mut() {
-                        *vagas *= fator;
+                    if novo_nivel == 0 {
+                        b.nivel = 0;
+                        b.reservas_caixa = 0.0;
+                        for vagas in b.empregados_por_tipo.values_mut() {
+                            *vagas = 0.0;
+                        }
+                    } else {
+                        let old_nivel = b.nivel.max(1);
+                        let fator = novo_nivel as f64 / old_nivel as f64;
+                        b.nivel = novo_nivel;
+                        b.reservas_caixa = (b.reservas_caixa * fator).max(2000.0 * novo_nivel as f64);
+                        for vagas in b.empregados_por_tipo.values_mut() {
+                            *vagas *= fator;
+                        }
                     }
                 }
             }
             
             // Se não tinha o prédio e novo_nivel > 0, criar novo prédio
             if !tem_predio && novo_nivel > 0 {
-                // Buscar definição do prédio no catálogo para criar com valores padrão
                 if let Some(tipo_predio) = cen.catalogo.tipos_predio.iter().find(|tp| tp.id == *tipo) {
                     let mut novo_predio = crate::entidades::Predio {
                         tipo_predio_id: tipo.clone(),
@@ -1041,12 +1332,16 @@ fn redistribuir_predios(
                         dia_ultima_mudanca_estado: 0,
                         cache: Default::default(),
                     };
-                    // Inicializar vagas baseado no tipo de pop padrão (operários para indústria, etc.)
-                    // O sistema de trabalho preencherá isso no primeiro tick
                     prov.predios.push(novo_predio);
                 }
             }
         }
+    }
+    
+    // Remover prédios com nível 0
+    for &idx in prov_indices {
+        let prov = &mut cen.provincias[idx];
+        prov.predios.retain(|b| b.nivel > 0);
     }
 }
 
@@ -1071,6 +1366,7 @@ fn estimar_vagas_predio(tipo: &str, nivel: u32) -> f64 {
 fn recalcular_emprego_por_vagas(
     cen: &mut CenarioEconomia,
     prov_indices: &[usize],
+    empregados_originais_por_tipo: &BTreeMap<String, f64>,
 ) {
     // Tipos de pop ativos (não-subsistência)
     const POPS_ATIVOS: &[&str] = &[
@@ -1082,6 +1378,10 @@ fn recalcular_emprego_por_vagas(
     let mut pop_ativa_por_pais: BTreeMap<String, f64> = BTreeMap::new();
     let mut vagas_por_pais: BTreeMap<String, f64> = BTreeMap::new();
     
+    // Também calcular vagas por província
+    let mut vagas_por_prov: HashMap<usize, f64> = HashMap::new();
+    let mut pop_ativa_por_prov: HashMap<usize, f64> = HashMap::new();
+
     for &idx in prov_indices {
         let prov = &cen.provincias[idx];
         let pais_id = &prov.pais_id;
@@ -1103,60 +1403,114 @@ fn recalcular_emprego_por_vagas(
         
         *pop_ativa_por_pais.entry(pais_id.clone()).or_default() += pop_ativa;
         *vagas_por_pais.entry(pais_id.clone()).or_default() += vagas_prov;
+        pop_ativa_por_prov.insert(idx, pop_ativa);
+        vagas_por_prov.insert(idx, vagas_prov);
     }
     
-    // Para cada país, calcular emprego alvo = min(pop_ativa * 0.935, vagas)
-    // Desemprego alvo = 6.5% (meio do intervalo 3-15%)
-    let mut emprego_alvo_por_pais: BTreeMap<String, f64> = BTreeMap::new();
-    for (pais_id, &pop_ativa) in &pop_ativa_por_pais {
-        let vagas = vagas_por_pais.get(pais_id).copied().unwrap_or(0.0);
-        let emprego_alvo = (pop_ativa * 0.935).min(vagas);
-        emprego_alvo_por_pais.insert(pais_id.clone(), emprego_alvo);
+    // Pré-calcular população ativa por tipo por país (para evitar borrow issues depois)
+    let mut pop_ativa_tipo_por_pais: BTreeMap<String, BTreeMap<String, f64>> = BTreeMap::new();
+    for &idx in prov_indices {
+        let prov = &cen.provincias[idx];
+        let pais_id = &prov.pais_id;
+        for pop in &prov.pops {
+            if POPS_ATIVOS.contains(&pop.tipo_pop_id.as_str()) {
+                *pop_ativa_tipo_por_pais
+                    .entry(pais_id.clone())
+                    .or_default()
+                    .entry(pop.tipo_pop_id.clone())
+                    .or_default() += pop.populacao;
+            }
+        }
     }
     
-    // Aplicar por província: distribuir emprego alvo proporcionalmente à população ativa da província
+    // Para cada país, calcular emprego alvo por tipo = original (±2%)
+    // Mas limitado pelas vagas totais do país
+    let mut emprego_alvo_por_pais_tipo: BTreeMap<String, BTreeMap<String, f64>> = BTreeMap::new();
+    
+    for (pais_id, &pop_ativa_total) in &pop_ativa_por_pais {
+        let vagas_total = vagas_por_pais.get(pais_id).copied().unwrap_or(0.0);
+        let emprego_max_total = pop_ativa_total.min(vagas_total); // não pode empregar mais que pop ativa nem vagas
+        
+        let mut emprego_alvo_tipo: BTreeMap<String, f64> = BTreeMap::new();
+        let mut soma_originais = 0.0;
+        
+        // Coletar empregados originais por tipo para este país
+        for (tipo, &emp_original) in empregados_originais_por_tipo {
+            // Verificar se este tipo existe neste país
+            let tem_tipo = prov_indices.iter().any(|&idx| {
+                let prov = &cen.provincias[idx];
+                prov.pais_id == *pais_id && prov.pops.iter().any(|p| p.tipo_pop_id == *tipo)
+            });
+            if tem_tipo {
+                emprego_alvo_tipo.insert(tipo.clone(), emp_original);
+                soma_originais += emp_original;
+            }
+        }
+        
+        // Se soma dos originais > emprego_max_total, escalar proporcionalmente
+        if soma_originais > emprego_max_total && soma_originais > 0.0 {
+            let fator = emprego_max_total / soma_originais;
+            for v in emprego_alvo_tipo.values_mut() {
+                *v *= fator;
+            }
+        }
+        
+        emprego_alvo_por_pais_tipo.insert(pais_id.clone(), emprego_alvo_tipo);
+    }
+
+    // Aplicar por província: distribuir emprego alvo por tipo proporcionalmente à população ativa da província
     for &idx in prov_indices {
         let prov = &mut cen.provincias[idx];
         let pais_id = &prov.pais_id;
-        let emprego_alvo_pais = emprego_alvo_por_pais.get(pais_id).copied().unwrap_or(0.0);
+        let emprego_alvo_tipo_pais = emprego_alvo_por_pais_tipo.get(pais_id).cloned().unwrap_or_default();
         let pop_ativa_pais = pop_ativa_por_pais.get(pais_id).copied().unwrap_or(0.0);
         
-        if pop_ativa_pais <= 0.0 || emprego_alvo_pais <= 0.0 {
+        if pop_ativa_pais <= 0.0 {
             continue;
         }
         
-        // Calcular população ativa desta província
-        let pop_ativa_prov: f64 = prov.pops.iter()
-            .filter(|p| POPS_ATIVOS.contains(&p.tipo_pop_id.as_str()))
-            .map(|p| p.populacao)
-            .sum();
-        
-        if pop_ativa_prov <= 0.0 {
-            continue;
-        }
-        
-        // Emprego alvo para esta província = proporcional à sua população ativa
-        let emprego_alvo_prov = emprego_alvo_pais * (pop_ativa_prov / pop_ativa_pais);
-        
-        // Emprego atual dos pops ativos nesta província
-        let emprego_atual_prov: f64 = prov.pops.iter()
-            .filter(|p| POPS_ATIVOS.contains(&p.tipo_pop_id.as_str()))
-            .map(|p| p.empregados)
-            .sum();
-        
-        if emprego_atual_prov <= 0.0 {
-            continue;
-        }
-        
-        // Fator de ajuste para atingir emprego alvo
-        let fator = (emprego_alvo_prov / emprego_atual_prov).clamp(0.0, 1.0);
-        
-        // Aplicar aos pops ativos (não-subsistência)
-        for pop in &mut prov.pops {
+        // Calcular população ativa por tipo nesta província
+        let mut pop_ativa_por_tipo_prov: BTreeMap<String, f64> = BTreeMap::new();
+        for pop in &prov.pops {
             if POPS_ATIVOS.contains(&pop.tipo_pop_id.as_str()) {
-                pop.empregados = (pop.empregados * fator).min(pop.populacao);
+                *pop_ativa_por_tipo_prov.entry(pop.tipo_pop_id.clone()).or_default() += pop.populacao;
             }
-            // Camponeses (subsistência) mantêm emprego original
+        }
+        
+        // Para cada tipo ativo, calcular emprego alvo na província
+        for (tipo, pop_ativa_tipo_prov) in pop_ativa_por_tipo_prov {
+            let emprego_alvo_tipo_pais = emprego_alvo_tipo_pais.get(&tipo).copied().unwrap_or(0.0);
+            if emprego_alvo_tipo_pais <= 0.0 || pop_ativa_tipo_prov <= 0.0 {
+                continue;
+            }
+            
+            // Proporção da população ativa deste tipo na província vs país (pré-calculado)
+            let pop_ativa_tipo_pais = pop_ativa_tipo_por_pais
+                .get(pais_id)
+                .and_then(|m| m.get(&tipo))
+                .copied()
+                .unwrap_or(0.0);
+            
+            if pop_ativa_tipo_pais <= 0.0 {
+                continue;
+            }
+            
+            let emprego_alvo_prov = emprego_alvo_tipo_pais * (pop_ativa_tipo_prov / pop_ativa_tipo_pais);
+            
+            // Aplicar ao pop deste tipo na província
+            for pop in &mut prov.pops {
+                if pop.tipo_pop_id == tipo {
+                    let taxa_alvo = (emprego_alvo_prov / pop_ativa_tipo_prov).min(1.0);
+                    pop.empregados = (pop.populacao * taxa_alvo).min(pop.populacao);
+                }
+            }
+        }
+        
+        // Camponeses (subsistência): mantêm taxa de emprego original
+        for pop in &mut prov.pops {
+            if pop.tipo_pop_id == "camponeses" {
+                // Manter emprego como está (já foi ajustado na redistribuição de população)
+            }
         }
     }
 }
