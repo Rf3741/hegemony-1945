@@ -6,6 +6,9 @@ use crate::entidades::{ConfigSimulacao, Estado, Mercado, Pais, Provincia};
 use crate::tipos::{CategoriaNecessidade, Estrato, NUM_NECESSIDADES};
 use rayon::prelude::*;
 
+/// Máximo de candidatos de substituição por necessidade (baseado nos dados: máx 4 em EnergiaAquecimento).
+const MAX_CANDIDATOS_NECESSIDADE: usize = 16;
+
 /// Trabalho de consumo/tributos de um país (partes disjuntas do estado, seguras para threads).
 struct TarefaPaisConsumo<'a> {
     pais: &'a mut Pais,
@@ -19,11 +22,13 @@ struct TarefaPaisConsumo<'a> {
 }
 
 /// Cesta pré-calculada por `(Pais, CategoriaNecessidade)` para um tick.
+/// Usa array fixo em vez de Vec para evitar alocações no caminho crítico.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct CestaNecessidadeCompilada {
     pub ativa: bool,
     /// Pares `(bem_idx, fatia_despesa)` cuja soma das fatias é `1.0`.
-    pub fatias_despesa: Vec<(usize, f64)>,
+    pub fatias_despesa: [(usize, f64); MAX_CANDIDATOS_NECESSIDADE],
+    pub num_fatias: usize,
     /// Valor real (a preços-base) adquirido por 1 unidade monetária gasta nesta necessidade.
     pub valor_real_por_moeda: f64,
     /// Imposto de consumo gerado por 1 unidade monetária gasta nesta necessidade.
@@ -45,12 +50,10 @@ pub fn calcular_fatias_substituicao(
     ofertas_mercado: &[f64],
     aliquotas_consumo_bem: &[f64],
     elasticidade: f64,
-) -> Vec<(usize, f64)> {
+) -> [(usize, f64); MAX_CANDIDATOS_NECESSIDADE] {
     let candidatos = &catalogo.candidatos_por_necessidade[necessidade.indice()];
-    if candidatos.is_empty() {
-        return Vec::new();
-    }
-    let mut saida = Vec::with_capacity(candidatos.len());
+    let mut saida = [(0, 0.0); MAX_CANDIDATOS_NECESSIDADE];
+    let mut num_fatias = 0;
     preencher_fatias_substituicao(
         catalogo,
         candidatos,
@@ -60,6 +63,7 @@ pub fn calcular_fatias_substituicao(
         None,
         elasticidade,
         &mut saida,
+        &mut num_fatias,
     );
     saida
 }
@@ -72,14 +76,16 @@ fn preencher_fatias_substituicao(
     aliquotas_consumo_bem: &[f64],
     pesos_era_bem: Option<&[f64]>,
     elasticidade: f64,
-    saida: &mut Vec<(usize, f64)>,
+    saida: &mut [(usize, f64); MAX_CANDIDATOS_NECESSIDADE],
+    num_fatias: &mut usize,
 ) {
-    saida.clear();
+    *num_fatias = 0;
     if candidatos.is_empty() {
         return;
     }
     if candidatos.len() == 1 {
-        saida.push((candidatos[0].bem_idx, 1.0));
+        saida[0] = (candidatos[0].bem_idx, 1.0);
+        *num_fatias = 1;
         return;
     }
 
@@ -95,7 +101,7 @@ fn preencher_fatias_substituicao(
 
     let eta = elasticidade.max(0.1);
     let mut soma_util = 0.0;
-    for c in candidatos {
+    for (i, c) in candidatos.iter().enumerate() {
         let g = c.bem_idx;
         let preco_base = catalogo.bens[g].preco_base;
         let preco_merc = precos_mercado
@@ -122,20 +128,21 @@ fn preencher_fatias_substituicao(
             .unwrap_or(1.0)
             .max(0.05);
         let util = c.peso * mult_era * fator_oferta * razao_preco.powf(-eta);
-        saida.push((g, util));
+        saida[i] = (g, util);
         soma_util += util;
     }
+    *num_fatias = candidatos.len();
 
     if soma_util <= 1e-12 {
         let igual = 1.0 / (candidatos.len() as f64);
-        for item in saida.iter_mut() {
-            item.1 = igual;
+        for i in 0..*num_fatias {
+            saida[i].1 = igual;
         }
         return;
     }
 
-    for item in saida.iter_mut() {
-        item.1 /= soma_util;
+    for i in 0..*num_fatias {
+        saida[i].1 /= soma_util;
     }
 
     // Duas passadas de respeito a [fracao_minima, fracao_maxima] com redistribuição proporcional
@@ -179,10 +186,10 @@ fn preencher_fatias_substituicao(
         }
     }
 
-    let soma_final: f64 = saida.iter().map(|x| x.1).sum();
+    let soma_final: f64 = saida[..*num_fatias].iter().map(|x| x.1).sum();
     if soma_final > 1e-12 {
-        for item in saida.iter_mut() {
-            item.1 /= soma_final;
+        for i in 0..*num_fatias {
+            saida[i].1 /= soma_final;
         }
     }
 }
@@ -231,7 +238,7 @@ pub(crate) fn executar_consumo_tributos_e_bem_estar(
                 let cesta = &mut cestas[n_idx];
                 if candidatos.is_empty() {
                     cesta.ativa = false;
-                    cesta.fatias_despesa.clear();
+                    cesta.num_fatias = 0;
                     cesta.valor_real_por_moeda = 0.0;
                     cesta.imposto_por_moeda = 0.0;
                     continue;
@@ -246,11 +253,13 @@ pub(crate) fn executar_consumo_tributos_e_bem_estar(
                     Some(pesos_era_bem),
                     config.elasticidade_substituicao,
                     &mut cesta.fatias_despesa,
+                    &mut cesta.num_fatias,
                 );
 
                 let mut v_real = 0.0;
                 let mut imp_moeda = 0.0;
-                for &(g, s) in &cesta.fatias_despesa {
+                for i in 0..cesta.num_fatias {
+                    let (g, s) = cesta.fatias_despesa[i];
                     let preco_base = catalogo.bens[g].preco_base;
                     let preco_m = mercado.precos_idx[g].max(1e-6);
                     let tau = pais.aliquota_consumo_por_bem[g].max(0.0);
@@ -512,7 +521,8 @@ pub(crate) fn executar_consumo_tributos_e_bem_estar(
             let cesta = &cestas_pais[c_idx][n];
             rec_consumo += gasto_total_n * cesta.imposto_por_moeda * pais.eficiencia_arrecadacao;
 
-            for &(g, s) in &cesta.fatias_despesa {
+            for i in 0..cesta.num_fatias {
+                let (g, s) = cesta.fatias_despesa[i];
                 let preco_m = mercado.precos_idx[g].max(1e-6);
                 let tau = pais.aliquota_consumo_por_bem[g].max(0.0);
                 let qtd = (gasto_total_n * s) / (preco_m * (1.0 + tau));

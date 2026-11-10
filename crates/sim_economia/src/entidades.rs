@@ -132,10 +132,15 @@ pub(crate) struct PredioCompilado {
     pub fator_insumos_ultimo_tick: f64,
     pub margem_lucro_ultimo_tick: f64,
     /// Fator de qualidade do recurso do estado e bônus de insumo local (estáticos por prédio;
-    /// `NAN` = ainda não calculado, preenchido no primeiro tick de produção após compilar o cache).
+    /// `-1.0` = ainda não calculado, preenchido no primeiro tick de produção após compilar o cache).
     pub qualidade_local: f64,
     /// Categoria do prédio (cacheada para evitar lookup no catálogo no loop quente).
     pub categoria: CategoriaPredio,
+    /// Cache de total_vagas (vagas_por_nivel * nivel) para evitar recalcular no loop quente.
+    /// Invalidado quando `nivel` muda.
+    pub total_vagas_cache: f64,
+    /// Nível no qual total_vagas_cache foi calculado.
+    pub total_vagas_cache_nivel: u32,
 }
 
 impl PredioCompilado {
@@ -180,8 +185,10 @@ impl Default for PredioCompilado {
             escala_efetiva_ultimo_tick: 0.0,
             fator_insumos_ultimo_tick: 1.0,
             margem_lucro_ultimo_tick: 0.0,
-            qualidade_local: f64::NAN,
+            qualidade_local: -1.0,
             categoria: CategoriaPredio::RuralAgricola,
+            total_vagas_cache: 0.0,
+            total_vagas_cache_nivel: 0,
         }
     }
 }
@@ -311,12 +318,30 @@ impl Predio {
     /// Capacidade total de vagas do prédio considerando o `nivel` atual.
     #[inline]
     pub fn total_vagas(&self) -> f64 {
+        if self.cache.total_vagas_cache_nivel == self.nivel && self.cache.total_vagas_cache > 0.0 {
+            self.cache.total_vagas_cache
+        } else {
+            let nivel = self.nivel as f64;
+            let total: f64 = self.cache
+                .vagas()
+                .iter()
+                .map(|v| (v.vagas_por_nivel as f64) * nivel)
+                .sum();
+            // Note: can't mutate self here since &self, but caller can update cache
+            total
+        }
+    }
+
+    /// Atualiza o cache de total_vagas (chamado quando nivel muda).
+    #[inline]
+    pub fn atualizar_total_vagas_cache(&mut self) {
         let nivel = self.nivel as f64;
-        self.cache
+        self.cache.total_vagas_cache = self.cache
             .vagas()
             .iter()
             .map(|v| (v.vagas_por_nivel as f64) * nivel)
-            .sum()
+            .sum();
+        self.cache.total_vagas_cache_nivel = self.nivel;
     }
 
     /// Taxa de preenchimento das vagas de trabalho (0.0..=1.0).

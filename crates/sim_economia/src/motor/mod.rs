@@ -79,10 +79,6 @@ struct BuffersTick {
     scratch_tipo_c: Vec<f64>,
     lotes_migrantes: Vec<LoteMigrante>,
     lotes_promocao: Vec<LotePromocao>,
-    /// HashMap reutilizado para índice de pops por província (trabalho)
-    trabalho_pop_idx: std::collections::HashMap<(usize, u16, u16), usize>,
-    /// HashMap reutilizado para agrupar promoções (trabalho)
-    trabalho_promo_map: std::collections::HashMap<(usize, u16, u16), usize>,
 }
 
 /// Instância indexada e determinística do mundo econômico em execução.
@@ -700,8 +696,6 @@ impl MundoEconomico {
             scratch_tipo_c: vec![0.0; num_tipos_pop],
             lotes_migrantes: Vec::with_capacity(16),
             lotes_promocao: Vec::with_capacity(8),
-            trabalho_pop_idx: std::collections::HashMap::new(),
-            trabalho_promo_map: std::collections::HashMap::new(),
         };
 
         let mut blocos_comerciais = cenario.blocos_comerciais;
@@ -981,8 +975,6 @@ impl MundoEconomico {
                 &mut self.buffers.scratch_tipo_b,
                 &mut self.buffers.scratch_tipo_c,
                 &mut self.buffers.lotes_promocao,
-                &mut self.buffers.trabalho_pop_idx,
-                &mut self.buffers.trabalho_promo_map,
             );
         }
 
@@ -1249,8 +1241,6 @@ impl MundoEconomico {
                 &mut self.buffers.scratch_tipo_b,
                 &mut self.buffers.scratch_tipo_c,
                 &mut self.buffers.lotes_promocao,
-                &mut self.buffers.trabalho_pop_idx,
-                &mut self.buffers.trabalho_promo_map,
             );
             t.trabalho_ms = i5.elapsed().as_secs_f64() * 1_000.0;
         }

@@ -187,6 +187,10 @@ pub(crate) fn executar_producao_diaria(
                     b.cache.fator_insumos_ultimo_tick = 1.0;
                     continue;
                 }
+                // Atualizar cache de total_vagas se nível mudou
+                if b.cache.total_vagas_cache_nivel != b.nivel {
+                    b.atualizar_total_vagas_cache();
+                }
                 let fator_retomada = b.fator_retomada();
                 if b.dias_retomada > 0 {
                     b.dias_retomada = b.dias_retomada.saturating_sub(1);
@@ -209,7 +213,7 @@ pub(crate) fn executar_producao_diaria(
                     1.0
                 };
 
-                let vagas_totais = b.total_vagas();
+                let vagas_totais = b.cache.total_vagas_cache;
                 let emp_totais = b.total_empregados();
                 let r_emp = if vagas_totais <= 0.0 {
                     fator_retomada
@@ -226,7 +230,7 @@ pub(crate) fn executar_producao_diaria(
                 }
 
                 let econ_escala = 1.0 + 0.01 * (b.nivel.saturating_sub(1).min(25) as f64);
-                let mult_qualidade = if b.cache.qualidade_local.is_nan() {
+                let mult_qualidade = if b.cache.qualidade_local < 0.0 {
                     let q = estados[e_idx].rendimento_recurso(&catalogo.tipos_predio[tp_idx]);
                     b.cache.qualidade_local = q;
                     q

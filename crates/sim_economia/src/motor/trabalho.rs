@@ -3,7 +3,6 @@
 
 use crate::catalogo::CatalogoEconomia;
 use crate::entidades::{ConfigSimulacao, Estado, Mercado, Pais, Pop, Provincia};
-use std::collections::HashMap;
 
 /// Registro compacto (`Copy`, sem alocações `String`) de promoção de trabalhadores.
 #[derive(Debug, Clone, Copy)]
@@ -15,6 +14,184 @@ pub(crate) struct LotePromocao {
     pub riqueza: f64,
     pub padrao_de_vida: f64,
     pub alfabetizacao: f64,
+}
+
+/// Busca linear para encontrar índice de pop por (tipo, cultura, religiao).
+/// Mais rápido que HashMap para n < 32 (tamanho típico de pops por província).
+#[inline]
+fn encontrar_pop_idx(pops: &[Pop], tipo_idx: usize, cultura_idx: u16, religiao_idx: u16) -> Option<usize> {
+    for (i, pop) in pops.iter().enumerate() {
+        if pop.populacao > 0.0
+            && pop.tipo_idx == tipo_idx
+            && pop.cultura_idx == cultura_idx
+            && pop.religiao_idx == religiao_idx
+        {
+            return Some(i);
+        }
+    }
+    None
+}
+
+/// Busca linear para encontrar índice de lote de promoção por (novo_tipo, cultura, religiao).
+#[inline]
+fn encontrar_promo_idx(promocoes: &[LotePromocao], novo_tipo_idx: usize, cultura_idx: u16, religiao_idx: u16) -> Option<usize> {
+    for (i, lote) in promocoes.iter().enumerate() {
+        if lote.novo_tipo_idx == novo_tipo_idx
+            && lote.cultura_idx == cultura_idx
+            && lote.religiao_idx == religiao_idx
+        {
+            return Some(i);
+        }
+    }
+    None
+}
+
+/// Registra ou mescla um lote de promoção (busca linear, sem HashMap).
+fn registrar_lote_promocao(
+    promocoes: &mut Vec<LotePromocao>,
+    novo_tipo_idx: usize,
+    origem: &Pop,
+    quantidade: f64,
+    riqueza: f64,
+) {
+    let cultura_idx = origem.cultura_idx;
+    let religiao_idx = origem.religiao_idx;
+    if let Some(idx) = encontrar_promo_idx(promocoes, novo_tipo_idx, cultura_idx, religiao_idx) {
+        let l = &mut promocoes[idx];
+        let total = l.quantidade + quantidade;
+        l.padrao_de_vida = (l.padrao_de_vida * l.quantidade + origem.padrao_de_vida * quantidade) / total;
+        l.alfabetizacao = (l.alfabetizacao * l.quantidade + origem.alfabetizacao * quantidade) / total;
+        l.quantidade = total;
+        l.riqueza += riqueza;
+    } else {
+        promocoes.push(LotePromocao {
+            novo_tipo_idx,
+            cultura_idx,
+            religiao_idx,
+            quantidade,
+            riqueza,
+            padrao_de_vida: origem.padrao_de_vida,
+            alfabetizacao: origem.alfabetizacao,
+        });
+    }
+}
+
+/// Aplica um lote de promoção à província (busca linear, sem HashMap).
+fn aplicar_lote_promocao(
+    catalogo: &CatalogoEconomia,
+    nomes_culturas: &[String],
+    nomes_religioes: &[String],
+    prov: &mut Provincia,
+    lote: LotePromocao,
+) {
+    let novo_tipo_idx = lote.novo_tipo_idx;
+    let cultura_idx = lote.cultura_idx;
+    let religiao_idx = lote.religiao_idx;
+
+    if let Some(pop_i) = encontrar_pop_idx(&prov.pops, novo_tipo_idx, cultura_idx, religiao_idx) {
+        let alvo = &mut prov.pops[pop_i];
+        let total = alvo.populacao + lote.quantidade;
+        if total > 0.0 {
+            alvo.padrao_de_vida = (alvo.padrao_de_vida * alvo.populacao + lote.padrao_de_vida * lote.quantidade) / total;
+            alvo.alfabetizacao = (alvo.alfabetizacao * alvo.populacao + lote.alfabetizacao * lote.quantidade) / total;
+        }
+        alvo.populacao = total;
+        alvo.riqueza_reservas += lote.riqueza;
+        return;
+    }
+
+    // Fallback: busca apenas por tipo (para compatibilidade com províncias grandes)
+    if prov.pops.len() >= 24 {
+        for (i, pop) in prov.pops.iter().enumerate() {
+            if pop.tipo_idx == novo_tipo_idx && pop.populacao > 0.0 {
+                let alvo = &mut prov.pops[i];
+                let total = alvo.populacao + lote.quantidade;
+                if total > 0.0 {
+                    alvo.padrao_de_vida = (alvo.padrao_de_vida * alvo.populacao + lote.padrao_de_vida * lote.quantidade) / total;
+                    alvo.alfabetizacao = (alvo.alfabetizacao * alvo.populacao + lote.alfabetizacao * lote.quantidade) / total;
+                }
+                alvo.populacao = total;
+                alvo.riqueza_reservas += lote.riqueza;
+                return;
+            }
+        }
+    }
+
+    // Cria novo pop
+    prov.pops.push(Pop {
+        tipo_pop_id: catalogo.tipos_pop[novo_tipo_idx].id.clone(),
+        cultura: nomes_culturas.get(cultura_idx as usize).cloned().unwrap_or_default(),
+        religiao: nomes_religioes.get(religiao_idx as usize).cloned().unwrap_or_default(),
+        populacao: lote.quantidade,
+        empregados: lote.quantidade,
+        riqueza_reservas: lote.riqueza,
+        padrao_de_vida: lote.padrao_de_vida,
+        alfabetizacao: lote.alfabetizacao,
+        renda_ultimo_tick: 0.0,
+        gasto_consumo_ultimo_tick: 0.0,
+        tipo_idx: novo_tipo_idx,
+        cultura_idx,
+        religiao_idx,
+    });
+}
+
+/// Aplica um lote de democao (promoção para tipo inferior) à província.
+fn aplicar_lote_democao(
+    catalogo: &CatalogoEconomia,
+    nomes_culturas: &[String],
+    nomes_religioes: &[String],
+    prov: &mut Provincia,
+    lote: LotePromocao,
+) {
+    let novo_tipo_idx = lote.novo_tipo_idx;
+    let cultura_idx = lote.cultura_idx;
+    let religiao_idx = lote.religiao_idx;
+
+    if let Some(pop_i) = encontrar_pop_idx(&prov.pops, novo_tipo_idx, cultura_idx, religiao_idx) {
+        let alvo = &mut prov.pops[pop_i];
+        let total = alvo.populacao + lote.quantidade;
+        if total > 0.0 {
+            alvo.padrao_de_vida = (alvo.padrao_de_vida * alvo.populacao + lote.padrao_de_vida * lote.quantidade) / total;
+            alvo.alfabetizacao = (alvo.alfabetizacao * alvo.populacao + lote.alfabetizacao * lote.quantidade) / total;
+        }
+        alvo.populacao = total;
+        alvo.riqueza_reservas += lote.riqueza;
+        return;
+    }
+
+    // Fallback: busca apenas por tipo
+    if prov.pops.len() >= 24 {
+        for (i, pop) in prov.pops.iter().enumerate() {
+            if pop.tipo_idx == novo_tipo_idx && pop.populacao > 0.0 {
+                let alvo = &mut prov.pops[i];
+                let total = alvo.populacao + lote.quantidade;
+                if total > 0.0 {
+                    alvo.padrao_de_vida = (alvo.padrao_de_vida * alvo.populacao + lote.padrao_de_vida * lote.quantidade) / total;
+                    alvo.alfabetizacao = (alvo.alfabetizacao * alvo.populacao + lote.alfabetizacao * lote.quantidade) / total;
+                }
+                alvo.populacao = total;
+                alvo.riqueza_reservas += lote.riqueza;
+                return;
+            }
+        }
+    }
+
+    // Cria novo pop (raro para democao)
+    prov.pops.push(Pop {
+        tipo_pop_id: catalogo.tipos_pop[novo_tipo_idx].id.clone(),
+        cultura: nomes_culturas.get(cultura_idx as usize).cloned().unwrap_or_default(),
+        religiao: nomes_religioes.get(religiao_idx as usize).cloned().unwrap_or_default(),
+        populacao: lote.quantidade,
+        empregados: 0.0,
+        riqueza_reservas: lote.riqueza,
+        padrao_de_vida: lote.padrao_de_vida,
+        alfabetizacao: lote.alfabetizacao,
+        renda_ultimo_tick: 0.0,
+        gasto_consumo_ultimo_tick: 0.0,
+        tipo_idx: novo_tipo_idx,
+        cultura_idx,
+        religiao_idx,
+    });
 }
 
 /// Executa o mercado de trabalho local em todas as províncias.
@@ -33,8 +210,7 @@ pub(crate) fn executar_contratacao_e_demissao(
     emp_alvo_por_tipo: &mut [f64],
     pop_total_por_tipo: &mut [f64],
     promocoes: &mut Vec<LotePromocao>,
-    trabalho_pop_idx: &mut HashMap<(usize, u16, u16), usize>,
-    trabalho_promo_map: &mut HashMap<(usize, u16, u16), usize>,
+    // HashMaps removidos - agora usamos busca linear
 ) {
     let fator_dias = dias_passo.max(1) as f64;
     let taxa_contratacao = (config.taxa_contratacao_diaria * fator_dias).clamp(0.005, 0.35);
@@ -58,14 +234,6 @@ pub(crate) fn executar_contratacao_e_demissao(
         }
 
         promocoes.clear();
-        trabalho_promo_map.clear();
-        trabalho_pop_idx.clear();
-        // Reutiliza o HashMap preenchendo-o (construir_indice_pops inline para evitar alocação)
-        for (i, pop) in prov.pops.iter().enumerate() {
-            if pop.populacao > 0.0 {
-                trabalho_pop_idx.insert((pop.tipo_idx, pop.cultura_idx, pop.religiao_idx), i);
-            }
-        }
         let mut houve_mudanca_emprego = false;
 
         for b in &mut prov.predios {
@@ -171,9 +339,7 @@ pub(crate) fn executar_contratacao_e_demissao(
                                 continue;
                             }
                             let tp_doador = &catalogo.tipos_pop[pop_doador.tipo_idx];
-                            if !(tp_doador.subsistencia
-                                || tp_doador.multiplicador_salario < mult_alvo)
-                            {
+                            if !(tp_doador.subsistencia || tp_doador.multiplicador_salario < mult_alvo) {
                                 continue;
                             }
 
@@ -189,25 +355,15 @@ pub(crate) fn executar_contratacao_e_demissao(
 
                             let fracao = (promovidos / pop_doador.populacao).clamp(0.0, 1.0);
                             let riq_transf = pop_doador.riqueza_reservas * fracao;
-                            pop_doador.populacao =
-                                (pop_doador.populacao - promovidos).max(pop_doador.empregados);
-                            pop_doador.riqueza_reservas =
-                                (pop_doador.riqueza_reservas - riq_transf).max(0.0);
-                            desemp_por_tipo[pop_doador.tipo_idx] =
-                                (disp_tipo_doador - promovidos).max(0.0);
+                            pop_doador.populacao = (pop_doador.populacao - promovidos).max(pop_doador.empregados);
+                            pop_doador.riqueza_reservas = (pop_doador.riqueza_reservas - riq_transf).max(0.0);
+                            desemp_por_tipo[pop_doador.tipo_idx] = (disp_tipo_doador - promovidos).max(0.0);
 
                             slot.empregados += promovidos;
                             restante -= promovidos;
                             houve_mudanca_emprego = true;
 
-                            registrar_lote_promocao(
-                                promocoes,
-                                trabalho_promo_map,
-                                tp_alvo_idx,
-                                pop_doador,
-                                promovidos,
-                                riq_transf,
-                            );
+                            registrar_lote_promocao(promocoes, tp_alvo_idx, pop_doador, promovidos, riq_transf);
                         }
                     }
 
@@ -218,11 +374,9 @@ pub(crate) fn executar_contratacao_e_demissao(
 
                 if !b.cache.financiado_pelo_governo {
                     if faltou_trabalhador && margem > 0.12 {
-                        b.salario_base =
-                            (b.salario_base * (1.0 + 0.004 * fator_dias)).clamp(1.2, 350.0);
+                        b.salario_base = (b.salario_base * (1.0 + 0.004 * fator_dias)).clamp(1.2, 350.0);
                     } else if margem > 0.35 && b.taxa_ocupacao() > 0.95 {
-                        b.salario_base =
-                            (b.salario_base * (1.0 + 0.0015 * fator_dias)).clamp(1.2, 350.0);
+                        b.salario_base = (b.salario_base * (1.0 + 0.0015 * fator_dias)).clamp(1.2, 350.0);
                     }
                 }
             } else if !b.cache.financiado_pelo_governo && !b.subsidiado && b.dias_retomada == 0 && margem < -0.03 {
@@ -245,7 +399,7 @@ pub(crate) fn executar_contratacao_e_demissao(
 
         if !promocoes.is_empty() {
             for &lote in promocoes.iter() {
-                aplicar_lote_promocao(catalogo, nomes_culturas, nomes_religioes, prov, lote, trabalho_pop_idx);
+                aplicar_lote_promocao(catalogo, nomes_culturas, nomes_religioes, prov, lote);
             }
             houve_mudanca_emprego = true;
         }
@@ -256,7 +410,6 @@ pub(crate) fn executar_contratacao_e_demissao(
 
         if let Some(camp_idx) = catalogo.tipo_pop_campones_idx {
             promocoes.clear();
-            trabalho_promo_map.clear();
             let mut demote_houve = false;
             for pop in &mut prov.pops {
                 if pop.populacao <= 50.0 || catalogo.tipos_pop[pop.tipo_idx].subsistencia {
@@ -281,203 +434,18 @@ pub(crate) fn executar_contratacao_e_demissao(
                     let riq_transf = pop.riqueza_reservas * fracao;
                     pop.populacao = (pop.populacao - demotados).max(pop.empregados);
                     pop.riqueza_reservas = (pop.riqueza_reservas - riq_transf).max(0.0);
-                    registrar_lote_promocao(
-                        promocoes,
-                        trabalho_promo_map,
-                        camp_idx,
-                        pop,
-                        demotados,
-                        riq_transf,
-                    );
+                    registrar_lote_promocao(promocoes, camp_idx, pop, demotados, riq_transf);
                     demote_houve = true;
                 }
             }
             if demote_houve && !promocoes.is_empty() {
                 for &lote in promocoes.iter() {
-                    aplicar_lote_democao(catalogo, nomes_culturas, nomes_religioes, prov, lote, trabalho_pop_idx);
+                    aplicar_lote_democao(catalogo, nomes_culturas, nomes_religioes, prov, lote);
                 }
                 reconciliar_empregados_provincia(prov, emp_alvo_por_tipo, pop_total_por_tipo);
             }
         }
     }
-}
-
-fn registrar_lote_promocao(
-    promocoes: &mut Vec<LotePromocao>,
-    promo_map: &mut HashMap<(usize, u16, u16), usize>,
-    novo_tipo_idx: usize,
-    origem: &Pop,
-    quantidade: f64,
-    riqueza: f64,
-) {
-    let key = (novo_tipo_idx, origem.cultura_idx, origem.religiao_idx);
-    if let Some(&idx) = promo_map.get(&key) {
-        let l = &mut promocoes[idx];
-        let total = l.quantidade + quantidade;
-        l.padrao_de_vida =
-            (l.padrao_de_vida * l.quantidade + origem.padrao_de_vida * quantidade) / total;
-        l.alfabetizacao =
-            (l.alfabetizacao * l.quantidade + origem.alfabetizacao * quantidade) / total;
-        l.quantidade = total;
-        l.riqueza += riqueza;
-    } else {
-        let idx = promocoes.len();
-        promocoes.push(LotePromocao {
-            novo_tipo_idx,
-            cultura_idx: origem.cultura_idx,
-            religiao_idx: origem.religiao_idx,
-            quantidade,
-            riqueza,
-            padrao_de_vida: origem.padrao_de_vida,
-            alfabetizacao: origem.alfabetizacao,
-        });
-        promo_map.insert(key, idx);
-    }
-}
-
-fn aplicar_lote_promocao(
-    catalogo: &CatalogoEconomia,
-    nomes_culturas: &[String],
-    nomes_religioes: &[String],
-    prov: &mut Provincia,
-    lote: LotePromocao,
-    pop_idx: &mut HashMap<(usize, u16, u16), usize>,
-) {
-    let key = (lote.novo_tipo_idx, lote.cultura_idx, lote.religiao_idx);
-    if let Some(&pop_i) = pop_idx.get(&key) {
-        let alvo = &mut prov.pops[pop_i];
-        let total = alvo.populacao + lote.quantidade;
-        if total > 0.0 {
-            alvo.padrao_de_vida = (alvo.padrao_de_vida * alvo.populacao
-                + lote.padrao_de_vida * lote.quantidade)
-                / total;
-            alvo.alfabetizacao = (alvo.alfabetizacao * alvo.populacao
-                + lote.alfabetizacao * lote.quantidade)
-                / total;
-        }
-        alvo.populacao = total;
-        alvo.riqueza_reservas += lote.riqueza;
-        return;
-    }
-
-    if prov.pops.len() >= 24 {
-        let key_tipo = (lote.novo_tipo_idx, 0, 0);
-        // Busca por tipo apenas (fallback)
-        for (i, pop) in prov.pops.iter().enumerate() {
-            if pop.tipo_idx == lote.novo_tipo_idx && pop.populacao > 0.0 {
-                let alvo = &mut prov.pops[i];
-                let total = alvo.populacao + lote.quantidade;
-                if total > 0.0 {
-                    alvo.padrao_de_vida = (alvo.padrao_de_vida * alvo.populacao
-                        + lote.padrao_de_vida * lote.quantidade)
-                        / total;
-                    alvo.alfabetizacao = (alvo.alfabetizacao * alvo.populacao
-                        + lote.alfabetizacao * lote.quantidade)
-                        / total;
-                }
-                alvo.populacao = total;
-                alvo.riqueza_reservas += lote.riqueza;
-                return;
-            }
-        }
-    }
-
-    // Cria novo pop
-    let new_idx = prov.pops.len();
-    prov.pops.push(Pop {
-        tipo_pop_id: catalogo.tipos_pop[lote.novo_tipo_idx].id.clone(),
-        cultura: nomes_culturas
-            .get(lote.cultura_idx as usize)
-            .cloned()
-            .unwrap_or_default(),
-        religiao: nomes_religioes
-            .get(lote.religiao_idx as usize)
-            .cloned()
-            .unwrap_or_default(),
-        populacao: lote.quantidade,
-        empregados: lote.quantidade,
-        riqueza_reservas: lote.riqueza,
-        padrao_de_vida: lote.padrao_de_vida,
-        alfabetizacao: lote.alfabetizacao,
-        renda_ultimo_tick: 0.0,
-        gasto_consumo_ultimo_tick: 0.0,
-        tipo_idx: lote.novo_tipo_idx,
-        cultura_idx: lote.cultura_idx,
-        religiao_idx: lote.religiao_idx,
-    });
-    pop_idx.insert(key, new_idx);
-}
-
-fn aplicar_lote_democao(
-    catalogo: &CatalogoEconomia,
-    nomes_culturas: &[String],
-    nomes_religioes: &[String],
-    prov: &mut Provincia,
-    lote: LotePromocao,
-    pop_idx: &mut HashMap<(usize, u16, u16), usize>,
-) {
-    let key = (lote.novo_tipo_idx, lote.cultura_idx, lote.religiao_idx);
-    if let Some(&pop_i) = pop_idx.get(&key) {
-        let alvo = &mut prov.pops[pop_i];
-        let total = alvo.populacao + lote.quantidade;
-        if total > 0.0 {
-            alvo.padrao_de_vida = (alvo.padrao_de_vida * alvo.populacao
-                + lote.padrao_de_vida * lote.quantidade)
-                / total;
-            alvo.alfabetizacao = (alvo.alfabetizacao * alvo.populacao
-                + lote.alfabetizacao * lote.quantidade)
-                / total;
-        }
-        alvo.populacao = total;
-        alvo.riqueza_reservas += lote.riqueza;
-        return;
-    }
-
-    if prov.pops.len() >= 24 {
-        // Busca por tipo apenas (fallback)
-        for (i, pop) in prov.pops.iter().enumerate() {
-            if pop.tipo_idx == lote.novo_tipo_idx && pop.populacao > 0.0 {
-                let alvo = &mut prov.pops[i];
-                let total = alvo.populacao + lote.quantidade;
-                if total > 0.0 {
-                    alvo.padrao_de_vida = (alvo.padrao_de_vida * alvo.populacao
-                        + lote.padrao_de_vida * lote.quantidade)
-                        / total;
-                    alvo.alfabetizacao = (alvo.alfabetizacao * alvo.populacao
-                        + lote.alfabetizacao * lote.quantidade)
-                        / total;
-                }
-                alvo.populacao = total;
-                alvo.riqueza_reservas += lote.riqueza;
-                return;
-            }
-        }
-    }
-
-    // Cria novo pop (should rarely happen for demotion)
-    let new_idx = prov.pops.len();
-    prov.pops.push(Pop {
-        tipo_pop_id: catalogo.tipos_pop[lote.novo_tipo_idx].id.clone(),
-        cultura: nomes_culturas
-            .get(lote.cultura_idx as usize)
-            .cloned()
-            .unwrap_or_default(),
-        religiao: nomes_religioes
-            .get(lote.religiao_idx as usize)
-            .cloned()
-            .unwrap_or_default(),
-        populacao: lote.quantidade,
-        empregados: 0.0,
-        riqueza_reservas: lote.riqueza,
-        padrao_de_vida: lote.padrao_de_vida,
-        alfabetizacao: lote.alfabetizacao,
-        renda_ultimo_tick: 0.0,
-        gasto_consumo_ultimo_tick: 0.0,
-        tipo_idx: lote.novo_tipo_idx,
-        cultura_idx: lote.cultura_idx,
-        religiao_idx: lote.religiao_idx,
-    });
-    pop_idx.insert(key, new_idx);
 }
 
 pub(crate) fn reconciliar_empregados_provincia(

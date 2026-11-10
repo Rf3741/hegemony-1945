@@ -132,8 +132,10 @@ pub(crate) fn compilar_cache_predio(
         escala_efetiva_ultimo_tick: 0.0,
         fator_insumos_ultimo_tick: 1.0,
         margem_lucro_ultimo_tick: 0.0,
-        qualidade_local: f64::NAN,
+        qualidade_local: -1.0,
         categoria: def_tipo.categoria,
+        total_vagas_cache: 0.0,
+        total_vagas_cache_nivel: 0, // 0 força atualização no primeiro tick (nivel >= 1)
     };
 
     Some(())
@@ -798,6 +800,7 @@ fn materializar_nivel_predio(
         .find(|b| b.cache.tipo_idx == tipo_predio_idx)
     {
         existente.nivel += 1;
+        existente.atualizar_total_vagas_cache();
     } else {
         let def = &catalogo.tipos_predio[tipo_predio_idx];
         let mut novo = Predio {
