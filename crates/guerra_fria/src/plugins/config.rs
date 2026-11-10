@@ -189,6 +189,32 @@ impl Default for ConfigGraficos {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ConfigVisualGuerra {
+    pub animacoes_ativas: bool,
+    pub mostrar_linhas_frente: bool,
+    pub mostrar_hachura_ocupacao: bool,
+    pub mostrar_marcadores_batalha: bool,
+    pub mostrar_setas_avanco: bool,
+    pub mostrar_aviso_guerra: bool,
+    pub som_aviso_guerra: bool,
+}
+
+impl Default for ConfigVisualGuerra {
+    fn default() -> Self {
+        Self {
+            animacoes_ativas: true,
+            mostrar_linhas_frente: true,
+            mostrar_hachura_ocupacao: true,
+            mostrar_marcadores_batalha: true,
+            mostrar_setas_avanco: true,
+            mostrar_aviso_guerra: true,
+            som_aviso_guerra: true,
+        }
+    }
+}
+
 #[derive(Resource, Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct ConfigJogo {
@@ -197,6 +223,7 @@ pub struct ConfigJogo {
     pub partida: ConfigPartida,
     pub interface: ConfigInterface,
     pub graficos: ConfigGraficos,
+    pub guerra_visual: ConfigVisualGuerra,
 }
 
 pub fn caminho_config() -> PathBuf {
