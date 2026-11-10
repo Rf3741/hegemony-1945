@@ -2,7 +2,7 @@
 //! crescimento e iluminação noturna. Os dados vêm de [`EntradaVisual`].
 
 use crate::atlas::AtlasVisual;
-use crate::config::VisualMapaConfig;
+use crate::config::{CidadesVisiveis, VisualMapaConfig};
 use crate::entrada::{AnoVisual, BlocoVisual, EntradaVisual};
 use crate::era::{GerenciadorEras, indice_era_para_ano};
 use crate::lod::MarcadorLod;
@@ -163,6 +163,7 @@ pub fn sincronizar_cidades_sistema(
     fonte: Option<Res<crate::cidade_v3::FonteRotulos>>,
     ano: Res<AnoVisual>,
     mut recursos: Local<Option<RecursosCidade>>,
+    cidades_visiveis: Res<CidadesVisiveis>,
 ) {
     let rec = recursos.get_or_insert_with(|| RecursosCidade {
         mesh_predio: meshes.add(Rectangle::new(1.0, 1.0)),
@@ -208,10 +209,11 @@ pub fn sincronizar_cidades_sistema(
         };
         let existe_agora = cidade.existe;
         let mat_lod = if c.eh_capital { rec.mat_capital.clone() } else { rec.mat_cidade.clone() };
+        let visibilidade = if cidades_visiveis.0 && existe_agora { Visibility::Inherited } else { Visibility::Hidden };
         let mut ent = commands.spawn((
             cidade,
             Transform::from_translation(pos.extend(10.0)),
-            if existe_agora { Visibility::Inherited } else { Visibility::Hidden },
+            visibilidade,
         ));
         let id_ent = ent.id();
         ent.with_children(|p| {
@@ -301,7 +303,16 @@ pub fn atualizar_sprites_cidade_sistema(
     eras: Res<GerenciadorEras>,
     cidades: Query<&CidadeVisual>,
     mut sprites: Query<(&ChildOf, &mut Sprite, &mut Transform), With<SpriteCidade>>,
+    cidades_visiveis: Res<CidadesVisiveis>,
 ) {
+    if !cidades_visiveis.0 {
+        for (_, mut sprite, _) in &mut sprites {
+            if sprite.color.alpha() > 0.0 {
+                sprite.color = sprite.color.with_alpha(0.0);
+            }
+        }
+        return;
+    }
     let Some(a) = atlas.carregado.as_ref() else { return };
     let tinta = if eras.modo_noturno { Color::srgb(0.55, 0.6, 0.85) } else { Color::WHITE };
     for (pai, mut sprite, mut tr) in &mut sprites {

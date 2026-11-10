@@ -10,6 +10,7 @@ use gf_mapa::tempo::VelocidadeJogo;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
+use visual_mapa::CidadesVisiveis;
 
 pub const RESOLUCOES: [(u32, u32); 6] = [
     (1280, 720),
@@ -128,6 +129,8 @@ pub struct ConfigInterface {
     /// Multiplicador do tamanho das fontes.
     pub fonte: f32,
     pub tooltips: bool,
+    /// Se a barra de mapas (Diplomacia/Tecnologia/Guerra + seletor de modo) está expandida.
+    pub barra_mapas_expandida: bool,
 }
 
 impl Default for ConfigInterface {
@@ -135,6 +138,7 @@ impl Default for ConfigInterface {
         Self {
             fonte: 1.0,
             tooltips: true,
+            barra_mapas_expandida: true,
         }
     }
 }
@@ -170,6 +174,8 @@ pub struct ConfigGraficos {
     pub sombras: bool,
     pub fumaca: bool,
     pub agua_animada: bool,
+    /// Mostrar pontos e rótulos das cidades no mapa.
+    pub mostrar_cidades: bool,
 }
 
 impl Default for ConfigGraficos {
@@ -185,6 +191,7 @@ impl Default for ConfigGraficos {
             sombras: true,
             fumaca: true,
             agua_animada: true,
+            mostrar_cidades: true,
         }
     }
 }
@@ -299,6 +306,8 @@ impl Plugin for ConfigPlugin {
                     aplicar_audio,
                     aplicar_tooltips,
                     tecla_tela_cheia,
+                    tecla_cidades,
+                    sincronizar_cidades_visiveis,
                     salvar_com_atraso,
                 ),
             )
@@ -362,6 +371,21 @@ fn tecla_tela_cheia(teclas: Res<ButtonInput<KeyCode>>, mut cfg: ResMut<ConfigJog
         } else {
             ModoTela::Janela
         };
+    }
+}
+
+/// Tecla C alterna a visibilidade dos pontos e rótulos das cidades no mapa.
+fn tecla_cidades(teclas: Res<ButtonInput<KeyCode>>, mut cfg: ResMut<ConfigJogo>, mut cidades_vis: ResMut<CidadesVisiveis>) {
+    if teclas.just_pressed(KeyCode::KeyC) && !teclas.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]) {
+        cfg.graficos.mostrar_cidades = !cfg.graficos.mostrar_cidades;
+        cidades_vis.0 = cfg.graficos.mostrar_cidades;
+    }
+}
+
+/// Sincroniza a visibilidade das cidades do ConfigJogo para o recurso do visual_mapa.
+fn sincronizar_cidades_visiveis(cfg: Res<ConfigJogo>, mut cidades_vis: ResMut<CidadesVisiveis>) {
+    if cfg.is_changed() {
+        cidades_vis.0 = cfg.graficos.mostrar_cidades;
     }
 }
 

@@ -97,3 +97,13 @@ impl Default for CamadaConstrucoesVisivel {
         Self(true)
     }
 }
+
+/// Controla se os pontos e rótulos das cidades estão visíveis.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CidadesVisiveis(pub bool);
+
+impl Default for CidadesVisiveis {
+    fn default() -> Self {
+        Self(true)
+    }
+}

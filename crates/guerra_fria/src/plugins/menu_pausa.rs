@@ -423,6 +423,7 @@ fn janela_config(
                     ui.checkbox(&mut c.graficos.sombras, "sombras");
                     ui.checkbox(&mut c.graficos.fumaca, "fumaça");
                     ui.checkbox(&mut c.graficos.agua_animada, "água animada");
+                    ui.checkbox(&mut c.graficos.mostrar_cidades, "pontos e rótulos das cidades");
                 });
                 linha(ui, "Intensidade da noite", |ui| {
                     ui.add(egui::Slider::new(&mut c.video.intensidade_noite, 0.0..=1.0).fixed_decimals(2));

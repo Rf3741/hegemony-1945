@@ -42,7 +42,7 @@ pub use atlas::AtlasVisual;
 pub use cenario::carregar_cenario_1945;
 pub use cidade::{CidadeVisual, IndiceEntidades, RotuloNomeCidade};
 pub use config::{
-    CamadaConstrucoesVisivel, ConfiguracaoObjetos, QualidadeObjetos, VisualMapaConfig,
+    CamadaConstrucoesVisivel, CidadesVisiveis, ConfiguracaoObjetos, QualidadeObjetos, VisualMapaConfig,
 };
 pub use entrada::{
     AnoVisual, BlocoVisual, CidadeDemograficaEntrada, CidadeEntrada, ConexaoEntrada,
@@ -82,6 +82,7 @@ impl Plugin for VisualMapaPlugin {
         app.init_resource::<VisualMapaConfig>()
             .init_resource::<ConfiguracaoObjetos>()
             .init_resource::<CamadaConstrucoesVisivel>()
+            .init_resource::<CidadesVisiveis>()
             .init_resource::<LimitesZoomVisual>()
             .init_resource::<AnoVisual>()
             .init_resource::<EntradaVisual>()

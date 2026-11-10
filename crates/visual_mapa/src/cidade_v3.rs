@@ -6,7 +6,7 @@
 //! do restante. Os detalhes são criados sob demanda (só no zoom próximo e dentro da tela).
 
 use crate::cidade::{CidadeVisual, RotuloNomeCidade};
-use crate::config::{CamadaConstrucoesVisivel, VisualMapaConfig};
+use crate::config::{CidadesVisiveis, CamadaConstrucoesVisivel, VisualMapaConfig};
 use crate::entrada::{AnoVisual, BlocoVisual};
 use crate::era::GerenciadorEras;
 use crate::lod::{DetalheLod, EstadoLod, MarcadorLod, NivelLod};
@@ -470,6 +470,7 @@ pub fn fundacao_nome_sistema(
     mut rotulos: Query<(&ChildOf, &mut Text2d), (With<RotuloNomeCidade>, Without<SombraRotulo>)>,
     mut sombras: Query<(&ChildOf, &mut Text2d), (With<SombraRotulo>, Without<RotuloNomeCidade>)>,
     pais_dos_rotulos: Query<&ChildOf, With<RotuloNomeCidade>>,
+    cidades_visiveis: Res<CidadesVisiveis>,
 ) {
     let total = cidades.iter().count();
     let novas = total != *vistas;
@@ -480,7 +481,7 @@ pub fn fundacao_nome_sistema(
     let mut renomeadas: HashMap<Entity, String> = HashMap::new();
     for (ent, mut c, mut vis) in &mut cidades {
         let existe = existe_no_ano(c.ano_fundacao, ano.0);
-        let alvo = if existe {
+        let alvo = if existe && cidades_visiveis.0 {
             Visibility::Inherited
         } else {
             Visibility::Hidden
@@ -552,7 +553,11 @@ pub fn ajustar_marcadores_sistema(
     cidades: Query<&CidadeVisual>,
     mut marcadores: Query<(&ChildOf, &mut Transform), (With<MarcadorLod>, Without<Camera2d>)>,
     mut ultima_escala: Local<f32>,
+    cidades_visiveis: Res<CidadesVisiveis>,
 ) {
+    if !cidades_visiveis.0 {
+        return;
+    }
     let Some((_, escala)) = escala_da_camera(&camera) else {
         return;
     };
@@ -588,7 +593,16 @@ pub fn layout_rotulos_sistema(
         (Entity, &ChildOf, &mut Visibility, &mut Transform),
         (With<RotuloNomeCidade>, Without<Camera2d>),
     >,
+    cidades_visiveis: Res<CidadesVisiveis>,
 ) {
+    if !cidades_visiveis.0 {
+        for (_, _, mut vis, _) in &mut rotulos {
+            if *vis != Visibility::Hidden {
+                *vis = Visibility::Hidden;
+            }
+        }
+        return;
+    }
     *acumulado += time.delta_secs();
     if *acumulado < 0.15 {
         return;
@@ -879,8 +893,9 @@ pub fn materializar_detalhes_sistema(
     camera: Query<(&Transform, &Projection), With<Camera2d>>,
     janela: Query<&Window, With<PrimaryWindow>>,
     cidades: Query<(Entity, &CidadeVisual, Option<&DetalhesGerados>)>,
+    cidades_visiveis: Res<CidadesVisiveis>,
 ) {
-    if lod.nivel_atual != NivelLod::Local {
+    if lod.nivel_atual != NivelLod::Local || !cidades_visiveis.0 {
         for (ent, _, ger) in &cidades {
             if let Some(g) = ger {
                 commands.entity(g.raiz).despawn();

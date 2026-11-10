@@ -11,6 +11,7 @@ use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use sim_economia::{calcular_com_perfil, precos_por_indice, PerfilPredio, CategoriaPredio, ContextoLucratividade, Estado, EstimativaLucratividade, Provincia, TipoPredio};
 use std::collections::HashMap;
+use visual_mapa::{AtlasVisual, CatalogoMapeamentoPredios};
 
 /// Modo de pintura do mapa.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -109,6 +110,69 @@ const CATEGORIAS: [CategoriaPredio; 7] = [
     CategoriaPredio::Governamental,
     CategoriaPredio::Militar,
 ];
+
+/// Recurso que armazena o ID da textura do atlas registrada no egui.
+#[derive(Resource, Default)]
+pub struct AtlasTextureId(Option<egui::TextureId>);
+
+/// Sistema que registra a textura do atlas no egui (roda no EguiPrimaryContextPass).
+fn registrar_atlas_egui(
+    mut contextos: EguiContexts,
+    atlas: Option<Res<AtlasVisual>>,
+    mut texture_id: ResMut<AtlasTextureId>,
+) {
+    if texture_id.0.is_some() {
+        return; // já registrado
+    }
+    let Some(atlas) = atlas else { return };
+    let Some(carregado) = atlas.carregado.as_ref() else { return };
+    texture_id.0 = Some(contextos.add_image(bevy_egui::EguiTextureHandle::Strong(carregado.imagem.clone())));
+}
+
+/// Tenta obter a `egui::Image` para um tipo de prédio usando o atlas do mapa visual.
+/// Retorna `None` se o atlas não estiver carregado ou o prédio não tiver sprite mapeado.
+fn imagem_predio_ui(
+    texture_id: &AtlasTextureId,
+    atlas: &AtlasVisual,
+    catalogo: &CatalogoMapeamentoPredios,
+    tipo_id: &str,
+    tam: f32,
+) -> Option<egui::Image<'static>> {
+    let Some(tex_id) = texture_id.0 else { return None };
+    let bloco = visual_mapa::entrada::BlocoVisual::Ocidental; // padrão para UI
+    let ano = 1945.0; // era base para UI
+    let sprite_id = catalogo.resolver_sprite(tipo_id, bloco, ano)?;
+    let carregado = atlas.carregado.as_ref()?;
+    let idx = carregado.indice.indice_por_id(sprite_id)?;
+    let r = carregado.indice.retangulos[idx];
+    let w = carregado.indice.largura as f32;
+    let h = carregado.indice.altura as f32;
+    let uv = egui::Rect::from_min_max(
+        egui::pos2(r.min.x as f32 / w, r.min.y as f32 / h),
+        egui::pos2(r.max.x as f32 / w, r.max.y as f32 / h),
+    );
+    let size = egui::vec2(tam, tam);
+    Some(egui::Image::new((tex_id, size)).uv(uv).fit_to_exact_size(size))
+}
+
+/// Desenha a imagem do prédio (se houver atlas) ou o glifo vetorial como fallback.
+fn mostrar_predio_ui(
+    ui: &mut egui::Ui,
+    texture_id: &AtlasTextureId,
+    atlas: Option<&AtlasVisual>,
+    catalogo: Option<&CatalogoMapeamentoPredios>,
+    tipo_id: &str,
+    tam: f32,
+) {
+    if let (Some(atlas), Some(catalogo)) = (atlas, catalogo) {
+        if let Some(img) = imagem_predio_ui(texture_id, atlas, catalogo, tipo_id, tam) {
+            ui.add(img);
+            return;
+        }
+    }
+    // Fallback: glifo vetorial maior
+    ui_refinada::glifo_ui(ui, ui_refinada::chave_para(tipo_id), tam * 1.2, None);
+}
 
 /// Província da economia (do país do jogador) que corresponde ao `adm1_code` do mapa.
 pub fn provincia_por_adm1<'a>(v: &'a VistaEconomia, adm1: &str) -> Option<&'a Provincia> {
@@ -555,7 +619,15 @@ pub fn botoes_gestao_predio_inline(
 }
 
 /// Seção "Construir aqui" do painel de província/estado. `adm1` é o código da província clicada no mapa.
-pub fn secao_construir_aqui(ui: &mut egui::Ui, v: &VistaEconomia, adm1: &str, c: &mut ConstrucaoUi) {
+pub fn secao_construir_aqui(
+    ui: &mut egui::Ui,
+    texture_id: &AtlasTextureId,
+    v: &VistaEconomia,
+    adm1: &str,
+    c: &mut ConstrucaoUi,
+    atlas: Option<&AtlasVisual>,
+    catalogo: Option<&CatalogoMapeamentoPredios>,
+) {
     ui.add_space(6.0);
     ui_refinada::titulo_secao(ui, "Construir aqui");
     if v.catalogo.is_none() {
@@ -610,7 +682,7 @@ pub fn secao_construir_aqui(ui: &mut egui::Ui, v: &VistaEconomia, adm1: &str, c:
                 .is_some_and(|t| t.financiado_pelo_governo);
             ui_refinada::moldura_cartao().show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&b.tipo_predio_id), 14.0, None);
+                    mostrar_predio_ui(ui, texture_id, atlas, catalogo, &b.tipo_predio_id, 32.0);
                     ui.label(egui::RichText::new(format!("{nome_b} (Nv. {})", b.nivel)).strong());
                     if b.fechado {
                         ui.colored_label(
@@ -692,7 +764,7 @@ pub fn secao_construir_aqui(ui: &mut egui::Ui, v: &VistaEconomia, adm1: &str, c:
                 ))
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&o.tipo_id), 16.0, None);
+                        mostrar_predio_ui(ui, texture_id, atlas, catalogo, &o.tipo_id, 40.0);
                         ui.label(
                             egui::RichText::new(&o.nome)
                                 .family(ui_refinada::familia_oswald(ui.ctx()))
@@ -744,7 +816,14 @@ pub fn secao_construir_aqui(ui: &mut egui::Ui, v: &VistaEconomia, adm1: &str, c:
     });
 }
 
-fn tela_construcao(mut contextos: EguiContexts, mut c: ResMut<ConstrucaoUi>, eco: Option<Res<EconomiaSim>>) -> Result {
+fn tela_construcao(
+    mut contextos: EguiContexts,
+    mut c: ResMut<ConstrucaoUi>,
+    eco: Option<Res<EconomiaSim>>,
+    atlas: Option<Res<AtlasVisual>>,
+    catalogo: Option<Res<CatalogoMapeamentoPredios>>,
+    texture_id: Res<AtlasTextureId>,
+) -> Result {
     if !c.aberta {
         return Ok(());
     }
@@ -756,14 +835,21 @@ fn tela_construcao(mut contextos: EguiContexts, mut c: ResMut<ConstrucaoUi>, eco
         .default_size([980.0, 660.0])
         .show(ctx, |ui| {
             ui_refinada::faixa_titulo(ui, "Construção e Edificação", Some("B"), Some(&mut aberta));
-            corpo_tela_construcao(ui, &eco.vista, &mut c);
+            corpo_tela_construcao(ui, &texture_id, &eco.vista, &mut c, atlas.as_deref(), catalogo.as_deref());
         });
     c.aberta = aberta;
     Ok(())
 }
 
 /// Conteúdo da tela de construção (separado para testes).
-pub fn corpo_tela_construcao(ui: &mut egui::Ui, v: &VistaEconomia, c: &mut ConstrucaoUi) {
+pub fn corpo_tela_construcao(
+    ui: &mut egui::Ui,
+    texture_id: &AtlasTextureId,
+    v: &VistaEconomia,
+    c: &mut ConstrucaoUi,
+    atlas: Option<&AtlasVisual>,
+    catalogo: Option<&CatalogoMapeamentoPredios>,
+) {
     let (Some(cat), Some(pais)) = (v.catalogo.as_ref(), v.pais.as_ref()) else {
         ui.label("A economia ainda está calculando...");
         return;
@@ -812,7 +898,7 @@ pub fn corpo_tela_construcao(ui: &mut egui::Ui, v: &VistaEconomia, c: &mut Const
                     continue;
                 }
                 ui.horizontal(|ui| {
-                    ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&t.id), 14.0, None);
+                    mostrar_predio_ui(ui, texture_id, atlas, catalogo, &t.id, 28.0);
                     if ui.selectable_label(c.tipo_idx == i, &t.nome).clicked() {
                         c.tipo_idx = i;
                     }
@@ -827,7 +913,7 @@ pub fn corpo_tela_construcao(ui: &mut egui::Ui, v: &VistaEconomia, c: &mut Const
         ui.add_space(6.0);
         ui_refinada::moldura_cartao().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&t.id), 18.0, None);
+                mostrar_predio_ui(ui, texture_id, atlas, catalogo, &t.id, 40.0);
                 ui.label(
                     egui::RichText::new(&t.nome)
                         .family(ui_refinada::familia_oswald(ui.ctx()))
@@ -1035,6 +1121,7 @@ pub struct ConstrucaoUiPlugin;
 impl Plugin for ConstrucaoUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ConstrucaoUi>()
+            .init_resource::<AtlasTextureId>()
             .add_systems(
                 Update,
                 (tecla_b, aplicar_pedidos.run_if(resource_exists::<EconomiaSim>), sincronizar_estado_clicado.run_if(resource_exists::<EconomiaSim>), repintar_mapa.run_if(resource_exists::<EconomiaSim>))
@@ -1042,7 +1129,7 @@ impl Plugin for ConstrucaoUiPlugin {
             )
             .add_systems(
                 EguiPrimaryContextPass,
-                (tela_construcao, janela_tutorial).run_if(crate::estado::em_partida),
+                (registrar_atlas_egui, tela_construcao, janela_tutorial).run_if(crate::estado::em_partida),
             );
     }
 }
@@ -1111,10 +1198,11 @@ mod testes {
             let ctx = egui::Context::default();
             let mut c = ConstrucaoUi::default();
             let v = app.world().resource::<EconomiaSim>().vista.clone();
+            let texture_id = AtlasTextureId::default();
             let mut saida = ctx.run_ui(egui::RawInput::default(), |ctx| {
                 egui::CentralPanel::default().show(ctx, |ui| {
-                    secao_construir_aqui(ui, &v, &adm1, &mut c);
-                    corpo_tela_construcao(ui, &v, &mut c);
+                    secao_construir_aqui(ui, &texture_id, &v, &adm1, &mut c, None, None);
+                    corpo_tela_construcao(ui, &texture_id, &v, &mut c, None, None);
                 });
             });
             saida.textures_delta.clear();

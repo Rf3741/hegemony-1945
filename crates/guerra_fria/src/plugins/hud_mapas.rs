@@ -325,6 +325,7 @@ pub fn barra_extra(
     mut guerra: Option<ResMut<super::guerra_sim::PainelGuerra>>,
     jogador: Option<Res<PaisJogador>>,
     relogio: Res<RecursoRelogio>,
+    mut cfg: Option<ResMut<super::config::ConfigJogo>>,
 ) -> Result {
     let ctx = contextos.ctx_mut()?.clone();
     let mut raiz = ui_raiz(&ctx);
@@ -348,10 +349,20 @@ pub fn barra_extra(
     }
     let alertas = calcular_alertas(&alertas_in);
     let _ = (&jogador, &relogio);
+    let expandida = cfg.as_ref().map_or(true, |c| c.interface.barra_mapas_expandida);
     let _resp = egui::Panel::top("barra_modulos")
         .frame(egui::Frame::NONE.fill(ui_refinada::menu::PAPEL).stroke(egui::Stroke::new(1.0, ui_refinada::menu::VERMELHO)).inner_margin(4.0))
         .show(&mut raiz, |ui| {
             ui.horizontal_wrapped(|ui| {
+                let icone = if expandida { "▾" } else { "▸" };
+                if ui.small_button(icone).on_hover_text(if expandida { "Minimizar barra de mapas" } else { "Expandir barra de mapas" }).clicked() {
+                    if let Some(mut c) = cfg.as_mut() {
+                        c.interface.barra_mapas_expandida = !expandida;
+                    }
+                }
+                if !expandida {
+                    return;
+                }
                 if let Some(d) = diplo.as_mut() {
                     let r = ui.selectable_label(d.aberto, "Diplomacia (4)");
                     super::tutorial_guiado::marcar(&r, "btn_diplo");

@@ -1,6 +1,6 @@
 //! Interface egui: barra superior (data e controles de tempo) e painel de província.
 use super::comercio_ui::PainelComercio;
-use super::construcao_ui::{ConstrucaoUi, secao_construir_aqui};
+use super::construcao_ui::{AtlasTextureId, ConstrucaoUi, secao_construir_aqui};
 use super::economia_sim::EconomiaSim;
 use super::economy::RecursoMundo;
 use super::enciclopedia::dica;
@@ -11,6 +11,7 @@ use super::time::RecursoRelogio;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use gf_mapa::tempo::VelocidadeJogo;
+use visual_mapa::{AtlasVisual, CatalogoMapeamentoPredios};
 
 /// Estado por quadro do retângulo livre da janela principal: `(quadro, rect_atual)`.
 type EstadoLayoutRaiz = (u64, egui::Rect);
@@ -233,6 +234,9 @@ pub(crate) fn painel_provincia(
     mundo: Res<RecursoMundo>,
     eco: Option<Res<EconomiaSim>>,
     mut constr: ResMut<ConstrucaoUi>,
+    atlas: Option<Res<AtlasVisual>>,
+    catalogo_mapa: Option<Res<CatalogoMapeamentoPredios>>,
+    texture_id: Res<AtlasTextureId>,
 ) -> Result {
     if selecionada.0 == 0 {
         return Ok(());
@@ -268,7 +272,7 @@ pub(crate) fn painel_provincia(
             if let Some(eco) = &eco {
                 egui::ScrollArea::vertical()
                     .id_salt("scroll_painel_prov")
-                    .show(ui, |ui| secao_construir_aqui(ui, &eco.vista, &prov.adm1_code, &mut constr));
+                    .show(ui, |ui| secao_construir_aqui(ui, &texture_id, &eco.vista, &prov.adm1_code, &mut constr, atlas.as_deref(), catalogo_mapa.as_deref()));
             }
         });
     super::tutorial_guiado::alvo(&ctx, "painel_provincia", resp.response.rect);
