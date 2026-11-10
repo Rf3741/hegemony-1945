@@ -2,7 +2,7 @@
 //! `Pop`, `Predio`, `Provincia`, `Estado`, `Pais`, `Mercado`, `RotaComercial` e `ConfigSimulacao`.
 
 use crate::catalogo::{CatalogoEconomia, TipoPredio};
-use crate::tipos::{FormulaPreco, ModoCadencia, RegimePropriedade};
+use crate::tipos::{CategoriaPredio, FormulaPreco, ModoCadencia, RegimePropriedade};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -134,6 +134,8 @@ pub(crate) struct PredioCompilado {
     /// Fator de qualidade do recurso do estado e bônus de insumo local (estáticos por prédio;
     /// `NAN` = ainda não calculado, preenchido no primeiro tick de produção após compilar o cache).
     pub qualidade_local: f64,
+    /// Categoria do prédio (cacheada para evitar lookup no catálogo no loop quente).
+    pub categoria: CategoriaPredio,
 }
 
 impl PredioCompilado {
@@ -179,6 +181,7 @@ impl Default for PredioCompilado {
             fator_insumos_ultimo_tick: 1.0,
             margem_lucro_ultimo_tick: 0.0,
             qualidade_local: f64::NAN,
+            categoria: CategoriaPredio::RuralAgricola,
         }
     }
 }

@@ -191,29 +191,15 @@ pub(crate) fn executar_producao_diaria(
                 if b.dias_retomada > 0 {
                     b.dias_retomada = b.dias_retomada.saturating_sub(1);
                 }
-                let vagas_totais = b.total_vagas();
-                let vagas_ativas = vagas_totais * fator_retomada;
-                let emp_totais = b.total_empregados();
-                if vagas_ativas > emp_totais {
-                    vagas_abertas_prov += vagas_ativas - emp_totais;
-                }
-                let r_emp = if vagas_totais <= 0.0 {
-                    fator_retomada
-                } else {
-                    (emp_totais / vagas_totais).clamp(0.0, fator_retomada)
-                };
-                if r_emp <= 1e-7 {
-                    b.cache.escala_efetiva_ultimo_tick = 0.0;
-                    continue;
-                }
-
                 let nivel_f = b.nivel as f64;
-                let escala_inst = nivel_f * r_emp;
                 let tp_idx = b.cache.tipo_idx;
-                let categoria = catalogo.tipos_predio[tp_idx].categoria;
+                let categoria = b.cache.categoria;
 
                 let mut fator_insumos = 1.0_f64;
-                for &(g_in, _) in b.cache.insumos() {
+                let num_insumos = b.cache.num_insumos as usize;
+                let num_produtos = b.cache.num_produtos as usize;
+                for i in 0..num_insumos {
+                    let (g_in, _) = b.cache.insumos_arr[i];
                     fator_insumos = fator_insumos.min(sup_mercado[g_in as usize]);
                 }
 
@@ -223,10 +209,27 @@ pub(crate) fn executar_producao_diaria(
                     1.0
                 };
 
+                let vagas_totais = b.total_vagas();
+                let emp_totais = b.total_empregados();
+                let r_emp = if vagas_totais <= 0.0 {
+                    fator_retomada
+                } else {
+                    (emp_totais / vagas_totais).clamp(0.0, fator_retomada)
+                };
+                if r_emp <= 1e-7 {
+                    b.cache.escala_efetiva_ultimo_tick = 0.0;
+                    continue;
+                }
+                let vagas_ativas = vagas_totais * fator_retomada;
+                if vagas_ativas > emp_totais {
+                    vagas_abertas_prov += vagas_ativas - emp_totais;
+                }
+
                 let econ_escala = 1.0 + 0.01 * (b.nivel.saturating_sub(1).min(25) as f64);
                 let mult_qualidade = if b.cache.qualidade_local.is_nan() {
-                    b.cache.qualidade_local = estados[e_idx].rendimento_recurso(&catalogo.tipos_predio[tp_idx]);
-                    b.cache.qualidade_local
+                    let q = estados[e_idx].rendimento_recurso(&catalogo.tipos_predio[tp_idx]);
+                    b.cache.qualidade_local = q;
+                    q
                 } else {
                     b.cache.qualidade_local
                 };
@@ -236,12 +239,14 @@ pub(crate) fn executar_producao_diaria(
                 } else {
                     1.0
                 };
+                let escala_inst = nivel_f * r_emp;
                 let escala = escala_inst * econ_escala * acesso * fator_insumos * mult_setor * mult_qualidade * mult_fabrica;
 
                 b.cache.escala_efetiva_ultimo_tick = escala;
                 b.cache.fator_insumos_ultimo_tick = fator_insumos;
 
-                for &(g_in, qtd) in b.cache.insumos() {
+                for i in 0..num_insumos {
+                    let (g_in, qtd) = b.cache.insumos_arr[i];
                     t.demanda[offset_mercado + (g_in as usize)] += escala * qtd;
                 }
                 let escala_prod = if b.cache.financiado_pelo_governo {
@@ -251,7 +256,8 @@ pub(crate) fn executar_producao_diaria(
                 } else {
                     escala * tfp
                 };
-                for &(g_out, qtd) in b.cache.produtos() {
+                for i in 0..num_produtos {
+                    let (g_out, qtd) = b.cache.produtos_arr[i];
                     t.oferta[offset_mercado + (g_out as usize)] += escala_prod * qtd;
                 }
 

@@ -133,6 +133,7 @@ pub(crate) fn compilar_cache_predio(
         fator_insumos_ultimo_tick: 1.0,
         margem_lucro_ultimo_tick: 0.0,
         qualidade_local: f64::NAN,
+        categoria: def_tipo.categoria,
     };
 
     Some(())
