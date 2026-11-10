@@ -16,8 +16,6 @@ struct TarefaMercadoProducao<'a> {
     demanda: &'a mut [f64],
     /// (índice do país, país, pop. incorporada, pontos de construção)
     paises: Vec<(usize, &'a mut Pais, &'a mut f64, &'a mut f64)>,
-    /// Mapa país_idx -> índice no vetor paises (para lookup O(1))
-    pais_idx_map: Vec<usize>,
 }
 
 /// Executa a produção física de todos os prédios e fazendas de subsistência em passagem única,
@@ -104,6 +102,9 @@ pub(crate) fn executar_producao_diaria(
     // 2. Passagem sobre as províncias, paralela por MERCADO.
     let num_alimentos = bens_alimento_basico.len();
     let num_paises = paises.len();
+    let num_mercados = mercados.len();
+
+    // Cria tarefas para cada mercado (reutiliza capacidade dos Vecs para evitar reallocations)
     let mut tarefas: Vec<TarefaMercadoProducao> = proxima_oferta
         .chunks_mut(num_bens)
         .zip(proxima_demanda.chunks_mut(num_bens))
@@ -112,9 +113,15 @@ pub(crate) fn executar_producao_diaria(
             oferta,
             demanda,
             paises: Vec::new(),
-            pais_idx_map: vec![usize::MAX; num_paises],
         })
         .collect();
+
+    // Reserva capacidade baseada no número de províncias/países por mercado (estimativa)
+    for t in &mut tarefas {
+        t.provs.reserve(provincias.len() / num_mercados.max(1) + 1);
+        t.paises.reserve(paises.len() / num_mercados.max(1) + 1);
+    }
+
     for (c_idx, ((pais, pop_inc), pontos)) in paises
         .iter_mut()
         .zip(pop_incorporada_pais.iter_mut())
@@ -124,7 +131,6 @@ pub(crate) fn executar_producao_diaria(
         let m_idx = pais.mercado_idx;
         let pos = tarefas[m_idx].paises.len();
         tarefas[m_idx].paises.push((c_idx, pais, pop_inc, pontos));
-        tarefas[m_idx].pais_idx_map[c_idx] = pos;
     }
     for prov in provincias.iter_mut() {
         tarefas[prov.mercado_idx].provs.push(prov);
@@ -135,15 +141,15 @@ pub(crate) fn executar_producao_diaria(
         for prov in provs {
             let m_idx = prov.mercado_idx;
             let c_idx = prov.pais_idx;
-            let ci = t.pais_idx_map[c_idx];
-            debug_assert!(ci != usize::MAX, "país do mercado não encontrado");
+            let pos = t.paises.iter().position(|(idx, _, _, _)| *idx == c_idx).unwrap();
+            let (_, pais_ref, pop_inc_ref, pontos_ref) = &mut t.paises[pos];
             let e_idx = prov.estado_idx;
             let acesso = estados[e_idx].acesso_mercado;
             let est_inc = estados[e_idx].incorporado;
             let offset_mercado = 0usize;
 
             let mut pop_prov = 0.0;
-            let mut camponeses_ativos = 0.0;
+            let mut camponeses_ativos = 0.0f64;
             for pop in &prov.pops {
                 pop_prov += pop.populacao;
                 if catalogo.tipos_pop[pop.tipo_idx].subsistencia {
@@ -151,14 +157,14 @@ pub(crate) fn executar_producao_diaria(
                 }
             }
             if est_inc {
-                *t.paises[ci].2 += pop_prov;
+                **pop_inc_ref += pop_prov;
             }
 
             // 2a. Produção excedente das terras de subsistência
             if num_alimentos > 0 && camponeses_ativos > 0.0 && prov.terra_aravel_livre() > 0 {
                 let cap_camponeses = (prov.terra_aravel_livre() as f64) * 5_000.0;
                 let efetivos = camponeses_ativos.min(cap_camponeses);
-                let excedente_total = (efetivos / 1_000.0) * 0.30 * acesso * t.paises[ci].1.produtividade;
+                let excedente_total = (efetivos / 1_000.0) * 0.30 * acesso * pais_ref.produtividade;
                 let por_bem = excedente_total / (num_alimentos as f64);
                 for &g_idx in bens_alimento_basico {
                     t.oferta[offset_mercado + g_idx] += por_bem;
@@ -166,9 +172,9 @@ pub(crate) fn executar_producao_diaria(
             }
 
             // 2b. Prédios formais
-            let util_construcao = t.paises[ci].1.utilizacao_construcao_ultimo_tick;
+            let util_construcao = pais_ref.utilizacao_construcao_ultimo_tick;
             let sup_mercado = &mercados[m_idx].fator_suprimento_idx;
-            let tfp = t.paises[ci].1.produtividade;
+            let tfp = pais_ref.produtividade;
             let mut vagas_abertas_prov = 0.0;
 
             for b in &mut prov.predios {
@@ -247,14 +253,13 @@ pub(crate) fn executar_producao_diaria(
 
                 let escala_cap = escala_inst * fator_insumos;
                 if b.cache.pontos_construcao_por_nivel > 0.0 {
-                    *t.paises[ci].3 +=
-                        escala_cap * b.cache.pontos_construcao_por_nivel * mult_setor;
+                    **pontos_ref += escala_cap * b.cache.pontos_construcao_por_nivel * mult_setor;
                 }
                 if b.cache.burocracia_por_nivel > 0.0 {
-                    t.paises[ci].1.burocracia_produzida += escala_cap * b.cache.burocracia_por_nivel;
+                    pais_ref.burocracia_produzida += escala_cap * b.cache.burocracia_por_nivel;
                 }
                 if b.cache.forca_militar_por_nivel > 0.0 {
-                    t.paises[ci].1.forca_militar_total += escala_cap * b.cache.forca_militar_por_nivel;
+                    pais_ref.forca_militar_total += escala_cap * b.cache.forca_militar_por_nivel;
                 }
             }
             prov.vagas_abertas_cache = vagas_abertas_prov;
