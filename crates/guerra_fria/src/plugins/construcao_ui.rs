@@ -601,73 +601,68 @@ pub fn secao_construir_aqui(ui: &mut egui::Ui, v: &VistaEconomia, adm1: &str, c:
     {
         ui.add_space(4.0);
         ui_refinada::titulo_secao(ui, "Prédios instalados nesta província");
-        egui::ScrollArea::vertical()
-            .id_salt("scroll_instalados_prov")
-            .max_height(190.0)
-            .show(ui, |ui| {
-                for b in prov.predios.iter().filter(|b| b.nivel > 0) {
-                    let nome_b = cat
-                        .obter_tipo_predio(&b.tipo_predio_id)
-                        .map_or(b.tipo_predio_id.as_str(), |t| t.nome.as_str());
-                    let eh_gov = cat
-                        .obter_tipo_predio(&b.tipo_predio_id)
-                        .is_some_and(|t| t.financiado_pelo_governo);
-                    ui_refinada::moldura_cartao().show(ui, |ui| {
-                        ui.horizontal_wrapped(|ui| {
-                            ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&b.tipo_predio_id), 14.0, None);
-                            ui.label(egui::RichText::new(format!("{nome_b} (Nv. {})", b.nivel)).strong());
-                            if b.fechado {
-                                ui.colored_label(
-                                    ui_refinada::menu::PERIGO,
-                                    format!("FECHADO ({}d)", b.dias_fechado),
-                                );
-                            } else if b.esta_em_retomada() {
-                                ui.colored_label(
-                                    ui_refinada::menu::AVISO,
-                                    format!(
-                                        "Retomando ({}d · {:.0}%)",
-                                        b.dias_retomada,
-                                        b.fator_retomada() * 100.0
-                                    ),
-                                );
-                            } else {
-                                ui.weak(format!(
-                                    "{:.0}/{:.0} trab.",
-                                    b.total_empregados(),
-                                    b.total_vagas()
-                                ));
-                            }
-                            if eh_gov {
-                                ui.colored_label(
-                                    ui_refinada::menu::INFO,
-                                    format!("Custo {}/d", fmt_din(b.folha_salarial_ultimo_tick + b.custo_insumos_ultimo_tick)),
-                                );
-                            } else {
-                                ui.colored_label(
-                                    cor_lucro(b.lucro_ultimo_tick),
-                                    format!("{}/d", fmt_din(b.lucro_ultimo_tick)),
-                                );
-                                if b.dias_prejuizo > 0 && !b.fechado {
-                                    ui.colored_label(
-                                        ui_refinada::menu::PERIGO,
-                                        format!("({}d prejuízo)", b.dias_prejuizo),
-                                    );
-                                }
-                            }
-                        });
-                        ui.horizontal_wrapped(|ui| {
-                            botoes_gestao_predio_inline(
-                                ui,
-                                v,
-                                &prov.id,
-                                b,
-                                &mut c.confirmar_demolicao,
-                                &mut c.acoes_predios,
+        for b in prov.predios.iter().filter(|b| b.nivel > 0) {
+            let nome_b = cat
+                .obter_tipo_predio(&b.tipo_predio_id)
+                .map_or(b.tipo_predio_id.as_str(), |t| t.nome.as_str());
+            let eh_gov = cat
+                .obter_tipo_predio(&b.tipo_predio_id)
+                .is_some_and(|t| t.financiado_pelo_governo);
+            ui_refinada::moldura_cartao().show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui_refinada::glifo_ui(ui, ui_refinada::chave_para(&b.tipo_predio_id), 14.0, None);
+                    ui.label(egui::RichText::new(format!("{nome_b} (Nv. {})", b.nivel)).strong());
+                    if b.fechado {
+                        ui.colored_label(
+                            ui_refinada::menu::PERIGO,
+                            format!("FECHADO ({}d)", b.dias_fechado),
+                        );
+                    } else if b.esta_em_retomada() {
+                        ui.colored_label(
+                            ui_refinada::menu::AVISO,
+                            format!(
+                                "Retomando ({}d · {:.0}%)",
+                                b.dias_retomada,
+                                b.fator_retomada() * 100.0
+                            ),
+                        );
+                    } else {
+                        ui.weak(format!(
+                            "{:.0}/{:.0} trab.",
+                            b.total_empregados(),
+                            b.total_vagas()
+                        ));
+                    }
+                    if eh_gov {
+                        ui.colored_label(
+                            ui_refinada::menu::INFO,
+                            format!("Custo {}/d", fmt_din(b.folha_salarial_ultimo_tick + b.custo_insumos_ultimo_tick)),
+                        );
+                    } else {
+                        ui.colored_label(
+                            cor_lucro(b.lucro_ultimo_tick),
+                            format!("{}/d", fmt_din(b.lucro_ultimo_tick)),
+                        );
+                        if b.dias_prejuizo > 0 && !b.fechado {
+                            ui.colored_label(
+                                ui_refinada::menu::PERIGO,
+                                format!("({}d prejuízo)", b.dias_prejuizo),
                             );
-                        });
-                    });
-                }
+                        }
+                    }
+                });
+                ui.horizontal_wrapped(|ui| {
+                    botoes_gestao_predio_inline(
+                        ui,
+                        v,
+                        &prov.id,
+                        b,
+                        &mut c.confirmar_demolicao,
+                        &mut c.acoes_predios,
+                    );
+                });
             });
+        }
         ui.add_space(4.0);
     }
     ui.horizontal_wrapped(|ui| {
