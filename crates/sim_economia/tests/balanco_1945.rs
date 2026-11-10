@@ -347,3 +347,91 @@ fn redistribuicao_totais_nacionais_preservados() {
         eprintln!("{pais_id}: total níveis = {total_niveis}");
     }
 }
+
+#[test]
+#[ignore = "diagnóstico manual"]
+fn checar_totais_originais() {
+    use std::process::Command;
+    use std::path::Path;
+    
+    // Carregar arquivo original via git show
+    let output = Command::new("git")
+        .args(["show", "c8a2db35:assets/data/economia/provincias.ron"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("Failed to run git show");
+    
+    let content = String::from_utf8(output.stdout).expect("Invalid UTF-8");
+    std::fs::write("/tmp/provincias_orig.ron", &content).expect("write");
+    
+    for file in ["bens.ron", "tipos_pop.ron", "tipos_predio.ron", "metodos_producao.ron", "tecnologias.ron", "estados.ron", "paises.ron", "cenario.ron"] {
+        let out = Command::new("git")
+            .args(["show", &format!("c8a2db35:assets/data/economia/{}", file)])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .expect("Failed");
+        std::fs::write(format!("/tmp/{}", file), out.stdout).expect("write");
+    }
+    
+    let dir = Path::new("/tmp");
+    let mut cen = CenarioEconomia::carregar_diretorio(dir).unwrap();
+    
+    let mut country_pops: std::collections::BTreeMap<String, std::collections::BTreeMap<String, f64>> = std::collections::BTreeMap::new();
+    let mut country_employed: std::collections::BTreeMap<String, std::collections::BTreeMap<String, f64>> = std::collections::BTreeMap::new();
+    let mut country_buildings: std::collections::BTreeMap<String, std::collections::BTreeMap<String, u64>> = std::collections::BTreeMap::new();
+    
+    for prov in &cen.provincias {
+        let pops = country_pops.entry(prov.pais_id.clone()).or_default();
+        let emp = country_employed.entry(prov.pais_id.clone()).or_default();
+        let bld = country_buildings.entry(prov.pais_id.clone()).or_default();
+        
+        for pop in &prov.pops {
+            *pops.entry(pop.tipo_pop_id.clone()).or_default() += pop.populacao;
+            *emp.entry(pop.tipo_pop_id.clone()).or_default() += pop.empregados;
+        }
+        for b in &prov.predios {
+            *bld.entry(b.tipo_predio_id.clone()).or_default() += b.nivel as u64;
+        }
+    }
+    
+    eprintln!("\n=== TOTAIS ORIGINAIS (c8a2db35) ===");
+    for (country, pops) in &country_pops {
+        let total: f64 = pops.values().sum();
+        if ["chi", "ccp", "man", "men", "nkg", "usa", "gbr", "sov", "bra", "ger", "jap", "fra", "ind"].contains(&country.as_str()) {
+            eprintln!("{} pop: {:.1}M", country, total / 1e6);
+        }
+    }
+    
+    eprintln!("\n--- USA pops ---");
+    if let Some(pops) = country_pops.get("usa") {
+        for (k, v) in pops { eprintln!("  {}: {:.0}", k, v); }
+    }
+    eprintln!("\n--- USA employed ---");
+    if let Some(emp) = country_employed.get("usa") {
+        for (k, v) in emp { eprintln!("  {}: {:.0}", k, v); }
+    }
+    eprintln!("\n--- USA buildings ---");
+    if let Some(bld) = country_buildings.get("usa") {
+        for (k, v) in bld { eprintln!("  {}: {}", k, v); }
+    }
+    
+    eprintln!("\n--- CHI group pops ---");
+    for c in ["chi", "ccp", "man", "men", "nkg"] {
+        if let Some(pops) = country_pops.get(c) {
+            let total: f64 = pops.values().sum();
+            eprintln!("{} pop: {:.1}M", c, total / 1e6);
+            for (k, v) in pops { eprintln!("  {}: {:.0}", k, v); }
+        }
+    }
+    
+    eprintln!("\n--- GBR pops ---");
+    if let Some(pops) = country_pops.get("gbr") {
+        let total: f64 = pops.values().sum();
+        eprintln!("gbr pop: {:.1}M", total / 1e6);
+        for (k, v) in pops { eprintln!("  {}: {:.0}", k, v); }
+    }
+    eprintln!("\n--- GBR buildings ---");
+    if let Some(bld) = country_buildings.get("gbr") {
+        for (k, v) in bld { eprintln!("  {}: {}", k, v); }
+    }
+}
