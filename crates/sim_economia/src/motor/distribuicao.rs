@@ -22,6 +22,9 @@ struct TarefaPaisDistribuicao<'a> {
     div_cap_pais: &'a mut f64,
     div_ari_pais: &'a mut f64,
     reservas: &'a mut f64,
+    /// Parâmetros do sistema econômico cacheados por país (taxa_cap, taxa_ari).
+    taxa_cap_base: f64,
+    taxa_ari_base: f64,
     provs: Vec<ProvDistribuicao<'a>>,
 }
 
@@ -57,9 +60,7 @@ pub(crate) fn executar_distribuicao_rendas(
     pop_ari_pais.fill(0.0);
     reservas_predios_pais.fill(0.0);
 
-    // Paralelo por PAÍS: cada país só escreve em si mesmo e nas suas províncias (e nas fatias delas nos
-    // vetores auxiliares); a ordem das províncias dentro do país é a global, então as somas de ponto
-    // flutuante (PIB, fundo privado, dividendos) são idênticas às da versão sequencial.
+    // Paralelo por PAÍS: cada país só escreve em si mesmo e nas suas províncias.
     let mut tarefas: Vec<TarefaPaisDistribuicao> = paises
         .iter_mut()
         .zip(pop_cap_pais.iter_mut())
@@ -67,14 +68,21 @@ pub(crate) fn executar_distribuicao_rendas(
         .zip(dividendos_cap_pais.iter_mut())
         .zip(dividendos_ari_pais.iter_mut())
         .zip(reservas_predios_pais.iter_mut())
-        .map(|(((((pais, pop_cap), pop_ari), div_cap_pais), div_ari_pais), reservas)| TarefaPaisDistribuicao {
-            pais,
-            pop_cap,
-            pop_ari,
-            div_cap_pais,
-            div_ari_pais,
-            reservas,
-            provs: Vec::new(),
+        .map(|(((((pais, pop_cap), pop_ari), div_cap_pais), div_ari_pais), reservas)| {
+            // Cache parâmetros do sistema econômico por país (evita match de string no loop quente)
+            let (taxa_cap_base, taxa_ari_base, _) =
+                governo::parametros_sistema_economico(&pais.politica_fiscal.lei_sistema_economico_id);
+            TarefaPaisDistribuicao {
+                pais,
+                pop_cap,
+                pop_ari,
+                div_cap_pais,
+                div_ari_pais,
+                reservas,
+                taxa_cap_base,
+                taxa_ari_base,
+                provs: Vec::new(),
+            }
         })
         .collect();
     for (((prov, sal_tipo), div_cap), div_ari) in provincias
@@ -87,11 +95,12 @@ pub(crate) fn executar_distribuicao_rendas(
         tarefas[c].provs.push(ProvDistribuicao { prov, sal_tipo, div_cap, div_ari });
     }
     tarefas.into_par_iter().for_each(|t| {
-        let TarefaPaisDistribuicao { pais, pop_cap, pop_ari, div_cap_pais, div_ari_pais, reservas, provs } = t;
+        let TarefaPaisDistribuicao { pais, pop_cap, pop_ari, div_cap_pais, div_ari_pais, reservas, taxa_cap_base, taxa_ari_base, provs } = t;
         for ProvDistribuicao { prov, sal_tipo, div_cap: div_cap_prov, div_ari: div_ari_prov } in provs {
             let m_idx = prov.mercado_idx;
             let precos = &mercados[m_idx].precos_idx;
 
+            // Contar população capitalista/aristocrata de uma só vez
             let mut pop_cap_local = 0.0;
             let mut pop_ari_local = 0.0;
             for pop in &prov.pops {
@@ -139,15 +148,24 @@ pub(crate) fn executar_distribuicao_rendas(
                     continue;
                 }
 
+                let num_insumos = b.cache.num_insumos as usize;
+                let num_produtos = b.cache.num_produtos as usize;
+                let num_vagas = b.cache.num_vagas as usize;
+                let financiado_pelo_governo = b.cache.financiado_pelo_governo;
+                let regime_propriedade = b.cache.regime_propriedade;
+                let categoria = b.cache.categoria;
+                let salario_base = b.salario_base;
+                let nivel = b.nivel as f64;
+
                 if b.fechado {
-                    let manut = (b.nivel as f64) * CUSTO_MANUTENCAO_FECHADO_POR_NIVEL;
+                    let manut = nivel * CUSTO_MANUTENCAO_FECHADO_POR_NIVEL;
                     let saque = manut.min(b.reservas_caixa);
                     b.reservas_caixa = (b.reservas_caixa - saque).max(0.0);
                     let descoberto = (manut - saque).max(0.0);
                     if descoberto > 0.0 {
-                        let cobre_estatal = b.cache.financiado_pelo_governo
+                        let cobre_estatal = financiado_pelo_governo
                             || exige_estatal
-                            || b.cache.regime_propriedade == RegimePropriedade::Estatal
+                            || regime_propriedade == RegimePropriedade::Estatal
                             || (b.subsidiado && !em_calote);
                         if cobre_estatal {
                             pais.orcamento.gasto_burocracia += descoberto;
@@ -179,26 +197,29 @@ pub(crate) fn executar_distribuicao_rendas(
                     b.dividendos_ultimo_tick = 0.0;
                     b.cache.margem_lucro_ultimo_tick = 0.0;
                     b.dias_fechado = 0;
-                    if !b.cache.financiado_pelo_governo && b.dias_retomada == 0 {
+                    if !financiado_pelo_governo && b.dias_retomada == 0 {
                         let mut rec_u = 0.0;
-                        for &(g_out, q) in b.cache.produtos() {
+                        for i in 0..num_produtos {
+                            let (g_out, q) = b.cache.produtos_arr[i];
                             rec_u += q * pais.produtividade * precos[g_out as usize];
                         }
                         let mut ins_u = 0.0;
-                        for &(g_in, q) in b.cache.insumos() {
+                        for i in 0..num_insumos {
+                            let (g_in, q) = b.cache.insumos_arr[i];
                             ins_u += q * precos[g_in as usize];
                         }
                         let mut fol_u = 0.0;
-                        for s in b.cache.vagas() {
+                        for i in 0..num_vagas {
+                            let s = &b.cache.vagas_arr[i];
                             let mult = catalogo.tipos_pop[s.tipo_pop_idx as usize].multiplicador_salario;
-                            fol_u += (s.vagas_por_nivel as f64) * b.salario_base * mult;
+                            fol_u += (s.vagas_por_nivel as f64) * salario_base * mult;
                         }
                         if fol_u > 1e-9 {
                             let m_teorica = (rec_u - ins_u - fol_u) / fol_u;
                             b.cache.margem_lucro_ultimo_tick = m_teorica;
                             if m_teorica < -0.05 {
                                 b.dias_prejuizo = b.dias_prejuizo.saturating_add(1);
-                                let perda_pot = (rec_u - ins_u - fol_u) * (b.nivel as f64);
+                                let perda_pot = (rec_u - ins_u - fol_u) * nivel;
                                 b.lucro_ultimo_tick = perda_pot;
                                 b.lucro_ema = 0.90 * b.lucro_ema + 0.10 * perda_pot;
                                 b.tendencia_lucro = b.lucro_ultimo_tick - b.lucro_ema;
@@ -212,27 +233,28 @@ pub(crate) fn executar_distribuicao_rendas(
                 }
 
                 let mut custo_insumos = 0.0;
-                for &(g_in, qtd) in b.cache.insumos() {
+                for i in 0..num_insumos {
+                    let (g_in, qtd) = b.cache.insumos_arr[i];
                     custo_insumos += escala * qtd * precos[g_in as usize];
                 }
 
-                let categoria = catalogo.tipos_predio[b.cache.tipo_idx].categoria;
                 let mut receita = 0.0;
-                let escala_prod = if b.cache.financiado_pelo_governo {
+                let escala_prod = if financiado_pelo_governo {
                     escala
                 } else if categoria == CategoriaPredio::Extrativo {
                     escala * (1.0 + (pais.produtividade - 1.0) * 0.5)
                 } else {
                     escala * pais.produtividade
                 };
-                for &(g_out, qtd) in b.cache.produtos() {
+                for i in 0..num_produtos {
+                    let (g_out, qtd) = b.cache.produtos_arr[i];
                     receita += escala_prod * qtd * precos[g_out as usize];
                 }
 
                 b.custo_insumos_ultimo_tick = custo_insumos;
                 b.receita_ultimo_tick = receita;
 
-                if b.cache.financiado_pelo_governo {
+                if financiado_pelo_governo {
                     let mult_sal_setor = match categoria {
                         CategoriaPredio::Militar => mult_mil,
                         CategoriaPredio::Construcao if em_calote => 0.5,
@@ -240,10 +262,11 @@ pub(crate) fn executar_distribuicao_rendas(
                     };
 
                     let mut folha_total = 0.0;
-                    for slot in b.cache.vagas() {
+                    for i in 0..num_vagas {
+                        let slot = &b.cache.vagas_arr[i];
                         let tp_idx = slot.tipo_pop_idx as usize;
                         let mult_tp = catalogo.tipos_pop[tp_idx].multiplicador_salario;
-                        let sal = slot.empregados * b.salario_base * mult_tp * mult_sal_setor;
+                        let sal = slot.empregados * salario_base * mult_tp * mult_sal_setor;
                         sal_tipo[tp_idx] += sal;
                         folha_total += sal;
                     }
@@ -278,9 +301,10 @@ pub(crate) fn executar_distribuicao_rendas(
                 pais.pib_diario += valor_adicionado.max(0.0);
 
                 let mut folha_alvo = 0.0;
-                for slot in b.cache.vagas() {
+                for i in 0..num_vagas {
+                    let slot = &b.cache.vagas_arr[i];
                     let mult_tp = catalogo.tipos_pop[slot.tipo_pop_idx as usize].multiplicador_salario;
-                    folha_alvo += slot.empregados * b.salario_base * mult_tp;
+                    folha_alvo += slot.empregados * salario_base * mult_tp;
                 }
 
                 let margem = if folha_alvo > 1e-9 {
@@ -291,13 +315,13 @@ pub(crate) fn executar_distribuicao_rendas(
                 b.cache.margem_lucro_ultimo_tick = margem;
 
                 let regime_efetivo =
-                    if exige_estatal && b.cache.regime_propriedade != RegimePropriedade::Cooperativo {
+                    if exige_estatal && regime_propriedade != RegimePropriedade::Cooperativo {
                         RegimePropriedade::Estatal
                     } else {
-                        b.cache.regime_propriedade
+                        regime_propriedade
                     };
 
-                let reserva_max = (b.nivel as f64) * RESERVA_CAIXA_POR_NIVEL;
+                let reserva_max = nivel * RESERVA_CAIXA_POR_NIVEL;
                 let mut folha_efetiva = folha_alvo;
                 let mut dividendos = 0.0;
 
@@ -365,10 +389,7 @@ pub(crate) fn executar_distribuicao_rendas(
                 reservas_prov += b.reservas_caixa;
                 b.dividendos_ultimo_tick = dividendos;
                 if dividendos > 0.0 {
-                    let (taxa_cap_base, taxa_ari_base, _) = governo::parametros_sistema_economico(
-                        &pais.politica_fiscal.lei_sistema_economico_id,
-                    );
-                    // Saturação suave baseada na escala do PIB anual do país (sem teto artificial de 250k)
+                    // Usar parâmetros cacheados em vez de match de string
                     let cap_escala = (pais.pib_diario * 365.0).max(500_000.0);
                     let saturacao = (pais.fundo_investimento_privado / (cap_escala * 2.0)).clamp(0.0, 1.0);
 

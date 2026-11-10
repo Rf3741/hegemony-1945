@@ -311,12 +311,12 @@ fn teste_consumo_por_estrato_e_substituicao_de_bens() {
     );
     let fatia_graos_normal = cesta_normal
         .iter()
-        .find(|&&(g, _)| g == idx_graos)
+        .find(|&&(g, s)| g == idx_graos && s > 0.0)
         .unwrap()
         .1;
     let fatia_carne_normal = cesta_normal
         .iter()
-        .find(|&&(g, _)| g == idx_carne)
+        .find(|&&(g, s)| g == idx_carne && s > 0.0)
         .unwrap()
         .1;
 
@@ -333,12 +333,12 @@ fn teste_consumo_por_estrato_e_substituicao_de_bens() {
     );
     let fatia_graos_choque = cesta_choque
         .iter()
-        .find(|&&(g, _)| g == idx_graos)
+        .find(|&&(g, s)| g == idx_graos && s > 0.0)
         .unwrap()
         .1;
     let fatia_carne_choque = cesta_choque
         .iter()
-        .find(|&&(g, _)| g == idx_carne)
+        .find(|&&(g, s)| g == idx_carne && s > 0.0)
         .unwrap()
         .1;
 
