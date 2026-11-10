@@ -700,6 +700,8 @@ impl MundoEconomico {
             scratch_tipo_c: vec![0.0; num_tipos_pop],
             lotes_migrantes: Vec::with_capacity(16),
             lotes_promocao: Vec::with_capacity(8),
+            trabalho_pop_idx: std::collections::HashMap::new(),
+            trabalho_promo_map: std::collections::HashMap::new(),
         };
 
         let mut blocos_comerciais = cenario.blocos_comerciais;

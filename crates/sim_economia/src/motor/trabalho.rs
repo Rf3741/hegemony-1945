@@ -3,7 +3,6 @@
 
 use crate::catalogo::CatalogoEconomia;
 use crate::entidades::{ConfigSimulacao, Estado, Mercado, Pais, Pop, Provincia};
-use std::collections::HashMap;
 
 /// Registro compacto (`Copy`, sem alocações `String`) de promoção de trabalhadores.
 #[derive(Debug, Clone, Copy)]
@@ -33,8 +32,6 @@ pub(crate) fn executar_contratacao_e_demissao(
     emp_alvo_por_tipo: &mut [f64],
     pop_total_por_tipo: &mut [f64],
     promocoes: &mut Vec<LotePromocao>,
-    trabalho_pop_idx: &mut std::collections::HashMap<(usize, u16, u16), usize>,
-    trabalho_promo_map: &mut std::collections::HashMap<(usize, u16, u16), usize>,
 ) {
     let fator_dias = dias_passo.max(1) as f64;
     let taxa_contratacao = (config.taxa_contratacao_diaria * fator_dias).clamp(0.005, 0.35);
@@ -202,7 +199,7 @@ pub(crate) fn executar_contratacao_e_demissao(
 
                             registrar_lote_promocao(
                                 promocoes,
-                                &mut promo_map,
+                                &mut *trabalho_promo_map,
                                 tp_alvo_idx,
                                 pop_doador,
                                 promovidos,
@@ -245,7 +242,7 @@ pub(crate) fn executar_contratacao_e_demissao(
 
         if !promocoes.is_empty() {
             for &lote in promocoes.iter() {
-                aplicar_lote_promocao(catalogo, nomes_culturas, nomes_religioes, prov, lote, &mut pop_idx);
+                aplicar_lote_promocao(catalogo, nomes_culturas, nomes_religioes, prov, lote, &mut *trabalho_pop_idx);
             }
             houve_mudanca_emprego = true;
         }
@@ -256,7 +253,7 @@ pub(crate) fn executar_contratacao_e_demissao(
 
         if let Some(camp_idx) = catalogo.tipo_pop_campones_idx {
             promocoes.clear();
-            promo_map.clear();
+            trabalho_promo_map.clear();
             let mut demote_houve = false;
             for pop in &mut prov.pops {
                 if pop.populacao <= 50.0 || catalogo.tipos_pop[pop.tipo_idx].subsistencia {
@@ -283,7 +280,7 @@ pub(crate) fn executar_contratacao_e_demissao(
                     pop.riqueza_reservas = (pop.riqueza_reservas - riq_transf).max(0.0);
                     registrar_lote_promocao(
                         promocoes,
-                        &mut promo_map,
+                        &mut *trabalho_promo_map,
                         camp_idx,
                         pop,
                         demotados,
@@ -294,7 +291,7 @@ pub(crate) fn executar_contratacao_e_demissao(
             }
             if demote_houve && !promocoes.is_empty() {
                 for &lote in promocoes.iter() {
-                    aplicar_lote_democao(catalogo, nomes_culturas, nomes_religioes, prov, lote, &mut pop_idx);
+                    aplicar_lote_democao(catalogo, nomes_culturas, nomes_religioes, prov, lote, &mut *trabalho_pop_idx);
                 }
                 reconciliar_empregados_provincia(prov, emp_alvo_por_tipo, pop_total_por_tipo);
             }

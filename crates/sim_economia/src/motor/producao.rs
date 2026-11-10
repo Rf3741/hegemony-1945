@@ -16,6 +16,8 @@ struct TarefaMercadoProducao<'a> {
     demanda: &'a mut [f64],
     /// (índice do país, país, pop. incorporada, pontos de construção)
     paises: Vec<(usize, &'a mut Pais, &'a mut f64, &'a mut f64)>,
+    /// Índice rápido: país_idx -> posição em `paises`
+    pais_pos: Vec<usize>,
 }
 
 /// Executa a produção física de todos os prédios e fazendas de subsistência em passagem única,
@@ -113,6 +115,7 @@ pub(crate) fn executar_producao_diaria(
             oferta,
             demanda,
             paises: Vec::new(),
+            pais_pos: vec![usize::MAX; num_paises],
         })
         .collect();
 
@@ -131,6 +134,7 @@ pub(crate) fn executar_producao_diaria(
         let m_idx = pais.mercado_idx;
         let pos = tarefas[m_idx].paises.len();
         tarefas[m_idx].paises.push((c_idx, pais, pop_inc, pontos));
+        tarefas[m_idx].pais_pos[c_idx] = pos;
     }
     for prov in provincias.iter_mut() {
         tarefas[prov.mercado_idx].provs.push(prov);
@@ -141,7 +145,7 @@ pub(crate) fn executar_producao_diaria(
         for prov in provs {
             let m_idx = prov.mercado_idx;
             let c_idx = prov.pais_idx;
-            let pos = t.paises.iter().position(|(idx, _, _, _)| *idx == c_idx).unwrap();
+            let pos = t.pais_pos[c_idx];
             let (_, pais_ref, pop_inc_ref, pontos_ref) = &mut t.paises[pos];
             let e_idx = prov.estado_idx;
             let acesso = estados[e_idx].acesso_mercado;
