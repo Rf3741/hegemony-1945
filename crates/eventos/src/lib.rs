@@ -239,6 +239,12 @@ pub struct Noticia {
 pub struct Pendente {
     pub evento_id: String,
     pub pais: String,
+    /// Dia absoluto (gregoriano) em que o evento entrou na fila.
+    #[serde(default)]
+    pub data_adicao: i64,
+    /// Se true, é evento histórico com data fixa (expira após ~60 dias ou na data-limite).
+    #[serde(default)]
+    pub historico: bool,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -347,9 +353,60 @@ impl EstadoEventos {
         })
     }
 
+    /// Verifica se um evento já foi resolvido (por ID).
+    pub fn evento_resolvido(&self, evento_id: &str) -> bool {
+        self.disparados.contains_key(evento_id)
+    }
+
+    /// Remove e resolve automaticamente eventos históricos que expiraram (>60 dias na fila
+    /// ou passaram da data-limite histórica). Aplica a primeira opção (decisão histórica)
+    /// e registra no jornal.
+    pub fn expirar_eventos_historicos(
+        &mut self,
+        cat: &CatalogoEventos,
+        ctx: &mut ContextoEfeitos,
+        hoje_abs: i64,
+    ) {
+        let mut i = 0;
+        while i < self.pendentes.len() {
+            let pend = &self.pendentes[i];
+            if !pend.historico {
+                i += 1;
+                continue;
+            }
+            let Some(evento) = cat.por_id(&pend.evento_id) else {
+                i += 1;
+                continue;
+            };
+            let data_evento_abs = dias(evento.data);
+            // Expira se: passou 60 dias na fila OU passou da data do evento + 60 dias (data-limite)
+            let expirou_por_tempo_fila = hoje_abs - pend.data_adicao > EXPIRACAO_HISTORICA_DIAS;
+            let expirou_por_data_limite = hoje_abs > data_evento_abs + EXPIRACAO_HISTORICA_DIAS;
+            if expirou_por_tempo_fila || expirou_por_data_limite {
+                if let Some(op) = evento.opcoes.first() {
+                    aplicar_opcao_com_contexto(ctx, self, evento, 0, &pend.pais);
+                    // aplicar_opcao_com_contexto já remove de pendentes por ID
+                    self.jornal.push(Noticia {
+                        data: (ctx.mundo.data.ano, ctx.mundo.data.mes, ctx.mundo.data.dia),
+                        texto: format!(
+                            "Decisão automática (expirado): {} — {}",
+                            evento.titulo, op.texto
+                        ),
+                    });
+                    if self.jornal.len() > 200 {
+                        self.jornal.remove(0);
+                    }
+                }
+                // Não incrementa i pois o elemento foi removido por aplicar_opcao_com_contexto
+            } else {
+                i += 1;
+            }
+        }
+    }
+
     /// Resolve automaticamente eventos excedentes da fila (além de 3), aplicando a primeira opção
-    /// e registrando no jornal. Remove do final da fila (eventos mais novos) para preservar
-    /// os mais antigos que o jogador ainda não viu.
+    /// e registrando no jornal. Remove do INÍCIO da fila (eventos mais antigos/expirados) para
+    /// preservar os mais recentes que o jogador ainda não viu.
     pub fn resolver_excedentes_fila(
         &mut self,
         cat: &CatalogoEventos,
@@ -358,16 +415,11 @@ impl EstadoEventos {
     ) {
         const MAX_PENDENTES: usize = 3;
         while self.pendentes.len() > MAX_PENDENTES {
-            if let Some(pend) = self.pendentes.pop() {
+            if let Some(pend) = self.pendentes.first().cloned() {
                 if let Some(evento) = cat.por_id(&pend.evento_id) {
                     if let Some(op) = evento.opcoes.first() {
                         aplicar_opcao_com_contexto(ctx, self, evento, 0, &pend.pais);
-                        let _nome_pais = ctx
-                            .mundo
-                            .paises
-                            .get(&pend.pais)
-                            .map(|p| p.nome.clone())
-                            .unwrap_or_else(|| pend.pais.clone());
+                        // aplicar_opcao_com_contexto já remove de pendentes por ID
                         self.jornal.push(Noticia {
                             data: (ctx.mundo.data.ano, ctx.mundo.data.mes, ctx.mundo.data.dia),
                             texto: format!(
@@ -380,6 +432,7 @@ impl EstadoEventos {
                         }
                     }
                 }
+                // Não remove(0) aqui pois aplicar_opcao_com_contexto já removeu por ID
             }
         }
     }
@@ -491,11 +544,15 @@ impl EstadoEventos {
 /// para sempre (a história do cenário não se repete).
 const JANELA_DIAS: i64 = 15;
 
+/// Dias máximos que um evento histórico fica na fila aguardando decisão do jogador.
+/// Após esse período, a decisão histórica é aplicada automaticamente.
+pub const EXPIRACAO_HISTORICA_DIAS: i64 = 60;
+
 /// Dia absoluto do calendário gregoriano (contagem de dias civis, com anos bissextos reais).
 /// A aproximação anterior de "mês de 30 dias" fazia dois dias reais terem o mesmo número
 /// (dia 31 e dia 1 do mês seguinte) e dois números nunca aparecerem (29 e 30 de fevereiro),
 /// adiantando ou tornando inatingível o disparo de eventos datados.
-fn dias(d: (i32, u8, u8)) -> i64 {
+pub fn dias(d: (i32, u8, u8)) -> i64 {
     let mut ano = i64::from(d.0);
     let (mes, dia) = (i64::from(d.1), i64::from(d.2));
     if mes <= 2 {
@@ -676,6 +733,11 @@ pub fn avaliar_dia_com_contexto(
     est.avancar_dias(1);
 
     let hoje = (ctx.mundo.data.ano, ctx.mundo.data.mes, ctx.mundo.data.dia);
+    let hoje_abs = dias(hoje);
+
+    // Expira eventos históricos que estão na fila há mais de 60 dias ou passaram da data-limite
+    est.expirar_eventos_historicos(cat, ctx, hoje_abs);
+
     let mut disparados = Vec::new();
     for ev in &cat.eventos {
         if !ev.generico && ev.data > hoje {
@@ -717,11 +779,17 @@ pub fn avaliar_dia_com_contexto(
             if exibidos < 2 && cooldown_liberado {
                 // Evita duplicatas por título na fila de pendentes
                 if !est.tem_pendente_com_titulo(cat, &ev.titulo) {
+                    let hoje_abs = dias(hoje);
                     est.disparados.insert(ev.id.clone(), None);
-                    est.pendentes.push(Pendente { evento_id: ev.id.clone(), pais: alvo.clone() });
+                    est.pendentes.push(Pendente {
+                        evento_id: ev.id.clone(),
+                        pais: alvo.clone(),
+                        data_adicao: hoje_abs,
+                        historico: !ev.generico,
+                    });
                     est.popups_por_semana.insert(semana, exibidos + 1);
                     est.ultimo_popup_por_pais.insert(alvo.clone(), semana);
-                    // Limita a fila a 3 eventos; excedentes (mais novos) são resolvidos automaticamente
+                    // Limita a fila a 3 eventos; excedentes (mais antigos/expirados) são resolvidos automaticamente
                     est.resolver_excedentes_fila(cat, ctx, &alvo);
                 }
             } else {
