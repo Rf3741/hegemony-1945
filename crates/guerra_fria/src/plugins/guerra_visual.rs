@@ -11,8 +11,8 @@ use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
-use bevy::sprite_render::Material2d;
 use bevy::sprite::Sprite;
+use bevy_sprite_render::{Material2d, Material2dPlugin};
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use gf_mapa::mapa::ESCALA_Y_MAPA;
 use serde::{Deserialize, Serialize};
@@ -52,6 +52,8 @@ impl Plugin for GuerraVisualPlugin {
             .init_resource::<MarcadoresBatalha>()
             .init_resource::<SetasAvanco>()
             .init_resource::<AvisoGuerraAtivo>()
+            .init_resource::<AssetsGuerra>()
+            .add_plugins(Material2dPlugin::<MaterialLinhasGuerra>::default())
             .add_systems(Startup, (carregar_assets_guerra, criar_material_linhas_guerra))
             .add_systems(
                 Update,
@@ -318,12 +320,12 @@ fn atualizar_linhas_frente(
 
     for frente in frentes.iter().filter(|f| f.ativa) {
         let guerra = guerras.iter().find(|g| g.id == frente.guerra_id && g.ativa);
-        let eh_proxy = guerra.map_or(false, |g| {
-            g.envolvimentos.iter().any(|e| {
-                matches!(e.nivel, NivelEnvolvimento::IntervencaoLimitada | NivelEnvolvimento::GuerraTotal)
-                    && (e.lado == LadoGuerra::Atacante || e.lado == LadoGuerra::Defensor)
-            })
-        });
+let eh_proxy = guerra.map_or(false, |g| {
+                g.envolvimentos.iter().any(|e| {
+                    matches!(e.nivel, NivelEnvolvimento::ConseleirosVoluntarios | NivelEnvolvimento::IntervencaoLimitada)
+                        && (e.lado == LadoGuerra::Atacante || e.lado == LadoGuerra::Defensor)
+                })
+            });
 
         for (reg_a_code, reg_b_code) in &frente.pares_fronteira {
             let Some(idx_a) = mapa_regioes.get(reg_a_code) else { continue };
@@ -391,14 +393,14 @@ fn atualizar_hachuras_ocupacao(
         // Verifica se é disputada (tem combate ativo na fronteira)
         let eh_disputada = guerras.iter().any(|g| {
             g.ativa && g.envolvimentos.iter().any(|e| {
-                matches!(e.nivel, NivelEnvolvimento::ConseleirosVoluntarios | NivelEnvolvimento::IntervencaoLimitada | NivelEnvolvimento::GuerraTotal)
+                matches!(e.nivel, NivelEnvolvimento::ApoioMaterial | NivelEnvolvimento::ConseleirosVoluntarios | NivelEnvolvimento::IntervencaoLimitada | NivelEnvolvimento::GuerraTotal)
             })
         });
 
         // Verifica se é guerra por procuração (nível 3-4)
         let eh_proxy = guerras.iter().any(|g| {
             g.ativa && g.envolvimentos.iter().any(|e| {
-                matches!(e.nivel, NivelEnvolvimento::IntervencaoLimitada | NivelEnvolvimento::GuerraTotal)
+                matches!(e.nivel, NivelEnvolvimento::ConseleirosVoluntarios | NivelEnvolvimento::IntervencaoLimitada)
             })
         });
 
@@ -468,7 +470,7 @@ fn atualizar_marcadores_batalha(
     for frente in frentes.iter().filter(|f| f.ativa) {
         let guerra = guerras.iter().find(|g| g.id == frente.guerra_id && g.ativa);
         let eh_proxy = guerra.map_or(false, |g| {
-            g.envolvimentos.iter().any(|e| matches!(e.nivel, NivelEnvolvimento::IntervencaoLimitada | NivelEnvolvimento::GuerraTotal))
+            g.envolvimentos.iter().any(|e| matches!(e.nivel, NivelEnvolvimento::ConseleirosVoluntarios | NivelEnvolvimento::IntervencaoLimitada))
         });
 
         for (reg_a_code, reg_b_code) in &frente.pares_fronteira {
@@ -1082,7 +1084,7 @@ mod testes {
         };
 
         let eh_proxy = guerra.envolvimentos.iter().any(|e| {
-            matches!(e.nivel, NivelEnvolvimento::IntervencaoLimitada | NivelEnvolvimento::GuerraTotal)
+            matches!(e.nivel, NivelEnvolvimento::ConseleirosVoluntarios | NivelEnvolvimento::IntervencaoLimitada)
         });
         assert!(eh_proxy, "Nível 4 (Intervenção Limitada) deve ser considerado proxy");
 
@@ -1101,8 +1103,28 @@ mod testes {
         };
 
         let eh_proxy2 = guerra2.envolvimentos.iter().any(|e| {
-            matches!(e.nivel, NivelEnvolvimento::IntervencaoLimitada | NivelEnvolvimento::GuerraTotal)
+            matches!(e.nivel, NivelEnvolvimento::ConseleirosVoluntarios | NivelEnvolvimento::IntervencaoLimitada)
         });
-        assert!(!eh_proxy2, "Nível 3 (Conselheiros) NÃO deve ser considerado proxy (apenas 4-5)");
+        assert!(eh_proxy2, "Nível 3 (Conselheiros/Voluntários) deve ser considerado proxy");
+
+        // Nível 5 (Guerra Total) NÃO é proxy - é guerra direta
+        let guerra3 = Guerra {
+            envolvimentos: vec![
+                EnvolvimentoGuerra {
+                    pais_tag: "CCC".into(),
+                    guerra_id: "guerra_proxy".into(),
+                    lado: LadoGuerra::Atacante,
+                    nivel: NivelEnvolvimento::GuerraTotal, // Nível 5
+                    data_inicio: DataJogo::nova(1945, 1, 1).unwrap(),
+                    custo_acumulado: 0.0,
+                },
+            ],
+            ..guerra.clone()
+        };
+
+        let eh_proxy3 = guerra3.envolvimentos.iter().any(|e| {
+            matches!(e.nivel, NivelEnvolvimento::ConseleirosVoluntarios | NivelEnvolvimento::IntervencaoLimitada)
+        });
+        assert!(!eh_proxy3, "Nível 5 (Guerra Total) NÃO deve ser considerado proxy (é guerra direta)");
     }
 }

@@ -3300,6 +3300,7 @@ dependencies = [
  "bandeiras_resolver",
  "bevy",
  "bevy_egui",
+ "bevy_sprite_render",
  "egui_plot",
  "eventos",
  "flate2",
