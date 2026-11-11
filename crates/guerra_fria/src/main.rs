@@ -18,6 +18,7 @@ use plugins::{
     guerra_ia::GuerraIaPlugin,
     guerra_sim::GuerraSimPlugin,
     guerra_ui::GuerraUiPlugin,
+    guerra_visual::GuerraVisualPlugin,
     jogador::JogadorPlugin,
     map::MapPlugin,
     mercado_ui::MercadoUiPlugin,
@@ -126,7 +127,7 @@ fn main() -> AppExit {
     .add_plugins(EstatisticasPlugin)
     .add_plugins(EnciclopediaPlugin)
     .add_plugins(PersonagensPlugin)
-    .add_plugins((GuerraSimPlugin, GuerraUiPlugin, GuerraIaPlugin))
+    .add_plugins((GuerraSimPlugin, GuerraUiPlugin, GuerraIaPlugin, GuerraVisualPlugin))
     .add_plugins(plugins::config::ConfigPlugin)
     // Sobrepõe o arquivo lido pelo ConfigPlugin (qualidade do smoke não é gravada).
     .insert_resource(config)

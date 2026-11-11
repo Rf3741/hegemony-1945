@@ -40,3 +40,4 @@ pub mod time;
 pub mod tutorial_guiado;
 pub mod ui;
 pub mod visual_construcoes;
+pub mod guerra_visual;
