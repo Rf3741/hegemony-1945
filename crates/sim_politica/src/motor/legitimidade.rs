@@ -160,6 +160,28 @@ pub fn calcular_legitimidade_governo(pais: &mut PaisPolitica, catalogo: &Catalog
         pontos -= (n - 2) as f64 * 4.0;
     }
 
+    // 8. Bônus de legitimidade institucional para democracias consolidadas.
+    // Leis democráticas fundamentais criam um piso de legitimidade que não depende
+    // da coalizão momentânea, evitando colapso em democracias estáveis sem crise real.
+    let leis_democraticas_fundamentais = [
+        "sufragio_universal",
+        "garantias_constitucionais_amplas",
+        "imprensa_livre",
+        "estado_laico",
+        "sindicatos_livres_regulamentados",
+        "cidadania_civica_jus_soli",
+    ];
+    let num_leis_democraticas = leis_democraticas_fundamentais
+        .iter()
+        .filter(|lei| pais.leis_ativas.values().any(|v| v == *lei))
+        .count();
+    if num_leis_democraticas >= 4 {
+        // Cada lei democrática fundamental adiciona até 5 pontos, com teto em 30.
+        // Requer pelo menos 4 das 6 leis para ativar (democracia consolidada).
+        let bonus_institucional = (num_leis_democraticas as f64 * 5.0).min(30.0);
+        pontos += bonus_institucional;
+    }
+
     // Normaliza para o intervalo 0..=100
     pais.legitimidade = pontos.clamp(0.0, 100.0);
     pais.faixa_legitimidade = FaixaLegitimidade::de_pontos(pais.legitimidade);
