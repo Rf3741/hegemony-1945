@@ -53,6 +53,7 @@ impl Plugin for GuerraVisualPlugin {
             .init_resource::<SetasAvanco>()
             .init_resource::<AvisoGuerraAtivo>()
             .init_resource::<AssetsGuerra>()
+            .init_resource::<ConfigVisualGuerra>()
             .add_plugins(Material2dPlugin::<MaterialLinhasGuerra>::default())
             .add_systems(Startup, (carregar_assets_guerra, criar_material_linhas_guerra))
             .add_systems(
