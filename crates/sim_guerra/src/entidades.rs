@@ -98,6 +98,9 @@ pub struct PaisMilitar {
     /// Eficiência da frota de comboios e marinha mercante para abastecer portos (0.0 a 1.0).
     #[serde(default = "padrao_um")]
     pub eficiencia_naval: f64,
+    /// Data de criação do país (para impedir entrada em guerra nos primeiros 365 dias).
+    #[serde(default)]
+    pub data_criacao: Option<DataJogo>,
 }
 
 /// Oficial general comandante de exército com habilidades e traços táticos.

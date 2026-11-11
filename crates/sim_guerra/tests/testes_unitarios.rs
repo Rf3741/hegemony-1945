@@ -145,6 +145,7 @@ fn cenario_guerra_coreia() -> CenarioGuerra {
             populacao_mobilizavel: 12000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 1.0,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "SOV".to_string(),
@@ -157,6 +158,7 @@ fn cenario_guerra_coreia() -> CenarioGuerra {
             populacao_mobilizavel: 15000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 0.85,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "CHN".to_string(),
@@ -169,6 +171,7 @@ fn cenario_guerra_coreia() -> CenarioGuerra {
             populacao_mobilizavel: 30000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 0.6,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "KOR".to_string(),
@@ -181,6 +184,7 @@ fn cenario_guerra_coreia() -> CenarioGuerra {
             populacao_mobilizavel: 2000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 0.7,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "PRK".to_string(),
@@ -193,6 +197,7 @@ fn cenario_guerra_coreia() -> CenarioGuerra {
             populacao_mobilizavel: 1500000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 0.5,
+            data_criacao: None,
         },
     ];
 
@@ -449,6 +454,7 @@ fn cenario_apoio_material() -> CenarioGuerra {
             populacao_mobilizavel: 5000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 1.0,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "BBB".to_string(),
@@ -461,6 +467,7 @@ fn cenario_apoio_material() -> CenarioGuerra {
             populacao_mobilizavel: 5000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 1.0,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "CCC".to_string(),
@@ -473,6 +480,7 @@ fn cenario_apoio_material() -> CenarioGuerra {
             populacao_mobilizavel: 10000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 1.0,
+            data_criacao: None,
         },
     ];
 
@@ -630,6 +638,7 @@ fn cenario_potencias_nucleares() -> CenarioGuerra {
             populacao_mobilizavel: 12000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 1.0,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "SOV".to_string(),
@@ -642,6 +651,7 @@ fn cenario_potencias_nucleares() -> CenarioGuerra {
             populacao_mobilizavel: 15000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 0.85,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "NEU".to_string(),
@@ -654,6 +664,7 @@ fn cenario_potencias_nucleares() -> CenarioGuerra {
             populacao_mobilizavel: 2000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 0.5,
+            data_criacao: None,
         },
     ];
 
@@ -1164,6 +1175,7 @@ fn test_declarar_guerra_jap_1947_puxa_usa_ocupante() {
             populacao_mobilizavel: 12000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 1.0,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "JAP".to_string(),
@@ -1176,6 +1188,7 @@ fn test_declarar_guerra_jap_1947_puxa_usa_ocupante() {
             populacao_mobilizavel: 5000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 0.8,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "SOV".to_string(),
@@ -1188,6 +1201,7 @@ fn test_declarar_guerra_jap_1947_puxa_usa_ocupante() {
             populacao_mobilizavel: 15000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 0.85,
+            data_criacao: None,
         },
     ];
 
@@ -1376,6 +1390,7 @@ fn test_otan_artigo5_atacar_membro_puxa_outros() {
             populacao_mobilizavel: 12000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 1.0,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "GBR".to_string(),
@@ -1388,6 +1403,7 @@ fn test_otan_artigo5_atacar_membro_puxa_outros() {
             populacao_mobilizavel: 4000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 1.0,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "FRA".to_string(),
@@ -1400,6 +1416,7 @@ fn test_otan_artigo5_atacar_membro_puxa_outros() {
             populacao_mobilizavel: 3500000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 0.9,
+            data_criacao: None,
         },
         PaisMilitar {
             tag: "SOV".to_string(),
@@ -1412,6 +1429,7 @@ fn test_otan_artigo5_atacar_membro_puxa_outros() {
             populacao_mobilizavel: 15000000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 0.85,
+            data_criacao: None,
         },
     ];
 

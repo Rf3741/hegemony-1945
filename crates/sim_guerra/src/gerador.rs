@@ -191,6 +191,7 @@ pub fn gerar_cenario_sintetico(
             populacao_mobilizavel: 1_000_000,
             estoque_suprimento: 1.0,
             eficiencia_naval: 1.0,
+            data_criacao: None,
         });
     }
 

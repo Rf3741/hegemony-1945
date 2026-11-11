@@ -395,6 +395,17 @@ fn calcular_nivel_envolvimento_otimo(
         nivel = NivelEnvolvimento::IntervencaoLimitada; // Máximo nível 4
     }
     
+    // REGRA: Nível 5 (Guerra Total) só com tratado de defesa/aliança com beligerante do lado
+    if nivel == NivelEnvolvimento::GuerraTotal {
+        let tem_tratado_defesa = match lado {
+            LadoGuerra::Atacante => guerra.atacantes.iter().any(|t| d.tem_pacto(pais_tag, t, TipoPacto::PactoDefesa) || d.tem_pacto(pais_tag, t, TipoPacto::Alianca)),
+            LadoGuerra::Defensor => guerra.defensores.iter().any(|t| d.tem_pacto(pais_tag, t, TipoPacto::PactoDefesa) || d.tem_pacto(pais_tag, t, TipoPacto::Alianca)),
+        };
+        if !tem_tratado_defesa {
+            nivel = NivelEnvolvimento::IntervencaoLimitada; // Máximo nível 4
+        }
+    }
+    
     // Países não alinhados não passam de nível 3 sem jogador
     if esfera == sim_diplomacia::Esfera::NaoAlinhado && nivel > NivelEnvolvimento::ConseleirosVoluntarios {
         nivel = NivelEnvolvimento::ConseleirosVoluntarios;
@@ -413,6 +424,9 @@ fn atualizar_envolvimentos_proxy(
     // Coleta IDs das guerras ativas primeiro para evitar problemas de borrow
     let guerra_ids: Vec<String> = g.0.guerras().iter().filter(|w| w.ativa).map(|w| w.id.clone()).collect();
     
+    // Data atual como DataJogo para comparação com data_criacao
+    let data_atual = sim_guerra::DataJogo::nova(data.0 as u16, data.1, data.2);
+    
     for guerra_id in &guerra_ids {
         // Coleta tags dos países que não são beligerantes diretos
         let tags_nao_beligerantes: Vec<String> = {
@@ -427,6 +441,21 @@ fn atualizar_envolvimentos_proxy(
         };
         
         for tag in &tags_nao_beligerantes {
+            // Pula países criados há menos de 365 dias (não entram em guerras por procuração no primeiro ano)
+            if let Some(pais) = g.0.paises().iter().find(|p| p.tag == *tag) {
+                if let Some(criacao) = pais.data_criacao {
+                    if let Some(atual) = data_atual {
+                        // Calcula dias aproximados desde a criação
+                        let dias_desde_criacao = (atual.ano as i32 - criacao.ano as i32) * 365
+                            + (atual.mes as i32 - criacao.mes as i32) * 30
+                            + (atual.dia as i32 - criacao.dia as i32);
+                        if dias_desde_criacao < 365 {
+                            continue;
+                        }
+                    }
+                }
+            }
+            
             // Verifica se já tem envolvimento registrado
             let ja_tem = {
                 let guerra = g.0.guerras().iter().find(|w| w.id == *guerra_id);
@@ -634,12 +663,14 @@ fn tick_ia_guerra(
     ia.dias += n as u32;
 
     // 2. IA declara guerra: tensão ativa e rivalidade entre blocos ou hostilidade severa (1o dia de cada mês).
-    if (mundo.0.data.dia == 1 || houve_dia_1) && diplo.0.tensao >= 20.0 {
-        let ano_mes = (mundo.0.data.ano as u32).wrapping_mul(12) + mundo.0.data.mes as u32;
-        let data_tuple = (mundo.0.data.ano as i32, mundo.0.data.mes, mundo.0.data.dia);
-        let antes_de_1960 = mundo.0.data.ano < 1960;
+    // Antes de 1960, sem jogador (modo espectador), não há guerras aleatórias: a história segue o roteiro.
+    let antes_de_1960 = mundo.0.data.ano < 1960;
+    if !(antes_de_1960 && eh_espectador) {
+        if (mundo.0.data.dia == 1 || houve_dia_1) && diplo.0.tensao >= 20.0 {
+            let ano_mes = (mundo.0.data.ano as u32).wrapping_mul(12) + mundo.0.data.mes as u32;
+            let data_tuple = (mundo.0.data.ano as i32, mundo.0.data.mes, mundo.0.data.dia);
 
-        let mut rivais: Vec<(String, String)> = diplo
+            let mut rivais: Vec<(String, String)> = diplo
             .0
             .pactos
             .iter()
@@ -710,6 +741,7 @@ fn tick_ia_guerra(
                 }
             }
         }
+    }
     }
 
     // 3. Postura, alvos e paz (periodicamente).
@@ -826,6 +858,7 @@ fn criar_rebelde_chines(g: &mut GuerraSim) {
         populacao_mobilizavel: 8_000_000,
         estoque_suprimento: 0.8,
         eficiencia_naval: 0.4,
+        data_criacao: Some(g.0.cenario.data_inicial),
     });
     g.0.mapa_paises.insert("CCP".into(), pais_idx);
     let div_id = "div_ccp_1".to_string();

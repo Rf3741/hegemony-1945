@@ -17,7 +17,7 @@ use super::time::EventoTickDiario;
 use bevy::prelude::*;
 use sim_guerra::{
     ArestaRegiao, CatalogoGuerra, ClausulaPaz, Comandante, ConfigGuerra,
-    Divisao, Exercito, Guerra, MundoGuerra, PaisMilitar, PosturaOperacional,
+    DataJogo, Divisao, Exercito, Guerra, MundoGuerra, PaisMilitar, PosturaOperacional,
     PropostaPaz, RegiaoMapa, TratadoPazAssinado,
 };
 use std::collections::HashMap;
@@ -214,6 +214,7 @@ pub fn construir_guerra_1945(
             populacao_mobilizavel: pop_mob,
             estoque_suprimento: 1.0,
             eficiencia_naval: 1.0,
+            data_criacao: Some(DataJogo::nova(1945, 1, 1).unwrap()),
         });
     }
 

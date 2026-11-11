@@ -137,6 +137,7 @@ fn tick_formacao(
                     let capital = e.provincias.first().map(|p| format!("prov_{p}")).unwrap_or_else(|| "prov_1".to_string());
                     let pop_mob = (pais.populacao_total() as f64 * 0.025) as u64;
                     let idx = g.0.cenario.paises.len();
+                    let data_criacao = sim_guerra::DataJogo::nova(e.data.ano as u16, e.data.mes, e.data.dia);
                     g.0.cenario.paises.push(sim_guerra::PaisMilitar {
                         tag: tag_norm.clone(),
                         nome_pt: pais.nome.clone(),
@@ -148,6 +149,7 @@ fn tick_formacao(
                         populacao_mobilizavel: pop_mob.max(50_000),
                         estoque_suprimento: 1.0,
                         eficiencia_naval: 1.0,
+                        data_criacao,
                     });
                     g.0.mapa_paises.insert(tag_norm.clone(), idx);
                     let div_id = format!("div_{}_{}", tag_norm.to_lowercase(), 1);
