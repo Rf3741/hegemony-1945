@@ -100,11 +100,11 @@ fn tick_eventos(
     if tutorial.as_ref().is_some_and(|t| t.ativo) {
         // No tutorial guiado, resolve automaticamente eventos urgentes na primeira opção
         // para alimentar o Jornal (J) sem pausar o relógio nem bloquear o mapa.
-        while let Some(pend) = ev.estado.pendentes.first().cloned() {
+        while let Some(pend) = ev.estado.pendentes.last().cloned() {
             if let Some(evento) = cat.0.por_id(&pend.evento_id).cloned() {
                 aplicar_opcao(&mut mundo.0, &mut ev.estado, &evento, 0, &pend.pais);
             } else {
-                ev.estado.pendentes.remove(0);
+                ev.estado.pendentes.pop();
             }
         }
         return;
@@ -145,9 +145,10 @@ fn popup_evento(
     if tutorial.as_ref().is_some_and(|t| t.ativo) || opcoes.as_ref().is_some_and(|o| o.espectador_ativo()) {
         return Ok(());
     }
-    let Some(pend) = ev.estado.pendentes.first().cloned() else { return Ok(()) };
+    // Mostra o evento mais recente/urgente (último na fila), não o mais antigo.
+    let Some(pend) = ev.estado.pendentes.last().cloned() else { return Ok(()) };
     let Some(evento) = cat.0.por_id(&pend.evento_id) else {
-        ev.estado.pendentes.remove(0);
+        ev.estado.pendentes.pop();
         return Ok(());
     };
     if cfg.partida.pausar_em_eventos {
@@ -158,7 +159,7 @@ fn popup_evento(
     let cor_pais = mundo.0.paises.get(&pend.pais).map(|p| egui::Color32::from_rgb(p.cor.0, p.cor.1, p.cor.2)).unwrap_or(CARIMBO);
     let nome_pais = mundo.0.paises.get(&pend.pais).map(|p| p.nome.clone()).unwrap_or_default();
     let mut escolhida: Option<usize> = None;
-    let faltam = ev.estado.pendentes.len() - 1;
+    let faltam = ev.estado.pendentes.len().saturating_sub(1);
 
     // Véu escurecido acima dos painéis abertos: bloqueia cliques enquanto o dossiê urgente está na tela.
     let ctx = contextos.ctx_mut()?.clone();
