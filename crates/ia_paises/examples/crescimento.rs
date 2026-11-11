@@ -113,7 +113,7 @@ fn main() {
                     println!("   demo {t}: sol={:.1} alfa={:.2} r_anual={:.4}", sp / w, ap / w, r / w);
                 }
                 let priv_n = p.fila_construcao.iter().filter(|i| i.privado).count();
-                println!("   {t}: pts_aplic/dia={:.1} fila={} (priv {}) niveis={tot} construcao={cons} fundo={:.2e} tes={:.2e} div={:.2e} rec={:.2e}", p.pontos_aplicados_ultimo_tick, p.fila_construcao.len(), priv_n, p.fundo_investimento_privado, p.orcamento.tesouro, p.orcamento.divida, p.orcamento.receita_total());
+                println!("   {t}: pts_aplic/dia={:.1} fila={} (priv {}) niveis={tot} construcao={cons} fundo={:.2e} tes={:.2e} div={:.2e} rec={:.2e}", p.pontos_aplicados_ultimo_tick(), p.fila_construcao.len(), priv_n, p.fundo_investimento_privado, p.orcamento.tesouro, p.orcamento.divida, p.orcamento.receita_total());
             }
         }
     }

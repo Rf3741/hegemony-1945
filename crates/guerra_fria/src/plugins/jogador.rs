@@ -1,16 +1,17 @@
 //! Camada jogável: país do jogador, HUD, painel do país (1), ranking e notificações.
-use super::enciclopedia::{dica_com, dica_conceito, texto_notificacao};
 use super::economia_sim::{Comando, EconomiaSim, VistaBem, VistaEconomia};
 use super::economy::RecursoMundo;
+use super::enciclopedia::{dica_com, dica_conceito, texto_notificacao};
 use super::mercado_ui::Icones;
+use super::politica_sim::PoliticaSim;
+use super::time::RecursoRelogio;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use sim_economia::{
-    CategoriaPredio, CatalogoEconomia, MetodoProducao, Predio, Provincia, SlotMetodo,
-    TipoPredio, materiais_por_ponto,
+    CatalogoEconomia, CategoriaPredio, MetodoProducao, Predio, Provincia, SlotMetodo, TipoPredio,
+    materiais_por_ponto,
 };
 use simulacao::mundo::EstadoPais;
-use super::politica_sim::PoliticaSim;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Tag do país controlado pelo jogador.
@@ -88,7 +89,10 @@ impl Notificacoes {
                 texto,
             );
         }
-        if let Some(resto) = texto.strip_prefix("GUERRA: ").or_else(|| texto.strip_prefix("GUERRA CIVIL ")) {
+        if let Some(resto) = texto
+            .strip_prefix("GUERRA: ")
+            .or_else(|| texto.strip_prefix("GUERRA CIVIL "))
+        {
             return texto_notificacao(
                 "msg_guerra_deflagrada",
                 &[
@@ -148,11 +152,15 @@ impl Plugin for JogadorPlugin {
             .init_resource::<Anterior>()
             .add_systems(
                 Update,
-                (alternar_painel, detectar_eventos).run_if(resource_exists::<PaisJogador>).run_if(crate::estado::em_partida),
+                (alternar_painel, detectar_eventos)
+                    .run_if(resource_exists::<PaisJogador>)
+                    .run_if(crate::estado::em_partida),
             )
             .add_systems(
                 EguiPrimaryContextPass,
-                (painel_pais.run_if(resource_exists::<EconomiaSim>), toasts).run_if(resource_exists::<PaisJogador>).run_if(crate::estado::em_partida),
+                (painel_pais.run_if(resource_exists::<EconomiaSim>), toasts)
+                    .run_if(resource_exists::<PaisJogador>)
+                    .run_if(crate::estado::em_partida),
             );
     }
 }
@@ -224,7 +232,15 @@ fn botao_painel(ui: &mut egui::Ui, texto: &str, ativo: bool) -> egui::Response {
 }
 
 /// Faixa do HUD com os indicadores do país do jogador (economia vinda do `sim_economia`).
-pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_aberto: &mut bool, mercado_aberto: &mut bool, comercio_aberto: &mut bool, construcao_aberta: &mut bool) {
+pub fn hud_pais(
+    ui: &mut egui::Ui,
+    p: &EstadoPais,
+    eco: &EconomiaSim,
+    painel_aberto: &mut bool,
+    mercado_aberto: &mut bool,
+    comercio_aberto: &mut bool,
+    construcao_aberta: &mut bool,
+) {
     let suave = ui_refinada::menu::TINTA_SUAVE;
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
@@ -240,32 +256,72 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
                 .color(ui_refinada::menu::TINTA),
         );
         ui.separator();
-        let val_txt = |t: String| egui::RichText::new(t).strong().color(ui_refinada::menu::TINTA);
+        let val_txt = |t: String| {
+            egui::RichText::new(t)
+                .strong()
+                .color(ui_refinada::menu::TINTA)
+        };
         match &eco.vista.pais {
             Some(pe) => {
                 let o = &pe.orcamento;
                 ui.label(egui::RichText::new("Tesouro").small().color(suave));
-                dica_com(ui.label(val_txt(fmt_din(o.tesouro))), "tooltip_topbar_tesouro", |ui| {
-                    ui.label(format!("Tesouro atual: {} | Dívida: {} | Saldo/dia: {}", fmt_din(o.tesouro), fmt_din(o.divida), fmt_din(o.saldo_diario)));
-                });
+                dica_com(
+                    ui.label(val_txt(fmt_din(o.tesouro))),
+                    "tooltip_topbar_tesouro",
+                    |ui| {
+                        ui.label(format!(
+                            "Tesouro atual: {} | Dívida: {} | Saldo/dia: {}",
+                            fmt_din(o.tesouro),
+                            fmt_din(o.divida),
+                            fmt_din(o.saldo_diario)
+                        ));
+                    },
+                );
                 ui.label(egui::RichText::new("Saldo/dia").small().color(suave));
-                let saldo_txt = if o.saldo_diario >= 0.0 { format!("+{}", fmt_din(o.saldo_diario)) } else { fmt_din(o.saldo_diario) };
-                dica_com(ui.colored_label(cor_saldo(o.saldo_diario), saldo_txt), "tooltip_topbar_balanco_diario", |ui| {
-                    ui.label(format!("Saldo diário atual: {} (por ano: {})", fmt_din(o.saldo_diario), fmt_din(o.saldo_diario * 365.0)));
-                });
+                let saldo_txt = if o.saldo_diario >= 0.0 {
+                    format!("+{}", fmt_din(o.saldo_diario))
+                } else {
+                    fmt_din(o.saldo_diario)
+                };
+                dica_com(
+                    ui.colored_label(cor_saldo(o.saldo_diario), saldo_txt),
+                    "tooltip_topbar_balanco_diario",
+                    |ui| {
+                        ui.label(format!(
+                            "Saldo diário atual: {} (por ano: {})",
+                            fmt_din(o.saldo_diario),
+                            fmt_din(o.saldo_diario * 365.0)
+                        ));
+                    },
+                );
                 ui.label(egui::RichText::new("Dívida").small().color(suave));
                 dica_conceito(ui.label(val_txt(fmt_din(o.divida))), "divida_publica");
                 ui.separator();
                 ui.label(egui::RichText::new("PIB").small().color(suave));
-                dica_conceito(ui.label(val_txt(fmt_din(eco.vista.pib_anual))), "produtividade_do_trabalho");
+                dica_conceito(
+                    ui.label(val_txt(fmt_din(eco.vista.pib_anual))),
+                    "produtividade_do_trabalho",
+                );
                 ui.label(egui::RichText::new("Pop.").small().color(suave));
-                dica_conceito(ui.label(val_txt(fmt_pop(eco.vista.populacao as u64))), "pop");
+                dica_conceito(
+                    ui.label(val_txt(fmt_pop(eco.vista.populacao as u64))),
+                    "pop",
+                );
                 ui.label(egui::RichText::new("Padrão de vida").small().color(suave));
-                dica_conceito(ui.label(val_txt(format!("{:.1}", eco.vista.padrao_vida))), "padrao_de_vida");
+                dica_conceito(
+                    ui.label(val_txt(format!("{:.1}", eco.vista.padrao_vida))),
+                    "padrao_de_vida",
+                );
                 ui.label(egui::RichText::new("Desemprego").small().color(suave));
-                dica_conceito(ui.label(val_txt(format!("{:.1}%", eco.vista.desemprego * 100.0))), "estrato_social");
+                dica_conceito(
+                    ui.label(val_txt(format!("{:.1}%", eco.vista.desemprego * 100.0))),
+                    "estrato_social",
+                );
                 if o.em_calote {
-                    ui.colored_label(ui_refinada::menu::PERIGO, egui::RichText::new("CALOTE").strong());
+                    ui.colored_label(
+                        ui_refinada::menu::PERIGO,
+                        egui::RichText::new("CALOTE").strong(),
+                    );
                 }
             }
             _ => {
@@ -273,23 +329,44 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
                 ui.label(val_txt(fmt_din(p.pib_anual_estimado)));
                 ui.label(egui::RichText::new("Pop.").small().color(suave));
                 ui.label(val_txt(fmt_pop(p.populacao_total())));
-                ui.label(egui::RichText::new("(economia detalhada indisponível)").italics().color(suave));
+                ui.label(
+                    egui::RichText::new("(economia detalhada indisponível)")
+                        .italics()
+                        .color(suave),
+                );
             }
         }
         ui.label(egui::RichText::new("Legitimidade").small().color(suave));
-        dica_com(ui.label(val_txt(format!("{:.0}%", p.politica.legitimidade))), "tooltip_topbar_legitimidade", |ui| {
-            ui.label(format!("Legitimidade atual: {:.1}%", p.politica.legitimidade));
-        });
+        dica_com(
+            ui.label(val_txt(format!("{:.0}%", p.politica.legitimidade))),
+            "tooltip_topbar_legitimidade",
+            |ui| {
+                ui.label(format!(
+                    "Legitimidade atual: {:.1}%",
+                    p.politica.legitimidade
+                ));
+            },
+        );
         if eco.atraso_dias() > 10 || eco.dias_perdidos > 0 {
-            ui.colored_label(ui_refinada::menu::AVISO, format!("Economia atrasada {} d", eco.atraso_dias()));
+            ui.colored_label(
+                ui_refinada::menu::AVISO,
+                format!("Economia atrasada {} d", eco.atraso_dias()),
+            );
         }
     });
     ui.add_space(2.0);
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
         let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
-        ui_refinada::theme::icone::desenhar(ui.painter(), rect, "torre", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
-        let b_constr = botao_painel(ui, "Construir (B)", *construcao_aberta).on_hover_text("Abre a tela de construção");
+        ui_refinada::theme::icone::desenhar(
+            ui.painter(),
+            rect,
+            "torre",
+            ui_refinada::menu::TINTA,
+            ui_refinada::menu::VERMELHO,
+        );
+        let b_constr = botao_painel(ui, "Construir (B)", *construcao_aberta)
+            .on_hover_text("Abre a tela de construção");
         super::tutorial_guiado::marcar(&b_constr, "btn_construir");
         if b_constr.clicked() {
             *construcao_aberta = !*construcao_aberta;
@@ -310,7 +387,13 @@ pub fn hud_pais(ui: &mut egui::Ui, p: &EstadoPais, eco: &EconomiaSim, painel_abe
             *comercio_aberto = !*comercio_aberto;
         }
         let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
-        ui_refinada::theme::icone::desenhar(ui.painter(), rect, "livro", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
+        ui_refinada::theme::icone::desenhar(
+            ui.painter(),
+            rect,
+            "livro",
+            ui_refinada::menu::TINTA,
+            ui_refinada::menu::VERMELHO,
+        );
         ui.label(egui::RichText::new("Enciclopédia (8)").color(ui_refinada::menu::TINTA_SUAVE));
     });
 }
@@ -345,10 +428,13 @@ fn detectar_eventos(
     mut pol: Option<ResMut<PoliticaSim>>,
     mut tec: Option<ResMut<super::tecnologia_ui::TecnologiaSim>>,
     tempo: Res<Time<Real>>,
+    relogio: Option<Res<RecursoRelogio>>,
     mut ant: ResMut<Anterior>,
     mut notas: ResMut<Notificacoes>,
 ) {
-    let Some(p) = mundo.paises.get(&jogador.0) else { return };
+    let Some(p) = mundo.paises.get(&jogador.0) else {
+        return;
+    };
     let agora = tempo.elapsed_secs_f64();
     if let Some(pol) = pol.as_mut() {
         for m in pol.mensagens.drain(..) {
@@ -357,7 +443,21 @@ fn detectar_eventos(
     }
     let mut calote = ant.calote;
     if let Some(eco) = eco.as_mut() {
-        for m in eco.mensagens.drain(..) {
+        // Calcula mês atual (ano * 12 + mes) para cooldown mensal de "Baixas de guerra"
+        let mes_atual = relogio
+            .as_ref()
+            .map(|r| r.data.ano * 12 + r.data.mes as i32)
+            .unwrap_or(1945 * 12 + 1);
+        // Drena mensagens para evitar empréstimo simultâneo
+        let mensagens: Vec<String> = eco.mensagens.drain(..).collect();
+        for m in mensagens {
+            // Filtra "Baixas de guerra extra registradas." para máx 1x por mês
+            if m == "Baixas de guerra extra registradas." {
+                if eco.ultimo_mes_baixas_guerra >= mes_atual {
+                    continue; // já mostrou este mês
+                }
+                eco.ultimo_mes_baixas_guerra = mes_atual;
+            }
             notas.push(Notificacoes::mensagem_modelada(&m, &p.nome), agora);
         }
         if let Some(pe) = &eco.vista.pais {
@@ -365,7 +465,11 @@ fn detectar_eventos(
             calote = pe.orcamento.em_calote;
             if ant.tag == jogador.0 && calote && !ant.calote {
                 let juros = format!("{:.1}", pe.orcamento.taxa_juros_efetiva_anual * 100.0);
-                let txt = super::enciclopedia::texto_notificacao("msg_tesouro_insolvente", &[("pais", p.nome.clone()), ("taxa_juros", juros)], "Calote soberano: dívida acima do limite de crédito!");
+                let txt = super::enciclopedia::texto_notificacao(
+                    "msg_tesouro_insolvente",
+                    &[("pais", p.nome.clone()), ("taxa_juros", juros)],
+                    "Calote soberano: dívida acima do limite de crédito!",
+                );
                 notas.push(txt, agora);
             }
         }
@@ -406,38 +510,40 @@ fn toasts(
         return Ok(());
     }
     // Acima dos botões fixos "Rankings (7)" e "Configurações" (canto inferior esquerdo).
-    egui::Area::new("toasts".into()).anchor(egui::Align2::LEFT_BOTTOM, [10.0, -64.0]).show(contextos.ctx_mut()?, |ui| {
-        ui.set_width(260.0);
-        for (txt, _, repeticoes) in notas.0.iter().rev().take(3) {
-            egui::Frame::NONE
-                .fill(ui_refinada::menu::PAPEL)
-                .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
-                .inner_margin(8.0)
-                .shadow(egui::Shadow {
-                    offset: [2, 3],
-                    blur: 6,
-                    spread: 0,
-                    color: egui::Color32::from_black_alpha(70),
-                })
-                .show(ui, |ui| {
-                    ui.set_min_width(260.0);
-                    let msg = if *repeticoes > 1 {
-                        format!("{txt} ×{repeticoes}")
-                    } else {
-                        txt.clone()
-                    };
-                    let mut job = egui::text::LayoutJob::simple(
-                        msg,
-                        egui::FontId::proportional(12.5),
-                        ui_refinada::menu::TINTA,
-                        244.0,
-                    );
-                    job.wrap.max_rows = 2;
-                    job.wrap.break_anywhere = false;
-                    ui.label(job);
-                });
-        }
-    });
+    egui::Area::new("toasts".into())
+        .anchor(egui::Align2::LEFT_BOTTOM, [10.0, -64.0])
+        .show(contextos.ctx_mut()?, |ui| {
+            ui.set_width(260.0);
+            for (txt, _, repeticoes) in notas.0.iter().rev().take(3) {
+                egui::Frame::NONE
+                    .fill(ui_refinada::menu::PAPEL)
+                    .stroke(egui::Stroke::new(1.5, ui_refinada::menu::VERMELHO))
+                    .inner_margin(8.0)
+                    .shadow(egui::Shadow {
+                        offset: [2, 3],
+                        blur: 6,
+                        spread: 0,
+                        color: egui::Color32::from_black_alpha(70),
+                    })
+                    .show(ui, |ui| {
+                        ui.set_min_width(260.0);
+                        let msg = if *repeticoes > 1 {
+                            format!("{txt} ×{repeticoes}")
+                        } else {
+                            txt.clone()
+                        };
+                        let mut job = egui::text::LayoutJob::simple(
+                            msg,
+                            egui::FontId::proportional(12.5),
+                            ui_refinada::menu::TINTA,
+                            244.0,
+                        );
+                        job.wrap.max_rows = 2;
+                        job.wrap.break_anywhere = false;
+                        ui.label(job);
+                    });
+            }
+        });
     Ok(())
 }
 
@@ -458,8 +564,20 @@ fn painel_pais(
     let mut fechar_painel = false;
     let mut aba = painel.aba;
     let ctx = contextos.ctx_mut()?;
-    let (tag_p, nome_p) = pol.as_ref().and_then(|p| p.vista.pais.as_ref().map(|x| (x.tag.clone(), x.nome.clone()))).unwrap_or_default();
-    let legado = if tag_p.is_empty() { String::new() } else { super::politica_sim::tag_legado_pub(&tag_p) };
+    let (tag_p, nome_p) = pol
+        .as_ref()
+        .and_then(|p| {
+            p.vista
+                .pais
+                .as_ref()
+                .map(|x| (x.tag.clone(), x.nome.clone()))
+        })
+        .unwrap_or_default();
+    let legado = if tag_p.is_empty() {
+        String::new()
+    } else {
+        super::politica_sim::tag_legado_pub(&tag_p)
+    };
     let resp_janela = ui_refinada::janela_dossie("Painel do país (1)", None)
         .default_pos([420.0, 118.0])
         .default_size([720.0, 600.0])
@@ -470,47 +588,50 @@ fn painel_pais(
             } else {
                 super::bandeiras_ui::nome_dinamico(ui, &legado).unwrap_or_else(|| nome_p.clone())
             };
-            egui::Frame::new().fill(ui_refinada::menu::AZUL_MARINHO).inner_margin(egui::Margin::symmetric(10, 5)).show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 8.0;
-                    ui.label(
-                        egui::RichText::new("1")
-                            .family(ui_refinada::familia_oswald(ui.ctx()))
-                            .size(12.0)
-                            .color(ui_refinada::menu::AZUL_MARINHO)
-                            .background_color(ui_refinada::menu::PAPEL)
-                            .strong(),
-                    );
-                    if !legado.is_empty() {
-                        super::bandeiras_ui::bandeira_ui(ui, &legado, 22.0);
-                    }
-                    ui.label(
-                        egui::RichText::new(format!("{nome_faixa}").to_uppercase())
-                            .family(ui_refinada::familia_oswald(ui.ctx()))
-                            .size(17.0)
-                            .strong()
-                            .color(ui_refinada::menu::PAPEL_CLARO),
-                    );
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                egui::RichText::new("X")
-                                    .family(ui_refinada::familia_oswald(ui.ctx()))
-                                    .size(13.0)
-                                    .strong()
-                                    .color(ui_refinada::menu::AZUL_MARINHO),
+            egui::Frame::new()
+                .fill(ui_refinada::menu::AZUL_MARINHO)
+                .inner_margin(egui::Margin::symmetric(10, 5))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 8.0;
+                        ui.label(
+                            egui::RichText::new("1")
+                                .family(ui_refinada::familia_oswald(ui.ctx()))
+                                .size(12.0)
+                                .color(ui_refinada::menu::AZUL_MARINHO)
+                                .background_color(ui_refinada::menu::PAPEL)
+                                .strong(),
+                        );
+                        if !legado.is_empty() {
+                            super::bandeiras_ui::bandeira_ui(ui, &legado, 22.0);
+                        }
+                        ui.label(
+                            egui::RichText::new(format!("{nome_faixa}").to_uppercase())
+                                .family(ui_refinada::familia_oswald(ui.ctx()))
+                                .size(17.0)
+                                .strong()
+                                .color(ui_refinada::menu::PAPEL_CLARO),
+                        );
+                        if ui
+                            .add(
+                                egui::Button::new(
+                                    egui::RichText::new("X")
+                                        .family(ui_refinada::familia_oswald(ui.ctx()))
+                                        .size(13.0)
+                                        .strong()
+                                        .color(ui_refinada::menu::AZUL_MARINHO),
+                                )
+                                .fill(ui_refinada::menu::PAPEL)
+                                .stroke(egui::Stroke::new(1.0, ui_refinada::menu::PAPEL_CLARO)),
                             )
-                            .fill(ui_refinada::menu::PAPEL)
-                            .stroke(egui::Stroke::new(1.0, ui_refinada::menu::PAPEL_CLARO)),
-                        )
-                        .on_hover_text("Fechar painel do país")
-                        .clicked()
-                    {
-                        fechar_painel = true;
-                    }
+                            .on_hover_text("Fechar painel do país")
+                            .clicked()
+                        {
+                            fechar_painel = true;
+                        }
+                    });
                 });
-            });
             // Cartão do país: bandeira grande + retrato do chefe + indicadores-chave.
             if let (Some(el), Some(r)) = (elenco.as_deref(), retratos.as_deref_mut()) {
                 if !tag_p.is_empty() {
@@ -522,7 +643,8 @@ fn painel_pais(
                                 super::bandeiras_ui::bandeira_ui(ui, &legado, 56.0);
                             }
                             super::personagens_ui::retrato_chefe(ui, el, r, &tag_p, 56.0);
-                            if let Some(pais_pol) = pol.as_ref().and_then(|p| p.vista.pais.as_ref()) {
+                            if let Some(pais_pol) = pol.as_ref().and_then(|p| p.vista.pais.as_ref())
+                            {
                                 let l = pais_pol.legitimidade as f32;
                                 let cor_l = if l >= 60.0 {
                                     ui_refinada::menu::SUCESSO
@@ -545,7 +667,10 @@ fn painel_pais(
                                         100.0,
                                         cor_l,
                                         180.0,
-                                        Some(&format!("{l:.0}% · {:?}", pais_pol.faixa_legitimidade)),
+                                        Some(&format!(
+                                            "{l:.0}% · {:?}",
+                                            pais_pol.faixa_legitimidade
+                                        )),
                                     );
                                 });
                             }
@@ -555,29 +680,43 @@ fn painel_pais(
             }
             ui.add_space(4.0);
             ui.horizontal(|ui| {
-                if ui_refinada::aba_glifo(ui, aba == Aba::Economia, Some("moeda"), "Economia") { aba = Aba::Economia; }
-                if ui_refinada::aba_glifo(ui, aba == Aba::Construcao, Some("torre"), "Construção") { aba = Aba::Construcao; }
-                if ui_refinada::aba_glifo(ui, aba == Aba::Politica, Some("balanca"), "Política") { aba = Aba::Politica; }
-                if ui_refinada::aba_glifo(ui, aba == Aba::Ranking, Some("grafico"), "Ranking") { aba = Aba::Ranking; }
+                if ui_refinada::aba_glifo(ui, aba == Aba::Economia, Some("moeda"), "Economia") {
+                    aba = Aba::Economia;
+                }
+                if ui_refinada::aba_glifo(ui, aba == Aba::Construcao, Some("torre"), "Construção")
+                {
+                    aba = Aba::Construcao;
+                }
+                if ui_refinada::aba_glifo(ui, aba == Aba::Politica, Some("balanca"), "Política") {
+                    aba = Aba::Politica;
+                }
+                if ui_refinada::aba_glifo(ui, aba == Aba::Ranking, Some("grafico"), "Ranking") {
+                    aba = Aba::Ranking;
+                }
             });
             ui_refinada::linha_decorativa(ui);
-            egui::ScrollArea::vertical().auto_shrink([false, false]).max_height(430.0).show(ui, |ui| match aba {
-                Aba::Economia => aba_economia(ui, &mut eco, &mut painel, &mut icones),
-                Aba::Construcao => aba_construcao(ui, &mut eco, &mut painel, &mut icones),
-                Aba::Politica => match pol.as_mut() {
-                    Some(p) => {
-                        super::politica_ui::aba_politica(ui, p);
-                        if let (Some(el), Some(r), Some(tag)) = (elenco.as_deref(), retratos.as_deref_mut(), p.tag.clone()) {
-                            ui.separator();
-                            super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .max_height(430.0)
+                .show(ui, |ui| match aba {
+                    Aba::Economia => aba_economia(ui, &mut eco, &mut painel, &mut icones),
+                    Aba::Construcao => aba_construcao(ui, &mut eco, &mut painel, &mut icones),
+                    Aba::Politica => match pol.as_mut() {
+                        Some(p) => {
+                            super::politica_ui::aba_politica(ui, p);
+                            if let (Some(el), Some(r), Some(tag)) =
+                                (elenco.as_deref(), retratos.as_deref_mut(), p.tag.clone())
+                            {
+                                ui.separator();
+                                super::personagens_ui::painel_lideres(ui, el, r, &tag, hoje);
+                            }
                         }
-                    }
-                    None => {
-                        ui.label("Política ainda carregando...");
-                    }
-                },
-                Aba::Ranking => aba_ranking(ui, &eco.vista),
-            });
+                        None => {
+                            ui.label("Política ainda carregando...");
+                        }
+                    },
+                    Aba::Ranking => aba_ranking(ui, &eco.vista),
+                });
         });
     if let Some(r) = resp_janela {
         super::tutorial_guiado::marcar(&r.response, "janela_pais");
@@ -590,12 +729,24 @@ fn painel_pais(
 }
 
 fn linha_fluxo(ui: &mut egui::Ui, nome: &str, v: f64) {
-    ui.label(egui::RichText::new(nome).size(13.0).color(ui_refinada::menu::TINTA));
+    ui.label(
+        egui::RichText::new(nome)
+            .size(13.0)
+            .color(ui_refinada::menu::TINTA),
+    );
     ui.allocate_ui_with_layout(
         egui::Vec2::new(96.0, 16.0),
         egui::Layout::right_to_left(egui::Align::Center),
         |ui| {
-            ui.add(egui::Label::new(egui::RichText::new(fmt_din(v)).size(13.0).strong().color(cor_saldo(v))).selectable(false));
+            ui.add(
+                egui::Label::new(
+                    egui::RichText::new(fmt_din(v))
+                        .size(13.0)
+                        .strong()
+                        .color(cor_saldo(v)),
+                )
+                .selectable(false),
+            );
         },
     );
     ui.end_row();
@@ -612,7 +763,12 @@ fn cabecalho_fluxo(ui: &mut egui::Ui, texto: &str, cor: egui::Color32) {
     );
 }
 
-fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPais, icones: &mut Icones) {
+fn aba_economia(
+    ui: &mut egui::Ui,
+    eco: &mut EconomiaSim,
+    painel: &mut PainelPais,
+    icones: &mut Icones,
+) {
     let mut cmds: Vec<Comando> = Vec::new();
     {
         let v = &eco.vista;
@@ -624,43 +780,91 @@ fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPai
 
         // ---------------- Orçamento ----------------
         ui_refinada::titulo_secao(ui, "Orçamento (por dia)");
-        ui.label(format!("Tesouro {} | Dívida {} | Limite de crédito {} | Juros {:.1}% a.a.", fmt_din(o.tesouro), fmt_din(o.divida), fmt_din(o.limite_credito), o.taxa_juros_efetiva_anual * 100.0));
+        ui.label(format!(
+            "Tesouro {} | Dívida {} | Limite de crédito {} | Juros {:.1}% a.a.",
+            fmt_din(o.tesouro),
+            fmt_din(o.divida),
+            fmt_din(o.limite_credito),
+            o.taxa_juros_efetiva_anual * 100.0
+        ));
         ui.columns(2, |cols| {
-            egui::Grid::new("receitas").num_columns(2).striped(true).spacing([8.0, 3.0]).show(&mut cols[0], |ui| {
-                cabecalho_fluxo(ui, "Receitas", ui_refinada::menu::SUCESSO);
-                ui.end_row();
-                linha_fluxo(ui, "Imposto de renda e dividendos", o.receita_imposto_renda);
-                linha_fluxo(ui, "Imposto de consumo", o.receita_imposto_consumo);
-                linha_fluxo(ui, "Imposto sobre a terra", o.receita_imposto_terra);
-                linha_fluxo(ui, "Empresas estatais", o.receita_dividendos_estatais);
-                linha_fluxo(ui, "Tarifas de importação", o.receita_tarifas);
-                linha_fluxo(ui, "Turismo e hotelaria", o.receita_turismo);
-            });
-            egui::Grid::new("despesas").num_columns(2).striped(true).spacing([8.0, 3.0]).show(&mut cols[1], |ui| {
-                cabecalho_fluxo(ui, "Despesas", ui_refinada::menu::PERIGO);
-                ui.end_row();
-                linha_fluxo(ui, "Burocracia", -o.gasto_burocracia);
-                linha_fluxo(ui, "Forças armadas", -o.gasto_militar);
-                linha_fluxo(ui, "Setor de construção", -o.gasto_construcao);
-                linha_fluxo(ui, "Materiais das obras", -o.gasto_obras_materiais);
-                linha_fluxo(ui, "Subsídios", -o.gasto_subsidios);
-                linha_fluxo(ui, "Juros da dívida", -o.gasto_juros);
-            });
+            egui::Grid::new("receitas")
+                .num_columns(2)
+                .striped(true)
+                .spacing([8.0, 3.0])
+                .show(&mut cols[0], |ui| {
+                    cabecalho_fluxo(ui, "Receitas", ui_refinada::menu::SUCESSO);
+                    ui.end_row();
+                    linha_fluxo(ui, "Imposto de renda e dividendos", o.receita_imposto_renda);
+                    linha_fluxo(ui, "Imposto de consumo", o.receita_imposto_consumo);
+                    linha_fluxo(ui, "Imposto sobre a terra", o.receita_imposto_terra);
+                    linha_fluxo(ui, "Empresas estatais", o.receita_dividendos_estatais);
+                    linha_fluxo(ui, "Tarifas de importação", o.receita_tarifas);
+                    linha_fluxo(ui, "Turismo e hotelaria", o.receita_turismo);
+                });
+            egui::Grid::new("despesas")
+                .num_columns(2)
+                .striped(true)
+                .spacing([8.0, 3.0])
+                .show(&mut cols[1], |ui| {
+                    cabecalho_fluxo(ui, "Despesas", ui_refinada::menu::PERIGO);
+                    ui.end_row();
+                    linha_fluxo(ui, "Burocracia", -o.gasto_burocracia);
+                    linha_fluxo(ui, "Forças armadas", -o.gasto_militar);
+                    linha_fluxo(ui, "Setor de construção", -o.gasto_construcao);
+                    linha_fluxo(ui, "Materiais das obras", -o.gasto_obras_materiais);
+                    linha_fluxo(ui, "Subsídios", -o.gasto_subsidios);
+                    linha_fluxo(ui, "Juros da dívida", -o.gasto_juros);
+                });
         });
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("Saldo diário:").size(13.0).strong().color(ui_refinada::menu::TINTA));
-            ui.colored_label(cor_saldo(o.saldo_diario), egui::RichText::new(fmt_din(o.saldo_diario)).size(13.0).strong().color(cor_saldo(o.saldo_diario)));
+            ui.label(
+                egui::RichText::new("Saldo diário:")
+                    .size(13.0)
+                    .strong()
+                    .color(ui_refinada::menu::TINTA),
+            );
+            ui.colored_label(
+                cor_saldo(o.saldo_diario),
+                egui::RichText::new(fmt_din(o.saldo_diario))
+                    .size(13.0)
+                    .strong()
+                    .color(cor_saldo(o.saldo_diario)),
+            );
             if o.em_calote {
-                ui.colored_label(ui_refinada::menu::PERIGO, egui::RichText::new("País em calote (dívida no limite de crédito)!").size(13.0).strong().color(ui_refinada::menu::PERIGO));
+                ui.colored_label(
+                    ui_refinada::menu::PERIGO,
+                    egui::RichText::new("País em calote (dívida no limite de crédito)!")
+                        .size(13.0)
+                        .strong()
+                        .color(ui_refinada::menu::PERIGO),
+                );
             }
         });
         ui.horizontal(|ui| {
-            ui.colored_label(ui_refinada::menu::INFO, egui::RichText::new(format!("Fundo de Investimento Privado: {}", fmt_din(pais.fundo_investimento_privado))).strong());
-            ui.label(format!("(+{}/d aportes, -{}/d obras)", fmt_din(pais.aporte_fundo_privado_ultimo_tick), fmt_din(pais.gasto_fundo_privado_ultimo_tick)));
+            ui.colored_label(
+                ui_refinada::menu::INFO,
+                egui::RichText::new(format!(
+                    "Fundo de Investimento Privado: {}",
+                    fmt_din(pais.fundo_investimento_privado)
+                ))
+                .strong(),
+            );
+            ui.label(format!(
+                "(+{}/d aportes, -{}/d obras)",
+                fmt_din(pais.aporte_fundo_privado_ultimo_tick),
+                fmt_din(pais.gasto_fundo_privado_ultimo_tick)
+            ));
         });
         let pf = &pais.politica_fiscal;
         ui.horizontal_wrapped(|ui| {
-            ui.label(format!("Imposto de renda: {:.0}% / {:.0}% / {:.0}% (baixo/médio/alto), dividendos {:.0}%", pf.aliquota_imposto_renda_baixo * 100.0, pf.aliquota_imposto_renda_medio * 100.0, pf.aliquota_imposto_renda_alto * 100.0, pf.aliquota_imposto_dividendos * 100.0));
+            ui.label(format!(
+                "Imposto de renda: {:.0}% / {:.0}% / {:.0}% (baixo/médio/alto), dividendos {:.0}%",
+                pf.aliquota_imposto_renda_baixo * 100.0,
+                pf.aliquota_imposto_renda_medio * 100.0,
+                pf.aliquota_imposto_renda_alto * 100.0,
+                pf.aliquota_imposto_dividendos * 100.0
+            ));
             if ui.button("Impostos -10%").clicked() {
                 cmds.push(Comando::EscalarImposto(0.9));
             }
@@ -677,50 +881,94 @@ fn aba_economia(ui: &mut egui::Ui, eco: &mut EconomiaSim, painel: &mut PainelPai
                 cmds.push(Comando::AjustarTarifa(0.02));
             }
         });
-        ui.label(format!("Lei de comércio: {} | Eficiência de arrecadação {:.0}%", pf.lei_comercial_id.replace('_', " "), pais.eficiencia_arrecadacao * 100.0));
+        ui.label(format!(
+            "Lei de comércio: {} | Eficiência de arrecadação {:.0}%",
+            pf.lei_comercial_id.replace('_', " "),
+            pais.eficiencia_arrecadacao * 100.0
+        ));
         ui.add_space(6.0);
         ui_refinada::linha_decorativa(ui);
 
         // ---------------- População ----------------
         ui_refinada::titulo_secao(ui, "População");
-        ui.label(format!("PIB {} | Padrão de vida médio {:.1} | Desemprego {:.1}%", fmt_din(v.pib_anual), v.padrao_vida, v.desemprego * 100.0));
-        egui::Grid::new("pops").striped(true).spacing([8.0, 3.0]).show(ui, |ui| {
-            for (h, largura) in [("Tipo", 170.0_f32), ("Habitantes", 90.0), ("Empregados", 90.0), ("Renda/pessoa/dia", 110.0), ("Padrão de vida", 96.0)] {
-                ui.add_sized(
-                    [largura, 16.0],
-                    egui::Label::new(
-                        egui::RichText::new(h.to_uppercase())
-                            .family(ui_refinada::familia_oswald(ui.ctx()))
-                            .size(12.0)
-                            .strong()
-                            .color(ui_refinada::menu::TINTA_SUAVE),
-                    )
-                    .selectable(false),
-                );
-            }
-            ui.end_row();
-            for p in &v.pops {
-                ui.horizontal(|ui| {
-                    icones.mostrar(ui, &p.id, 16.0);
-                    ui.label(&p.nome);
-                });
-                ui.add_sized([90.0, 16.0], egui::Label::new(fmt_pop(p.populacao as u64)).selectable(false));
-                ui.add_sized([90.0, 16.0], egui::Label::new(fmt_pop(p.empregados as u64)).selectable(false));
-                ui.add_sized([110.0, 16.0], egui::Label::new(format!("{:.2}", p.renda_per_capita())).selectable(false));
-                ui.add_sized([96.0, 16.0], egui::Label::new(format!("{:.1}", p.padrao_vida())).selectable(false));
+        ui.label(format!(
+            "PIB {} | Padrão de vida médio {:.1} | Desemprego {:.1}%",
+            fmt_din(v.pib_anual),
+            v.padrao_vida,
+            v.desemprego * 100.0
+        ));
+        egui::Grid::new("pops")
+            .striped(true)
+            .spacing([8.0, 3.0])
+            .show(ui, |ui| {
+                for (h, largura) in [
+                    ("Tipo", 170.0_f32),
+                    ("Habitantes", 90.0),
+                    ("Empregados", 90.0),
+                    ("Renda/pessoa/dia", 110.0),
+                    ("Padrão de vida", 96.0),
+                ] {
+                    ui.add_sized(
+                        [largura, 16.0],
+                        egui::Label::new(
+                            egui::RichText::new(h.to_uppercase())
+                                .family(ui_refinada::familia_oswald(ui.ctx()))
+                                .size(12.0)
+                                .strong()
+                                .color(ui_refinada::menu::TINTA_SUAVE),
+                        )
+                        .selectable(false),
+                    );
+                }
                 ui.end_row();
-            }
-        });
+                for p in &v.pops {
+                    ui.horizontal(|ui| {
+                        icones.mostrar(ui, &p.id, 16.0);
+                        ui.label(&p.nome);
+                    });
+                    ui.add_sized(
+                        [90.0, 16.0],
+                        egui::Label::new(fmt_pop(p.populacao as u64)).selectable(false),
+                    );
+                    ui.add_sized(
+                        [90.0, 16.0],
+                        egui::Label::new(fmt_pop(p.empregados as u64)).selectable(false),
+                    );
+                    ui.add_sized(
+                        [110.0, 16.0],
+                        egui::Label::new(format!("{:.2}", p.renda_per_capita())).selectable(false),
+                    );
+                    ui.add_sized(
+                        [96.0, 16.0],
+                        egui::Label::new(format!("{:.1}", p.padrao_vida())).selectable(false),
+                    );
+                    ui.end_row();
+                }
+            });
         ui.add_space(6.0);
         ui_refinada::linha_decorativa(ui);
 
         // ---------------- Construção & Prédios (Resumo) ----------------
         ui_refinada::titulo_secao(ui, "Construção & Prédios");
         ui.horizontal_wrapped(|ui| {
-            ui.label(format!("Capacidade: {:.0} pts/dia | Obras na fila: {} | Gasto diário em materiais: {}", v.pontos_construcao_dia, pais.fila_construcao.len(), fmt_din(o.gasto_obras_materiais)));
+            ui.label(format!(
+                "Capacidade: {:.0} pts/dia | Obras na fila: {} | Gasto diário em materiais: {}",
+                v.pontos_construcao_dia,
+                pais.fila_construcao.len(),
+                fmt_din(o.gasto_obras_materiais)
+            ));
             let (rect_gl, _) = ui.allocate_exact_size(egui::vec2(16.0, 16.0), egui::Sense::hover());
-            ui_refinada::theme::icone::desenhar(ui.painter(), rect_gl, "torre", ui_refinada::menu::TINTA, ui_refinada::menu::VERMELHO);
-            if ui.button("Ir para a aba Construção e Prédios (Gestão Completa)").clicked() {
+            ui_refinada::theme::icone::desenhar(
+                ui.painter(),
+                rect_gl,
+                "torre",
+                ui_refinada::menu::TINTA,
+                ui_refinada::menu::VERMELHO,
+            );
+            if ui
+                .button("Ir para a aba Construção e Prédios (Gestão Completa)")
+                .clicked()
+            {
                 painel.aba = Aba::Construcao;
             }
         });
@@ -734,42 +982,79 @@ fn aba_ranking(ui: &mut egui::Ui, v: &VistaEconomia) {
     let mut paises: Vec<&super::economia_sim::ResumoPaisEco> = v.ranking.iter().collect();
     ui.columns(3, |cols| {
         paises.sort_by(|a, b| b.pib_anual.total_cmp(&a.pib_anual));
-        ranking_coluna(&mut cols[0], "Maiores PIBs", &paises, &v.pais_id, |p| fmt_din(p.pib_anual));
+        ranking_coluna(&mut cols[0], "Maiores PIBs", &paises, &v.pais_id, |p| {
+            fmt_din(p.pib_anual)
+        });
         paises.sort_by(|a, b| b.populacao.total_cmp(&a.populacao));
-        ranking_coluna(&mut cols[1], "Maiores populações", &paises, &v.pais_id, |p| fmt_pop(p.populacao as u64));
+        ranking_coluna(
+            &mut cols[1],
+            "Maiores populações",
+            &paises,
+            &v.pais_id,
+            |p| fmt_pop(p.populacao as u64),
+        );
         paises.retain(|p| p.populacao > 1.0e6);
         paises.sort_by(|a, b| b.padrao_vida.total_cmp(&a.padrao_vida));
-        ranking_coluna(&mut cols[2], "Maior padrão de vida", &paises, &v.pais_id, |p| format!("{:.1}", p.padrao_vida));
+        ranking_coluna(
+            &mut cols[2],
+            "Maior padrão de vida",
+            &paises,
+            &v.pais_id,
+            |p| format!("{:.1}", p.padrao_vida),
+        );
     });
 }
 
 /// Uma das três colunas de ranking do painel do país: cabeçalho em Oswald e linhas numeradas.
-fn ranking_coluna(ui: &mut egui::Ui, titulo: &str, paises: &[&super::economia_sim::ResumoPaisEco], pais_id: &str, valor: impl Fn(&super::economia_sim::ResumoPaisEco) -> String) {
+fn ranking_coluna(
+    ui: &mut egui::Ui,
+    titulo: &str,
+    paises: &[&super::economia_sim::ResumoPaisEco],
+    pais_id: &str,
+    valor: impl Fn(&super::economia_sim::ResumoPaisEco) -> String,
+) {
     ui_refinada::titulo_secao(ui, titulo);
-    egui::Grid::new(titulo).striped(true).spacing([8.0, 3.0]).show(ui, |ui| {
-        for (i, p) in paises.iter().take(10).enumerate() {
-            let eu = p.id == pais_id;
-            let cor = if eu { ui_refinada::menu::VERMELHO } else { ui_refinada::menu::TINTA };
-            let nome = if eu {
-                egui::RichText::new(&p.nome).size(12.0).strong().color(cor)
-            } else {
-                egui::RichText::new(&p.nome).size(12.0).color(cor)
-            };
-            ui.add_sized(
-                [22.0, 16.0],
-                egui::Label::new(egui::RichText::new(format!("{}.", i + 1)).size(12.0).color(ui_refinada::menu::TINTA_SUAVE)).selectable(false),
-            );
-            ui.add_sized([150.0, 16.0], egui::Label::new(nome).selectable(false));
-            ui.allocate_ui_with_layout(
-                egui::Vec2::new(86.0, 16.0),
-                egui::Layout::right_to_left(egui::Align::Center),
-                |ui| {
-                    ui.add(egui::Label::new(egui::RichText::new(valor(p)).size(12.0).strong().color(cor)).selectable(false));
-                },
-            );
-            ui.end_row();
-        }
-    });
+    egui::Grid::new(titulo)
+        .striped(true)
+        .spacing([8.0, 3.0])
+        .show(ui, |ui| {
+            for (i, p) in paises.iter().take(10).enumerate() {
+                let eu = p.id == pais_id;
+                let cor = if eu {
+                    ui_refinada::menu::VERMELHO
+                } else {
+                    ui_refinada::menu::TINTA
+                };
+                let nome = if eu {
+                    egui::RichText::new(&p.nome).size(12.0).strong().color(cor)
+                } else {
+                    egui::RichText::new(&p.nome).size(12.0).color(cor)
+                };
+                ui.add_sized(
+                    [22.0, 16.0],
+                    egui::Label::new(
+                        egui::RichText::new(format!("{}.", i + 1))
+                            .size(12.0)
+                            .color(ui_refinada::menu::TINTA_SUAVE),
+                    )
+                    .selectable(false),
+                );
+                ui.add_sized([150.0, 16.0], egui::Label::new(nome).selectable(false));
+                ui.allocate_ui_with_layout(
+                    egui::Vec2::new(86.0, 16.0),
+                    egui::Layout::right_to_left(egui::Align::Center),
+                    |ui| {
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new(valor(p)).size(12.0).strong().color(cor),
+                            )
+                            .selectable(false),
+                        );
+                    },
+                );
+                ui.end_row();
+            }
+        });
 }
 
 fn rotulo_slot(slot: SlotMetodo) -> &'static str {
@@ -802,7 +1087,12 @@ pub(crate) fn calcular_lucratividade_esperada(
         bens.iter()
             .find(|b| b.id == bid)
             .map(|b| b.preco_nacional)
-            .unwrap_or_else(|| cat.bens.iter().find(|b| b.id == bid).map_or(20.0, |b| b.preco_base))
+            .unwrap_or_else(|| {
+                cat.bens
+                    .iter()
+                    .find(|b| b.id == bid)
+                    .map_or(20.0, |b| b.preco_base)
+            })
     };
 
     let mut map_produtos: BTreeMap<String, f64> = BTreeMap::new();
@@ -836,7 +1126,11 @@ pub(crate) fn calcular_lucratividade_esperada(
     let mut custo_folha = 0.0;
     let mut vagas_totais = 0.0;
     for (pid, delta) in map_empregos {
-        let mult = cat.tipos_pop.iter().find(|tp| tp.id == pid).map_or(1.0, |tp| tp.multiplicador_salario);
+        let mult = cat
+            .tipos_pop
+            .iter()
+            .find(|tp| tp.id == pid)
+            .map_or(1.0, |tp| tp.multiplicador_salario);
         if delta > 0 {
             let v = delta as f64;
             vagas_totais += v;
@@ -850,8 +1144,16 @@ pub(crate) fn calcular_lucratividade_esperada(
         receita - custo_insumos - custo_folha
     };
 
-    let margem = if receita > 1e-6 { (lucro_liquido / receita) * 100.0 } else { 0.0 };
-    let produtividade = if vagas_totais > 0.0 { (receita - custo_insumos) / vagas_totais } else { 0.0 };
+    let margem = if receita > 1e-6 {
+        (lucro_liquido / receita) * 100.0
+    } else {
+        0.0
+    };
+    let produtividade = if vagas_totais > 0.0 {
+        (receita - custo_insumos) / vagas_totais
+    } else {
+        0.0
+    };
 
     LucratividadeEsperada {
         receita,
@@ -878,10 +1180,18 @@ pub(crate) fn calcular_custo_materiais_obra(
         bens.iter()
             .find(|b| b.id == bid)
             .map(|b| b.preco_nacional)
-            .unwrap_or_else(|| cat.bens.iter().find(|b| b.id == bid).map_or(20.0, |b| b.preco_base))
+            .unwrap_or_else(|| {
+                cat.bens
+                    .iter()
+                    .find(|b| b.id == bid)
+                    .map_or(20.0, |b| b.preco_base)
+            })
     };
     let nome_bem = |bid: &str| -> String {
-        cat.bens.iter().find(|b| b.id == bid).map_or_else(|| bid.to_string(), |b| b.nome.clone())
+        cat.bens
+            .iter()
+            .find(|b| b.id == bid)
+            .map_or_else(|| bid.to_string(), |b| b.nome.clone())
     };
 
     let mut itens = Vec::new();
@@ -908,21 +1218,41 @@ fn formatar_efeito_troca_metodo(
     let Some(novo) = cat.metodos_producao.iter().find(|m| m.id == metodo_novo_id) else {
         return format!("Trocar para {metodo_novo_id}");
     };
-    let antigo = cat.metodos_producao.iter().find(|m| m.id == metodo_antigo_id);
+    let antigo = cat
+        .metodos_producao
+        .iter()
+        .find(|m| m.id == metodo_antigo_id);
 
     let nome_bem = |bid: &str| -> String {
-        cat.bens.iter().find(|b| b.id == bid).map_or_else(|| bid.to_string(), |b| b.nome.clone())
+        cat.bens
+            .iter()
+            .find(|b| b.id == bid)
+            .map_or_else(|| bid.to_string(), |b| b.nome.clone())
     };
     let nome_pop = |pid: &str| -> String {
-        cat.tipos_pop.iter().find(|p| p.id == pid).map_or_else(|| pid.to_string(), |p| p.nome.clone())
+        cat.tipos_pop
+            .iter()
+            .find(|p| p.id == pid)
+            .map_or_else(|| pid.to_string(), |p| p.nome.clone())
     };
     let preco_de = |bid: &str| -> f64 {
-        bens.iter().find(|b| b.id == bid).map(|b| b.preco_nacional).unwrap_or(20.0)
+        bens.iter()
+            .find(|b| b.id == bid)
+            .map(|b| b.preco_nacional)
+            .unwrap_or(20.0)
     };
 
     let mut lines = Vec::new();
-    lines.push(format!("Trocar para: {} ({})", novo.nome, rotulo_slot(novo.slot)));
-    lines.push(format!("Alvo: {} ({} níveis)\n", escopo_label, niveis.max(1)));
+    lines.push(format!(
+        "Trocar para: {} ({})",
+        novo.nome,
+        rotulo_slot(novo.slot)
+    ));
+    lines.push(format!(
+        "Alvo: {} ({} níveis)\n",
+        escopo_label,
+        niveis.max(1)
+    ));
 
     // Insumos
     let mut insumos_deltas = Vec::new();
@@ -932,12 +1262,22 @@ fn formatar_efeito_troca_metodo(
     }
     for &bid in &todos_insumos {
         let q_novo = novo.insumos.get(bid).copied().unwrap_or(0.0);
-        let q_antigo = antigo.and_then(|a| a.insumos.get(bid)).copied().unwrap_or(0.0);
+        let q_antigo = antigo
+            .and_then(|a| a.insumos.get(bid))
+            .copied()
+            .unwrap_or(0.0);
         let d = q_novo - q_antigo;
         if d.abs() > 1e-5 {
             let val = d * preco_de(bid);
             let sinal = if d > 0.0 { "+" } else { "" };
-            insumos_deltas.push(format!("  • {}{:.1} {}/dia ({}{})", sinal, d, nome_bem(bid), sinal, fmt_din(val)));
+            insumos_deltas.push(format!(
+                "  • {}{:.1} {}/dia ({}{})",
+                sinal,
+                d,
+                nome_bem(bid),
+                sinal,
+                fmt_din(val)
+            ));
         }
     }
     if !insumos_deltas.is_empty() {
@@ -955,12 +1295,22 @@ fn formatar_efeito_troca_metodo(
     }
     for &bid in &todos_produtos {
         let q_novo = novo.produtos.get(bid).copied().unwrap_or(0.0);
-        let q_antigo = antigo.and_then(|a| a.produtos.get(bid)).copied().unwrap_or(0.0);
+        let q_antigo = antigo
+            .and_then(|a| a.produtos.get(bid))
+            .copied()
+            .unwrap_or(0.0);
         let d = q_novo - q_antigo;
         if d.abs() > 1e-5 {
             let val = d * preco_de(bid);
             let sinal = if d > 0.0 { "+" } else { "" };
-            produtos_deltas.push(format!("  • {}{:.1} {}/dia ({}{})", sinal, d, nome_bem(bid), sinal, fmt_din(val)));
+            produtos_deltas.push(format!(
+                "  • {}{:.1} {}/dia ({}{})",
+                sinal,
+                d,
+                nome_bem(bid),
+                sinal,
+                fmt_din(val)
+            ));
         }
     }
     if !produtos_deltas.is_empty() {
@@ -978,7 +1328,10 @@ fn formatar_efeito_troca_metodo(
     }
     for &pid in &todos_empregos {
         let e_novo = novo.empregos.get(pid).copied().unwrap_or(0);
-        let e_antigo = antigo.and_then(|a| a.empregos.get(pid)).copied().unwrap_or(0);
+        let e_antigo = antigo
+            .and_then(|a| a.empregos.get(pid))
+            .copied()
+            .unwrap_or(0);
         let d = e_novo - e_antigo;
         if d != 0 {
             let sinal = if d > 0 { "+" } else { "" };
@@ -1015,7 +1368,11 @@ pub fn aba_construcao(
         let mut prejuizo_total = 0.0f64;
         for pr in &v.provincias {
             for b in &pr.predios {
-                let financiado = cat.tipos_predio.iter().find(|t| t.id == b.tipo_predio_id).map_or(false, |t| t.financiado_pelo_governo);
+                let financiado = cat
+                    .tipos_predio
+                    .iter()
+                    .find(|t| t.id == b.tipo_predio_id)
+                    .map_or(false, |t| t.financiado_pelo_governo);
                 if !financiado && b.lucro_ultimo_tick < -0.01 {
                     predios_com_prejuizo += 1;
                     prejuizo_total += b.lucro_ultimo_tick.abs();
@@ -1028,11 +1385,17 @@ pub fn aba_construcao(
         // =========================================================================
         let cota_priv = pais.alocacao_privada_lei();
         let cota_est = pais.alocacao_estatal_lei();
-        let lei_nome = pais.politica_fiscal.lei_sistema_economico_id.replace('_', " ");
+        let lei_nome = pais
+            .politica_fiscal
+            .lei_sistema_economico_id
+            .replace('_', " ");
 
         ui.heading("Construção & Prédios (Estilo Victoria 3)");
         ui.horizontal_wrapped(|ui| {
-            ui.label(format!("Capacidade de Construção: {:.0} pts/dia (máx. 25 pts/obra)", v.pontos_construcao_dia));
+            ui.label(format!(
+                "Capacidade de Construção: {:.0} pts/dia (máx. 25 pts/obra)",
+                v.pontos_construcao_dia
+            ));
             ui.separator();
             ui.label(format!(
                 "Alocação da Lei: {:.0}% Estatal ({:.1} pts/d) | {:.0}% Privado ({:.1} pts/d) [{}]",
@@ -1043,7 +1406,10 @@ pub fn aba_construcao(
                 lei_nome
             ));
             ui.separator();
-            ui.label(format!("Gasto estatal com materiais: {}", fmt_din(pais.orcamento.gasto_obras_materiais)));
+            ui.label(format!(
+                "Gasto estatal com materiais: {}",
+                fmt_din(pais.orcamento.gasto_obras_materiais)
+            ));
         });
 
         if predios_com_prejuizo > 0 {
@@ -1080,7 +1446,10 @@ pub fn aba_construcao(
 
         ui.horizontal(|ui| {
             ui.heading(format!("Obras Públicas e Estatais ({n_estatais})"));
-            ui.label(format!("Cota reservada: {:.1} pts/dia | Financiamento: Orçamento Público", v.pontos_construcao_dia * cota_est));
+            ui.label(format!(
+                "Cota reservada: {:.1} pts/dia | Financiamento: Orçamento Público",
+                v.pontos_construcao_dia * cota_est
+            ));
         });
 
         if n_estatais == 0 {
@@ -1106,14 +1475,19 @@ pub fn aba_construcao(
                     ui.end_row();
 
                     for (pos_ordem, &(idx_original, item)) in obras_estatais.iter().enumerate() {
-                        let nome_t = cat.tipos_predio.iter().find(|t| t.id == item.tipo_predio_id)
+                        let nome_t = cat
+                            .tipos_predio
+                            .iter()
+                            .find(|t| t.id == item.tipo_predio_id)
                             .map_or(item.tipo_predio_id.as_str(), |t| t.nome.as_str());
                         let prov = v.provincias.iter().find(|p| p.id == item.provincia_id);
                         let nome_p = prov.map_or(item.provincia_id.as_str(), |p| p.nome.as_str());
-                        let nome_e = prov.and_then(|pr| v.estados.iter().find(|e| e.id == pr.estado_id))
+                        let nome_e = prov
+                            .and_then(|pr| v.estados.iter().find(|e| e.id == pr.estado_id))
                             .map_or("", |e| e.nome.as_str());
 
-                        let frac = (item.progresso_pontos / item.custo_total_pontos.max(1.0)).clamp(0.0, 1.0) as f32;
+                        let frac = (item.progresso_pontos / item.custo_total_pontos.max(1.0))
+                            .clamp(0.0, 1.0) as f32;
                         let falta = (item.custo_total_pontos - item.progresso_pontos).max(0.0);
 
                         let alocacao_hoje = (pts_restantes_hoje.min(max_por_obra)).min(falta);
@@ -1137,20 +1511,32 @@ pub fn aba_construcao(
                         });
 
                         // Localização
-                        ui.label(if nome_e.is_empty() { nome_p.to_string() } else { format!("{nome_p} ({nome_e})") });
+                        ui.label(if nome_e.is_empty() {
+                            nome_p.to_string()
+                        } else {
+                            format!("{nome_p} ({nome_e})")
+                        });
 
                         // Progresso
                         ui.add(
                             egui::ProgressBar::new(frac)
                                 .desired_width(130.0)
-                                .text(format!("{:.0}% ({:.0}/{:.0})", frac * 100.0, item.progresso_pontos, item.custo_total_pontos))
+                                .text(format!(
+                                    "{:.0}% ({:.0}/{:.0})",
+                                    frac * 100.0,
+                                    item.progresso_pontos,
+                                    item.custo_total_pontos
+                                )),
                         );
 
                         // Ritmo
                         if pais.orcamento.em_calote {
                             ui.colored_label(ui_refinada::menu::PERIGO, "Paralisado (Calote)");
                         } else if alocacao_hoje > 0.0 {
-                            ui.colored_label(ui_refinada::menu::SUCESSO, format!("{alocacao_hoje:.1} pts/d"));
+                            ui.colored_label(
+                                ui_refinada::menu::SUCESSO,
+                                format!("{alocacao_hoje:.1} pts/d"),
+                            );
                         } else {
                             ui.colored_label(ui_refinada::menu::TINTA_SUAVE, "Aguardando");
                         }
@@ -1165,19 +1551,54 @@ pub fn aba_construcao(
                         // Reordenação na fila do país
                         ui.horizontal(|ui| {
                             ui.spacing_mut().item_spacing.x = 4.0;
-                            if ui.add_enabled(pos_ordem > 0, egui::Button::new(egui::RichText::new("Topo").size(11.0))).on_hover_text("Mover para o topo").clicked() {
-                                cmds.push(Comando::MoverObra { de: idx_original, para: 0 });
+                            if ui
+                                .add_enabled(
+                                    pos_ordem > 0,
+                                    egui::Button::new(egui::RichText::new("Topo").size(11.0)),
+                                )
+                                .on_hover_text("Mover para o topo")
+                                .clicked()
+                            {
+                                cmds.push(Comando::MoverObra {
+                                    de: idx_original,
+                                    para: 0,
+                                });
                             }
-                            if ui.add_enabled(pos_ordem > 0, egui::Button::new(egui::RichText::new("Subir").size(11.0))).on_hover_text("Subir 1 posição").clicked() {
-                                cmds.push(Comando::MoverObra { de: idx_original, para: idx_original.saturating_sub(1) });
+                            if ui
+                                .add_enabled(
+                                    pos_ordem > 0,
+                                    egui::Button::new(egui::RichText::new("Subir").size(11.0)),
+                                )
+                                .on_hover_text("Subir 1 posição")
+                                .clicked()
+                            {
+                                cmds.push(Comando::MoverObra {
+                                    de: idx_original,
+                                    para: idx_original.saturating_sub(1),
+                                });
                             }
-                            if ui.add_enabled(pos_ordem + 1 < n_estatais, egui::Button::new(egui::RichText::new("Descer").size(11.0))).on_hover_text("Descer 1 posição").clicked() {
-                                cmds.push(Comando::MoverObra { de: idx_original, para: (idx_original + 1).min(pais.fila_construcao.len().saturating_sub(1)) });
+                            if ui
+                                .add_enabled(
+                                    pos_ordem + 1 < n_estatais,
+                                    egui::Button::new(egui::RichText::new("Descer").size(11.0)),
+                                )
+                                .on_hover_text("Descer 1 posição")
+                                .clicked()
+                            {
+                                cmds.push(Comando::MoverObra {
+                                    de: idx_original,
+                                    para: (idx_original + 1)
+                                        .min(pais.fila_construcao.len().saturating_sub(1)),
+                                });
                             }
                         });
 
                         // Ação (Cancelar obra pública)
-                        if ui.button("X").on_hover_text("Cancelar esta obra pública").clicked() {
+                        if ui
+                            .button("X")
+                            .on_hover_text("Cancelar esta obra pública")
+                            .clicked()
+                        {
                             cmds.push(Comando::CancelarObra(idx_original));
                         }
 
@@ -1529,8 +1950,15 @@ pub fn aba_construcao(
         ui.label("Agrupado por tipo. Troque métodos de produção com 1 clique (para o país todo no cabeçalho ou individualmente na província).");
 
         for (ti, t) in cat.tipos_predio.iter().enumerate() {
-            let linhas: Vec<(&Provincia, &Predio)> = v.provincias.iter()
-                .flat_map(|p| p.predios.iter().filter(|b| b.tipo_predio_id == t.id).map(move |b| (p, b)))
+            let linhas: Vec<(&Provincia, &Predio)> = v
+                .provincias
+                .iter()
+                .flat_map(|p| {
+                    p.predios
+                        .iter()
+                        .filter(|b| b.tipo_predio_id == t.id)
+                        .map(move |b| (p, b))
+                })
                 .collect();
 
             if linhas.is_empty() {
@@ -1540,8 +1968,11 @@ pub fn aba_construcao(
             // Filtro por texto
             let busca = painel.filtro_texto_predios.to_lowercase();
             if !busca.is_empty() {
-                let nome_bate = t.nome.to_lowercase().contains(&busca) || t.id.to_lowercase().contains(&busca);
-                let prov_bate = linhas.iter().any(|(p, _)| p.nome.to_lowercase().contains(&busca));
+                let nome_bate =
+                    t.nome.to_lowercase().contains(&busca) || t.id.to_lowercase().contains(&busca);
+                let prov_bate = linhas
+                    .iter()
+                    .any(|(p, _)| p.nome.to_lowercase().contains(&busca));
                 if !nome_bate && !prov_bate {
                     continue;
                 }
@@ -1552,11 +1983,15 @@ pub fn aba_construcao(
             let vagas: f64 = linhas.iter().map(|(_, b)| b.total_vagas()).sum();
             let lucro: f64 = linhas.iter().map(|(_, b)| b.lucro_ultimo_tick).sum();
             let rec: f64 = linhas.iter().map(|(_, b)| b.receita_ultimo_tick).sum();
-            let ins: f64 = linhas.iter().map(|(_, b)| b.custo_insumos_ultimo_tick).sum();
+            let ins: f64 = linhas
+                .iter()
+                .map(|(_, b)| b.custo_insumos_ultimo_tick)
+                .sum();
             let produtividade: f64 = if emp > 0.0 { (rec - ins) / emp } else { 0.0 };
 
             // Quantos prédios deste tipo dão prejuízo
-            let perdas: Vec<(&Provincia, &Predio)> = linhas.iter()
+            let perdas: Vec<(&Provincia, &Predio)> = linhas
+                .iter()
                 .filter(|(_, b)| !t.financiado_pelo_governo && b.lucro_ultimo_tick < -0.01)
                 .copied()
                 .collect();
@@ -1579,7 +2014,11 @@ pub fn aba_construcao(
                 niveis,
                 fmt_pop(emp as u64),
                 fmt_pop(vagas as u64),
-                if vagas > 0.0 { (emp / vagas) * 100.0 } else { 0.0 },
+                if vagas > 0.0 {
+                    (emp / vagas) * 100.0
+                } else {
+                    0.0
+                },
                 fmt_din(lucro),
                 fmt_din(produtividade),
                 alerta_prej
@@ -1840,7 +2279,11 @@ mod testes {
     #[test]
     fn calculo_materiais_obra_retorna_bens_e_custo() {
         let cat = carregar_catalogo_teste();
-        let sid = cat.tipos_predio.iter().find(|t| t.id == "siderurgica").expect("siderurgica");
+        let sid = cat
+            .tipos_predio
+            .iter()
+            .find(|t| t.id == "siderurgica")
+            .expect("siderurgica");
         let custo = calcular_custo_materiais_obra(&cat, sid, &[]);
         assert!(!custo.itens.is_empty(), "deve exigir bens para construir");
         assert!(custo.total_reais > 0.0, "custo em bens deve ser > 0");
@@ -1849,27 +2292,32 @@ mod testes {
     #[test]
     fn calculo_lucratividade_esperada_funciona() {
         let cat = carregar_catalogo_teste();
-        let sid = cat.tipos_predio.iter().find(|t| t.id == "siderurgica").expect("siderurgica");
+        let sid = cat
+            .tipos_predio
+            .iter()
+            .find(|t| t.id == "siderurgica")
+            .expect("siderurgica");
         let luc = calcular_lucratividade_esperada(&cat, sid, &sid.metodos_padrao, &[], 4.0);
         assert!(luc.receita > 0.0, "siderurgica deve gerar receita");
         assert!(luc.custo_insumos > 0.0, "siderurgica deve consumir insumos");
-        assert!(luc.vagas_totais > 0.0, "siderurgica deve ter postos de trabalho");
+        assert!(
+            luc.vagas_totais > 0.0,
+            "siderurgica deve ter postos de trabalho"
+        );
         assert!(luc.produtividade.is_finite());
     }
 
     #[test]
     fn formatacao_efeito_troca_metodo_mostra_deltas() {
         let cat = carregar_catalogo_teste();
-        let sid = cat.tipos_predio.iter().find(|t| t.id == "siderurgica").expect("siderurgica");
+        let sid = cat
+            .tipos_predio
+            .iter()
+            .find(|t| t.id == "siderurgica")
+            .expect("siderurgica");
         let metodo_alvo = &sid.metodos_permitidos[0];
-        let texto = formatar_efeito_troca_metodo(
-            &cat,
-            &[],
-            metodo_alvo,
-            metodo_alvo,
-            5,
-            "Nacional",
-        );
+        let texto =
+            formatar_efeito_troca_metodo(&cat, &[], metodo_alvo, metodo_alvo, 5, "Nacional");
         assert!(texto.contains("Trocar para:"));
         assert!(texto.contains("Alvo: Nacional (5 níveis)"));
     }
