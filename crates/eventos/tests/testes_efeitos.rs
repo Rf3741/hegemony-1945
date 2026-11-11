@@ -822,13 +822,13 @@ fn teste_fila_eventos_deduplicacao_por_titulo() {
                     ia_peso: 100,
                 }],
                 chance: 1.0,
-                generico: true,
+generico: true,
             },
         ],
     };
-
-    let mut ctx = ContextoEfeitos::apenas_mundo(&mut m);
-
+    
+    let _ctx = ContextoEfeitos::apenas_mundo(&mut m);
+    
     // Adiciona evt_a
     est.pendentes.push(Pendente { evento_id: "evt_a".to_string(), pais: "USA".to_string() });
     est.disparados.insert("evt_a".to_string(), None);

@@ -118,7 +118,7 @@ pub struct GuerraHistoricaDef {
 #[derive(Debug, Clone, Default)]
 pub struct CatalogoDesignGuerra {
     pub casus_belli: Vec<CasusBelliDef>,
-    pub unidades: Vec<UnidadeDef>,
+    _unidades: Vec<UnidadeDef>,
     pub generais: Vec<GeneralDef>,
     pub guerras_historicas: Vec<GuerraHistoricaDef>,
 }
@@ -160,7 +160,7 @@ impl CatalogoDesignGuerra {
 
         Ok(Self {
             casus_belli,
-            unidades,
+            _unidades: unidades,
             generais,
             guerras_historicas,
         })

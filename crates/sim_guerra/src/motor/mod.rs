@@ -426,7 +426,7 @@ impl MundoGuerra {
     }
 
     /// Reconstrói o mundo de guerra a partir do estado salvo.
-    pub fn restaurar_estado(catalogo: CatalogoGuerra, e: EstadoGuerraSalvo) -> ResultadoGuerra<Self> {
+    pub fn restaurar_estado(_catalogo: CatalogoGuerra, e: EstadoGuerraSalvo) -> ResultadoGuerra<Self> {
         let mut m = Self::novo(e.cenario)?;
         m.rng = e.rng;
         m.frentes_ativas = e.frentes_ativas;

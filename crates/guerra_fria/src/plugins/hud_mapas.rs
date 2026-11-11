@@ -356,7 +356,7 @@ pub fn barra_extra(
             ui.horizontal_wrapped(|ui| {
                 let icone = if expandida { "▾" } else { "▸" };
                 if ui.small_button(icone).on_hover_text(if expandida { "Minimizar barra de mapas" } else { "Expandir barra de mapas" }).clicked() {
-                    if let Some(mut c) = cfg.as_mut() {
+                    if let Some(c) = cfg.as_mut() {
                         c.interface.barra_mapas_expandida = !expandida;
                     }
                 }

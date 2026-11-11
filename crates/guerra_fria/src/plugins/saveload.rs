@@ -170,6 +170,7 @@ fn fnv64(b: &[u8]) -> u64 {
 }
 
 /// Checksum do estado (FNV-1a do RON canônico).
+#[allow(dead_code)]
 pub fn checksum(p: &Partida) -> Result<u64, String> {
     Ok(fnv64(ron::to_string(p).map_err(|e| e.to_string())?.as_bytes()))
 }
@@ -274,7 +275,7 @@ pub(crate) fn varrer(raiz: &Path) -> Vec<(Slot, InfoSlot)> {
 }
 
 /// Lista os slots; chama `escolher(slot)` no clique em "Carregar".
-pub fn lista_slots(ui: &mut egui::Ui, slots: &Slots, mut carregar: impl FnMut(Slot), mut salvar: Option<&mut dyn FnMut(Slot)>) {
+fn _lista_slots(ui: &mut egui::Ui, slots: &Slots, mut carregar: impl FnMut(Slot), mut salvar: Option<&mut dyn FnMut(Slot)>) {
     for (s, info) in &slots.lista {
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new(s.rotulo()).strong());
@@ -366,7 +367,7 @@ fn executar_salvar(mut pedidos: MessageReader<PedirSalvar>, mut espera: Local<Ve
         return;
     }
     let (raiz, mundo, relogio, jogador, eco, pol, diplo, tec, ev, div, guerra_sim, elenco) = rec;
-    let (Some(jogador), Some(mut eco), Some(mut pol), Some(diplo), Some(tec), Some(ev)) = (jogador, eco, pol, diplo, tec, ev) else {
+    let (Some(jogador), Some(mut eco), Some(pol), Some(diplo), Some(tec), Some(ev)) = (jogador, eco, pol, diplo, tec, ev) else {
         espera.clear();
         slots.mensagem = "Nada para salvar ainda.".into();
         return;
@@ -465,7 +466,7 @@ fn executar_carregar(mut pedidos: MessageReader<PedirCarregar>, mut espera: Loca
     if let Some(guerra_sim) = r.guerra_sim.as_mut()
         && let Some(guerra) = guerra
     {
-        if let Ok(mut mundo_guerra) = sim_guerra::MundoGuerra::restaurar_estado(guerra_sim.0.cenario.catalogo.clone(), guerra) {
+        if let Ok(mundo_guerra) = sim_guerra::MundoGuerra::restaurar_estado(guerra_sim.0.cenario.catalogo.clone(), guerra) {
             guerra_sim.0 = mundo_guerra;
         }
     }
@@ -643,7 +644,6 @@ mod testes {
         );
         let bytes = codificar(&p1).unwrap();
         let p2 = decodificar(&bytes).unwrap();
-        let g1 = p1.guerra.as_ref().unwrap();
         let g2 = p2.guerra.as_ref().unwrap();
         assert_eq!(g2.cenario.guerras.len(), guerras_antes);
         assert_eq!(g2.cenario.divisoes.len(), divisoes_antes);

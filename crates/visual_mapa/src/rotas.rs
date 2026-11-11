@@ -218,10 +218,10 @@ pub struct MalhasRotas {
 
 const COR_TERRA: Color = Color::srgba(0.45, 0.36, 0.24, 0.45);
 const COR_ASFALTO: Color = Color::srgba(0.80, 0.78, 0.72, 0.5);
-const COR_CONTORNO: Color = Color::srgba(0.17, 0.16, 0.15, 0.35);
+const _COR_CONTORNO: Color = Color::srgba(0.17, 0.16, 0.15, 0.35);
 const COR_LEITO: Color = Color::srgba(0.12, 0.12, 0.14, 0.55);
-const COR_DORMENTE: Color = Color::srgb(0.28, 0.20, 0.13);
-const COR_TRILHO: Color = Color::srgb(0.88, 0.88, 0.90);
+const _COR_DORMENTE: Color = Color::srgb(0.28, 0.20, 0.13);
+const _COR_TRILHO: Color = Color::srgb(0.88, 0.88, 0.90);
 
 pub fn construir_malhas(nos: &[NoRota], arestas: &[Aresta], ano: f32, cfg: &ConfigRotas) -> MalhasRotas {
     let mut estradas = ConstrutorLinhas::novo();

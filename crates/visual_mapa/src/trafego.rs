@@ -502,6 +502,7 @@ struct EstadoPlano {
 
 impl EstadoPlano {
     /// Rotas atualmente em uso (diagnóstico).
+    #[allow(dead_code)]
     pub fn rotas(&self) -> &[RotaNavios] {
         &self.atual
     }
@@ -539,6 +540,7 @@ pub struct AviaoVisual {
 }
 
 #[derive(Component)]
+#[allow(dead_code)]
 struct Esteira;
 #[derive(Component)]
 struct Sombra;

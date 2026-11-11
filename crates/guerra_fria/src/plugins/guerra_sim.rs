@@ -44,11 +44,11 @@ pub const GUERRAS_HISTORICAS_IDS: &[&str] = &[
 #[derive(Resource, Default)]
 pub struct PainelGuerra {
     pub aberto: bool,
-    pub guerra_selecionada: Option<String>,
+    _guerra_selecionada: Option<String>,
     pub aba: u8, // 0 = Guerras, 1 = Frentes, 2 = Exércitos, 3 = Tratados
     pub proposta_anexar: bool,
     pub proposta_reparacoes: bool,
-    pub casus_belli_idx: usize,
+    _casus_belli_idx: usize,
     pub mensagem: String,
     pub repintar: bool,
 }

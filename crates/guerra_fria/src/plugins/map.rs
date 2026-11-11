@@ -194,11 +194,11 @@ pub struct EntradaMapa {
     /// Cor RGBA por id de província (índice = id).
     pub cor_prov: Vec<[u8; 4]>,
     /// Índice do dono por id de província (0 = sem dono).
-    pub dono_prov: Vec<u32>,
+    _dono_prov: Vec<u32>,
     /// Índice do estado por id de província (0 = nenhum).
-    pub estado_prov: Vec<u32>,
+    _estado_prov: Vec<u32>,
     /// Cor do ocupante por id de província (hachura de zona de ocupação já na carga inicial).
-    pub ocupante_cor: Vec<Option<[u8; 4]>>,
+    _ocupante_cor: Vec<Option<[u8; 4]>>,
 }
 
 /// Berlim é uma única província no mapa; para mostrar os 4 setores de ocupação o pintor divide os
@@ -633,7 +633,7 @@ fn iniciar_carga(mut commands: Commands, raiz: Res<RaizProjeto>, catalogo: Res<R
         }
     }
     commands.insert_resource(CoresMapa { cor_prov: cor_prov.clone(), dono_prov: dono_prov.clone(), estado_prov: estado_prov.clone(), ocupante_cor: ocupante_cor.clone() });
-    let entrada = EntradaMapa { caminho_png: raiz.0.join("assets/map/provinces.png"), cor_prov, dono_prov, estado_prov, ocupante_cor };
+    let entrada = EntradaMapa { caminho_png: raiz.0.join("assets/map/provinces.png"), cor_prov, _dono_prov: dono_prov, _estado_prov: estado_prov, _ocupante_cor: ocupante_cor };
     let tarefa = AsyncComputeTaskPool::get_or_init(TaskPool::default).spawn(async move { gerar_mapa(&entrada) });
     commands.insert_resource(TarefaMapa(tarefa));
 }
@@ -1089,7 +1089,7 @@ mod testes {
             let k = idx.len() as u32 + 1;
             estado_prov[p.id as usize] = *idx.entry(p.adm1_code.clone()).or_insert(k);
         }
-        let ent = EntradaMapa { caminho_png: raiz.join("assets/map/provinces.png"), cor_prov, dono_prov: vec![1; n], estado_prov, ocupante_cor: vec![None; n] };
+        let ent = EntradaMapa { caminho_png: raiz.join("assets/map/provinces.png"), cor_prov, _dono_prov: vec![1; n], _estado_prov: estado_prov, _ocupante_cor: vec![None; n] };
         let t = std::time::Instant::now();
         let s = gerar_mapa(&ent).unwrap();
         eprintln!("gerar_mapa: {:?}", t.elapsed());
