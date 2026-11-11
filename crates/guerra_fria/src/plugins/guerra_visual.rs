@@ -1,11 +1,11 @@
 //! Visualização de guerra no mapa: linhas de frente pulsantes, províncias ocupadas/disputadas,
 //! marcadores de batalha, setas de avanço, faixa de aviso e estilos para guerras por procuração.
 
-use super::audio::{CanalAudio, SomTocar};
+use super::audio::SomTocar;
 use super::config::{ConfigJogo, QualidadeGrafica};
-use super::guerra_sim::{GuerraSim, PainelGuerra};
-use super::map::{CaixasProvincia, CoresMapa, DadosMapa, ImagemMapa, RaizProjeto};
-use super::time::EventoTickDiario;
+use super::guerra_sim::GuerraSim;
+use super::map::{CaixasProvincia, DadosMapa};
+
 use bevy::asset::RenderAssetUsages;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
@@ -16,9 +16,9 @@ use bevy_sprite_render::{Material2d, Material2dPlugin};
 use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use gf_mapa::mapa::ESCALA_Y_MAPA;
 use serde::{Deserialize, Serialize};
-use sim_guerra::{Frente, Guerra, LadoGuerra, MundoGuerra, NivelEnvolvimento};
-use std::collections::{HashMap, HashSet};
-use std::time::Duration;
+use sim_guerra::{Frente, Guerra, LadoGuerra, NivelEnvolvimento};
+use std::collections::HashMap;
+
 
 // RNG simples determinístico para evitar dependência do crate rand
 struct SimpleRng(u64);
@@ -90,11 +90,11 @@ pub struct EstadoVisualGuerra {
 /// Linha de frente entre duas províncias beligerantes.
 #[derive(Debug, Clone)]
 pub struct LinhaFrente {
-    pub provincia_a: u32,
-    pub provincia_b: u32,
-    pub tag_a: String,
-    pub tag_b: String,
-    pub guerra_id: String,
+    pub _provincia_a: u32,
+    pub _provincia_b: u32,
+    pub _tag_a: String,
+    pub _tag_b: String,
+    pub _guerra_id: String,
     pub eh_proxy: bool,
     /// Pontos da linha no espaço do mundo (já convertidos).
     pub pontos: Vec<Vec2>,
@@ -107,12 +107,12 @@ pub struct LinhaFrente {
 /// Hachura animada em província ocupada/disputada.
 #[derive(Debug, Clone)]
 pub struct HachuraOcupacao {
-    pub provincia_id: u32,
-    pub cor_ocupante: [u8; 4],
-    pub tag_ocupante: String,
-    pub tag_dono: String,
-    pub eh_disputada: bool,
-    pub eh_proxy: bool,
+    pub _provincia_id: u32,
+    pub _cor_ocupante: [u8; 4],
+    pub _tag_ocupante: String,
+    pub _tag_dono: String,
+    pub _eh_disputada: bool,
+    pub _eh_proxy: bool,
     pub fase: f32,
 }
 
@@ -125,15 +125,15 @@ pub struct MarcadoresBatalha {
 /// Marcador individual de batalha.
 #[derive(Debug, Clone)]
 pub struct MarcadorBatalha {
-    pub provincia_id: u32,
+    pub _provincia_id: u32,
     pub posicao: Vec2,
     pub atacante: String,
     pub defensor: String,
-    pub forca_atacante: f32,
-    pub forca_defensor: f32,
-    pub progresso: f32,
-    pub baixas_atacante: u32,
-    pub baixas_defensor: u32,
+    pub _forca_atacante: f32,
+    pub _forca_defensor: f32,
+    pub _progresso: f32,
+    pub _baixas_atacante: u32,
+    pub _baixas_defensor: u32,
     pub regiao_conquistada: bool,
     pub tempo_criacao: f32,
     pub pulso: f32,
@@ -148,11 +148,11 @@ pub struct SetasAvanco {
 /// Seta de avanço individual.
 #[derive(Debug, Clone)]
 pub struct SetaAvanco {
-    pub exercito_id: String,
-    pub pais_tag: String,
+    pub _exercito_id: String,
+    pub _pais_tag: String,
     pub origem: Vec2,
     pub destino: Vec2,
-    pub guerra_id: String,
+    pub _guerra_id: String,
     pub eh_ofensiva: bool,
     pub fase: f32,
 }
@@ -272,7 +272,7 @@ fn atualizar_visual_guerra(
     let frentes = &guerra_sim.0.frentes_ativas;
     let exercitos = &guerra_sim.0.cenario.exercitos;
     let divisoes = &guerra_sim.0.cenario.divisoes;
-    let relatorio = &guerra_sim.0; // RelatorioTickGuerra não está acessível diretamente, usamos guerras ativas
+    let _relatorio = &guerra_sim.0; // RelatorioTickGuerra não está acessível diretamente, usamos guerras ativas
 
     // 1. Atualiza linhas de frente a partir das frentes ativas
     atualizar_linhas_frente(&mut estado, frentes, regioes, &dados, &caixas, guerras);
@@ -354,17 +354,17 @@ let eh_proxy = guerra.map_or(false, |g| {
                 pontos.push(base + offset);
             }
 
-            estado.linhas_frente.push(LinhaFrente {
-                provincia_a: prov_a,
-                provincia_b: prov_b,
-                tag_a: reg_a.controlador_tag.clone(),
-                tag_b: reg_b.controlador_tag.clone(),
-                guerra_id: frente.guerra_id.clone(),
-                eh_proxy,
-                pontos,
-                pulso: 0.0,
-                fase: random_f32() * std::f32::consts::TAU,
-            });
+        estado.linhas_frente.push(LinhaFrente {
+            _provincia_a: prov_a,
+            _provincia_b: prov_b,
+            _tag_a: reg_a.controlador_tag.clone(),
+            _tag_b: reg_b.controlador_tag.clone(),
+            _guerra_id: frente.guerra_id.clone(),
+            eh_proxy,
+            pontos,
+            pulso: 0.0,
+            fase: random_f32() * std::f32::consts::TAU,
+        });
         }
     }
 }
@@ -374,7 +374,7 @@ fn atualizar_hachuras_ocupacao(
     estado: &mut EstadoVisualGuerra,
     regioes: &[sim_guerra::RegiaoMapa],
     mundo: &simulacao::mundo::MundoJogo,
-    dados: &DadosMapa,
+    _dados: &DadosMapa,
     caixas: &CaixasProvincia,
     guerras: &[Guerra],
 ) {
@@ -408,12 +408,12 @@ fn atualizar_hachuras_ocupacao(
         let cor_ocupante = mundo.paises.get(&reg.controlador_tag).map(|p| [p.cor.0, p.cor.1, p.cor.2, 255]).unwrap_or([200, 200, 200, 255]);
 
         estado.hachuras_ocupacao.push(HachuraOcupacao {
-            provincia_id: prov_id,
-            cor_ocupante,
-            tag_ocupante: reg.controlador_tag.clone(),
-            tag_dono: reg.dono_tag.clone(),
-            eh_disputada,
-            eh_proxy,
+            _provincia_id: prov_id,
+            _cor_ocupante: cor_ocupante,
+            _tag_ocupante: reg.controlador_tag.clone(),
+            _tag_dono: reg.dono_tag.clone(),
+            _eh_disputada: eh_disputada,
+            _eh_proxy: eh_proxy,
             fase: random_f32() * std::f32::consts::TAU,
         });
     }
@@ -435,7 +435,7 @@ fn atualizar_marcadores_batalha(
     // Detecta novas guerras para aviso
     for guerra in guerras.iter().filter(|g| g.ativa) {
         // Verifica se é uma guerra nova (iniciou agora)
-        let duracao_guerra = (guerra_sim_data_para_dias(guerra.data_inicio) as f32);
+        let duracao_guerra = guerra_sim_data_para_dias(guerra.data_inicio) as f32;
         // Simplificação: avisa se a guerra tem menos de 1 dia
         if duracao_guerra < 1.0 && !aviso.ativo {
             let atacantes: Vec<String> = guerra.atacantes.iter().cloned().collect();
@@ -469,11 +469,6 @@ fn atualizar_marcadores_batalha(
     }
 
     for frente in frentes.iter().filter(|f| f.ativa) {
-        let guerra = guerras.iter().find(|g| g.id == frente.guerra_id && g.ativa);
-        let eh_proxy = guerra.map_or(false, |g| {
-            g.envolvimentos.iter().any(|e| matches!(e.nivel, NivelEnvolvimento::ConseleirosVoluntarios | NivelEnvolvimento::IntervencaoLimitada))
-        });
-
         for (reg_a_code, reg_b_code) in &frente.pares_fronteira {
             let Some(idx_a) = mapa_regioes.get(reg_a_code) else { continue };
             let Some(idx_b) = mapa_regioes.get(reg_b_code) else { continue };
@@ -497,15 +492,15 @@ fn atualizar_marcadores_batalha(
 
             if !ja_existe {
                 marcadores.marcadores.push(MarcadorBatalha {
-                    provincia_id: prov_a,
+                    _provincia_id: prov_a,
                     posicao: pos,
                     atacante: frente.lado_a_tag.clone(),
                     defensor: frente.lado_b_tag.clone(),
-                    forca_atacante: 1.0,
-                    forca_defensor: 1.0,
-                    progresso: 0.5,
-                    baixas_atacante: 0,
-                    baixas_defensor: 0,
+                    _forca_atacante: 1.0,
+                    _forca_defensor: 1.0,
+                    _progresso: 0.5,
+                    _baixas_atacante: 0,
+                    _baixas_defensor: 0,
                     regiao_conquistada: false,
                     tempo_criacao: tempo_atual,
                     pulso: 0.0,
@@ -574,11 +569,11 @@ fn atualizar_setas_avanco(
                 let eh_ofensiva = matches!(exercito.postura, sim_guerra::PosturaOperacional::AssaltoAgressivo | sim_guerra::PosturaOperacional::OfensivaEquilibrada);
 
                 setas.setas.push(SetaAvanco {
-                    exercito_id: exercito.id.clone(),
-                    pais_tag: exercito.pais_tag.clone(),
+                    _exercito_id: exercito.id.clone(),
+                    _pais_tag: exercito.pais_tag.clone(),
                     origem,
                     destino: *destino,
-                    guerra_id: guerras.iter().find(|g| g.ativa && g.participa(&exercito.pais_tag)).map(|g| g.id.clone()).unwrap_or_default(),
+                    _guerra_id: guerras.iter().find(|g| g.ativa && g.participa(&exercito.pais_tag)).map(|g| g.id.clone()).unwrap_or_default(),
                     eh_ofensiva,
                     fase: tempo_atual,
                 });
@@ -711,7 +706,7 @@ fn desenhar_linhas_frente(
             MeshMaterial2d(material),
             Transform::from_xyz(0.0, 0.0, 10.0 + i as f32 * 0.001),
             Visibility::Visible,
-            LinhaFrenteVisual { idx: i },
+            LinhaFrenteVisual { _idx: i },
         ));
     }
 }
@@ -719,7 +714,7 @@ fn desenhar_linhas_frente(
 /// Componente para identificar linhas de frente visuais.
 #[derive(Component)]
 struct LinhaFrenteVisual {
-    idx: usize,
+    _idx: usize,
 }
 
 /// Desenha marcadores de batalha.
