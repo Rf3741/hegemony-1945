@@ -663,9 +663,9 @@ fn tick_ia_guerra(
     ia.dias += n as u32;
 
     // 2. IA declara guerra: tensão ativa e rivalidade entre blocos ou hostilidade severa (1o dia de cada mês).
-    // Antes de 1960, sem jogador (modo espectador), não há guerras aleatórias: a história segue o roteiro.
+    // Antes de 1960 não há guerras aleatórias entre países da IA (com ou sem jogador): a história segue o roteiro.
     let antes_de_1960 = mundo.0.data.ano < 1960;
-    if !(antes_de_1960 && eh_espectador) {
+    if !antes_de_1960 {
         if (mundo.0.data.dia == 1 || houve_dia_1) && diplo.0.tensao >= 20.0 {
             let ano_mes = (mundo.0.data.ano as u32).wrapping_mul(12) + mundo.0.data.mes as u32;
             let data_tuple = (mundo.0.data.ano as i32, mundo.0.data.mes, mundo.0.data.dia);
