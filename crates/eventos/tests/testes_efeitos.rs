@@ -414,7 +414,7 @@ fn teste_efeito_ligacao_sim_politica() {
     let p_atualizado = pol.pais(&p_id_pol).unwrap();
     let aprov_nova = p_atualizado.grupos_interesse["intelectuais"].aprovacao;
     assert!((aprov_nova - (aprov_inicial + 12.0)).abs() < 1e-3);
-    assert!((p_atualizado.legitimidade - (leg_inicial + 10.0)).abs() < 1e-3);
+    assert!((p_atualizado.legitimidade - (leg_inicial + 10.0).min(100.0)).abs() < 1e-3);
 }
 
 #[test]
