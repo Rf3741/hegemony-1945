@@ -81,7 +81,7 @@ fn obra_publica_consome_materiais_e_custa_ao_orcamento() {
         mundo.executar_tick_diario();
     }
     let usa = mundo.obter_pais("usa").unwrap();
-    assert!(usa.pontos_aplicados_ultimo_tick > 0.0, "a obra deve receber pontos");
+    assert!(usa.pontos_aplicados_ultimo_tick() > 0.0, "a obra deve receber pontos");
     assert!(usa.orcamento.gasto_obras_materiais > 0.0, "obra pública deve custar materiais ao orçamento");
     let est = mundo.custo_materiais_obra("usa", "siderurgica").unwrap();
     eprintln!("custo estimado da siderúrgica: {est:.0}; gasto/dia: {:.0}; PIB/dia {:.0}", usa.orcamento.gasto_obras_materiais, usa.pib_diario);

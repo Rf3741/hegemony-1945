@@ -374,6 +374,59 @@ impl Predio {
     }
 }
 
+impl Default for Predio {
+    fn default() -> Self {
+        Self {
+            tipo_predio_id: String::new(),
+            nivel: 0,
+            metodos_ativos: Vec::new(),
+            empregados_por_tipo: BTreeMap::new(),
+            salario_base: 4.0,
+            reservas_caixa: 0.0,
+            subsidiado: false,
+            receita_ultimo_tick: 0.0,
+            custo_insumos_ultimo_tick: 0.0,
+            folha_salarial_ultimo_tick: 0.0,
+            lucro_ultimo_tick: 0.0,
+            dividendos_ultimo_tick: 0.0,
+            fechado: false,
+            dias_retomada: 0,
+            dias_prejuizo: 0,
+            dias_fechado: 0,
+            lucro_ema: 0.0,
+            tendencia_lucro: 0.0,
+            dia_ultima_mudanca_estado: 0,
+            cache: PredioCompilado::default(),
+        }
+    }
+}
+
+/// Cria um novo prédio com os campos essenciais, inicializando o cache interno com valores padrão.
+pub fn novo_predio(tipo_predio_id: impl Into<String>, nivel: u32) -> Predio {
+    Predio {
+        tipo_predio_id: tipo_predio_id.into(),
+        nivel,
+        metodos_ativos: Vec::new(),
+        empregados_por_tipo: BTreeMap::new(),
+        salario_base: 4.0,
+        reservas_caixa: 0.0,
+        subsidiado: false,
+        receita_ultimo_tick: 0.0,
+        custo_insumos_ultimo_tick: 0.0,
+        folha_salarial_ultimo_tick: 0.0,
+        lucro_ultimo_tick: 0.0,
+        dividendos_ultimo_tick: 0.0,
+        fechado: false,
+        dias_retomada: 0,
+        dias_prejuizo: 0,
+        dias_fechado: 0,
+        lucro_ema: 0.0,
+        tendencia_lucro: 0.0,
+        dia_ultima_mudanca_estado: 0,
+        cache: PredioCompilado::default(),
+    }
+}
+
 /// Unidade geográfica local contendo populações (`Pop`), recursos e prédios (`Predio`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Provincia {
@@ -447,6 +500,57 @@ impl Provincia {
     pub fn terra_aravel_livre(&self) -> u32 {
         self.terra_aravel_total
             .saturating_sub(self.terra_aravel_ocupada)
+    }
+
+    /// Cria uma nova província com os campos essenciais, inicializando caches internos com valores padrão.
+    pub fn new(
+        id: impl Into<String>,
+        nome: impl Into<String>,
+        estado_id: impl Into<String>,
+        pais_id: impl Into<String>,
+        terra_aravel_total: u32,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            nome: nome.into(),
+            codigo_externo: None,
+            estado_id: estado_id.into(),
+            pais_id: pais_id.into(),
+            terra_aravel_total,
+            limites_recursos: BTreeMap::new(),
+            infraestrutura_base: 25.0,
+            pops: Vec::new(),
+            predios: Vec::new(),
+            estado_idx: 0,
+            pais_idx: 0,
+            mercado_idx: 0,
+            atracao_migratoria: 0.0,
+            vagas_abertas_cache: 0.0,
+            terra_aravel_ocupada: 0,
+        }
+    }
+}
+
+impl Default for Provincia {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            nome: String::new(),
+            codigo_externo: None,
+            estado_id: String::new(),
+            pais_id: String::new(),
+            terra_aravel_total: 0,
+            limites_recursos: BTreeMap::new(),
+            infraestrutura_base: 25.0,
+            pops: Vec::new(),
+            predios: Vec::new(),
+            estado_idx: 0,
+            pais_idx: 0,
+            mercado_idx: 0,
+            atracao_migratoria: 0.0,
+            vagas_abertas_cache: 0.0,
+            terra_aravel_ocupada: 0,
+        }
     }
 }
 
@@ -991,7 +1095,7 @@ pub struct Pais {
     pub(crate) demanda_obras: Vec<f64>,
     /// Pontos de construção efetivamente aplicados à fila no último tick.
     #[serde(skip)]
-    pub pontos_aplicados_ultimo_tick: f64,
+    pub(crate) pontos_aplicados_ultimo_tick: f64,
 }
 
 impl Pais {
@@ -1067,6 +1171,12 @@ impl Pais {
     #[inline]
     pub fn estados_indices(&self) -> &[usize] {
         &self.estados_indices
+    }
+
+    /// Pontos de construção efetivamente aplicados à fila no último tick.
+    #[inline]
+    pub fn pontos_aplicados_ultimo_tick(&self) -> f64 {
+        self.pontos_aplicados_ultimo_tick
     }
 
     /// Parcela teórica de pontos de construção dedicada ao setor privado segundo a lei econômica (0.0 a 1.0).

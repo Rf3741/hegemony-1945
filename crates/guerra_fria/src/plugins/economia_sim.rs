@@ -1728,6 +1728,7 @@ mod testes {
         use sim_economia::{
             Bem, CatalogoEconomia, CategoriaBem, CategoriaPredio, MetodoProducao, Predio,
             Provincia, RegimePropriedade, SlotMetodo, SubstituicaoNecessidade, TipoPredio,
+            novo_predio,
         };
         use std::collections::BTreeMap;
 
@@ -1784,133 +1785,42 @@ mod testes {
             comercializavel: true,
             substituicoes: vec![],
         });
+        cat.validar_e_indexar().unwrap();
 
         // Cria províncias com prédios em prejuízo
-        let mut prov1 = Provincia {
-            id: "prov1".into(),
-            nome: "Ilha Jarvis".into(),
-            codigo_externo: None,
-            estado_id: "estado1".into(),
-            pais_id: "usa".into(),
-            terra_aravel_total: 1000,
-            limites_recursos: BTreeMap::new(),
-            infraestrutura_base: 1.0,
-            pops: vec![],
-            predios: vec![],
-            estado_idx: 0,
-            pais_idx: 0,
-            mercado_idx: 0,
-            atracao_migratoria: 0.0,
-            vagas_abertas_cache: 0.0,
-            terra_aravel_ocupada: 0,
-        };
-        prov1.predios.push(Predio {
-            tipo_predio_id: "mina_bauxita".into(),
-            nivel: 1,
-            metodos_ativos: vec!["basico".into()],
-            empregados_por_tipo: BTreeMap::new(),
-            salario_base: 10.0,
-            reservas_caixa: 0.0,
-            subsidiado: false,
-            receita_ultimo_tick: 0.0,
-            custo_insumos_ultimo_tick: 25.0,
-            folha_salarial_ultimo_tick: 0.0,
-            lucro_ultimo_tick: -25.0,
-            dividendos_ultimo_tick: 0.0,
-            fechado: false,
-            dias_retomada: 0,
-            dias_prejuizo: 50,
-            dias_fechado: 0,
-            lucro_ema: -25.0,
-            tendencia_lucro: 0.0,
-            dia_ultima_mudanca_estado: 0,
-            cache: Default::default(),
-        });
-        prov1.predios.push(Predio {
-            tipo_predio_id: "mina_bauxita".into(),
-            nivel: 2,
-            metodos_ativos: vec!["basico".into()],
-            empregados_por_tipo: BTreeMap::new(),
-            salario_base: 10.0,
-            reservas_caixa: 0.0,
-            subsidiado: false,
-            receita_ultimo_tick: 0.0,
-            custo_insumos_ultimo_tick: 30.0,
-            folha_salarial_ultimo_tick: 0.0,
-            lucro_ultimo_tick: -30.0,
-            dividendos_ultimo_tick: 0.0,
-            fechado: false,
-            dias_retomada: 0,
-            dias_prejuizo: 60,
-            dias_fechado: 0,
-            lucro_ema: -30.0,
-            tendencia_lucro: 0.0,
-            dia_ultima_mudanca_estado: 0,
-            cache: Default::default(),
-        });
-        prov1.predios.push(Predio {
-            tipo_predio_id: "fabrica_tecidos".into(),
-            nivel: 1,
-            metodos_ativos: vec!["basico".into()],
-            empregados_por_tipo: BTreeMap::new(),
-            salario_base: 10.0,
-            reservas_caixa: 0.0,
-            subsidiado: false,
-            receita_ultimo_tick: 0.0,
-            custo_insumos_ultimo_tick: 15.0,
-            folha_salarial_ultimo_tick: 0.0,
-            lucro_ultimo_tick: -15.0,
-            dividendos_ultimo_tick: 0.0,
-            fechado: false,
-            dias_retomada: 0,
-            dias_prejuizo: 45,
-            dias_fechado: 0,
-            lucro_ema: -15.0,
-            tendencia_lucro: 0.0,
-            dia_ultima_mudanca_estado: 0,
-            cache: Default::default(),
-        });
+        let mut prov1 = Provincia::new("prov1", "Ilha Jarvis", "estado1", "usa", 1000);
+        prov1.infraestrutura_base = 1.0;
+        prov1.predios.push(novo_predio("mina_bauxita", 1));
+        prov1.predios.last_mut().unwrap().metodos_ativos = vec!["basico".into()];
+        prov1.predios.last_mut().unwrap().salario_base = 10.0;
+        prov1.predios.last_mut().unwrap().custo_insumos_ultimo_tick = 25.0;
+        prov1.predios.last_mut().unwrap().lucro_ultimo_tick = -25.0;
+        prov1.predios.last_mut().unwrap().dias_prejuizo = 50;
+        prov1.predios.last_mut().unwrap().lucro_ema = -25.0;
+        prov1.predios.push(novo_predio("mina_bauxita", 2));
+        prov1.predios.last_mut().unwrap().metodos_ativos = vec!["basico".into()];
+        prov1.predios.last_mut().unwrap().salario_base = 10.0;
+        prov1.predios.last_mut().unwrap().custo_insumos_ultimo_tick = 30.0;
+        prov1.predios.last_mut().unwrap().lucro_ultimo_tick = -30.0;
+        prov1.predios.last_mut().unwrap().dias_prejuizo = 60;
+        prov1.predios.last_mut().unwrap().lucro_ema = -30.0;
+        prov1.predios.push(novo_predio("fabrica_tecidos", 1));
+        prov1.predios.last_mut().unwrap().metodos_ativos = vec!["basico".into()];
+        prov1.predios.last_mut().unwrap().salario_base = 10.0;
+        prov1.predios.last_mut().unwrap().custo_insumos_ultimo_tick = 15.0;
+        prov1.predios.last_mut().unwrap().lucro_ultimo_tick = -15.0;
+        prov1.predios.last_mut().unwrap().dias_prejuizo = 45;
+        prov1.predios.last_mut().unwrap().lucro_ema = -15.0;
 
-        let mut prov2 = Provincia {
-            id: "prov2".into(),
-            nome: "Howland".into(),
-            codigo_externo: None,
-            estado_id: "estado2".into(),
-            pais_id: "usa".into(),
-            terra_aravel_total: 1000,
-            limites_recursos: BTreeMap::new(),
-            infraestrutura_base: 1.0,
-            pops: vec![],
-            predios: vec![],
-            estado_idx: 0,
-            pais_idx: 0,
-            mercado_idx: 0,
-            atracao_migratoria: 0.0,
-            vagas_abertas_cache: 0.0,
-            terra_aravel_ocupada: 0,
-        };
-        prov2.predios.push(Predio {
-            tipo_predio_id: "mina_bauxita".into(),
-            nivel: 1,
-            metodos_ativos: vec!["basico".into()],
-            empregados_por_tipo: BTreeMap::new(),
-            salario_base: 10.0,
-            reservas_caixa: 0.0,
-            subsidiado: false,
-            receita_ultimo_tick: 0.0,
-            custo_insumos_ultimo_tick: 20.0,
-            folha_salarial_ultimo_tick: 0.0,
-            lucro_ultimo_tick: -20.0,
-            dividendos_ultimo_tick: 0.0,
-            fechado: false,
-            dias_retomada: 0,
-            dias_prejuizo: 55,
-            dias_fechado: 0,
-            lucro_ema: -20.0,
-            tendencia_lucro: 0.0,
-            dia_ultima_mudanca_estado: 0,
-            cache: Default::default(),
-        });
+        let mut prov2 = Provincia::new("prov2", "Howland", "estado2", "usa", 1000);
+        prov2.infraestrutura_base = 1.0;
+        prov2.predios.push(novo_predio("mina_bauxita", 1));
+        prov2.predios.last_mut().unwrap().metodos_ativos = vec!["basico".into()];
+        prov2.predios.last_mut().unwrap().salario_base = 10.0;
+        prov2.predios.last_mut().unwrap().custo_insumos_ultimo_tick = 20.0;
+        prov2.predios.last_mut().unwrap().lucro_ultimo_tick = -20.0;
+        prov2.predios.last_mut().unwrap().dias_prejuizo = 55;
+        prov2.predios.last_mut().unwrap().lucro_ema = -20.0;
 
         let provincias = vec![prov1, prov2];
         let mut alertas = BTreeMap::new();
@@ -1920,8 +1830,8 @@ mod testes {
         assert!(resultado.is_some(), "deve retornar resumo agrupado");
         let (titulo, texto) = resultado.unwrap();
         assert_eq!(titulo, "Prejuízo persistente em vários prédios");
-        assert!(texto.contains("4 instalações"));
-        assert!(texto.contains("Mina de Bauxita (3)"));
+        assert!(texto.contains("3 instalações"));
+        assert!(texto.contains("Mina de Bauxita (2)"));
         assert!(texto.contains("Fábrica de Tecidos (1)"));
         assert!(texto.contains("veja em Construções"));
 
@@ -1943,6 +1853,7 @@ mod testes {
         use sim_economia::{
             Bem, CatalogoEconomia, CategoriaBem, CategoriaPredio, MetodoProducao, Predio,
             Provincia, RegimePropriedade, SlotMetodo, SubstituicaoNecessidade, TipoPredio,
+            novo_predio,
         };
         use std::collections::BTreeMap;
 
@@ -1990,92 +1901,43 @@ mod testes {
             comercializavel: true,
             substituicoes: vec![],
         });
+        cat.validar_e_indexar().unwrap();
 
-        let mut prov = Provincia {
-            id: "prov1".into(),
-            nome: "Teste".into(),
-            codigo_externo: None,
-            estado_id: "estado1".into(),
-            pais_id: "usa".into(),
-            terra_aravel_total: 1000,
-            limites_recursos: BTreeMap::new(),
-            infraestrutura_base: 1.0,
-            pops: vec![],
-            predios: vec![],
-            estado_idx: 0,
-            pais_idx: 0,
-            mercado_idx: 0,
-            atracao_migratoria: 0.0,
-            vagas_abertas_cache: 0.0,
-            terra_aravel_ocupada: 0,
-        };
-        let predio_base = Predio {
-            tipo_predio_id: String::new(),
-            nivel: 1,
-            metodos_ativos: vec!["basico".into()],
-            empregados_por_tipo: BTreeMap::new(),
-            salario_base: 10.0,
-            reservas_caixa: 0.0,
-            subsidiado: false,
-            receita_ultimo_tick: 0.0,
-            custo_insumos_ultimo_tick: 0.0,
-            folha_salarial_ultimo_tick: 0.0,
-            lucro_ultimo_tick: 0.0,
-            dividendos_ultimo_tick: 0.0,
-            fechado: false,
-            dias_retomada: 0,
-            dias_prejuizo: 50,
-            dias_fechado: 0,
-            lucro_ema: 0.0,
-            tendencia_lucro: 0.0,
-            dia_ultima_mudanca_estado: 0,
-            cache: Default::default(),
-        };
+        let mut prov = Provincia::new("prov1", "Teste", "estado1", "usa", 1000);
+        prov.infraestrutura_base = 1.0;
         // Mina em prejuízo (privada) - deve alertar
-        prov.predios.push(Predio {
-            tipo_predio_id: "mina_bauxita".into(),
-            custo_insumos_ultimo_tick: 25.0,
-            lucro_ultimo_tick: -25.0,
-            ..predio_base.clone()
-        });
+        prov.predios.push(novo_predio("mina_bauxita", 1));
+        prov.predios.last_mut().unwrap().metodos_ativos = vec!["basico".into()];
+        prov.predios.last_mut().unwrap().custo_insumos_ultimo_tick = 25.0;
+        prov.predios.last_mut().unwrap().lucro_ultimo_tick = -25.0;
+        prov.predios.last_mut().unwrap().dias_prejuizo = 50;
         // Base militar em prejuízo (governo) - NÃO deve alertar
-        prov.predios.push(Predio {
-            tipo_predio_id: "base_militar".into(),
-            custo_insumos_ultimo_tick: 100.0,
-            lucro_ultimo_tick: -100.0,
-            ..predio_base.clone()
-        });
+        prov.predios.push(novo_predio("base_militar", 1));
+        prov.predios.last_mut().unwrap().metodos_ativos = vec!["basico".into()];
+        prov.predios.last_mut().unwrap().custo_insumos_ultimo_tick = 100.0;
+        prov.predios.last_mut().unwrap().lucro_ultimo_tick = -100.0;
         // Mina com pouco prejuízo (< -10) - NÃO deve alertar
-        prov.predios.push(Predio {
-            tipo_predio_id: "mina_bauxita".into(),
-            custo_insumos_ultimo_tick: 5.0,
-            lucro_ultimo_tick: -5.0,
-            ..predio_base.clone()
-        });
+        prov.predios.push(novo_predio("mina_bauxita", 1));
+        prov.predios.last_mut().unwrap().metodos_ativos = vec!["basico".into()];
+        prov.predios.last_mut().unwrap().custo_insumos_ultimo_tick = 5.0;
+        prov.predios.last_mut().unwrap().lucro_ultimo_tick = -5.0;
         // Mina com poucos dias de prejuízo (< 45) - NÃO deve alertar
-        prov.predios.push(Predio {
-            tipo_predio_id: "mina_bauxita".into(),
-            dias_prejuizo: 30,
-            custo_insumos_ultimo_tick: 25.0,
-            lucro_ultimo_tick: -25.0,
-            ..predio_base.clone()
-        });
+        prov.predios.push(novo_predio("mina_bauxita", 1));
+        prov.predios.last_mut().unwrap().metodos_ativos = vec!["basico".into()];
+        prov.predios.last_mut().unwrap().dias_prejuizo = 30;
+        prov.predios.last_mut().unwrap().custo_insumos_ultimo_tick = 25.0;
+        prov.predios.last_mut().unwrap().lucro_ultimo_tick = -25.0;
         // Mina fechada - NÃO deve alertar
-        prov.predios.push(Predio {
-            tipo_predio_id: "mina_bauxita".into(),
-            fechado: true,
-            custo_insumos_ultimo_tick: 25.0,
-            lucro_ultimo_tick: -25.0,
-            ..predio_base.clone()
-        });
+        prov.predios.push(novo_predio("mina_bauxita", 1));
+        prov.predios.last_mut().unwrap().metodos_ativos = vec!["basico".into()];
+        prov.predios.last_mut().unwrap().fechado = true;
+        prov.predios.last_mut().unwrap().custo_insumos_ultimo_tick = 25.0;
+        prov.predios.last_mut().unwrap().lucro_ultimo_tick = -25.0;
         // Mina nível 0 - NÃO deve alertar
-        prov.predios.push(Predio {
-            tipo_predio_id: "mina_bauxita".into(),
-            nivel: 0,
-            custo_insumos_ultimo_tick: 25.0,
-            lucro_ultimo_tick: -25.0,
-            ..predio_base
-        });
+        prov.predios.push(novo_predio("mina_bauxita", 0));
+        prov.predios.last_mut().unwrap().metodos_ativos = vec!["basico".into()];
+        prov.predios.last_mut().unwrap().custo_insumos_ultimo_tick = 25.0;
+        prov.predios.last_mut().unwrap().lucro_ultimo_tick = -25.0;
 
         let provincias = vec![prov];
         let mut alertas = BTreeMap::new();

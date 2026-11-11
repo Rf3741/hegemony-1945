@@ -35,7 +35,7 @@ pub use cenario::CenarioEconomia;
 pub use entidades::{
     BlocoComercial, ConfigSimulacao, DetalheRotaComercial, Estado, ItemConstrucao, Mercado,
     OpcaoParceiroComercial, OrcamentoGoverno, Pais, PoliticaFiscal, Pop, PotencialRegional, Predio,
-    Provincia, ResumoComercioPais, RotaComercial,
+    Provincia, ResumoComercioPais, RotaComercial, novo_predio,
 };
 pub use erro::{ErroEconomia, ResultadoEconomia, validar_id_snake_case};
 pub use gerador::{ParametrosEscalaMundial, gerar_cenario_escala_mundial};
