@@ -384,7 +384,8 @@ impl EstadoEventos {
             let expirou_por_data_limite = hoje_abs > data_evento_abs + EXPIRACAO_HISTORICA_DIAS;
             if expirou_por_tempo_fila || expirou_por_data_limite {
                 if let Some(op) = evento.opcoes.first() {
-                    aplicar_opcao_com_contexto(ctx, self, evento, 0, &pend.pais);
+                    let pais = pend.pais.clone();
+                    aplicar_opcao_com_contexto(ctx, self, evento, 0, &pais);
                     // aplicar_opcao_com_contexto já remove de pendentes por ID
                     self.jornal.push(Noticia {
                         data: (ctx.mundo.data.ano, ctx.mundo.data.mes, ctx.mundo.data.dia),
