@@ -1007,7 +1007,7 @@ fn test_apoio_material_nivel2_tesouro_e_forca() {
     let mut mundo = MundoGuerra::novo(cenario).expect("mundo deve inicializar");
 
     let guerra_id = mundo.guerras()[0].id.clone();
-    let tesouro_inicial_ccc = 1000.0; // Valor simulado - o sim_guerra não tem tesouro direto, mas testamos a mecânica
+    let _tesouro_inicial_ccc = 1000.0; // Valor simulado - o sim_guerra não tem tesouro direto, mas testamos a mecânica
 
     // Adiciona envolvimento de apoio material (nível 2) do país CCC para o lado defensor (BBB)
     if let Some(g) = mundo.cenario.guerras.iter_mut().find(|w| w.id == guerra_id) {
@@ -1054,10 +1054,10 @@ fn test_apoio_material_nivel2_tesouro_e_forca() {
 #[test]
 fn test_potencias_nucleares_nao_nivel5_sem_jogador() {
     let cenario = cenario_potencias_nucleares();
-    let mut mundo = MundoGuerra::novo(cenario).expect("mundo deve inicializar");
-
-    let guerra_id = mundo.guerras()[0].id.clone();
-    let data_teste = (1950, 1, 1); // Ano 1950 - ambas têm armas nucleares (USA desde 1945, URSS desde 1949)
+    let mundo = MundoGuerra::novo(cenario).expect("mundo deve inicializar");
+    
+    let _guerra_id = mundo.guerras()[0].id.clone();
+    let _data_teste = (1950, 1, 1); // Ano 1950 - ambas têm armas nucleares (USA desde 1945, URSS desde 1949)
 
     // Função tem_armas_nucleares do guerra_ia.rs
     fn tem_armas_nucleares(tag: &str, ano: i32) -> bool {

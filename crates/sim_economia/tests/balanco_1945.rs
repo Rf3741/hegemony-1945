@@ -69,10 +69,10 @@ fn diagnostico_dias() {
         while dia < alvo { m.executar_tick_diario(); dia += 1; }
         let p = m.obter_pais(&id).unwrap();
         let (mut emp, mut niv, mut nb, mut lucro_neg) = (0.0, 0u32, 0, 0);
-        let mut rend = 0.0; let mut ops = 0.0;
+        let mut rend = 0.0; let mut _ops = 0.0;
         for pr in m.provincias().iter().filter(|x| x.pais_id == id) {
             for b in &pr.predios { if b.nivel>0 { nb+=1; niv+=b.nivel; if b.margem_lucro() < 0.0 {lucro_neg+=1;} emp += b.total_empregados(); } }
-            for pop in &pr.pops { rend += pop.renda_ultimo_tick; if pop.tipo_pop_id=="operarios" {ops+=pop.populacao;} }
+            for pop in &pr.pops { rend += pop.renda_ultimo_tick; if pop.tipo_pop_id=="operarios" {_ops+=pop.populacao;} }
         }
         eprintln!("dia {dia:>3} emp_pred {:>12.0} predios {nb} niveis {niv} margem<0 {lucro_neg} renda_pops {:>12.0} PIBd {:>12.0} desemp {:.1}% saldo {:.0} rec {:.0} desp {:.0} (burocr {:.0} milit {:.0} constr {:.0} subs {:.0} juros {:.0})",
           emp, rend, p.pib_diario, 100.0*m.taxa_desemprego_media_pais(&id).unwrap(), p.orcamento.saldo_diario, p.orcamento.receita_total(), p.orcamento.despesa_total(), p.orcamento.gasto_burocracia, p.orcamento.gasto_militar, p.orcamento.gasto_construcao, p.orcamento.gasto_subsidios, p.orcamento.gasto_juros);

@@ -349,6 +349,7 @@ impl Maquina {
 }
 
 /// O clique em `p` passa? Só dentro do buraco (se houver) ou da caixa do tutorial.
+#[allow(dead_code)]
 pub fn clique_permitido(buraco: Option<egui::Rect>, caixa: egui::Rect, p: egui::Pos2) -> bool {
     caixa.contains(p) || buraco.is_some_and(|b| b.contains(p))
 }
@@ -381,7 +382,7 @@ impl TutorialGuiado {
         self.maquina.as_ref().map(|m| m.passo)
     }
 
-    pub fn estado(&self) -> Option<EstadoTut> {
+    fn _estado(&self) -> Option<EstadoTut> {
         self.maquina.as_ref().map(|m| m.estado)
     }
 

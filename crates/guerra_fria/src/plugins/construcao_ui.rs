@@ -72,6 +72,7 @@ impl Default for ConstrucaoUi {
 /// Uma opção de prédio para uma província.
 #[derive(Debug, Clone)]
 pub struct OpcaoConstrucao {
+    #[allow(dead_code)]
     pub tipo_idx: usize,
     pub tipo_id: String,
     pub nome: String,

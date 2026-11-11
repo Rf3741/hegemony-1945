@@ -105,6 +105,10 @@ where
     S: AsRef<str>,
 {
     let argv: Vec<String> = args.into_iter().map(|a| a.as_ref().to_string()).collect();
+    if argv.iter().any(|a| a == "--help" || a == "-h") {
+        print_help();
+        std::process::exit(0);
+    }
     let mut op = OpcoesCli::default();
     let mut i = 0;
     while i < argv.len() {
@@ -283,9 +287,59 @@ fn painel(texto: &str) -> Result<u8, String> {
         .parse()
         .map_err(|_| format!("--painel exige um número de 1 a 9: {texto}"))?;
     if !matches!(n, 1..=9) {
-        return Err(format!("--painel exige um número de 1 a 9: {texto}"));
+        return Err(format!(
+            "--painel exige um número de 1 a 9: {texto}\n{}",
+            painel_help()
+        ));
     }
     Ok(n)
+}
+
+fn painel_help() -> String {
+    "Painéis disponíveis:\n\
+      1  País (visão geral do país do jogador)\n\
+      2  Mercado (bens, preços, produção)\n\
+      3  Comércio (acordos, tarifas, rotas)\n\
+      4  Diplomacia (relações, esferas, tratados)\n\
+      5  Tecnologia (pesquisa, árvore tecnológica)\n\
+      6  Guerra (conflitos, frentes, exércitos, paz)\n\
+      7  Estatísticas (rankings, gráficos históricos, ledger)\n\
+      8  Enciclopédia (referência de bens, prédios, etc.)\n\
+      9  Configurações (áudio, vídeo, interface)".to_string()
+}
+
+fn print_help() {
+    eprintln!(
+        "Hegemony: 1945 - Modos de teste automatizados\n\
+        \n\
+        Uso:\n\
+          guerra_fria --smoke <segundos> [opções]\n\
+          guerra_fria --espectador [opções]\n\
+        \n\
+        Flags principais:\n\
+          --smoke <segundos>    Execução automatizada por N segundos reais (ex.: --smoke 150)\n\
+          --espectador          IA joga sozinha; gera relatório periódico\n\
+          --help, -h            Mostra esta ajuda\n\
+        \n\
+        Opções de --smoke:\n\
+          --painel <1-9>        Abre painel específico durante o smoke (ver abaixo)\n\
+          --screenshot <arquivo.png>  Captura tela antes de encerrar\n\
+          --qualidade <baixo|medio|alto|ultra>  Qualidade gráfica\n\
+          --velocidade <0-5>    Velocidade do relógio (0=pausado, 5=máximo)\n\
+          --camera <lon> <lat>  Posição inicial da câmera\n\
+          --zoom <fator>        Zoom inicial da câmera\n\
+          --tutorial            Executa tutorial guiado completo com capturas\n\
+          --semente <número>    Semente determinística da partida\n\
+        \n\
+        Opções de --espectador:\n\
+          --anos <número>       Anos de jogo a simular (padrão: 100)\n\
+          --pais <tag>          País a ser governado pela IA (padrão: BRA)\n\
+          --relatorio <arquivo> Caminho do relatório Markdown\n\
+          --semente <número>    Semente determinística\n\
+        \n\
+        {}",
+        painel_help()
+    );
 }
 
 fn parse_lon(texto: &str) -> Result<f32, String> {

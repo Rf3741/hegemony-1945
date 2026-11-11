@@ -2,8 +2,8 @@
 
 use super::economia_sim::{Comando, EconomiaSim};
 use super::economy::RecursoMundo;
-use super::guerra_ia::{aliados_com_obrigacao_defesa, ocupantes_atuais, ocupantes_historicos, todos_os_ocupantes};
-use super::guerra_sim::{DadosGuerra, GuerraSim, acao_declarar_guerra, declarar_com_aliados, normalizar_tag};
+use super::guerra_ia::{aliados_com_obrigacao_defesa, todos_os_ocupantes};
+use super::guerra_sim::{declarar_com_aliados, normalizar_tag};
 use super::jogador::PaisJogador;
 use super::map::{CoresMapa, DadosMapa, ImagemMapa, pintar_paleta};
 use super::time::EventoTickDiario;
@@ -38,7 +38,7 @@ pub struct PainelDiplomacia {
     pub dias_desde_pintura: u32,
     pub cache_lista: Vec<ItemDiploCache>,
     pub cache_busca: String,
-    pub versao_diplo: u64,
+    _versao_diplo: u64,
 }
 
 pub struct DiplomaciaUiPlugin;

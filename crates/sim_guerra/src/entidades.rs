@@ -1,7 +1,7 @@
 //! Entidades de domínio militar serializáveis em RON:
 //! regiões do mapa, países militares, comandantes, divisões, exércitos, frentes, guerras e configuração.
 
-use crate::tipos::{DataJogo, EnvolvimentoGuerra, LadoGuerra, PosturaOperacional};
+use crate::tipos::{DataJogo, EnvolvimentoGuerra, PosturaOperacional};
 use serde::{Deserialize, Serialize};
 
 const fn padrao_true() -> bool {

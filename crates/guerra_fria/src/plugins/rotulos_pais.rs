@@ -37,6 +37,7 @@ struct EstadoRotulos {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct GeoPais {
     pub tag: String,
     pub centro: Vec2,

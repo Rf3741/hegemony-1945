@@ -70,7 +70,7 @@ impl MetricaGrafico {
         }
     }
 
-    pub fn formatar_valor(self, v: f64) -> String {
+    fn _formatar_valor(self, v: f64) -> String {
         match self {
             Self::Pib | Self::Divida | Self::Tesouro => fmt_din(v),
             Self::PibPerCapita => format!("${:.1}", v),
@@ -240,7 +240,7 @@ impl MesSimulado {
 #[derive(Debug, Clone)]
 pub struct DescricaoBem {
     pub idx: usize,
-    pub id: String,
+    _id: String,
     pub nome: String,
 }
 
@@ -304,6 +304,7 @@ pub struct EntradaRankingPotencia {
 
 /// Colunas da tabela geral ordenável do Ledger.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[allow(dead_code)]
 pub enum ColunaLedger {
     #[default]
     RankGeral,
@@ -374,7 +375,7 @@ pub struct RecursoLedger {
     pub tabela_cache_bloco: Option<String>,
     pub tabela_cache_col: ColunaLedger,
     pub tabela_cache_desc: bool,
-    pub tabela_cache_versao: usize,
+    _tabela_cache_versao: usize,
     pub lista_grafico_cache: Vec<(usize, String, String, String)>,
     pub lista_grafico_busca: String,
     pub lista_grafico_versao: usize,
@@ -409,7 +410,7 @@ impl Default for RecursoLedger {
             tabela_cache_bloco: None,
             tabela_cache_col: ColunaLedger::PontuacaoTotal,
             tabela_cache_desc: true,
-            tabela_cache_versao: 0,
+            _tabela_cache_versao: 0,
             lista_grafico_cache: Vec::new(),
             lista_grafico_busca: String::new(),
             lista_grafico_versao: 0,
@@ -504,7 +505,7 @@ fn coletar_historico_mensal(
                 .enumerate()
                 .map(|(i, b)| DescricaoBem {
                     idx: i,
-                    id: b.id.clone(),
+                    _id: b.id.clone(),
                     nome: b.nome.clone(),
                 })
                 .collect();
@@ -516,7 +517,7 @@ fn coletar_historico_mensal(
                 .enumerate()
                 .map(|(i, b)| DescricaoBem {
                     idx: i,
-                    id: b.id.clone(),
+                    _id: b.id.clone(),
                     nome: b.nome.clone(),
                 })
                 .collect();

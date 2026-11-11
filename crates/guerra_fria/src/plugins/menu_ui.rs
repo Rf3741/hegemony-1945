@@ -10,6 +10,7 @@ use simulacao::mundo::EstadoPais;
 
 /// Sub-tela do menu principal.
 #[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[allow(dead_code)]
 pub enum TelaMenu {
     #[default]
     Titulo,
@@ -20,10 +21,15 @@ pub enum TelaMenu {
 /// Dica histórica (assets/menu/dicas.ron).
 #[derive(Debug, Clone, Deserialize)]
 pub struct Dica {
+    #[allow(dead_code)]
     pub categoria: String,
+    #[allow(dead_code)]
     pub ano: i32,
+    #[allow(dead_code)]
     pub titulo: String,
+    #[allow(dead_code)]
     pub texto: String,
+    #[allow(dead_code)]
     pub dica_mecanica: String,
 }
 
@@ -112,7 +118,7 @@ pub fn desenhar_fundo(ctx: &egui::Context, fundo: &mut Option<egui::TextureHandl
 }
 
 /// Vinheta vetorial da Guerra Fria usada enquanto os dados do mapa são carregados.
-pub fn desenhar_animacao_carregamento(ctx: &egui::Context, segundos: f32) {
+fn _desenhar_animacao_carregamento(ctx: &egui::Context, segundos: f32) {
     let tela = ctx.viewport_rect();
     let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("animacao_carregamento")));
     let centro = tela.center();
@@ -128,14 +134,14 @@ pub fn desenhar_animacao_carregamento(ctx: &egui::Context, segundos: f32) {
         8.0,
         egui::Color32::from_rgba_unmultiplied(35, 29, 23, 105),
     );
-    desenhar_bandeira_usa(&painter, esquerda);
-    desenhar_bandeira_urss(&painter, direita);
-    desenhar_missil(&painter, tela, segundos, false, escala);
-    desenhar_missil(&painter, tela, segundos + 2.7, true, escala);
+    _desenhar_bandeira_usa(&painter, esquerda);
+    _desenhar_bandeira_urss(&painter, direita);
+    _desenhar_missil(&painter, tela, segundos, false, escala);
+    _desenhar_missil(&painter, tela, segundos + 2.7, true, escala);
     ctx.request_repaint();
 }
 
-fn desenhar_bandeira_usa(painter: &egui::Painter, rect: egui::Rect) {
+fn _desenhar_bandeira_usa(painter: &egui::Painter, rect: egui::Rect) {
     let azul = egui::Color32::from_rgb(25, 55, 96);
     let vermelho = egui::Color32::from_rgb(151, 42, 34);
     painter.rect_filled(rect, 2.0, egui::Color32::from_rgb(235, 222, 194));
@@ -158,7 +164,7 @@ fn desenhar_bandeira_usa(painter: &egui::Painter, rect: egui::Rect) {
     painter.text(rect.center_top() + egui::vec2(0.0, -22.0), egui::Align2::CENTER_CENTER, "EUA", egui::FontId::proportional(14.0), egui::Color32::from_rgb(235, 222, 194));
 }
 
-fn desenhar_bandeira_urss(painter: &egui::Painter, rect: egui::Rect) {
+fn _desenhar_bandeira_urss(painter: &egui::Painter, rect: egui::Rect) {
     let vermelho = egui::Color32::from_rgb(157, 38, 31);
     let dourado = egui::Color32::from_rgb(239, 196, 74);
     painter.rect_filled(rect, 2.0, vermelho);
@@ -176,7 +182,7 @@ fn desenhar_bandeira_urss(painter: &egui::Painter, rect: egui::Rect) {
     painter.text(rect.center_top() + egui::vec2(0.0, -22.0), egui::Align2::CENTER_CENTER, "URSS", egui::FontId::proportional(14.0), egui::Color32::from_rgb(239, 196, 74));
 }
 
-fn desenhar_missil(painter: &egui::Painter, tela: egui::Rect, segundos: f32, direita: bool, escala: f32) {
+fn _desenhar_missil(painter: &egui::Painter, tela: egui::Rect, segundos: f32, direita: bool, escala: f32) {
     let progresso = (segundos * 0.16).rem_euclid(1.0);
     let (inicio_x, fim_x) = if direita { (tela.right() * 0.88, tela.right() * 0.58) } else { (tela.left() + tela.width() * 0.12, tela.left() + tela.width() * 0.42) };
     let inicio = egui::pos2(inicio_x, tela.bottom() + 24.0);
@@ -389,6 +395,7 @@ fn card_pais(ui: &mut egui::Ui, p: &EstadoPais, posicao_pib: usize) -> bool {
 }
 
 /// Dica da tela de carregamento (troca a cada 6 s).
+#[allow(dead_code)]
 pub fn dica_atual<'a>(dicas: &'a [Dica], segundos: f32) -> Option<&'a Dica> {
     if dicas.is_empty() {
         return None;

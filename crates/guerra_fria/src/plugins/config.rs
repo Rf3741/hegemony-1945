@@ -153,7 +153,7 @@ pub enum QualidadeTerreno {
 }
 
 impl QualidadeTerreno {
-    pub const TODAS: [(Self, &'static str); 4] = [
+    const _TODAS: [(Self, &'static str); 4] = [
         (Self::Baixo, "Baixo"),
         (Self::Medio, "Médio"),
         (Self::Alto, "Alto"),

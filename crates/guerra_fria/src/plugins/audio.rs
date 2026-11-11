@@ -22,6 +22,7 @@ const ARQ_CONFIG: &str = "assets/data/sons.ron";
 #[serde(rename = "CanalAudio")]
 pub struct CanalSom {
     pub id: String,
+    #[allow(dead_code)]
     pub nome: String,
     pub volume: f32,
     pub mutado: bool,
@@ -37,6 +38,7 @@ pub struct EfeitoSonoro {
     pub limite_concorrencia: u32,
     pub cooldown_ms: u32,
     #[serde(default)]
+    #[allow(dead_code)]
     pub descricao: String,
 }
 
@@ -48,7 +50,9 @@ pub struct MapeamentoEvento {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConfigAudio {
+    #[allow(dead_code)]
     pub versao: u32,
+    #[allow(dead_code)]
     pub taxa_amostragem_padrao: u32,
     pub canais: Vec<CanalSom>,
     pub efeitos: Vec<EfeitoSonoro>,

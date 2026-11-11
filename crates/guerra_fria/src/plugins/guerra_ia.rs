@@ -10,7 +10,7 @@ use super::jogador::Notificacoes;
 use super::time::EventoTickDiario;
 use bevy::prelude::*;
 use eventos::Noticia;
-use sim_diplomacia::{Bloco, Diplomacia, Esfera, TipoPacto};
+use sim_diplomacia::{Bloco, Diplomacia, TipoPacto};
 use sim_guerra::{Divisao, EnvolvimentoGuerra, Exercito, LadoGuerra, NivelEnvolvimento, PaisMilitar, PosturaOperacional};
 use std::collections::BTreeSet;
 
@@ -24,7 +24,7 @@ pub const OCUPACOES_DATADAS: &[(&str, &str, (i32, u8, u8), (i32, u8, u8))] = &[
 
 /// Verifica se `tag` está sob ocupação histórica na data `data`.
 /// Retorna `Some(ocupante)` se ocupado, `None` caso contrário.
-pub fn ocupado_historicamente(tag: &str, data: (i32, u8, u8)) -> Option<&'static str> {
+fn _ocupado_historicamente(tag: &str, data: (i32, u8, u8)) -> Option<&'static str> {
     OCUPACOES_DATADAS
         .iter()
         .find(|(t, _, de, ate)| *t == tag && data >= *de && data <= *ate)
@@ -219,7 +219,7 @@ fn poder_pais(g: &GuerraSim, tag: &str) -> f64 {
 }
 
 /// Calcula o poder total de um lado (país + seus aliados na guerra).
-fn poder_lado(g: &GuerraSim, d: &Diplomacia, tags: &[String], data: (i32, u8, u8)) -> f64 {
+fn poder_lado(g: &GuerraSim, d: &Diplomacia, tags: &[String], _data: (i32, u8, u8)) -> f64 {
     let mut total = 0.0;
     for t in tags {
         total += poder_pais(g, t);
@@ -350,19 +350,17 @@ fn calcular_nivel_envolvimento_otimo(
         && guerra.participa(outra_superpotencia);
     
     // Lógica de decisão baseada em poder, importância, tensão e risco nuclear
-    let mut nivel = NivelEnvolvimento::Neutro;
-    
-    if poder < 50.0 {
-        nivel = NivelEnvolvimento::ApoioDiplomatico;
+    let mut nivel = if poder < 50.0 {
+        NivelEnvolvimento::ApoioDiplomatico
     } else if poder < 200.0 {
-        nivel = NivelEnvolvimento::ApoioMaterial;
+        NivelEnvolvimento::ApoioMaterial
     } else if poder < 500.0 {
-        nivel = NivelEnvolvimento::ConseleirosVoluntarios;
+        NivelEnvolvimento::ConseleirosVoluntarios
     } else if poder < 1000.0 {
-        nivel = NivelEnvolvimento::IntervencaoLimitada;
+        NivelEnvolvimento::IntervencaoLimitada
     } else {
-        nivel = NivelEnvolvimento::GuerraTotal;
-    }
+        NivelEnvolvimento::GuerraTotal
+    };
     
     // Ajuste por importância do aliado
     if importancia_aliado > 2.0 {
@@ -506,7 +504,7 @@ fn aplicar_efeitos_envolvimentos(g: &mut GuerraSim, guerra_id: &str) {
         guerra.pontuacao_guerra += bonus_atk * 10.0 - bonus_def * 10.0;
         
         // Gera tensão mundial
-        let tensao_total: f32 = guerra.envolvimentos.iter().map(|e| e.nivel.tensao_diaria()).sum();
+        let _tensao_total: f32 = guerra.envolvimentos.iter().map(|e| e.nivel.tensao_diaria()).sum();
         // A tensão será aplicada no tick de diplomacia
     }
 }
@@ -894,7 +892,7 @@ mod testes {
     fn ia_pesa_custo_atacar_ocupados_e_sem_guerras_ocidentais_antes_1960() {
         // Carrega o cenário real de 1945
         let raiz = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let (catalogo, mundo_base) = MundoJogo::carregar_de_arquivos(
+        let (_catalogo, mundo_base) = MundoJogo::carregar_de_arquivos(
             raiz.join("assets/map/provinces.ron"),
             raiz.join("data/scenario_1945/countries_1945.ron"),
             raiz.join("data/scenario_1945/province_owners_1945.ron"),
