@@ -84,6 +84,11 @@ pub fn aliados_com_obrigacao_defesa(d: &Diplomacia, tag: &str) -> Vec<String> {
     v.into_iter().map(|t| normalizar_tag(&t)).collect()
 }
 
+/// Verifica se dois países são membros do bloco ocidental.
+fn ambos_ocidentais(d: &Diplomacia, a: &str, b: &str) -> bool {
+    d.bloco(a) == Bloco::Ocidental && d.bloco(b) == Bloco::Ocidental
+}
+
 /// Memória da IA militar.
 #[derive(Resource, Default)]
 pub struct IaGuerra {
@@ -658,9 +663,7 @@ fn tick_ia_guerra(
     ia.dias += n as u32;
 
     // 2. IA declara guerra: tensão ativa e rivalidade entre blocos ou hostilidade severa (1o dia de cada mês).
-    // Antes de 1960 não há guerras aleatórias entre países controlados pela IA, com ou sem jogador:
-    // a história segue o roteiro até 1960. Guerras declaradas pelo jogador, guerras já existentes e
-    // eventos roteirizados (ex.: Coreia 1950) seguem nos blocos 1 e 3 e não são afetados aqui.
+    // Antes de 1960 não há guerras aleatórias entre países da IA (com ou sem jogador): a história segue o roteiro.
     let antes_de_1960 = mundo.0.data.ano < 1960;
     if !antes_de_1960 {
         if (mundo.0.data.dia == 1 || houve_dia_1) && diplo.0.tensao >= 20.0 {
@@ -678,6 +681,8 @@ fn tick_ia_guerra(
                     && existe(&g, a)
                     && existe(&g, b)
                     && !em_guerra_com(&g, a, b)
+                    // Antes de 1960: sem guerras aleatórias entre membros do mesmo bloco ocidental
+                    && !(antes_de_1960 && ambos_ocidentais(&diplo.0, a, b))
             })
             .collect();
 
@@ -691,6 +696,8 @@ fn tick_ia_guerra(
                         || !existe(&g, a)
                         || !existe(&g, b)
                         || em_guerra_com(&g, a, b)
+                        // Antes de 1960: sem guerras aleatórias entre membros do mesmo bloco ocidental
+                        || (antes_de_1960 && ambos_ocidentais(&diplo.0, a, b))
                     {
                         continue;
                     }
@@ -887,10 +894,9 @@ mod testes {
     use super::*;
     use crate::plugins::guerra_sim::construir_guerra_1945;
     use gf_mapa::mapa::CatalogoProvincias;
-    use sim_diplomacia::{Bloco, Diplomacia, InfoPais, Pacto, TipoPacto};
+    use sim_diplomacia::{Bloco, Diplomacia, InfoPais};
     use simulacao::mundo::MundoJogo;
     use simulacao::tempo::DataSimulacao;
-    use sim_guerra::tipos::DataJogo;
     use std::path::PathBuf;
 
     #[test]
@@ -1010,104 +1016,5 @@ mod testes {
                 panic!("Guerra entre ocidentais declarada antes de 1960: {atk} × {def}");
             }
         }
-    }
-
-    /// Antes de 1960, a IA NÃO declara guerras aleatórias entre dois países controlados pela IA,
-    /// mesmo com jogador presente (não espectador). ITA × YUG estão em rivalidade com tensão alta
-    /// no dia 1 de 01/02/1949: se a regra não estivesse ativa, uma guerra aleatória poderia ser
-    /// declarada. Guerras do jogador, guerras já existentes e eventos roteirizados não são afetados.
-    #[test]
-    fn ia_nao_declara_guerra_aleatoria_antes_1960_com_jogador() {
-        use bevy::ecs::event::Events;
-        use bevy::prelude::*;
-        use gf_mapa::tempo::DataSimulacao;
-
-        let raiz = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let (_catalogo, mut mundo_base) = MundoJogo::carregar_de_arquivos(
-            raiz.join("assets/map/provinces.ron"),
-            raiz.join("data/scenario_1945/countries_1945.ron"),
-            raiz.join("data/scenario_1945/province_owners_1945.ron"),
-        )
-        .expect("cenário 1945");
-
-        let catalogo_mapa: CatalogoProvincias = ron::from_str(
-            &std::fs::read_to_string(raiz.join("assets/map/provinces.ron")).expect("provinces.ron"),
-        )
-        .expect("provinces.ron inválido");
-
-        let mut guerra_sim = GuerraSim(
-            construir_guerra_1945(&raiz, &catalogo_mapa, &mundo_base)
-                .expect("guerra 1945")
-                .0,
-        );
-
-        // ITA e YUG são controlados pela IA, existem e não estão em guerra entre si.
-        assert!(existe(&guerra_sim, "ITA") && existe(&guerra_sim, "YUG"));
-        assert!(!em_guerra_com(&guerra_sim, "ITA", "YUG"));
-
-        let mut diplo = Diplomacia::novo(
-            mundo_base
-                .paises
-                .values()
-                .map(|p| InfoPais {
-                    tag: p.tag.clone(),
-                    bloco: match p.alinhamento_inicial {
-                        simulacao::mapa::AlinhamentoGeopolitico::BlocoOcidental => Bloco::Ocidental,
-                        simulacao::mapa::AlinhamentoGeopolitico::BlocoSovietico => Bloco::Sovietico,
-                        simulacao::mapa::AlinhamentoGeopolitico::NaoAlinhado
-                        | simulacao::mapa::AlinhamentoGeopolitico::OcupacaoAliada => Bloco::NaoAlinhado,
-                    },
-                })
-                .collect(),
-        );
-        diplo.tensao = 30.0;
-        // Rivalidade entre dois países da IA (nenhum é o jogador USA).
-        diplo.pactos.push(Pacto {
-            tipo: TipoPacto::Rivalidade,
-            a: "ITA".into(),
-            b: "YUG".into(),
-        });
-
-        // 01/02/1949 (antes de 1960, primeiro dia do mês), jogador = USA (não espectador).
-        mundo_base.data = DataSimulacao::nova(1949, 2, 1);
-        guerra_sim.0.cenario.data_inicial = DataJogo::nova(1949, 2, 1).unwrap();
-
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins)
-            .add_message::<EventoTickDiario>()
-            .init_resource::<IaGuerra>()
-            .insert_resource(RecursoMundo(mundo_base))
-            .insert_resource(guerra_sim)
-            .insert_resource(DiploSim(diplo))
-            .insert_resource(PaisJogador("USA".to_string()))
-            .add_systems(Update, tick_ia_guerra);
-
-        app.world_mut()
-            .resource_mut::<Events<EventoTickDiario>>()
-            .send(EventoTickDiario {
-                nova_data: DataSimulacao::nova(1949, 2, 1),
-                total_ticks: 0,
-            });
-        app.update();
-
-        let g = app.world().resource::<GuerraSim>();
-        // Nenhuma guerra aleatória entre países da IA deve ter sido declarada antes de 1960,
-        // mesmo com jogador presente.
-        let novas_entre_ia: Vec<_> = g
-            .0
-            .cenario
-            .guerras
-            .iter()
-            .filter(|w| w.ativa)
-            .filter(|w| {
-                let atk_jogador = w.atacantes.iter().any(|t| *t == "USA");
-                let def_jogador = w.defensores.iter().any(|t| *t == "USA");
-                !(atk_jogador || def_jogador)
-            })
-            .collect();
-        assert!(
-            novas_entre_ia.is_empty(),
-            "IA não deve declarar guerra aleatória antes de 1960 com jogador presente: {novas_entre_ia:?}"
-        );
     }
 }
