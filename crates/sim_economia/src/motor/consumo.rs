@@ -276,6 +276,11 @@ pub(crate) fn executar_consumo_tributos_e_bem_estar(
     // necessidade e nas suas províncias; a ordem das províncias dentro do país é a global, então as somas de
     // ponto flutuante são idênticas à versão sequencial (determinístico, independente do nº de threads).
     let cestas_ro: &[[CestaNecessidadeCompilada; NUM_NECESSIDADES]] = &*cestas_pais;
+    // Pré-aloca a capacidade de províncias de cada país: evita realocações do `provs` a cada tick.
+    let mut prov_por_pais = vec![0usize; paises.len()];
+    for prov in provincias.iter() {
+        prov_por_pais[prov.pais_idx] += 1;
+    }
     let mut tarefas: Vec<TarefaPaisConsumo> = paises
         .iter_mut()
         .zip(demanda_necessidade_pais.iter_mut())
@@ -288,7 +293,7 @@ pub(crate) fn executar_consumo_tributos_e_bem_estar(
             c_dividendos_ari_pais: dividendos_ari_pais[c],
             c_pop_cap_pais: pop_cap_pais[c],
             c_pop_ari_pais: pop_ari_pais[c],
-            provs: Vec::new(),
+            provs: Vec::with_capacity(prov_por_pais[c]),
         })
         .collect();
     for (p_idx, prov) in provincias.iter_mut().enumerate() {

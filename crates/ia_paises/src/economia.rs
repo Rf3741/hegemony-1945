@@ -109,17 +109,23 @@ impl IaEconomia {
                 self.pib_pc_mundial = pib / pop;
             }
         }
-        let ids: Vec<String> = mundo.paises().iter().map(|p| p.id.clone()).collect();
-        for (i, id) in ids.iter().enumerate() {
-            if ignorar.iter().any(|x| x == id) {
+        let n = mundo.paises().len();
+        for i in 0..n {
+            let fase = dia + i as u64;
+            let passo_semanal = fase % 7 == 0;
+            let passo_mensal = fase % 30 == 0;
+            if !passo_semanal && !passo_mensal {
                 continue;
             }
-            let fase = dia + i as u64;
-            if fase % 7 == 0 {
-                self.passo_semanal(mundo, id, dia);
+            let id = mundo.paises()[i].id.clone();
+            if ignorar.iter().any(|x| x.as_str() == id.as_str()) {
+                continue;
             }
-            if fase % 30 == 0 {
-                self.passo_mensal(mundo, id, dia);
+            if passo_semanal {
+                self.passo_semanal(mundo, &id, dia);
+            }
+            if passo_mensal {
+                self.passo_mensal(mundo, &id, dia);
             }
         }
     }

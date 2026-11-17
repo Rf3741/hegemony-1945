@@ -101,8 +101,11 @@ pub const ALIAS_TAGS: [(&str, &str); 12] = [
 pub const DIAS_AQUECIMENTO: u32 = 90;
 /// Máximo de dias pendentes; acima disso a economia "perde" dias (aparece no HUD).
 const MAX_ATRASO_DIAS: u32 = 60;
-/// Máximo de dias por lote enviado à thread.
+/// Máximo de dias por lote enviado à thread em condições normais.
 const DIAS_POR_LOTE: u32 = 30;
+/// Quando o atraso passa de 7 dias, processa mais dias por lote para a thread de economia
+/// alcançar o relógio do jogo mais rapidamente (limite efetivo: MAX_ATRASO_DIAS).
+const DIAS_POR_LOTE_RECUPERACAO: u32 = 90;
 
 // ---------------------------------------------------------------------------------------------
 // Núcleo (sem Bevy): mundo + mercado global + catálogo
@@ -295,14 +298,14 @@ impl Nucleo {
 
     pub fn avancar(&mut self, dias: u32) -> usize {
         let mut obras = 0;
+        let ignorar: Vec<String> = if self.jogador_eh_ia {
+            Vec::new()
+        } else {
+            self.jogador.iter().cloned().collect()
+        };
         for _ in 0..dias {
             let rel = self.mundo.executar_tick_diario();
             obras += rel.obras_concluidas;
-            let ignorar: Vec<String> = if self.jogador_eh_ia {
-                Vec::new()
-            } else {
-                self.jogador.iter().cloned().collect()
-            };
             self.ia.passo_diario(&mut self.mundo, &ignorar);
             self.mundo.atualizar_mercado_global(&mut self.global);
         }
@@ -1296,7 +1299,13 @@ fn despachar_interno(eco: &mut EconomiaSim) {
         return;
     }
     eco.precisa_vista = false;
-    let dias = eco.pendentes.min(DIAS_POR_LOTE);
+    // Quando o atraso passa de 7 dias, despacha lotes maiores para recuperar o relógio do jogo.
+    let limite_lote = if eco.pendentes > 7 {
+        DIAS_POR_LOTE_RECUPERACAO
+    } else {
+        DIAS_POR_LOTE
+    };
+    let dias = eco.pendentes.min(limite_lote);
     eco.pendentes -= dias;
     let cmds = std::mem::take(&mut eco.comandos);
     let ganhos = std::mem::take(&mut eco.ganhos_tec);

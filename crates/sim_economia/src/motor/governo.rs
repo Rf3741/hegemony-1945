@@ -318,6 +318,24 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
 ) -> usize {
     let mut obras_concluidas_total = 0usize;
 
+    // Materiais por ponto de cada categoria resolvidos para índices de bem (iguais para todos os países;
+    // computados uma vez por tick em vez de uma vez por país).
+    let mats: [Vec<(usize, f64)>; 7] = [
+        CategoriaPredio::RuralAgricola,
+        CategoriaPredio::Extrativo,
+        CategoriaPredio::Industrial,
+        CategoriaPredio::Infraestrutura,
+        CategoriaPredio::Construcao,
+        CategoriaPredio::Governamental,
+        CategoriaPredio::Militar,
+    ]
+    .map(|c| {
+        materiais_por_ponto(c)
+            .iter()
+            .filter_map(|&(id, q)| catalogo.indice_bens.get(id).map(|&g| (g, q)))
+            .collect()
+    });
+
     for (c_idx, pais) in paises.iter_mut().enumerate() {
         // 1. Limite de crédito lastreado no PIB anualizado + reservas privadas dos prédios do país
         let reservas_predios = reservas_predios_pais[c_idx];
@@ -341,6 +359,7 @@ pub(crate) fn executar_fechamento_fiscal_e_construcao(
             &mercados[pais.mercado_idx],
             pais,
             pontos_construcao_setores_pais[c_idx],
+            &mats,
         );
 
         // 3. Reembolso proporcional do setor de construção pelo uso privado de pontos (Victoria 3)
@@ -550,6 +569,7 @@ fn avancar_fila_construcao(
     mercado: &Mercado,
     pais: &mut Pais,
     pontos_setores: f64,
+    mats: &[Vec<(usize, f64)>; 7],
 ) {
     pais.demanda_obras.clear();
     pais.orcamento.gasto_obras_materiais = 0.0;
@@ -564,21 +584,6 @@ fn avancar_fila_construcao(
     let num_bens = catalogo.bens.len();
     pais.demanda_obras.resize(num_bens, 0.0);
     // Materiais por ponto de cada categoria já resolvidos para índices de bens (evita buscas por texto por obra).
-    let mats: [Vec<(usize, f64)>; 7] = [
-        CategoriaPredio::RuralAgricola,
-        CategoriaPredio::Extrativo,
-        CategoriaPredio::Industrial,
-        CategoriaPredio::Infraestrutura,
-        CategoriaPredio::Construcao,
-        CategoriaPredio::Governamental,
-        CategoriaPredio::Militar,
-    ]
-    .map(|c| {
-        materiais_por_ponto(c)
-            .iter()
-            .filter_map(|&(id, q)| catalogo.indice_bens.get(id).map(|&g| (g, q)))
-            .collect()
-    });
 
     let pts_totais = (pais.pontos_construcao_base + pontos_setores) * pais.mult_eficiencia_construcao_lei;
     let (_, _, cota_priv) = parametros_sistema_economico(&pais.politica_fiscal.lei_sistema_economico_id);

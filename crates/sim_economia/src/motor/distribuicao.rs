@@ -60,6 +60,12 @@ pub(crate) fn executar_distribuicao_rendas(
     pop_ari_pais.fill(0.0);
     reservas_predios_pais.fill(0.0);
 
+    // Pré-aloca a capacidade de províncias de cada país: evita realocações do `provs` a cada tick.
+    let mut prov_por_pais = vec![0usize; paises.len()];
+    for prov in provincias.iter() {
+        prov_por_pais[prov.pais_idx] += 1;
+    }
+
     // Paralelo por PAÍS: cada país só escreve em si mesmo e nas suas províncias.
     let mut tarefas: Vec<TarefaPaisDistribuicao> = paises
         .iter_mut()
@@ -85,6 +91,9 @@ pub(crate) fn executar_distribuicao_rendas(
             }
         })
         .collect();
+    for (c, t) in tarefas.iter_mut().enumerate() {
+        t.provs.reserve(prov_por_pais[c]);
+    }
     for (((prov, sal_tipo), div_cap), div_ari) in provincias
         .iter_mut()
         .zip(salarios_prov_tipo.chunks_mut(num_tipos_pop))

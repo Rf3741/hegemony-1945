@@ -30,6 +30,13 @@ pub struct MercadoGlobal {
     pub preco_mundial: Vec<f64>,
     pub oferta_mundial: Vec<f64>,
     pub demanda_mundial: Vec<f64>,
+    /// Índices dos bens comercializáveis (ordem do catálogo): evita varrer bens não
+    /// comercializáveis na arbitragem de preços a cada tick.
+    #[serde(default)]
+    pub bens_comercializaveis: Vec<usize>,
+    /// Limites (mínimo, máximo) de preço por bem, pré-calculados a partir do catálogo e config.
+    #[serde(default)]
+    pub limites_preco: Vec<(f64, f64)>,
     /// Histórico diário do preço mundial por bem (mais antigo primeiro).
     pub historico_mundial: Vec<VecDeque<f32>>,
     /// Índice do mercado acompanhado (o do jogador) no histórico nacional.
@@ -44,11 +51,24 @@ impl MercadoGlobal {
     /// Inicializa o preço mundial como média dos preços dos mercados, ponderada pelo volume.
     pub fn novo(mundo: &MundoEconomico) -> Self {
         let n = mundo.catalogo.bens.len();
+        let mut bens_comercializaveis = Vec::with_capacity(n);
+        let mut limites_preco = Vec::with_capacity(n);
+        for (b, bem) in mundo.catalogo.bens.iter().enumerate() {
+            if bem.comercializavel {
+                bens_comercializaveis.push(b);
+            }
+            limites_preco.push((
+                bem.preco_base * mundo.config.multiplicador_preco_minimo,
+                bem.preco_base * mundo.config.multiplicador_preco_maximo,
+            ));
+        }
         let mut g = Self {
             config: ConfigMercadoGlobal::default(),
             preco_mundial: vec![0.0; n],
             oferta_mundial: vec![0.0; n],
             demanda_mundial: vec![0.0; n],
+            bens_comercializaveis,
+            limites_preco,
             historico_mundial: vec![VecDeque::new(); n],
             mercado_acompanhado: None,
             historico_nacional: vec![VecDeque::new(); n],
@@ -283,8 +303,8 @@ impl MundoEconomico {
             };
             let ant = global.preco_mundial[b];
             let novo = (ant + cfg.suavizacao_mundial * (alvo - ant)).clamp(
-                bem.preco_base * self.config.multiplicador_preco_minimo,
-                bem.preco_base * self.config.multiplicador_preco_maximo,
+                global.limites_preco[b].0,
+                global.limites_preco[b].1,
             );
             global.preco_mundial[b] = if novo.is_finite() { novo } else { bem.preco_base };
         }
@@ -292,15 +312,11 @@ impl MundoEconomico {
         // Arbitragem: o preço mundial puxa os preços nacionais proporcionalmente à abertura comercial.
         for m_idx in 0..self.mercados.len() {
             let k = cfg.forca_arbitragem * self.abertura_comercial_mercado(m_idx);
-            for b in 0..n {
-                let bem = &self.catalogo.bens[b];
-                if !bem.comercializavel {
-                    continue;
-                }
+            for &b in &global.bens_comercializaveis {
                 let p = self.mercados[m_idx].precos_idx[b];
                 let novo = (p + k * (global.preco_mundial[b] - p)).clamp(
-                    bem.preco_base * self.config.multiplicador_preco_minimo,
-                    bem.preco_base * self.config.multiplicador_preco_maximo,
+                    global.limites_preco[b].0,
+                    global.limites_preco[b].1,
                 );
                 self.mercados[m_idx].precos_idx[b] = novo;
             }
