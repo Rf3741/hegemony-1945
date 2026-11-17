@@ -13,7 +13,9 @@ pub const BONUS_CADEIA_MAX: f64 = 0.20;
 pub const PESO_OUTROS_ESTADOS: f64 = 0.25;
 
 /// Insumos (índice do bem, peso por valor) do método padrão de cada tipo industrial.
-fn insumos_por_tipo(cat: &CatalogoEconomia) -> Vec<Vec<(usize, f64)>> {
+/// Depende apenas do catálogo (estático da partida): pré-calcular uma vez e reutilizar a cada tick,
+/// evitando alocações e buscas lineares no caminho quente de `atualizar_indices_estados`.
+pub(crate) fn insumos_por_tipo(cat: &CatalogoEconomia) -> Vec<Vec<(usize, f64)>> {
     cat.tipos_predio
         .iter()
         .map(|t| {
@@ -39,7 +41,13 @@ fn insumos_por_tipo(cat: &CatalogoEconomia) -> Vec<Vec<(usize, f64)>> {
 }
 
 /// Recalcula os índices de todos os estados a partir do último tick de produção.
-pub(crate) fn atualizar_indices_estados(cat: &CatalogoEconomia, estados: &mut [Estado], provincias: &[Provincia]) {
+/// `insumos_por_tipo` é o vetor pré-calculado em `MundoEconomico::novo` (catálogo estático).
+pub(crate) fn atualizar_indices_estados(
+    cat: &CatalogoEconomia,
+    estados: &mut [Estado],
+    provincias: &[Provincia],
+    insumos_por_tipo: &[Vec<(usize, f64)>],
+) {
     let (nt, nb) = (cat.tipos_predio.len(), cat.bens.len());
     let n_paises = estados.iter().map(|e| e.pais_idx + 1).max().unwrap_or(0);
     for e in estados.iter_mut() {
@@ -78,7 +86,7 @@ pub(crate) fn atualizar_indices_estados(cat: &CatalogoEconomia, estados: &mut [E
             dem_pais[e.pais_idx * nb + g] += dem[ei * nb + g];
         }
     }
-    let insumos = insumos_por_tipo(cat);
+    let insumos = insumos_por_tipo;
     for (ei, e) in estados.iter_mut().enumerate() {
         let pi = e.pais_idx;
         for (ti, ins) in insumos.iter().enumerate() {

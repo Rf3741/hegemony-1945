@@ -38,6 +38,7 @@ pub(crate) fn executar_producao_diaria(
     infra_usada_estado: &mut [f64],
     pop_incorporada_pais: &mut [f64],
     recalcular_infra: bool,
+    insumos_cadeia_por_tipo: &[Vec<(usize, f64)>],
 ) {
     let num_bens = catalogo.bens.len();
     proxima_oferta.fill(0.0);
@@ -281,7 +282,7 @@ pub(crate) fn executar_producao_diaria(
     });
 
     // 2c. Índices por estado (níveis por tipo, produção local, bônus de cadeia) para o próximo tick e para a IA/UI.
-    crate::motor::cadeia::atualizar_indices_estados(catalogo, estados, provincias);
+    crate::motor::cadeia::atualizar_indices_estados(catalogo, estados, provincias, insumos_cadeia_por_tipo);
 
     // 3. Consolidar acesso ao mercado por Estado
     for (e_idx, est) in estados.iter_mut().enumerate() {

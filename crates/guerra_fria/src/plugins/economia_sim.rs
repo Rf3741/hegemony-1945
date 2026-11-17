@@ -298,14 +298,14 @@ impl Nucleo {
 
     pub fn avancar(&mut self, dias: u32) -> usize {
         let mut obras = 0;
+        let ignorar: Vec<String> = if self.jogador_eh_ia {
+            Vec::new()
+        } else {
+            self.jogador.iter().cloned().collect()
+        };
         for _ in 0..dias {
             let rel = self.mundo.executar_tick_diario();
             obras += rel.obras_concluidas;
-            let ignorar: Vec<String> = if self.jogador_eh_ia {
-                Vec::new()
-            } else {
-                self.jogador.iter().cloned().collect()
-            };
             self.ia.passo_diario(&mut self.mundo, &ignorar);
             self.mundo.atualizar_mercado_global(&mut self.global);
         }

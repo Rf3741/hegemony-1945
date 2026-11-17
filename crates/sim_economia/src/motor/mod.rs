@@ -107,6 +107,10 @@ pub struct MundoEconomico {
     pub(crate) turismo: turismo::EstadoTurismo,
     /// Ciclos históricos de demanda, tecnologia e choques de recursos.
     pub(crate) ciclos_demanda: ciclos_demanda::EstadoCiclosDemanda,
+    /// Insumos do método padrão de cada tipo industrial (índice do bem, peso por valor),
+    /// pré-calculados uma vez a partir do catálogo estático e reutilizados por tick em
+    /// `cadeia::atualizar_indices_estados` (evita alocações e buscas lineares no caminho quente).
+    insumos_cadeia_por_tipo: Vec<Vec<(usize, f64)>>,
 }
 
 impl MundoEconomico {
@@ -672,6 +676,9 @@ impl MundoEconomico {
         let num_estados = cenario.estados.len();
         let num_provincias = cenario.provincias.len();
         let bens_alimento_basico = listar_bens_alimento_basico(&catalogo);
+        // Catálogo estático: insumos de cadeia por tipo de prédio calculados uma vez e reutilizados
+        // a cada tick (evita alocações e buscas lineares no caminho quente de atualizar_indices_estados).
+        let insumos_cadeia_por_tipo = cadeia::insumos_por_tipo(&catalogo);
 
         let buffers = BuffersTick {
             proxima_oferta: vec![0.0; num_mercados * num_bens],
@@ -786,6 +793,7 @@ impl MundoEconomico {
             nomes_religioes,
             bens_alimento_basico,
             buffers,
+            insumos_cadeia_por_tipo,
         })
     }
 
@@ -842,6 +850,7 @@ impl MundoEconomico {
             &mut self.buffers.infra_usada_estado,
             &mut self.buffers.pop_incorporada_pais,
             recalcular_infra,
+            &self.insumos_cadeia_por_tipo,
         );
         self.ciclos_demanda.aplicar_demanda_industrial_era(
             &self.catalogo,
@@ -1099,6 +1108,7 @@ impl MundoEconomico {
             &mut self.buffers.infra_usada_estado,
             &mut self.buffers.pop_incorporada_pais,
             recalcular_infra,
+            &self.insumos_cadeia_por_tipo,
         );
         self.ciclos_demanda.aplicar_demanda_industrial_era(
             &self.catalogo,
