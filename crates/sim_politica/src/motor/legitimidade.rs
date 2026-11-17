@@ -176,10 +176,12 @@ pub fn calcular_legitimidade_governo(pais: &mut PaisPolitica, catalogo: &Catalog
         .filter(|lei| pais.leis_ativas.values().any(|v| v == *lei))
         .count();
     if num_leis_democraticas >= 4 {
-        // Cada lei democrática fundamental adiciona até 5 pontos, com teto em 30.
-        // Requer pelo menos 4 das 6 leis para ativar (democracia consolidada).
         let bonus_institucional = (num_leis_democraticas as f64 * 5.0).min(30.0);
         pontos += bonus_institucional;
+    }
+
+    if num_leis_democraticas >= 4 && pontos < 55.0 {
+        pontos = 55.0;
     }
 
     // Normaliza para o intervalo 0..=100
